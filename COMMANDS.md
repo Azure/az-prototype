@@ -24,6 +24,9 @@ Analysis commands let you diagnose errors and estimate costs at any point.
 | [az prototype design](#az-prototype-design) | Analyze requirements and generate architecture design. | Preview |
 | [az prototype build](#az-prototype-build) | Generate infrastructure and application code in staged output. | Preview |
 | [az prototype deploy](#az-prototype-deploy) | Deploy prototype to Azure with staged, incremental deployments. | Preview |
+| [az prototype deploy outputs](#az-prototype-deploy-outputs) | Show captured deployment outputs. | Preview |
+| [az prototype deploy rollback-info](#az-prototype-deploy-rollback-info) | Show rollback instructions based on deployment history. | Preview |
+| [az prototype deploy generate-scripts](#az-prototype-deploy-generate-scripts) | Generate deploy scripts for application directories. | Preview |
 | [az prototype status](#az-prototype-status) | Show current project status across all stages. | Preview |
 | [az prototype analyze](#az-prototype-analyze) | Analyze errors, costs, and diagnostics for the prototype. | Preview |
 | [az prototype analyze error](#az-prototype-analyze-error) | Analyze an error and get a fix with redeployment instructions. | Preview |
@@ -31,17 +34,23 @@ Analysis commands let you diagnose errors and estimate costs at any point.
 | [az prototype config](#az-prototype-config) | Manage prototype project configuration. | Preview |
 | [az prototype config init](#az-prototype-config-init) | Interactive setup to create a prototype.yaml configuration file. | Preview |
 | [az prototype config show](#az-prototype-config-show) | Display current project configuration. | Preview |
+| [az prototype config get](#az-prototype-config-get) | Get a single configuration value. | Preview |
 | [az prototype config set](#az-prototype-config-set) | Set a configuration value. | Preview |
 | [az prototype generate](#az-prototype-generate) | Generate documentation, spec-kit artifacts, and backlogs. | Preview |
 | [az prototype generate backlog](#az-prototype-generate-backlog) | Generate a backlog of user stories or issues from the architecture. | Preview |
 | [az prototype generate docs](#az-prototype-generate-docs) | Generate documentation from templates. | Preview |
 | [az prototype generate speckit](#az-prototype-generate-speckit) | Generate the spec-kit documentation bundle. | Preview |
+| [az prototype knowledge](#az-prototype-knowledge) | Manage knowledge base contributions. | Preview |
+| [az prototype knowledge contribute](#az-prototype-knowledge-contribute) | Submit a knowledge base contribution as a GitHub Issue. | Preview |
 | [az prototype agent](#az-prototype-agent) | Manage AI agents for prototype generation. | Preview |
 | [az prototype agent list](#az-prototype-agent-list) | List all available agents (built-in and custom). | Preview |
 | [az prototype agent add](#az-prototype-agent-add) | Add a custom agent to the project. | Preview |
 | [az prototype agent override](#az-prototype-agent-override) | Override a built-in agent with a custom definition. | Preview |
 | [az prototype agent show](#az-prototype-agent-show) | Show details of a specific agent. | Preview |
-| [az prototype agent remove](#az-prototype-agent-remove) | Remove a custom agent. | Preview |
+| [az prototype agent remove](#az-prototype-agent-remove) | Remove a custom agent or override. | Preview |
+| [az prototype agent update](#az-prototype-agent-update) | Update an existing custom agent's properties. | Preview |
+| [az prototype agent test](#az-prototype-agent-test) | Send a test prompt to any agent. | Preview |
+| [az prototype agent export](#az-prototype-agent-export) | Export an agent as a YAML file. | Preview |
 
 ---
 
@@ -49,13 +58,17 @@ Analysis commands let you diagnose errors and estimate costs at any point.
 
 Initialize a new prototype project.
 
-Sets up project scaffolding, authenticates with GitHub (validates Copilot license), and creates the project configuration file.
+Sets up project scaffolding, creates the project configuration file, and optionally authenticates with GitHub (validates Copilot license). GitHub authentication is only required for the `copilot` and `github-models` AI providers. When using `azure-openai`, GitHub auth is skipped entirely.
+
+If the target directory already contains a `prototype.yaml`, the command will prompt before overwriting.
 
 ```
 az prototype init --name
                   --location
                   [--iac-tool {bicep, terraform}]
                   [--ai-provider {azure-openai, copilot, github-models}]
+                  [--environment {dev, staging, prod}]
+                  [--model]
                   [--output-dir]
                   [--template]
 ```
@@ -74,10 +87,16 @@ Initialize with Bicep preference.
 az prototype init --name my-app --location westus2 --iac-tool bicep
 ```
 
-Use Azure OpenAI instead of GitHub Models.
+Use Azure OpenAI (skips GitHub auth).
 
 ```
 az prototype init --name my-app --location eastus --ai-provider azure-openai
+```
+
+Specify environment and model.
+
+```
+az prototype init --name my-app --location eastus --environment staging --model gpt-4o
 ```
 
 ### Required Parameters
@@ -103,12 +122,25 @@ Infrastructure-as-code tool preference.
 
 `--ai-provider`
 
-AI provider for agent interactions.
+AI provider for agent interactions. When set to `azure-openai`, GitHub authentication is skipped.
 
 | | |
 |---|---|
-| Default value: | `github-models` |
+| Default value: | `copilot` |
 | Accepted values: | `azure-openai`, `copilot`, `github-models` |
+
+`--environment`
+
+Target environment for the prototype.
+
+| | |
+|---|---|
+| Default value: | `dev` |
+| Accepted values: | `dev`, `staging`, `prod` |
+
+`--model`
+
+AI model to use. If not specified, defaults to `claude-sonnet-4.5` for the copilot provider and `gpt-4o` for others.
 
 `--output-dir`
 
@@ -154,7 +186,9 @@ This stage is re-entrant — run it again to refine the design.
 ```
 az prototype design [--artifacts]
                     [--context]
+                    [--interactive]
                     [--reset]
+                    [--status]
 ```
 
 ### Examples
@@ -183,6 +217,12 @@ Reset and start design fresh.
 az prototype design --reset
 ```
 
+Show current discovery status without starting a session.
+
+```
+az prototype design --status
+```
+
 ### Optional Parameters
 
 `--artifacts`
@@ -193,9 +233,25 @@ Path to directory containing requirement documents, diagrams, or other artifacts
 
 Additional context or requirements as free text.
 
+`--interactive` `-i`
+
+Enter an interactive refinement loop after architecture generation.
+
+| | |
+|---|---|
+| Default value: | `False` |
+
 `--reset`
 
 Reset design state and start fresh.
+
+| | |
+|---|---|
+| Default value: | `False` |
+
+`--status` `-s`
+
+Show current discovery status (open items, confirmed items) without starting a session. Useful for checking progress before resuming.
 
 | | |
 |---|---|
@@ -209,19 +265,42 @@ Generate infrastructure and application code in staged output.
 
 Uses the architecture design to generate Terraform/Bicep modules, application code, database scripts, and documentation.
 
-All output is organized into deployment stages based on dependency analysis. Use `az prototype deploy --plan-only` to see the stage breakdown before deploying.
+**Interactive by default** — the build session uses Claude Code-inspired bordered prompts, progress indicators, policy enforcement, and a conversational review loop. All output is organized into fine-grained, dependency-ordered deployment stages. Each infrastructure component, database system, and application gets its own stage.
+
+Workload templates are used as optional starting points when they match the design. After generation, a build report shows what was built and you can provide feedback to regenerate specific stages. Type `done` to accept the build.
+
+**Slash commands during build:**
+- `/status` — Show stage completion summary
+- `/stages` — Show full deployment plan
+- `/files` — List all generated files
+- `/policy` — Show policy check summary
+- `/help` — Show available commands
 
 ```
 az prototype build [--scope {all, apps, db, docs, infra}]
                    [--dry-run]
+                   [--status]
+                   [--reset]
 ```
 
 ### Examples
 
-Build everything (staged).
+Interactive build session (default).
 
 ```
 az prototype build
+```
+
+Show current build progress.
+
+```
+az prototype build --status
+```
+
+Clear build state and start fresh.
+
+```
+az prototype build --reset
 ```
 
 Build only infrastructure code.
@@ -255,75 +334,139 @@ Preview what would be generated without writing files.
 |---|---|
 | Default value: | `False` |
 
+`--status` / `-s`
+
+Show current build progress without starting a session.
+
+| | |
+|---|---|
+| Default value: | `False` |
+
+`--reset`
+
+Clear existing build state and start fresh.
+
+| | |
+|---|---|
+| Default value: | `False` |
+
 ---
 
 ## az prototype deploy
 
-Deploy prototype to Azure with staged, incremental deployments.
+Deploy prototype to Azure with an interactive deployment session.
 
-Deploys infrastructure and applications to Azure. Supports staged deployments — use `--plan-only` to see stages, then `--stage N` to deploy a specific stage. Tracks changes so subsequent deployments only push what has changed.
+Launches an interactive session that deploys infrastructure and applications to Azure in the staged order defined by `az prototype build`. Runs preflight checks (subscription, IaC tool, resource group, resource providers), then deploys each stage sequentially with real-time output. Supports rollback, per-stage what-if previews, and QA-first error routing.
+
+Use `--dry-run` for what-if/plan preview without deploying. Use `--stage N` to deploy a single stage non-interactively. Use `--status` to view current deployment state.
 
 ```
-az prototype deploy [--scope {all, apps, infra}]
-                    [--stage]
+az prototype deploy [--stage]
                     [--force]
-                    [--plan-only]
+                    [--dry-run]
+                    [--status]
+                    [--reset]
                     [--subscription]
                     [--resource-group]
 ```
 
 ### Examples
 
-Deploy everything (all stages, incremental).
+Start interactive deployment session with preflight checks.
 
 ```
 az prototype deploy
 ```
 
-View deployment plan with stage breakdown.
+Preview what-if/plan for all stages without deploying.
 
 ```
-az prototype deploy --plan-only
+az prototype deploy --dry-run
 ```
 
-View plan for apps only.
+Preview what-if/plan for stage 2 only.
 
 ```
-az prototype deploy --scope apps --plan-only
+az prototype deploy --stage 2 --dry-run
 ```
 
-Deploy only stage 1 of infrastructure.
+Deploy only stage 1 (non-interactive).
 
 ```
-az prototype deploy --scope infra --stage 1
+az prototype deploy --stage 1
 ```
 
-Deploy only stage 2 of apps.
+View current deployment status across all stages.
 
 ```
-az prototype deploy --scope apps --stage 2
+az prototype deploy --status
 ```
 
-Force full redeployment.
+Reset deployment state to start over.
+
+```
+az prototype deploy --reset
+```
+
+Force full redeployment, ignoring change tracking.
 
 ```
 az prototype deploy --force
 ```
 
+Deploy to a specific subscription and resource group.
+
+```
+az prototype deploy --subscription abc-123 --resource-group my-rg
+```
+
+### Interactive Session
+
+The default mode launches an interactive session with 7 phases:
+
+1. **Load build state** — imports deployment stages from build output
+2. **Plan overview** — displays stage status, confirms proceeding
+3. **Preflight** — checks subscription, IaC tool, resource group, resource providers
+4. **Stage-by-stage deploy** — executes each pending stage with real-time output
+5. **Output capture** — captures Terraform/Bicep outputs after infra stages
+6. **Deploy report** — summarizes deployment results
+7. **Interactive loop** — slash commands for status, rollback, redeploy, etc.
+
+### Slash Commands
+
+During the interactive session, the following commands are available:
+
+| Command | Description |
+|---------|-------------|
+| `/status` | Show deployment status for all stages |
+| `/stages` | Alias for `/status` |
+| `/deploy [N\|all]` | Deploy a specific stage or all pending stages |
+| `/rollback [N\|all]` | Roll back a deployed stage (reverse order enforced) |
+| `/redeploy N` | Roll back and redeploy a specific stage |
+| `/plan N` | Show what-if/terraform plan for a stage |
+| `/outputs` | Display captured deployment outputs |
+| `/preflight` | Re-run preflight checks |
+| `/help` | Show available commands |
+
+Type `q`, `quit`, or `exit` to end the session. Type `done` or `finish` to finalize.
+
+### Rollback
+
+Rollback enforces reverse deployment order — you cannot roll back stage N while a higher-numbered stage (N+1, N+2, ...) is still deployed. Use `/rollback all` to roll back all deployed stages in the correct order.
+
+### Preflight Checks
+
+Before deploying, the session validates:
+- Azure subscription is set and accessible
+- IaC tool (Terraform or Bicep) is installed
+- Target resource group exists (offers fix command if missing)
+- Required Azure resource providers are registered
+
 ### Optional Parameters
-
-`--scope`
-
-What to deploy.
-
-| | |
-|---|---|
-| Default value: | `all` |
-| Accepted values: | `all`, `apps`, `infra` |
 
 `--stage`
 
-Deploy only a specific stage number. Use `--plan-only` to see available stages before deploying.
+Deploy or preview a specific stage number. Without `--dry-run`, deploys the stage non-interactively. With `--dry-run`, shows what-if/plan for that stage only.
 
 | | |
 |---|---|
@@ -337,9 +480,25 @@ Force full deployment, ignoring change tracking.
 |---|---|
 | Default value: | `False` |
 
-`--plan-only`
+`--dry-run`
 
-Show deployment plan with stage breakdown without executing.
+Show what-if/terraform plan preview without executing any deployments.
+
+| | |
+|---|---|
+| Default value: | `False` |
+
+`--status` `-s`
+
+Display current deployment state across all stages and exit.
+
+| | |
+|---|---|
+| Default value: | `False` |
+
+`--reset`
+
+Clear all deployment state and start fresh.
 
 | | |
 |---|---|
@@ -353,15 +512,182 @@ Azure subscription ID to deploy to.
 
 Target resource group name.
 
+### Subcommands
+
+| Command | Description |
+|---|---|
+| [az prototype deploy outputs](#az-prototype-deploy-outputs) | Show captured deployment outputs. |
+| [az prototype deploy rollback-info](#az-prototype-deploy-rollback-info) | Show rollback instructions based on deployment history. |
+| [az prototype deploy generate-scripts](#az-prototype-deploy-generate-scripts) | Generate deploy scripts for application directories. |
+
+---
+
+## az prototype deploy outputs
+
+Show captured deployment outputs.
+
+After infrastructure is deployed (Terraform / Bicep), the outputs are captured so that app deploy scripts can reference them. Displays all captured outputs from the most recent deployment.
+
+```
+az prototype deploy outputs
+```
+
+### Examples
+
+Show deployment outputs.
+
+```
+az prototype deploy outputs
+```
+
+---
+
+## az prototype deploy rollback-info
+
+Show rollback instructions based on deployment history.
+
+Displays the last deployment snapshot and generated rollback instructions. Use this to understand what would happen if you roll back.
+
+```
+az prototype deploy rollback-info
+```
+
+### Examples
+
+View rollback instructions.
+
+```
+az prototype deploy rollback-info
+```
+
+---
+
+## az prototype deploy generate-scripts
+
+Generate deploy scripts for application directories.
+
+Scans `./concept/apps/` for sub-directories and generates a `deploy.sh` in each one, tailored to the chosen deployment target (webapp, container app, or function).
+
+```
+az prototype deploy generate-scripts [--scope {apps}]
+                                      [--deploy-type {container_app, function, webapp}]
+                                      [--resource-group]
+                                      [--registry]
+```
+
+### Examples
+
+Generate webapp deploy scripts (default).
+
+```
+az prototype deploy generate-scripts
+```
+
+Generate container app deploy scripts with registry.
+
+```
+az prototype deploy generate-scripts --deploy-type container_app --registry myregistry.azurecr.io
+```
+
+Generate function deploy scripts for a specific resource group.
+
+```
+az prototype deploy generate-scripts --deploy-type function --resource-group my-rg
+```
+
+### Optional Parameters
+
+`--scope`
+
+Scope for script generation.
+
+| | |
+|---|---|
+| Default value: | `apps` |
+| Accepted values: | `apps` |
+
+`--deploy-type`
+
+Azure deployment target type.
+
+| | |
+|---|---|
+| Default value: | `webapp` |
+| Accepted values: | `container_app`, `function`, `webapp` |
+
+`--resource-group`
+
+Default resource group name for generated scripts.
+
+`--registry`
+
+Container registry URL (for `container_app` type).
+
 ---
 
 ## az prototype status
 
 Show current project status across all stages.
 
+Displays a layered summary of the prototype project including configuration, stage progress (design, build, deploy), and pending file changes. By default shows a human-readable Rich console summary. Use `--json` for machine-readable output suitable for scripting. Use `--verbose` for expanded per-stage details.
+
+The command reads state from all three stage files (`discovery.yaml`, `build.yaml`, `deploy.yaml`) to show real progress — not just boolean completion flags.
+
+```
+az prototype status [--verbose]
+                    [--json]
+```
+
+### Examples
+
+Show project status.
+
 ```
 az prototype status
 ```
+
+Show detailed status with per-stage breakdown.
+
+```
+az prototype status --verbose
+```
+
+Get machine-readable JSON output.
+
+```
+az prototype status --json
+```
+
+### Default Output
+
+```
+Project: my-prototype (eastus, dev)
+IaC: terraform | AI: copilot | Naming: microsoft-caf
+
+  Design   [v] Complete (8 exchanges, 12 confirmed, 0 open)
+  Build    [v] Complete (5/5 stages accepted, 23 files, 1 policy override)
+  Deploy   [~] In Progress (3/5 deployed, 1 failed, 0 rolled back)
+
+  3 file(s) changed since last deployment
+```
+
+### Optional Parameters
+
+`--verbose` `-v`
+
+Show expanded per-stage details: discovery open/confirmed items, build stage breakdown, deploy stage status, and deployment history.
+
+| | |
+|---|---|
+| Default value: | `False` |
+
+`--json` `-j`
+
+Output machine-readable JSON instead of formatted display. Returns an enriched dict with all stage details, deployment history, and project metadata.
+
+| | |
+|---|---|
+| Default value: | `False` |
 
 ---
 
@@ -426,8 +752,11 @@ Estimate Azure costs at Small/Medium/Large t-shirt sizes.
 
 Analyzes the current architecture design, queries Azure Retail Prices API for each component, and produces a cost report with estimates at three consumption tiers.
 
+Results are cached in `.prototype/state/cost_analysis.yaml`. Re-running the command returns the cached result unless the design context has changed. Use `--refresh` to force a fresh analysis.
+
 ```
 az prototype analyze costs [--output-format {json, markdown, table}]
+                            [--refresh]
 ```
 
 ### Examples
@@ -444,6 +773,12 @@ Get costs in JSON format.
 az prototype analyze costs --output-format json
 ```
 
+Force fresh analysis (bypass cache).
+
+```
+az prototype analyze costs --refresh
+```
+
 ### Optional Parameters
 
 `--output-format`
@@ -454,6 +789,14 @@ Output format for the cost report.
 |---|---|
 | Default value: | `markdown` |
 | Accepted values: | `json`, `markdown`, `table` |
+
+`--refresh`
+
+Force fresh analysis, bypassing cached results.
+
+| | |
+|---|---|
+| Default value: | `False` |
 
 ---
 
@@ -467,6 +810,7 @@ Manage prototype project configuration.
 |---|---|
 | [az prototype config init](#az-prototype-config-init) | Interactive setup to create a prototype.yaml configuration file. |
 | [az prototype config show](#az-prototype-config-show) | Display current project configuration. |
+| [az prototype config get](#az-prototype-config-get) | Get a single configuration value. |
 | [az prototype config set](#az-prototype-config-set) | Set a configuration value. |
 
 ---
@@ -535,11 +879,47 @@ az prototype config set --key naming.zone_id --value zp
 
 ## az prototype config show
 
-Display current project configuration.
+Display current project configuration. Secret values (API keys, subscription IDs, tokens) stored in `prototype.secrets.yaml` are masked as `***` in the output.
 
 ```
 az prototype config show
 ```
+
+---
+
+## az prototype config get
+
+Get a single configuration value by its dot-separated key path. Secret values are masked as `***`.
+
+```
+az prototype config get --key
+```
+
+### Examples
+
+Get the AI provider.
+
+```
+az prototype config get --key ai.provider
+```
+
+Get the project location.
+
+```
+az prototype config get --key project.location
+```
+
+Get the naming strategy.
+
+```
+az prototype config get --key naming.strategy
+```
+
+### Required Parameters
+
+`--key`
+
+Configuration key to retrieve (dot-separated path, e.g., `ai.provider`).
 
 ---
 
@@ -692,13 +1072,15 @@ Output directory for the spec-kit bundle.
 
 ## az prototype generate backlog
 
-Generate a backlog of user stories or issues from the architecture.
+Generate a backlog and push work items to GitHub or Azure DevOps.
 
-Analyzes the current architecture design and produces a structured backlog suitable for GitHub Issues or Azure DevOps work items. The project-manager agent decomposes the architecture into epics, user stories, tasks, and acceptance criteria.
+**Interactive by default** — generates a structured backlog from the architecture design and enters a conversational session where you can review, refine, add, update, and remove items before pushing them to your provider.
 
-**GitHub mode** creates issues with checkbox task lists (`- [ ]`) in the description body, grouped by epic with effort labels.
+**GitHub mode** creates issues with checkbox task lists (`- [ ]`) in the description body, grouped by epic with effort labels. Issues are created via the `gh` CLI.
 
-**Azure DevOps mode** creates User Story work items with associated Task work items, including area paths and remaining work estimates.
+**Azure DevOps mode** creates Features with User Stories and Tasks as child work items, including area paths and effort estimates. Work items are created via `az boards`.
+
+**Scope-aware**: in-scope items become stories, out-of-scope items are excluded, and deferred items get a separate "Deferred / Future Work" epic (scope from `az prototype design`).
 
 Each story/issue includes:
 - A descriptive title
@@ -707,21 +1089,43 @@ Each story/issue includes:
 - Actionable tasks
 - Effort estimate (S/M/L/XL)
 
-Backlog provider, org, and project can also be set persistently in `prototype.yaml` under the `backlog` section. Authentication tokens are stored in `prototype.secrets.yaml`.
+Backlog state is persisted in `.prototype/state/backlog.yaml` for re-entrant sessions. Provider, org, and project can be set persistently in `prototype.yaml` under the `backlog` section.
 
 ```
 az prototype generate backlog [--provider {devops, github}]
                               [--org]
                               [--project]
                               [--output-format {json, markdown, table}]
+                              [--quick]
+                              [--refresh]
+                              [--status]
+                              [--push]
 ```
 
 ### Examples
 
-Generate GitHub issues backlog.
+Interactive backlog session (default).
 
 ```
 az prototype generate backlog --provider github
+```
+
+Quick mode — generate, confirm, and push.
+
+```
+az prototype generate backlog --provider github --quick
+```
+
+Show current backlog status.
+
+```
+az prototype generate backlog --status
+```
+
+Force fresh generation (bypass cache).
+
+```
+az prototype generate backlog --refresh
 ```
 
 Generate Azure DevOps work items.
@@ -736,6 +1140,36 @@ Use defaults from prototype.yaml.
 az prototype generate backlog
 ```
 
+### Interactive Session
+
+The default mode launches an interactive session with these phases:
+
+1. **Load context** — loads design context, scope, and existing backlog state
+2. **Generate** — AI generates structured backlog items from architecture
+3. **Review/Refine loop** — conversational back-and-forth for modifications
+4. **Push** — creates work items in GitHub or Azure DevOps
+5. **Report** — displays links to created work items
+
+### Slash Commands
+
+During the interactive session:
+
+| Command | Description |
+|---------|-------------|
+| `/list` | Show all items grouped by epic |
+| `/show N` | Show item N with full details |
+| `/add` | Add a new item (AI-assisted) |
+| `/remove N` | Remove item N |
+| `/preview` | Show what will be pushed (provider-formatted) |
+| `/save` | Save to `concept/docs/BACKLOG.md` locally |
+| `/push` | Push all pending items to provider |
+| `/push N` | Push specific item N |
+| `/status` | Show push status per item |
+| `/help` | Show available commands |
+| `/quit` | Exit session |
+
+Type `done` or `finish` to end the session. Type `q`, `quit`, or `exit` to cancel.
+
 ### Optional Parameters
 
 `--provider`
@@ -744,7 +1178,6 @@ Backlog provider: `github` for GitHub Issues, `devops` for Azure DevOps work ite
 
 | | |
 |---|---|
-| Default value: | `github` |
 | Accepted values: | `devops`, `github` |
 
 `--org`
@@ -763,6 +1196,132 @@ Output format for the backlog.
 |---|---|
 | Default value: | `markdown` |
 | Accepted values: | `json`, `markdown`, `table` |
+
+`--quick`
+
+Skip interactive session — generate, confirm, and push.
+
+| | |
+|---|---|
+| Default value: | `False` |
+
+`--refresh`
+
+Force fresh AI generation, bypassing cached items.
+
+| | |
+|---|---|
+| Default value: | `False` |
+
+`--status` `-s`
+
+Show current backlog state without starting a session.
+
+| | |
+|---|---|
+| Default value: | `False` |
+
+`--push`
+
+In quick mode, auto-push after generation (without confirmation prompt).
+
+| | |
+|---|---|
+| Default value: | `False` |
+
+---
+
+## az prototype knowledge
+
+Manage knowledge base contributions.
+
+Submit knowledge contributions as GitHub Issues when patterns or pitfalls are discovered during QA diagnosis or manual testing. Contributions are reviewed and merged into the shared knowledge base so future sessions benefit from community findings.
+
+### Commands
+
+| Command | Description |
+|---|---|
+| [az prototype knowledge contribute](#az-prototype-knowledge-contribute) | Submit a knowledge base contribution as a GitHub Issue. |
+
+---
+
+## az prototype knowledge contribute
+
+Submit a knowledge base contribution as a GitHub Issue.
+
+Creates a structured GitHub Issue in the knowledge repository when a pattern, pitfall, or service gap is discovered. Interactive by default — walks through type, section, context, rationale, and content. Non-interactive when `--service` and `--description` are provided.
+
+Use `--draft` to preview the contribution without submitting (skips gh auth). Use `--file` to load contribution content from a file.
+
+```
+az prototype knowledge contribute [--service]
+                                   [--description]
+                                   [--file]
+                                   [--draft]
+                                   [--type]
+                                   [--section]
+```
+
+### Examples
+
+Interactive knowledge contribution.
+
+```
+az prototype knowledge contribute
+```
+
+Quick non-interactive contribution.
+
+```
+az prototype knowledge contribute --service cosmos-db --description "RU throughput must be >= 400"
+```
+
+Contribute from a file.
+
+```
+az prototype knowledge contribute --file ./finding.md
+```
+
+Preview without submitting.
+
+```
+az prototype knowledge contribute --service redis --description "Cache eviction pitfall" --draft
+```
+
+### Optional Parameters
+
+`--service`
+
+Azure service name (e.g., `cosmos-db`, `key-vault`).
+
+`--description`
+
+Brief description of the knowledge contribution.
+
+`--file`
+
+Path to a file containing the contribution content.
+
+`--draft`
+
+Preview the contribution without submitting.
+
+| | |
+|---|---|
+| Default value: | `False` |
+
+`--type`
+
+Type of knowledge contribution.
+
+| | |
+|---|---|
+| Default value: | `Pitfall` |
+| Accepted values: | `Service pattern update`, `New service`, `Tool pattern`, `Language pattern`, `Pitfall` |
+
+`--section`
+
+Target section within the knowledge file.
 
 ---
 
@@ -796,7 +1355,10 @@ Agent resolution order: **custom** → **override** → **built-in**.
 | [az prototype agent add](#az-prototype-agent-add) | Add a custom agent to the project. |
 | [az prototype agent override](#az-prototype-agent-override) | Override a built-in agent with a custom definition. |
 | [az prototype agent show](#az-prototype-agent-show) | Show details of a specific agent. |
-| [az prototype agent remove](#az-prototype-agent-remove) | Remove a custom agent. |
+| [az prototype agent remove](#az-prototype-agent-remove) | Remove a custom agent or override. |
+| [az prototype agent update](#az-prototype-agent-update) | Update an existing custom agent's properties. |
+| [az prototype agent test](#az-prototype-agent-test) | Send a test prompt to any agent. |
+| [az prototype agent export](#az-prototype-agent-export) | Export an agent as a YAML file. |
 
 ---
 
@@ -804,8 +1366,32 @@ Agent resolution order: **custom** → **override** → **built-in**.
 
 List all available agents (built-in and custom).
 
+Displays agents grouped by source (built-in, custom, override) with name, description, and capabilities. Use `--json` for machine-readable output. Use `--verbose` for expanded capability details.
+
 ```
 az prototype agent list [--show-builtin]
+                        [--verbose]
+                        [--json]
+```
+
+### Examples
+
+List all agents with formatted output.
+
+```
+az prototype agent list
+```
+
+Get machine-readable JSON output.
+
+```
+az prototype agent list --json
+```
+
+Show expanded details.
+
+```
+az prototype agent list --verbose
 ```
 
 ### Optional Parameters
@@ -818,19 +1404,31 @@ Include built-in agents in the listing.
 |---|---|
 | Default value: | `True` |
 
+`--verbose` `-v`
+
+Show expanded capability details for each agent.
+
+| | |
+|---|---|
+| Default value: | `False` |
+
+`--json` `-j`
+
+Output machine-readable JSON instead of formatted display.
+
+| | |
+|---|---|
+| Default value: | `False` |
+
 ---
 
 ## az prototype agent add
 
 Add a custom agent to the project.
 
-Creates a new custom agent definition in `.prototype/agents/` and registers it
-in the project configuration manifest.
+Creates a new custom agent definition in `.prototype/agents/` and registers it in the project configuration manifest.
 
-When neither `--file` nor `--definition` is provided, the built-in example
-template is used as the starting point. Use `--definition` to start from a
-specific built-in agent's YAML (e.g., `cloud_architect`, `bicep_agent`).
-Use `--file` to bring your own YAML or Python definition.
+**Interactive by default** — when neither `--file` nor `--definition` is provided, walks you through description, capabilities, constraints, system prompt, and optional few-shot examples. Non-interactive modes: `--definition` copies a built-in agent's YAML, `--file` uses your own definition.
 
 ```
 az prototype agent add --name
@@ -840,7 +1438,7 @@ az prototype agent add --name
 
 ### Examples
 
-Create a new agent from the example template.
+Interactive agent creation (default).
 
 ```
 az prototype agent add --name my-data-agent
@@ -881,7 +1479,7 @@ Name of a built-in definition to copy as a starting point (e.g., `cloud_architec
 
 Override a built-in agent with a custom definition.
 
-Replaces the behavior of a built-in agent with a custom implementation. The override is recorded in the project configuration.
+Replaces the behavior of a built-in agent with a custom implementation. The override is recorded in `prototype.yaml` and takes effect on the next command run. The override file is validated: must exist on disk, parse as valid YAML, and contain a `name` field. A warning is shown if the target name does not match a known built-in agent.
 
 ```
 az prototype agent override --name
@@ -912,8 +1510,32 @@ Path to YAML or Python agent definition file.
 
 Show details of a specific agent.
 
+Displays agent metadata including description, source, capabilities, constraints, and a preview of the system prompt. Use `--verbose` to show the full system prompt. Use `--json` for machine-readable output.
+
 ```
 az prototype agent show --name
+                        [--verbose]
+                        [--json]
+```
+
+### Examples
+
+Show agent details.
+
+```
+az prototype agent show --name cloud-architect
+```
+
+Show full system prompt.
+
+```
+az prototype agent show --name cloud-architect --verbose
+```
+
+Get JSON output.
+
+```
+az prototype agent show --name cloud-architect --json
 ```
 
 ### Required Parameters
@@ -922,16 +1544,48 @@ az prototype agent show --name
 
 Name of the agent to show details for.
 
+### Optional Parameters
+
+`--verbose` `-v`
+
+Show full system prompt instead of 200-char preview.
+
+| | |
+|---|---|
+| Default value: | `False` |
+
+`--json` `-j`
+
+Output machine-readable JSON instead of formatted display.
+
+| | |
+|---|---|
+| Default value: | `False` |
+
 ---
 
 ## az prototype agent remove
 
-Remove a custom agent.
+Remove a custom agent or override.
 
-Removes the agent definition from the project's `.prototype/agents/` directory and cleans up the project configuration manifest entry.
+Removes the agent definition from the project's `.prototype/agents/` directory and cleans up the project configuration manifest entry. Can also remove overrides, restoring the built-in agent behavior. Built-in agents cannot be removed.
 
 ```
 az prototype agent remove --name
+```
+
+### Examples
+
+Remove a custom agent.
+
+```
+az prototype agent remove --name my-data-agent
+```
+
+Remove an override (restores built-in).
+
+```
+az prototype agent remove --name cloud-architect
 ```
 
 ### Required Parameters
@@ -942,78 +1596,142 @@ Name of the custom agent to remove.
 
 ---
 
-## Governance Policies
+## az prototype agent update
 
-The extension ships with built-in governance policies that are automatically
-injected into agent prompts. Policies define rules, patterns, and anti-patterns
-that agents MUST or SHOULD follow when generating infrastructure and application code.
+Update an existing custom agent's properties.
 
-### Built-in Policies
+**Interactive by default** — walks through the same prompts as `agent add` with current values as defaults. Press Enter to keep existing values. Providing any field flag (`--description`, `--capabilities`, `--system-prompt-file`) switches to non-interactive mode and only changes the specified fields. Only custom YAML agents can be updated.
 
-| Policy | Category | Services | Rules |
-|---|---|---|---|
-| `container-apps` | azure | container-apps, container-registry | CA-001 through CA-004 |
-| `key-vault` | azure | key-vault | KV-001 through KV-005 |
-| `sql-database` | azure | sql-database | SQL-001 through SQL-005 |
-| `cosmos-db` | azure | cosmos-db | CDB-001 through CDB-004 |
-| `managed-identity` | security | all compute + data services | MI-001 through MI-004 |
-| `network-isolation` | security | all PaaS services | NET-001 through NET-004 |
-| `apim-to-container-apps` | integration | api-management, container-apps | INT-001 through INT-004 |
-
-### Custom Policies
-
-Add `.policy.yaml` files to `.prototype/policies/` in your project to extend
-or override built-in policies. Use the same schema as the built-in files.
-
-### Policy Schema
-
-```yaml
-apiVersion: v1
-kind: policy
-metadata:
-  name: my-service
-  category: azure | security | integration | cost | data
-  services: [service-name-1, service-name-2]
-  last_reviewed: "2025-01-01"
-
-rules:
-  - id: XX-001
-    severity: required | recommended | optional
-    description: "What to do"
-    rationale: "Why"
-    applies_to: [cloud-architect, terraform, bicep, app-developer]
-
-patterns:
-  - name: "Pattern name"
-    description: "When to use it"
-    example: |
-      code example here
-
-anti_patterns:
-  - description: "What NOT to do"
-    instead: "What to do instead"
-
-references:
-  - title: "Doc title"
-    url: "https://..."
+```
+az prototype agent update --name
+                          [--description]
+                          [--capabilities]
+                          [--system-prompt-file]
 ```
 
-### Severity Levels
+### Examples
 
-| Level | Prompt keyword | Meaning |
-|---|---|---|
-| `required` | **MUST** | Agent must follow; violation is a defect |
-| `recommended` | **SHOULD** | Agent should follow unless there is a justified reason |
-| `optional` | **MAY** | Best practice; agent may skip if not relevant |
+Interactive update with current values as defaults.
 
-### Validation
+```
+az prototype agent update --name my-agent
+```
 
-Policy files are validated automatically:
+Update only the description.
 
-- **Pre-commit hook**: Install with `python scripts/install-hooks.py` or `pre-commit install`
-- **CI pipeline**: Runs `python -m azext_prototype.policies.validate --strict` on every push
-- **Release pipeline**: Validates before building the wheel
-- **Manual**: `python -m azext_prototype.policies.validate --dir azext_prototype/policies/`
+```
+az prototype agent update --name my-agent --description "New description"
+```
+
+Update capabilities.
+
+```
+az prototype agent update --name my-agent --capabilities "architect,deploy"
+```
+
+Update system prompt from file.
+
+```
+az prototype agent update --name my-agent --system-prompt-file ./new-prompt.txt
+```
+
+### Required Parameters
+
+`--name`
+
+Name of the custom agent to update.
+
+### Optional Parameters
+
+`--description`
+
+New description for the agent.
+
+`--capabilities`
+
+Comma-separated list of capabilities (e.g., `architect,deploy`).
+
+`--system-prompt-file`
+
+Path to a text file containing the new system prompt.
+
+---
+
+## az prototype agent test
+
+Send a test prompt to any agent and display the response.
+
+Sends a prompt to the specified agent using the configured AI provider and displays the response with model and token count. Useful for validating agent behavior after creation or update. Requires a configured AI provider.
+
+```
+az prototype agent test --name
+                        [--prompt]
+```
+
+### Examples
+
+Test with default prompt.
+
+```
+az prototype agent test --name cloud-architect
+```
+
+Test with custom prompt.
+
+```
+az prototype agent test --name my-agent --prompt "Design a web app with Redis caching"
+```
+
+### Required Parameters
+
+`--name`
+
+Name of the agent to test.
+
+### Optional Parameters
+
+`--prompt`
+
+Test prompt to send to the agent. Defaults to "Briefly introduce yourself and describe your capabilities."
+
+---
+
+## az prototype agent export
+
+Export any agent (including built-in) as a YAML file.
+
+Exports the agent's metadata, system prompt, capabilities, constraints, and examples as a portable YAML file. The exported file can be shared with other projects or loaded via `agent add --file`.
+
+```
+az prototype agent export --name
+                          [--output]
+```
+
+### Examples
+
+Export a built-in agent.
+
+```
+az prototype agent export --name cloud-architect
+```
+
+Export to a specific path.
+
+```
+az prototype agent export --name qa-engineer --output ./agents/qa.yaml
+```
+
+### Required Parameters
+
+`--name`
+
+Name of the agent to export.
+
+### Optional Parameters
+
+`--output`
+
+Output file path for the exported YAML. Defaults to `./<name>.yaml`.
 
 ---
 
