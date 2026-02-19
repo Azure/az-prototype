@@ -188,6 +188,7 @@ az prototype design [--artifacts]
                     [--context]
                     [--interactive]
                     [--reset]
+                    [--skip-discovery]
                     [--status]
 ```
 
@@ -217,6 +218,12 @@ Reset and start design fresh.
 az prototype design --reset
 ```
 
+Skip discovery and generate architecture from existing discovery state.
+
+```
+az prototype design --skip-discovery
+```
+
 Show current discovery status without starting a session.
 
 ```
@@ -244,6 +251,14 @@ Enter an interactive refinement loop after architecture generation.
 `--reset`
 
 Reset design state and start fresh.
+
+| | |
+|---|---|
+| Default value: | `False` |
+
+`--skip-discovery`
+
+Skip the discovery conversation and generate architecture directly from existing discovery state. Requires a previous discovery session to have been completed. Use this to resume architecture generation without re-answering discovery questions.
 
 | | |
 |---|---|
@@ -281,6 +296,7 @@ az prototype build [--scope {all, apps, db, docs, infra}]
                    [--dry-run]
                    [--status]
                    [--reset]
+                   [--auto-accept]
 ```
 
 ### Examples
@@ -313,6 +329,12 @@ Preview what would be generated.
 
 ```
 az prototype build --scope all --dry-run
+```
+
+Build and auto-accept all policy/standards recommendations.
+
+```
+az prototype build --auto-accept
 ```
 
 ### Optional Parameters
@@ -350,15 +372,25 @@ Clear existing build state and start fresh.
 |---|---|
 | Default value: | `False` |
 
+`--auto-accept`
+
+Automatically accept the default (compliant) recommendation for every policy violation or standards conflict without prompting. Useful for CI/CD pipelines or non-interactive builds where governance defaults are trusted.
+
+| | |
+|---|---|
+| Default value: | `False` |
+
 ---
 
 ## az prototype deploy
 
 Deploy prototype to Azure with an interactive deployment session.
 
-Launches an interactive session that deploys infrastructure and applications to Azure in the staged order defined by `az prototype build`. Runs preflight checks (subscription, IaC tool, resource group, resource providers), then deploys each stage sequentially with real-time output. Supports rollback, per-stage what-if previews, and QA-first error routing.
+Launches an interactive session that deploys infrastructure and applications to Azure in the staged order defined by `az prototype build`. Runs preflight checks (subscription, tenant, IaC tool, resource group, resource providers), then deploys each stage sequentially with real-time output. Supports rollback, per-stage what-if previews, and QA-first error routing.
 
-Use `--dry-run` for what-if/plan preview without deploying. Use `--stage N` to deploy a single stage non-interactively. Use `--status` to view current deployment state.
+**AI provider is optional** — the deploy stage is 100% subprocess-based (terraform/bicep/az CLI). Users without an AI provider configured (e.g., no GitHub Copilot license) can still deploy. QA error diagnosis degrades gracefully when no AI is available.
+
+Use `--dry-run` for what-if/plan preview without deploying. Use `--stage N` to deploy a single stage non-interactively. Use `--status` to view current deployment state. Use `--service-principal` for cross-tenant CI/CD deployments.
 
 ```
 az prototype deploy [--stage]
@@ -367,7 +399,11 @@ az prototype deploy [--stage]
                     [--status]
                     [--reset]
                     [--subscription]
-                    [--resource-group]
+                    [--tenant]
+                    [--service-principal]
+                    [--client-id]
+                    [--client-secret]
+                    [--tenant-id]
 ```
 
 ### Examples
@@ -414,10 +450,31 @@ Force full redeployment, ignoring change tracking.
 az prototype deploy --force
 ```
 
-Deploy to a specific subscription and resource group.
+Deploy to a specific subscription.
 
 ```
-az prototype deploy --subscription abc-123 --resource-group my-rg
+az prototype deploy --subscription abc-123
+```
+
+Deploy to a different tenant.
+
+```
+az prototype deploy --tenant 00000000-0000-0000-0000-000000000001 --subscription abc-123
+```
+
+Deploy using a service principal (one-off credentials).
+
+```
+az prototype deploy --service-principal --client-id abc123 --client-secret mysecret --tenant-id def456
+```
+
+Deploy using a service principal with pre-configured credentials.
+
+```
+az prototype config set --key deploy.service_principal.client_id --value abc123
+az prototype config set --key deploy.service_principal.client_secret --value mysecret
+az prototype config set --key deploy.service_principal.tenant_id --value def456
+az prototype deploy --service-principal
 ```
 
 ### Interactive Session
@@ -446,6 +503,7 @@ During the interactive session, the following commands are available:
 | `/plan N` | Show what-if/terraform plan for a stage |
 | `/outputs` | Display captured deployment outputs |
 | `/preflight` | Re-run preflight checks |
+| `/login` | Run `az login` interactively |
 | `/help` | Show available commands |
 
 Type `q`, `quit`, or `exit` to end the session. Type `done` or `finish` to finalize.
@@ -458,6 +516,7 @@ Rollback enforces reverse deployment order — you cannot roll back stage N whil
 
 Before deploying, the session validates:
 - Azure subscription is set and accessible
+- Azure tenant matches the target (when `--tenant` is specified)
 - IaC tool (Terraform or Bicep) is installed
 - Target resource group exists (offers fix command if missing)
 - Required Azure resource providers are registered
@@ -508,9 +567,29 @@ Clear all deployment state and start fresh.
 
 Azure subscription ID to deploy to.
 
-`--resource-group`
+`--tenant`
 
-Target resource group name.
+Azure AD tenant ID for cross-tenant deployment. When specified, the session sets the deployment context to this tenant and warns during preflight if the active tenant differs.
+
+`--service-principal`
+
+Authenticate using a service principal before deploying. Requires `--client-id`, `--client-secret`, and `--tenant-id` (via CLI flags or pre-configured values). Service principal login runs before guard checks so that the `az_logged_in` guard passes after authentication. Having credentials configured in `prototype.secrets.yaml` does **not** auto-activate SP login — this flag is an explicit opt-in.
+
+| | |
+|---|---|
+| Default value: | `False` |
+
+`--client-id`
+
+Service principal application/client ID. Can also be set via `az prototype config set --key deploy.service_principal.client_id --value <id>`.
+
+`--client-secret`
+
+Service principal client secret. Can also be set via `az prototype config set --key deploy.service_principal.client_secret --value <secret>`. Stored in `prototype.secrets.yaml`.
+
+`--tenant-id`
+
+Tenant ID for service principal authentication. Can also be set via `az prototype config set --key deploy.service_principal.tenant_id --value <tenant>`. Stored in `prototype.secrets.yaml`.
 
 ### Subcommands
 
