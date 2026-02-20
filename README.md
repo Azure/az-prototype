@@ -16,7 +16,7 @@ Rapid Azure prototype generation powered by AI agent teams.
 ## Installation
 
 ```bash
-az extension add --source path/to/az_prototype-0.1.0-py3-none-any.whl
+az extension add --source path/to/az_prototype-0.2.0-py3-none-any.whl
 ```
 
 ## Quick Start
