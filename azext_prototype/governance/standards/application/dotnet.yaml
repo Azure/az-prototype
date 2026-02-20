@@ -1,0 +1,81 @@
+# .NET/C# application standards.
+#
+# These standards apply to generated .NET application code
+# (APIs, Azure Functions, background workers).
+
+domain: .NET Application Standards
+category: application
+description: >-
+  Standards for generated .NET/C# application code, including project
+  structure, dependency management, Azure SDK patterns, and Azure Functions
+  isolated worker model requirements.
+
+principles:
+  - id: CS-001
+    name: Use Azure SDK with DefaultAzureCredential
+    description: >-
+      Always use DefaultAzureCredential from Azure.Identity for
+      authenticating to Azure services.  This works with managed
+      identity in Azure and developer credentials locally.
+    applies_to:
+      - app-developer
+    examples:
+      - "using Azure.Identity;"
+      - "var credential = new DefaultAzureCredential();"
+      - "Never pass connection strings when managed identity is available"
+
+  - id: CS-002
+    name: Complete Project Structure
+    description: >-
+      Every generated .NET app must include a .csproj file with all
+      NuGet PackageReferences, a Program.cs entry point, and all
+      model/DTO classes referenced by services.  No file may reference
+      a type that is not defined in the generated output.
+    applies_to:
+      - app-developer
+    examples:
+      - "MyApp.csproj — project file with all PackageReferences"
+      - "Program.cs — entry point with DI registration"
+      - "Models/Project.cs — every referenced model class must exist"
+      - "If a service references 'ProjectDto', that class must be generated"
+
+  - id: CS-003
+    name: Azure Functions Isolated Worker Model
+    description: >-
+      All C# Azure Functions must target the .NET isolated worker model
+      using Microsoft.Azure.Functions.Worker (not the in-process model).
+      Must include host.json (version 2.0) and local.settings.json with
+      all required app settings.
+    applies_to:
+      - app-developer
+    examples:
+      - "Target net8.0 with Microsoft.Azure.Functions.Worker packages"
+      - "host.json with version 2.0 extensionBundle"
+      - "local.settings.json with FUNCTIONS_WORKER_RUNTIME = dotnet-isolated"
+      - "Program.cs with HostBuilder configuration"
+
+  - id: CS-004
+    name: Configuration via appsettings.json
+    description: >-
+      Use IConfiguration with appsettings.json for all configuration.
+      Never hardcode endpoints, connection strings, or secrets.  Use
+      the Options pattern for strongly-typed settings.
+    applies_to:
+      - app-developer
+    examples:
+      - "builder.Configuration.AddJsonFile(\"appsettings.json\")"
+      - "services.Configure<MyOptions>(config.GetSection(\"MyOptions\"))"
+      - "Never hardcode URLs, ports, or service endpoints"
+
+  - id: CS-005
+    name: Dependency Injection
+    description: >-
+      Use IServiceCollection for DI registration.  All services,
+      repositories, and Azure SDK clients must be registered in
+      Program.cs.  Use interface-based abstractions for testability.
+    applies_to:
+      - app-developer
+    examples:
+      - "builder.Services.AddSingleton<IMyService, MyService>();"
+      - "builder.Services.AddAzureClients(b => b.AddBlobServiceClient(...));"
+      - "Register all services used by controllers/functions in Program.cs"

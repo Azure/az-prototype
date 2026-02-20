@@ -1,0 +1,43 @@
+# Pre-commit hooks for azext-prototype
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+# See https://pre-commit.com for more information.
+#
+# NOTE: This file lives in scripts/ — if using the pre-commit framework,
+# either symlink or copy it to the repo root:
+#   ln -s scripts/.pre-commit-config.yaml .pre-commit-config.yaml
+
+repos:
+  - repo: local
+    hooks:
+      - id: validate-policies
+        name: Validate governance policies
+        entry: python -m azext_prototype.governance.policies.validate --hook --strict
+        language: python
+        types: [yaml]
+        files: '\.policy\.yaml$'
+        pass_filenames: false
+
+      - id: validate-templates
+        name: Validate workload template compliance
+        entry: python -m azext_prototype.templates.validate --hook --strict
+        language: python
+        types: [yaml]
+        files: '\.template\.yaml$'
+        pass_filenames: false
+
+      - id: validate-anti-patterns
+        name: Validate anti-pattern definitions
+        entry: python -m azext_prototype.governance.anti_patterns.validate --hook --strict
+        language: python
+        types: [yaml]
+        files: 'anti_patterns/.*\.yaml$'
+        pass_filenames: false
+
+      - id: validate-standards
+        name: Validate design standards
+        entry: python -m azext_prototype.governance.standards.validate --hook --strict
+        language: python
+        types: [yaml]
+        files: 'standards/.*\.yaml$'
+        pass_filenames: false

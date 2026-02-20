@@ -29,7 +29,7 @@ az prototype config set --key ai.model --value <model-id>
 
 ## GitHub Copilot (`copilot`)
 
-**Recommended provider.** Routes requests via direct HTTP calls to the GitHub Copilot completions API (`https://api.githubcopilot.com/chat/completions`), which exposes models from OpenAI, Anthropic, and Google under a single authentication flow.
+**Recommended provider.** Routes requests via direct HTTP calls to the GitHub Copilot enterprise API (`https://api.enterprise.githubcopilot.com/chat/completions`), which exposes models from OpenAI, Anthropic, and Google under a single authentication flow.
 
 The raw OAuth token (`gho_`, `ghu_`, `ghp_`) is sent directly as a `Bearer` header with editor-identification headers — no JWT exchange or SDK subprocess is required. This makes requests fast and lightweight.
 
@@ -37,16 +37,44 @@ The raw OAuth token (`gho_`, `ghu_`, `ghp_`) is sent directly as a `Bearer` head
 
 ### Supported Models
 
-| Model ID | Name | Provider | Context Window | Notes |
-|---|---|---|---|---|
-| `claude-sonnet-4.5` | Claude Sonnet 4.5 | Anthropic | 200K tokens | **Default.** Best balance of quality, speed, and cost for code generation. |
-| `claude-sonnet-4` | Claude Sonnet 4 | Anthropic | 200K tokens | Strong coding model, slightly lower cost than 4.5. |
-| `gpt-4o` | GPT-4o | OpenAI | 128K tokens | Strong all-rounder from OpenAI. |
-| `gpt-4.1` | GPT-4.1 | OpenAI | 1M tokens | Massive context window. Useful for analyzing very large codebases. |
-| `o3-mini` | o3-mini | OpenAI | 200K tokens | Fast reasoning model. |
-| `gemini-2.5-pro` | Gemini 2.5 Pro | Google | 1M tokens | Google's flagship model. Large context window. |
+The enterprise endpoint dynamically exposes the full Copilot model catalogue. The provider queries `/models` at runtime, but the curated table below reflects verified models:
 
-> The model list above is curated from verified models. Additional models (e.g. `claude-opus-4.5`, `claude-haiku-4.5`, `gpt-5.2`) may be available as GitHub adds them to the Copilot API.
+**Anthropic Claude**
+
+| Model ID | Name | Context Window | Notes |
+|---|---|---|---|
+| `claude-sonnet-4` | Claude Sonnet 4 | 200K tokens | **Default.** Best balance of quality, speed, and cost for code generation. |
+| `claude-sonnet-4.5` | Claude Sonnet 4.5 | 200K tokens | Excellent coding model. |
+| `claude-sonnet-4.6` | Claude Sonnet 4.6 | 200K tokens | Latest Sonnet. |
+| `claude-opus-4.5` | Claude Opus 4.5 | 200K tokens | High-quality reasoning model. |
+| `claude-opus-4.6` | Claude Opus 4.6 | 200K tokens | Latest Opus. |
+| `claude-opus-4.6-fast` | Claude Opus 4.6 (Fast) | 200K tokens | Faster variant of Opus 4.6. |
+| `claude-opus-4.6-1m` | Claude Opus 4.6 (1M) | 1M tokens | Extended context Opus. |
+| `claude-haiku-4.5` | Claude Haiku 4.5 | 200K tokens | Fastest Claude. Good for simpler tasks. |
+
+**OpenAI GPT**
+
+| Model ID | Name | Context Window | Notes |
+|---|---|---|---|
+| `gpt-5.3-codex` | GPT-5.3 Codex | — | Latest GPT codex model. |
+| `gpt-5.2-codex` | GPT-5.2 Codex | — | High-quality codex. |
+| `gpt-5.2` | GPT-5.2 | — | GPT-5 series. |
+| `gpt-5.1-codex-max` | GPT-5.1 Codex Max | — | Maximum capability codex. |
+| `gpt-5.1-codex` | GPT-5.1 Codex | — | Standard codex. |
+| `gpt-5.1` | GPT-5.1 | — | General-purpose GPT-5.1. |
+| `gpt-5.1-codex-mini` | GPT-5.1 Codex Mini | — | Lightweight codex. |
+| `gpt-5-mini` | GPT-5 Mini | — | Fast, cost-effective. |
+| `gpt-4.1` | GPT-4.1 | 1M tokens | Massive context window. |
+| `gpt-4o-mini` | GPT-4o Mini | 128K tokens | Lower cost, good for simpler tasks. |
+
+**Google Gemini**
+
+| Model ID | Name | Context Window | Notes |
+|---|---|---|---|
+| `gemini-3-pro-preview` | Gemini 3 Pro (Preview) | — | Latest Gemini preview. |
+| `gemini-2.5-pro` | Gemini 2.5 Pro | 1M tokens | Google's flagship model. Large context window. |
+
+> Model availability is dynamic — run `az prototype config show` to see the full list queried from the API at runtime.
 
 ### Credential Resolution
 
@@ -160,17 +188,17 @@ For most users, the quickest path to a working setup:
 
 ```bash
 az prototype config set --key ai.provider --value copilot
-az prototype config set --key ai.model --value claude-sonnet-4.5
+az prototype config set --key ai.model --value claude-sonnet-4
 ```
 
-This is the default configuration. Claude Sonnet 4.5 provides the best balance of code generation quality, architectural reasoning, and speed for the prototype workflow.
+This is the default configuration. Claude Sonnet 4 provides the best balance of code generation quality, architectural reasoning, and speed for the prototype workflow.
 
 ### By Use Case
 
 | Use Case | Provider | Model | Why |
 |---|---|---|---|
-| **General prototyping** | `copilot` | `claude-sonnet-4.5` | Best code generation quality and architectural reasoning. |
-| **Complex architecture design** | `copilot` | `claude-opus-4.5` | Most capable model for nuanced design trade-offs. Slower but higher quality. |
+| **General prototyping** | `copilot` | `claude-sonnet-4` | Best code generation quality and architectural reasoning. |
+| **Complex architecture design** | `copilot` | `claude-opus-4.6` | Most capable model for nuanced design trade-offs. Slower but higher quality. |
 | **Fast iteration / cost-sensitive** | `copilot` | `claude-haiku-4.5` | Fastest response times. Good enough for straightforward generation tasks. |
 | **Very large codebases** | `copilot` | `gpt-4.1` or `gemini-2.5-pro` | 1M token context windows let you feed entire repos. |
 | **Enterprise / compliance** | `azure-openai` | `gpt-4o` | Data stays in your Azure tenant. Private endpoints, RBAC, audit logs. |
@@ -184,12 +212,12 @@ Different stages benefit from different model characteristics:
 | Stage | Recommended Model | Rationale |
 |---|---|---|
 | `init` | Any (minimal AI usage) | Initialization is mostly scaffold work. |
-| `design` | `claude-sonnet-4.5` or `claude-opus-4.5` | Architecture design benefits from strong reasoning. Opus for complex multi-service designs. |
-| `build` | `claude-sonnet-4.5` | Code generation is Sonnet's sweet spot — fast, high-quality Bicep/Terraform/app code. |
-| `deploy` | `claude-sonnet-4.5` | Deployment troubleshooting needs good code understanding and Azure knowledge. |
-| `analyze error` | `claude-sonnet-4.5` | Error diagnosis requires correlating logs, code, and Azure docs. |
-| `analyze costs` | `claude-haiku-4.5` or `gpt-4o` | Cost estimation is structured output — faster models work fine. |
-| `generate docs` | `claude-sonnet-4.5` | Documentation generation benefits from natural language fluency. |
+| `design` | `claude-sonnet-4` or `claude-opus-4.6` | Architecture design benefits from strong reasoning. Opus for complex multi-service designs. |
+| `build` | `claude-sonnet-4` | Code generation is Sonnet's sweet spot — fast, high-quality Bicep/Terraform/app code. |
+| `deploy` | `claude-sonnet-4` | Deployment troubleshooting needs good code understanding and Azure knowledge. |
+| `analyze error` | `claude-sonnet-4` | Error diagnosis requires correlating logs, code, and Azure docs. |
+| `analyze costs` | `claude-haiku-4.5` or `gpt-4o-mini` | Cost estimation is structured output — faster models work fine. |
+| `generate docs` | `claude-sonnet-4` | Documentation generation benefits from natural language fluency. |
 
 > [!NOTE]
 > The extension uses a single model across all stages. Per-stage model selection is planned for a future release.
@@ -200,7 +228,7 @@ Change the model at any time:
 
 ```bash
 # Switch to a different model
-az prototype config set --key ai.model --value claude-opus-4.5
+az prototype config set --key ai.model --value claude-opus-4.6
 
 # Switch provider entirely
 az prototype config set --key ai.provider --value github-models
@@ -222,7 +250,7 @@ az prototype config show
 | `Invalid Azure OpenAI endpoint` | Endpoint must match `https://<resource>.openai.azure.com/`. Public OpenAI endpoints are blocked. |
 | Slow responses | Try a smaller/faster model like `gpt-4o-mini`. The `copilot` provider uses direct HTTP (no SDK overhead). |
 | Token limit exceeded | Switch to a model with a larger context window (`gpt-4.1`, `gemini-2.5-pro`). |
-| Timeout on large prompts | Increase the timeout: `set COPILOT_TIMEOUT=300` (default is 120 seconds). |
+| Timeout on large prompts | Increase the timeout: `set COPILOT_TIMEOUT=300` (default is 300 seconds). |
 
 ---
 

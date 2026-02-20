@@ -1,0 +1,37 @@
+# Anti-pattern detection — Cost domain
+#
+# Detects potential cost overruns and oversized configurations in
+# AI-generated output.  These are recommendations, not hard rules —
+# users may choose larger SKUs for production workloads.
+
+domain: cost
+description: Oversized SKUs, missing autoscale, and cost-inefficient configurations
+
+patterns:
+  - search_patterns:
+      - "sku_name = \"p1v3\""
+      - "sku_name = \"p2v3\""
+      - "sku_name = \"p3v3\""
+      - "sku_name = \"premium\""
+    safe_patterns:
+      - "production"
+      - "high availability"
+      - "performance requirement"
+    warning_message: "Premium SKU detected — consider Standard or Basic tier for POC workloads to reduce cost."
+
+  - search_patterns:
+      - "min_replicas = 1"
+      - "minimum_instance_count = 1"
+    safe_patterns:
+      - "production"
+      - "always-on"
+      - "high availability"
+    warning_message: "Minimum instances set to 1 — consider 0 for dev/test to avoid idle costs."
+
+  - search_patterns:
+      - "reserved_capacity"
+      - "reserved_instance"
+    safe_patterns:
+      - "production"
+      - "cost analysis"
+    warning_message: "Reserved capacity in POC — reserved instances lock in commitment; use pay-as-you-go for prototypes."

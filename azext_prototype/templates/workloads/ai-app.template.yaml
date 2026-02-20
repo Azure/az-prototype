@@ -1,0 +1,98 @@
+# yaml-language-server: $schema=../template.schema.json
+#
+# AI App template — Container Apps + Azure OpenAI + Cosmos DB + APIM
+# Adheres to: CA-001..004, CDB-001..004, MI-001..004, NET-001..004,
+#             INT-001..004
+# -------------------------------------------------------------------
+metadata:
+  name: ai-app
+  display_name: "AI Application"
+  description: >
+    An AI-powered application with Azure OpenAI for inference,
+    Container Apps for the API layer, Cosmos DB for conversation
+    history, and APIM for rate limiting and auth.
+  category: ai-app
+  tags: [container-apps, openai, cosmos-db, apim, ai]
+
+services:
+  - name: api
+    type: container-apps
+    tier: consumption
+    config:
+      ingress: internal          # INT-003
+      identity: system-assigned  # MI-001
+      min_replicas: 1            # AI apps need warm instances
+      health_probes: true
+
+  - name: ai-engine
+    type: cognitive-services
+    tier: standard
+    config:
+      kind: openai
+      models:
+        - name: gpt-4o
+          deployment: chat
+          capacity: 30
+      identity: system-assigned  # MI-001
+      private_endpoint: true     # NET-001
+
+  - name: conversation-store
+    type: cosmos-db
+    tier: serverless
+    config:
+      api: nosql
+      entra_rbac: true           # CDB-001
+      local_auth_disabled: true
+      consistency: session       # CDB-002
+      autoscale: true            # CDB-003 — autoscale throughput
+      partition_key: "/userId"   # CDB-004
+      ttl_seconds: 2592000       # 30 days — no unlimited containers
+      private_endpoint: true     # NET-001
+
+  - name: gateway
+    type: api-management
+    tier: consumption
+    config:
+      identity: system-assigned  # INT-002
+      caching: true              # INT-004
+      rate_limiting: true
+
+  - name: secrets
+    type: key-vault
+    tier: standard
+    config:
+      rbac_authorization: true
+      soft_delete: true
+      purge_protection: true
+      private_endpoint: true
+      diagnostics: true          # KV-004 — Log Analytics
+
+  - name: network
+    type: virtual-network
+    config:
+      subnets:
+        - name: apps
+          delegation: container-apps
+        - name: private-endpoints
+        - name: apim
+
+  - name: monitoring
+    type: log-analytics
+    config:
+      retention_days: 30
+
+iac_defaults:
+  resource_group_name: "rg-{project}-{env}"
+  tags:
+    managed_by: az-prototype
+    template: ai-app
+
+requirements: |
+  Build an AI-powered application with:
+  - Azure Container Apps API backend (internal ingress)
+  - Azure OpenAI (GPT-4o) for AI inference
+  - Azure Cosmos DB for conversation history (30-day TTL)
+  - Azure API Management as external gateway with rate limiting
+  - Azure Key Vault for secrets
+  - All services connected via managed identity and private endpoints
+  - APIM authenticates to Container Apps using managed identity

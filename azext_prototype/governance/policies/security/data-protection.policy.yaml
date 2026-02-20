@@ -1,0 +1,65 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: data-protection
+  category: security
+  services: [sql-database, cosmos-db, storage, key-vault]
+  last_reviewed: "2026-02-01"
+
+rules:
+  - id: DP-001
+    severity: required
+    description: "Enable encryption at rest for all data services (TDE, SSE, or service-managed keys)"
+    rationale: "Encryption at rest is enabled by default on most Azure services; ensure it is not disabled"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, biz-analyst]
+
+  - id: DP-002
+    severity: required
+    description: "Enforce TLS 1.2+ for all data-in-transit connections"
+    rationale: "Older TLS versions have known vulnerabilities"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+
+  - id: DP-003
+    severity: recommended
+    description: "Store application secrets and connection configuration in Azure Key Vault, not in code or environment variables"
+    rationale: "Key Vault provides auditing, rotation support, and access control for secrets"
+    applies_to: [cloud-architect, app-developer, biz-analyst]
+
+  - id: DP-004
+    severity: recommended
+    description: "Use Azure Key Vault references in App Service and Container Apps configuration instead of plaintext secrets"
+    rationale: "Key Vault references are resolved at runtime, avoiding secret sprawl"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer]
+
+patterns:
+  - name: "Key Vault reference in Container Apps"
+    description: "Reference a Key Vault secret from Container App environment variable"
+    example: |
+      resource "azurerm_container_app" "api" {
+        template {
+          container {
+            env {
+              name        = "DB_CONNECTION"
+              secret_name = "db-conn"
+            }
+          }
+        }
+        secret {
+          name                = "db-conn"
+          key_vault_secret_id = azurerm_key_vault_secret.db_conn.versionless_id
+          identity            = "System"
+        }
+      }
+
+anti_patterns:
+  - description: "Do not hardcode secrets, API keys, or connection strings in application code or config files"
+    instead: "Use Key Vault references or managed identity for credential-free access"
+  - description: "Do not disable TDE or encryption at rest on any data service"
+    instead: "Leave default encryption settings enabled; use customer-managed keys only if required"
+
+references:
+  - title: "Azure encryption at rest overview"
+    url: "https://learn.microsoft.com/azure/security/fundamentals/encryption-atrest"
+  - title: "Key Vault references for App Service"
+    url: "https://learn.microsoft.com/azure/app-service/app-service-key-vault-references"

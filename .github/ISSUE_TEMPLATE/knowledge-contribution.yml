@@ -1,0 +1,77 @@
+name: Knowledge Contribution
+description: Submit a knowledge base contribution (pattern, pitfall, or service update)
+title: "[Knowledge] "
+labels: ["knowledge-contribution"]
+body:
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      description: What kind of knowledge contribution is this?
+      options:
+        - Service pattern update
+        - New service
+        - Tool pattern
+        - Language pattern
+        - Pitfall
+    validations:
+      required: true
+
+  - type: input
+    id: target_file
+    attributes:
+      label: Target File
+      description: Which knowledge file should be updated?
+      placeholder: "knowledge/services/cosmos-db.md"
+    validations:
+      required: true
+
+  - type: input
+    id: section
+    attributes:
+      label: Section
+      description: Which section of the file should be updated?
+      placeholder: "Terraform Patterns > Role Assignments"
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Brief description of what was discovered.
+    validations:
+      required: true
+
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Rationale
+      description: >
+        Detailed explanation of why this contribution is necessary, what problem
+        it solves, what failures it prevents, and what the correct approach is.
+    validations:
+      required: true
+
+  - type: textarea
+    id: content
+    attributes:
+      label: Content to Add
+      description: Exact content to copy/paste into the knowledge file.
+      render: markdown
+    validations:
+      required: true
+
+  - type: dropdown
+    id: source
+    attributes:
+      label: Source
+      description: How was this discovered?
+      options:
+        - QA diagnosis
+        - Deployment failure
+        - Build review
+        - User report
+        - Manual discovery
+    validations:
+      required: true

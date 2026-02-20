@@ -1,0 +1,73 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: sql-database
+  category: azure
+  services: [sql-database]
+  last_reviewed: "2025-12-01"
+
+rules:
+  - id: SQL-001
+    severity: required
+    description: "Use Microsoft Entra authentication, disable SQL auth where possible"
+    rationale: "Centralised identity management, no password rotation"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer, biz-analyst]
+    template_check:
+      scope: [sql-database]
+      require_config: [entra_auth_only]
+      error_message: "Service '{service_name}' ({service_type}) missing entra_auth_only: true"
+
+  - id: SQL-002
+    severity: required
+    description: "Enable Transparent Data Encryption (TDE)"
+    rationale: "Data-at-rest encryption is a baseline security requirement"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    template_check:
+      scope: [sql-database]
+      require_config: [tde_enabled]
+      error_message: "Service '{service_name}' ({service_type}) missing tde_enabled: true"
+
+  - id: SQL-003
+    severity: required
+    description: "Enable Advanced Threat Protection"
+    rationale: "Detects anomalous database activities"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    template_check:
+      scope: [sql-database]
+      require_config: [threat_protection]
+      error_message: "Service '{service_name}' ({service_type}) missing threat_protection: true"
+
+  - id: SQL-004
+    severity: recommended
+    description: "Use serverless tier for dev/test workloads"
+    rationale: "Auto-pause reduces costs for intermittent usage"
+    applies_to: [cloud-architect, cost-analyst, biz-analyst]
+
+  - id: SQL-005
+    severity: recommended
+    description: "Configure geo-replication for production databases"
+    rationale: "Business continuity and disaster recovery"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, biz-analyst]
+
+patterns:
+  - name: "SQL with Entra auth"
+    description: "Configure SQL Server with Entra-only authentication"
+    example: |
+      resource "azurerm_mssql_server" "main" {
+        azuread_administrator {
+          login_username = "sql-admins"
+          object_id      = var.sql_admin_group_id
+        }
+        azuread_authentication_only = true
+      }
+
+anti_patterns:
+  - description: "Do not use SQL authentication with username/password"
+    instead: "Use Microsoft Entra (Azure AD) authentication with managed identity"
+  - description: "Do not set firewall rule 0.0.0.0-255.255.255.255"
+    instead: "Use private endpoints or specific IP ranges"
+
+references:
+  - title: "SQL Database security best practices"
+    url: "https://learn.microsoft.com/azure/azure-sql/database/security-best-practice"

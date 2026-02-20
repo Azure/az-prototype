@@ -1,0 +1,75 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: key-vault
+  category: azure
+  services: [key-vault]
+  last_reviewed: "2025-12-01"
+
+rules:
+  - id: KV-001
+    severity: required
+    description: "Enable soft-delete and purge protection"
+    rationale: "Prevents accidental permanent deletion of secrets and keys"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    template_check:
+      scope: [key-vault]
+      require_config: [soft_delete, purge_protection]
+      error_message: "Service '{service_name}' ({service_type}) missing {config_key}: true"
+
+  - id: KV-002
+    severity: required
+    description: "Use RBAC authorization model, not access policies"
+    rationale: "RBAC is the recommended model for fine-grained access control"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, biz-analyst]
+    template_check:
+      scope: [key-vault]
+      require_config: [rbac_authorization]
+      error_message: "Service '{service_name}' ({service_type}) missing rbac_authorization: true"
+
+  - id: KV-003
+    severity: required
+    description: "Access Key Vault via managed identity, never service principal secrets"
+    rationale: "Managed identity removes credential management overhead"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer, biz-analyst]
+
+  - id: KV-004
+    severity: recommended
+    description: "Enable diagnostic logging to Log Analytics"
+    rationale: "Audit trail for secret access and key operations"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    template_check:
+      scope: [key-vault]
+      require_config: [diagnostics]
+      error_message: "Service '{service_name}' ({service_type}) missing diagnostics: true for Log Analytics"
+
+  - id: KV-005
+    severity: recommended
+    description: "Use private endpoints in production environments"
+    rationale: "Restricts Key Vault access to the virtual network"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    template_check:
+      scope: [key-vault]
+      require_config: [private_endpoint]
+      error_message: "Service '{service_name}' ({service_type}) missing private_endpoint: true"
+
+patterns:
+  - name: "Key Vault with RBAC"
+    description: "Create Key Vault with RBAC authorization and role assignments"
+    example: |
+      resource "azurerm_key_vault" "main" {
+        enable_rbac_authorization = true
+        soft_delete_retention_days = 90
+        purge_protection_enabled  = true
+      }
+
+anti_patterns:
+  - description: "Do not use access policies for authorization"
+    instead: "Set enable_rbac_authorization = true and use role assignments"
+  - description: "Do not disable soft-delete"
+    instead: "Keep soft-delete enabled with at least 7-day retention"
+
+references:
+  - title: "Key Vault best practices"
+    url: "https://learn.microsoft.com/azure/key-vault/general/best-practices"

@@ -1,0 +1,38 @@
+# Anti-pattern detection — Authentication domain
+#
+# Detects weak or deprecated authentication methods in AI-generated output.
+
+domain: authentication
+description: Authentication method and RBAC assignment detection
+
+patterns:
+  - search_patterns:
+      - "sql authentication"
+      - "username/password"
+      - "sql_login"
+      - "administrator_login_password"
+    safe_patterns:
+      - "do not use sql authentication"
+      - "avoid sql authentication"
+      - "entra authentication"
+    warning_message: "SQL authentication with username/password detected — use Microsoft Entra (Azure AD) authentication with managed identity."
+
+  - search_patterns:
+      - "access_policy {"
+      - "access_policy ="
+      - "access policies"
+    safe_patterns:
+      - "do not use access policies"
+      - "avoid access policies"
+      - "rbac_authorization"
+    warning_message: "Key Vault access policies detected — use enable_rbac_authorization = true with role assignments instead."
+
+  - search_patterns:
+      - "\"owner\""
+      - "\"contributor\""
+    safe_patterns:
+      - "built-in role"
+      - "narrowest scope"
+      - "least privilege"
+      - "specific role"
+    warning_message: "Broad role assignment detected (Owner/Contributor) — use the most specific built-in role at the narrowest scope."

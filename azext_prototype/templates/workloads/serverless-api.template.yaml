@@ -1,0 +1,83 @@
+# yaml-language-server: $schema=../template.schema.json
+#
+# Serverless API template — Functions + SQL + Key Vault + APIM
+# Adheres to: SQL-001..005, MI-001..004, NET-001..004, INT-001..004
+# -------------------------------------------------------------------
+metadata:
+  name: serverless-api
+  display_name: "Serverless API"
+  description: >
+    A serverless REST API using Azure Functions with SQL Database
+    backend, Key Vault for secrets, and API Management for external
+    access. Optimised for low-cost dev/test with auto-pause.
+  category: serverless
+  tags: [functions, sql, key-vault, apim, serverless]
+
+services:
+  - name: api
+    type: functions
+    tier: consumption
+    config:
+      runtime: dotnet-isolated
+      identity: system-assigned  # MI-001
+      vnet_integrated: true      # NET-002
+      https_only: true           # AS-001
+      min_tls_version: "1.2"     # AS-002
+
+  - name: gateway
+    type: api-management
+    tier: consumption
+    config:
+      identity: system-assigned
+      caching: true
+
+  - name: database
+    type: sql-database
+    tier: serverless
+    config:
+      entra_auth_only: true      # SQL-001
+      tde_enabled: true          # SQL-002
+      threat_protection: true    # SQL-003
+      auto_pause_delay: 60       # SQL-004 — serverless auto-pause
+      geo_replication: false     # SQL-005 — enabled in prod override
+      private_endpoint: true     # NET-001
+
+  - name: secrets
+    type: key-vault
+    tier: standard
+    config:
+      rbac_authorization: true
+      soft_delete: true
+      purge_protection: true
+      private_endpoint: true
+      diagnostics: true
+
+  - name: monitoring
+    type: log-analytics
+    config:
+      retention_days: 30
+
+  - name: network
+    type: virtual-network
+    config:
+      subnets:
+        - name: functions
+          delegation: functions
+        - name: private-endpoints
+        - name: apim
+
+iac_defaults:
+  resource_group_name: "rg-{project}-{env}"
+  tags:
+    managed_by: az-prototype
+    template: serverless-api
+
+requirements: |
+  Build a serverless REST API with:
+  - Azure Functions (.NET isolated) for request handling
+  - Azure API Management as external gateway
+  - Azure SQL Database (serverless tier, auto-pause) with Entra-only auth
+  - Azure Key Vault (RBAC mode) for secrets
+  - Log Analytics workspace for monitoring
+  - All services connected via managed identity and private endpoints
+  - VNET-integrated Functions with dedicated subnets

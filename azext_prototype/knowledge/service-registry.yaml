@@ -1,0 +1,885 @@
+# =============================================================================
+# Azure Service Registry - Canonical Reference
+# =============================================================================
+#
+# Single source of truth for Azure service configuration used by all agents at
+# runtime. Contains RBAC role IDs, private DNS zones, API versions, SDK
+# packages, and authentication scopes for every supported Azure service.
+#
+# Ported from the Innovation Factory SERVICE_REGISTRY.yaml and extended with
+# additional services (event-grid, signalr, cognitive-search). Unlike the IF
+# version, this extension deploys infrastructure directly -- there is no
+# execution-policy restriction on running commands.
+#
+# Maintenance:
+#   - Keep bicep_api_version entries on current stable versions (2023-xx / 2024-xx)
+#   - When adding a new service, ensure ALL required fields are present
+#   - Validate with: python -m yaml service-registry.yaml
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Data & Storage
+  # ---------------------------------------------------------------------------
+
+  azure-sql:
+    display_name: Azure SQL Database
+    resource_provider: Microsoft.Sql
+    terraform_resource: azurerm_mssql_server, azurerm_mssql_database
+    bicep_resource: Microsoft.Sql/servers, Microsoft.Sql/servers/databases
+    bicep_api_version: "2023-08-01-preview"
+    private_endpoint:
+      dns_zone: privatelink.database.windows.net
+      group_id: sqlServer
+    rbac_roles:
+      data_read: db_datareader (contained user)
+      data_write: db_datawriter (contained user)
+      admin: db_owner (contained user)
+    rbac_role_ids: {}
+    authentication:
+      method: Azure AD with Managed Identity
+      token_scope: https://database.windows.net/.default
+      notes: |
+        - Azure AD-only authentication must be enabled
+        - SQL authentication must be disabled
+        - Contained users created via T-SQL after deployment
+    sdk_packages:
+      dotnet: [Microsoft.Data.SqlClient, Azure.Identity]
+      python: [pyodbc, azure-identity]
+      nodejs: [tedious, "@azure/identity"]
+    special_considerations:
+      - Requires T-SQL script execution for user provisioning
+      - Cannot grant database roles via Terraform/Bicep
+      - Must use AAD admin for initial setup
+
+  cosmos-db:
+    display_name: Azure Cosmos DB
+    resource_provider: Microsoft.DocumentDB
+    terraform_resource: azurerm_cosmosdb_account, azurerm_cosmosdb_sql_database
+    bicep_resource: Microsoft.DocumentDB/databaseAccounts
+    bicep_api_version: "2024-05-15"
+    private_endpoint:
+      dns_zone: privatelink.documents.azure.com
+      group_id: Sql
+    rbac_roles:
+      data_read: Cosmos DB Built-in Data Reader
+      data_write: Cosmos DB Built-in Data Contributor
+      admin: Cosmos DB Account Contributor
+    rbac_role_ids:
+      data_read: "00000000-0000-0000-0000-000000000001"
+      data_write: "00000000-0000-0000-0000-000000000002"
+    authentication:
+      method: RBAC with Managed Identity
+      token_scope: https://cosmos.azure.com/.default
+      notes: |
+        - Disable key-based metadata write access
+        - Use built-in RBAC roles (not custom)
+    sdk_packages:
+      dotnet: [Microsoft.Azure.Cosmos, Azure.Identity]
+      python: [azure-cosmos, azure-identity]
+      nodejs: ["@azure/cosmos", "@azure/identity"]
+    special_considerations:
+      - Partition key design is critical and hard to change
+      - Consider throughput mode (provisioned vs serverless)
+      - Multiple API types available (NoSQL, MongoDB, Cassandra, Gremlin, Table)
+
+  blob-storage:
+    display_name: Azure Blob Storage
+    resource_provider: Microsoft.Storage
+    terraform_resource: azurerm_storage_account, azurerm_storage_container
+    bicep_resource: Microsoft.Storage/storageAccounts
+    bicep_api_version: "2023-05-01"
+    private_endpoint:
+      dns_zone: privatelink.blob.core.windows.net
+      group_id: blob
+    rbac_roles:
+      data_read: Storage Blob Data Reader
+      data_write: Storage Blob Data Contributor
+      admin: Storage Blob Data Owner
+    rbac_role_ids:
+      data_read: 2a2b9908-6ea1-4ae2-8e65-a410df84e7d1
+      data_write: ba92f5b4-2d11-453d-a403-e96b0029c9fe
+      admin: b7e6dc6d-f1e8-4753-8033-0f276bb0955b
+    authentication:
+      method: RBAC with Managed Identity
+      token_scope: https://storage.azure.com/.default
+      notes: |
+        - Shared key access should be disabled when using RBAC
+        - Use user delegation SAS when temporary access is needed
+    sdk_packages:
+      dotnet: [Azure.Storage.Blobs, Azure.Identity]
+      python: [azure-storage-blob, azure-identity]
+      nodejs: ["@azure/storage-blob", "@azure/identity"]
+    special_considerations:
+      - Consider access tier (Hot, Cool, Archive) based on access patterns
+      - Lifecycle management policies for cost optimization
+
+  redis-cache:
+    display_name: Azure Cache for Redis
+    resource_provider: Microsoft.Cache
+    terraform_resource: azurerm_redis_cache
+    bicep_resource: Microsoft.Cache/redis
+    bicep_api_version: "2024-03-01"
+    private_endpoint:
+      dns_zone: privatelink.redis.cache.windows.net
+      group_id: redisCache
+    rbac_roles:
+      data_read: Redis Cache Reader (Preview)
+      data_write: Redis Cache Contributor
+    rbac_role_ids: {}
+    authentication:
+      method: Azure AD with Managed Identity (requires AAD auth enabled)
+      token_scope: https://redis.azure.com/.default
+      notes: |
+        - AAD authentication must be explicitly enabled
+        - Access keys should be disabled when using AAD
+    sdk_packages:
+      dotnet: [StackExchange.Redis, Azure.Identity]
+      python: [redis, azure-identity]
+      nodejs: [ioredis, "@azure/identity"]
+    special_considerations:
+      - AAD auth is newer; verify customer's Redis version supports it
+      - Some legacy applications may require access keys
+
+  # ---------------------------------------------------------------------------
+  # Messaging & Events
+  # ---------------------------------------------------------------------------
+
+  service-bus:
+    display_name: Azure Service Bus
+    resource_provider: Microsoft.ServiceBus
+    terraform_resource: azurerm_servicebus_namespace, azurerm_servicebus_queue, azurerm_servicebus_topic
+    bicep_resource: Microsoft.ServiceBus/namespaces
+    bicep_api_version: "2024-01-01"
+    private_endpoint:
+      dns_zone: privatelink.servicebus.windows.net
+      group_id: namespace
+    rbac_roles:
+      data_read: Azure Service Bus Data Receiver
+      data_write: Azure Service Bus Data Sender
+      admin: Azure Service Bus Data Owner
+    rbac_role_ids:
+      data_read: 4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0
+      data_write: 69a216fc-b8fb-44d8-bc22-1f3c2cd27a39
+      admin: 090c5cfd-751d-490a-894a-3ce6f1109419
+    authentication:
+      method: RBAC with Managed Identity
+      token_scope: https://servicebus.azure.net/.default
+      notes: |
+        - Shared access policies should be avoided in favor of RBAC
+        - Premium tier required for private endpoints
+    sdk_packages:
+      dotnet: [Azure.Messaging.ServiceBus, Azure.Identity]
+      python: [azure-servicebus, azure-identity]
+      nodejs: ["@azure/service-bus", "@azure/identity"]
+    special_considerations:
+      - Premium tier required for private endpoints and large messages
+      - Consider partitioning strategy for high-throughput scenarios
+
+  event-grid:
+    display_name: Azure Event Grid
+    resource_provider: Microsoft.EventGrid
+    terraform_resource: azurerm_eventgrid_topic, azurerm_eventgrid_system_topic
+    bicep_resource: Microsoft.EventGrid/topics
+    bicep_api_version: "2024-06-01-preview"
+    private_endpoint:
+      dns_zone: privatelink.eventgrid.azure.net
+      group_id: topic
+    rbac_roles:
+      data_send: EventGrid Data Sender
+      contributor: EventGrid Contributor
+    rbac_role_ids:
+      data_send: d5a91429-5739-47e2-a06b-3470a27159e7
+    authentication:
+      method: RBAC with Managed Identity
+      token_scope: https://eventgrid.azure.net/.default
+      notes: |
+        - Use RBAC for publishing; avoid SAS keys in new deployments
+        - System topics auto-created for Azure resource events
+    sdk_packages:
+      dotnet: [Azure.Messaging.EventGrid, Azure.Identity]
+      python: [azure-eventgrid, azure-identity]
+      nodejs: ["@azure/eventgrid", "@azure/identity"]
+    special_considerations:
+      - System topics vs custom topics serve different purposes
+      - Event subscriptions support filtering and dead-lettering
+      - CloudEvents schema recommended for new implementations
+
+  # ---------------------------------------------------------------------------
+  # Security & Identity
+  # ---------------------------------------------------------------------------
+
+  key-vault:
+    display_name: Azure Key Vault
+    resource_provider: Microsoft.KeyVault
+    terraform_resource: azurerm_key_vault, azurerm_key_vault_secret
+    bicep_resource: Microsoft.KeyVault/vaults
+    bicep_api_version: "2023-07-01"
+    private_endpoint:
+      dns_zone: privatelink.vaultcore.azure.net
+      group_id: vault
+    rbac_roles:
+      secrets_read: Key Vault Secrets User
+      secrets_write: Key Vault Secrets Officer
+      keys_read: Key Vault Crypto User
+      keys_write: Key Vault Crypto Officer
+      certs_read: Key Vault Certificate User
+      certs_write: Key Vault Certificates Officer
+      admin: Key Vault Administrator
+    rbac_role_ids:
+      secrets_read: 4633458b-17de-408a-b874-0445c86b69e6
+      secrets_write: b86a8fe4-44ce-4948-aee5-eccb2c155cd7
+      admin: 00482a5a-887f-4fb3-b363-3b7fe8e74483
+    authentication:
+      method: RBAC with Managed Identity
+      token_scope: https://vault.azure.net/.default
+      notes: |
+        - Use RBAC mode (not access policies) for new vaults
+        - Soft delete and purge protection enabled by default
+    sdk_packages:
+      dotnet: [Azure.Security.KeyVault.Secrets, Azure.Security.KeyVault.Keys, Azure.Security.KeyVault.Certificates, Azure.Identity]
+      python: [azure-keyvault-secrets, azure-keyvault-keys, azure-keyvault-certificates, azure-identity]
+      nodejs: ["@azure/keyvault-secrets", "@azure/keyvault-keys", "@azure/keyvault-certificates", "@azure/identity"]
+    special_considerations:
+      - Use RBAC mode (not access policies) for new vaults
+      - Soft delete is enabled by default
+      - Purge protection recommended for production
+
+  user-managed-identity:
+    display_name: User-Assigned Managed Identity
+    resource_provider: Microsoft.ManagedIdentity
+    terraform_resource: azurerm_user_assigned_identity
+    bicep_resource: Microsoft.ManagedIdentity/userAssignedIdentities
+    bicep_api_version: "2023-07-31-preview"
+    private_endpoint:
+      dns_zone: null
+      group_id: null
+    rbac_roles:
+      operator: Managed Identity Operator
+      contributor: Managed Identity Contributor
+    rbac_role_ids: {}
+    authentication:
+      method: null
+      token_scope: null
+      notes: |
+        - This resource IS the authentication mechanism for other services
+        - No authentication needed for the identity resource itself
+    sdk_packages:
+      dotnet: [Azure.Identity]
+      python: [azure-identity]
+      nodejs: ["@azure/identity"]
+    special_considerations:
+      - Create early in deployment sequence
+      - Assign to resources that need to authenticate
+      - RBAC roles assigned TO this identity for resource access
+
+  # ---------------------------------------------------------------------------
+  # AI & Cognitive Services
+  # ---------------------------------------------------------------------------
+
+  azure-openai:
+    display_name: Azure OpenAI Service
+    resource_provider: Microsoft.CognitiveServices
+    terraform_resource: azurerm_cognitive_account
+    bicep_resource: Microsoft.CognitiveServices/accounts
+    bicep_api_version: "2024-04-01-preview"
+    private_endpoint:
+      dns_zone: privatelink.openai.azure.com
+      group_id: account
+    rbac_roles:
+      data_read: Cognitive Services User
+      admin: Cognitive Services Contributor
+    rbac_role_ids:
+      data_read: a97b65f3-24c7-4388-baec-2e87135dc908
+      admin: 25fbc0a9-bd7c-42a3-aa1a-3b75d497ee68
+    authentication:
+      method: RBAC with Managed Identity
+      token_scope: https://cognitiveservices.azure.com/.default
+      notes: |
+        - Disable local (key-based) authentication for production
+        - Model deployments managed separately from account
+    sdk_packages:
+      dotnet: [Azure.AI.OpenAI, Azure.Identity]
+      python: [openai, azure-identity]
+      nodejs: [openai, "@azure/identity"]
+    special_considerations:
+      - Model deployments are separate from account creation
+      - Regional availability varies by model
+      - Quota limits apply per subscription/region
+      - Content filtering policies apply by default
+
+  cognitive-search:
+    display_name: Azure AI Search
+    resource_provider: Microsoft.Search
+    terraform_resource: azurerm_search_service
+    bicep_resource: Microsoft.Search/searchServices
+    bicep_api_version: "2024-03-01-preview"
+    private_endpoint:
+      dns_zone: privatelink.search.windows.net
+      group_id: searchService
+    rbac_roles:
+      data_read: Search Index Data Reader
+      data_write: Search Index Data Contributor
+      admin: Search Service Contributor
+    rbac_role_ids:
+      data_read: 1407120a-92aa-4202-b7e9-c0e197c71c8f
+      data_write: 8ebe5a00-799e-43f5-93ac-243d3dce84a7
+    authentication:
+      method: RBAC with Managed Identity or API key
+      token_scope: https://search.azure.com/.default
+      notes: |
+        - RBAC authentication preferred over API keys for production
+        - Disable API key access when RBAC is fully configured
+        - Supports both data-plane and control-plane RBAC
+    sdk_packages:
+      dotnet: [Azure.Search.Documents, Azure.Identity]
+      python: [azure-search-documents, azure-identity]
+      nodejs: ["@azure/search-documents", "@azure/identity"]
+    special_considerations:
+      - Index schema changes may require reindexing
+      - Semantic ranking requires Standard tier or higher
+      - Integrated vectorization available for AI-enriched search
+      - Skillsets enable AI enrichment during indexing
+
+  # ---------------------------------------------------------------------------
+  # Compute & Containers
+  # ---------------------------------------------------------------------------
+
+  container-apps:
+    display_name: Azure Container Apps
+    resource_provider: Microsoft.App
+    terraform_resource: azurerm_container_app, azurerm_container_app_environment
+    bicep_resource: Microsoft.App/containerApps, Microsoft.App/managedEnvironments
+    bicep_api_version: "2024-03-01"
+    private_endpoint:
+      dns_zone: null
+      group_id: null
+    rbac_roles:
+      contributor: Contributor (scoped to app)
+    rbac_role_ids: {}
+    authentication:
+      method: User-Assigned Managed Identity attached to app
+      token_scope: null
+      notes: |
+        - Identity assigned at container app level
+        - Uses workload identity for outbound connections
+        - No private endpoint; VNet integration via environment
+    sdk_packages:
+      dotnet: [Azure.ResourceManager.AppContainers, Azure.Identity]
+      python: [azure-mgmt-appcontainers, azure-identity]
+      nodejs: ["@azure/arm-appcontainers", "@azure/identity"]
+    special_considerations:
+      - Requires Container Apps Environment (with Log Analytics workspace)
+      - Requires Container Registry for images
+      - Ingress configuration determines public/private access
+      - Environment provides VNet integration (not private endpoints)
+
+  container-registry:
+    display_name: Azure Container Registry
+    resource_provider: Microsoft.ContainerRegistry
+    terraform_resource: azurerm_container_registry
+    bicep_resource: Microsoft.ContainerRegistry/registries
+    bicep_api_version: "2023-11-01-preview"
+    private_endpoint:
+      dns_zone: privatelink.azurecr.io
+      group_id: registry
+    rbac_roles:
+      pull: AcrPull
+      push: AcrPush
+      admin: AcrImageSigner
+    rbac_role_ids:
+      pull: 7f951dda-4ed3-4680-a7ca-43fe172d538d
+      push: 8311e382-0749-4cb8-b61a-304f252e45ec
+    authentication:
+      method: RBAC with Managed Identity
+      token_scope: null
+      notes: |
+        - Admin user should be disabled
+        - Use AcrPull role for container runtimes
+        - Token-based repository-scoped access available
+    sdk_packages:
+      dotnet: [Azure.Containers.ContainerRegistry, Azure.Identity]
+      python: [azure-containerregistry, azure-identity]
+      nodejs: ["@azure/container-registry", "@azure/identity"]
+    special_considerations:
+      - Premium tier required for private endpoints and geo-replication
+      - Image vulnerability scanning available with Defender for Containers
+
+  azure-functions:
+    display_name: Azure Functions
+    resource_provider: Microsoft.Web
+    terraform_resource: azurerm_linux_function_app, azurerm_windows_function_app
+    bicep_resource: Microsoft.Web/sites
+    bicep_api_version: "2023-12-01"
+    private_endpoint:
+      dns_zone: privatelink.azurewebsites.net
+      group_id: sites
+    rbac_roles:
+      contributor: Website Contributor
+    rbac_role_ids: {}
+    authentication:
+      method: User-Assigned Managed Identity attached to function app
+      token_scope: null
+      notes: |
+        - Identity assigned at function app level
+        - Use managed identity for connections to other Azure services
+    sdk_packages:
+      dotnet: [Microsoft.Azure.Functions.Worker, Azure.Identity]
+      python: [azure-functions, azure-identity]
+      nodejs: ["@azure/functions", "@azure/identity"]
+    special_considerations:
+      - Requires App Service Plan or Consumption plan
+      - Requires Storage Account for runtime
+      - Can use VNet integration for outbound
+      - Flex Consumption plan offers per-function scaling
+
+  app-service:
+    display_name: Azure Web App (App Service)
+    resource_provider: Microsoft.Web
+    terraform_resource: azurerm_linux_web_app, azurerm_windows_web_app, azurerm_service_plan
+    bicep_resource: Microsoft.Web/sites, Microsoft.Web/serverfarms
+    bicep_api_version: "2023-12-01"
+    private_endpoint:
+      dns_zone: privatelink.azurewebsites.net
+      group_id: sites
+    rbac_roles:
+      contributor: Website Contributor
+    rbac_role_ids: {}
+    authentication:
+      method: User-Assigned Managed Identity attached to web app
+      token_scope: null
+      notes: |
+        - Identity assigned at web app level
+        - Easy Auth available for end-user authentication
+    sdk_packages:
+      dotnet: [Azure.ResourceManager.AppService, Azure.Identity]
+      python: [azure-mgmt-web, azure-identity]
+      nodejs: ["@azure/arm-appservice", "@azure/identity"]
+    special_considerations:
+      - Requires App Service Plan
+      - Can use VNet integration for outbound
+      - Supports deployment slots
+      - Always-on setting required for production workloads
+
+  # ---------------------------------------------------------------------------
+  # API & Integration
+  # ---------------------------------------------------------------------------
+
+  api-management:
+    display_name: Azure API Management
+    resource_provider: Microsoft.ApiManagement
+    terraform_resource: azurerm_api_management
+    bicep_resource: Microsoft.ApiManagement/service
+    bicep_api_version: "2023-09-01-preview"
+    private_endpoint:
+      dns_zone: privatelink.azure-api.net
+      group_id: Gateway
+    rbac_roles:
+      reader: API Management Service Reader
+      contributor: API Management Service Contributor
+    rbac_role_ids: {}
+    authentication:
+      method: Managed Identity for backend authentication
+      token_scope: null
+      notes: |
+        - Use managed identity for authenticating to backend APIs
+        - Configure authentication policies in APIM
+        - Subscription keys for consumer-facing access control
+    sdk_packages:
+      dotnet: [Azure.ResourceManager.ApiManagement, Azure.Identity]
+      python: [azure-mgmt-apimanagement, azure-identity]
+      nodejs: ["@azure/arm-apimanagement", "@azure/identity"]
+    special_considerations:
+      - Long deployment times (30-45 minutes)
+      - Multiple SKU tiers with different capabilities
+      - VNet integration modes (external/internal)
+      - v2 SKUs offer faster deployment and scaling
+
+  signalr:
+    display_name: Azure SignalR Service
+    resource_provider: Microsoft.SignalRService
+    terraform_resource: azurerm_signalr_service
+    bicep_resource: Microsoft.SignalRService/signalR
+    bicep_api_version: "2024-03-01"
+    private_endpoint:
+      dns_zone: privatelink.service.signalr.net
+      group_id: signalr
+    rbac_roles:
+      app_server: SignalR App Server
+      admin: SignalR Service Owner
+    rbac_role_ids: {}
+    authentication:
+      method: RBAC with Managed Identity
+      token_scope: null
+      notes: |
+        - Use AAD authentication instead of connection strings in production
+        - SignalR App Server role required for server-side connections
+    sdk_packages:
+      dotnet: [Microsoft.Azure.SignalR, Azure.Identity]
+      python: []
+      nodejs: ["@microsoft/signalr", "@azure/identity"]
+    special_considerations:
+      - No dedicated Python SDK; use REST API or Azure Functions bindings
+      - Serverless mode available for event-driven architectures
+      - Consider connection limits per unit
+      - Upstream URL configuration for serverless mode
+
+  # ---------------------------------------------------------------------------
+  # Monitoring & Observability
+  # ---------------------------------------------------------------------------
+
+  app-insights:
+    display_name: Application Insights
+    resource_provider: Microsoft.Insights
+    terraform_resource: azurerm_application_insights
+    bicep_resource: Microsoft.Insights/components
+    bicep_api_version: "2020-02-02"
+    private_endpoint:
+      dns_zone: null
+      group_id: null
+    rbac_roles:
+      reader: Application Insights Component Reader
+      contributor: Application Insights Component Contributor
+    rbac_role_ids: {}
+    authentication:
+      method: Connection string or Managed Identity
+      token_scope: null
+      notes: |
+        - Modern SDKs support AAD authentication
+        - Connection string does not contain secrets (just instrumentation key)
+        - OpenTelemetry-based SDKs recommended for new projects
+    sdk_packages:
+      dotnet: [Microsoft.ApplicationInsights.AspNetCore, Azure.Monitor.OpenTelemetry.AspNetCore]
+      python: [opencensus-ext-azure, azure-monitor-opentelemetry]
+      nodejs: [applicationinsights, "@azure/monitor-opentelemetry"]
+    special_considerations:
+      - Requires Log Analytics workspace
+      - Connection string safe to include in config (not a secret)
+      - OpenTelemetry distro is the modern recommended approach
+
+  log-analytics:
+    display_name: Log Analytics Workspace
+    resource_provider: Microsoft.OperationalInsights
+    terraform_resource: azurerm_log_analytics_workspace
+    bicep_resource: Microsoft.OperationalInsights/workspaces
+    bicep_api_version: "2023-09-01"
+    private_endpoint:
+      dns_zone: privatelink.oms.opinsights.azure.com
+      group_id: azuremonitor
+    rbac_roles:
+      reader: Log Analytics Reader
+      contributor: Log Analytics Contributor
+    rbac_role_ids:
+      reader: 73c42c96-874c-492b-b04d-ab87d138a893
+      contributor: 92aaf0da-9dab-42b6-94a3-d43ce8d16293
+    authentication:
+      method: RBAC with Managed Identity
+      token_scope: https://api.loganalytics.io/.default
+      notes: |
+        - Query access controlled via RBAC
+        - Data collection rules manage ingestion
+    sdk_packages:
+      dotnet: [Azure.Monitor.Query, Azure.Identity]
+      python: [azure-monitor-query, azure-identity]
+      nodejs: ["@azure/monitor-query", "@azure/identity"]
+    special_considerations:
+      - Foundation for most monitoring scenarios
+      - Required by App Insights, Container Apps Environment
+      - Consider data retention settings and cost implications
+      - Dedicated clusters available for high-volume scenarios
+
+  # ---------------------------------------------------------------------------
+  # Additional Compute
+  # ---------------------------------------------------------------------------
+
+  aks:
+    display_name: Azure Kubernetes Service
+    resource_provider: Microsoft.ContainerService
+    terraform_resource: azurerm_kubernetes_cluster
+    bicep_resource: Microsoft.ContainerService/managedClusters
+    bicep_api_version: "2024-03-02-preview"
+    private_endpoint:
+      dns_zone: privatelink.<region>.azmk8s.io
+      group_id: management
+    rbac_roles:
+      cluster_user: Azure Kubernetes Service Cluster User Role
+      rbac_admin: Azure Kubernetes Service RBAC Admin
+      rbac_writer: Azure Kubernetes Service RBAC Writer
+      rbac_reader: Azure Kubernetes Service RBAC Reader
+    rbac_role_ids:
+      cluster_user: 4abbcc35-e782-43d8-92c5-2d3f1bd2253f
+      rbac_admin: 3498e952-d568-435e-9b2c-8d77e338d7f7
+      rbac_writer: a7ffa36f-339b-4b5c-8bdf-e2c188b2c0eb
+      rbac_reader: 7f6c6a51-bcf8-42ba-9220-52d62157d06d
+    authentication:
+      method: Azure AD + Kubernetes RBAC with Workload Identity
+      token_scope: 6dae42f8-4368-4678-94ff-3960e28e3630/.default
+      notes: |
+        - Workload identity for pod-level Azure service access
+        - OIDC issuer must be enabled on cluster
+        - Federated identity credentials link K8s service accounts to Azure identities
+    sdk_packages:
+      dotnet: [Azure.ResourceManager.ContainerService, Azure.Identity]
+      python: [azure-mgmt-containerservice, azure-identity]
+      nodejs: ["@azure/arm-containerservice", "@azure/identity"]
+    special_considerations:
+      - Network plugin choice (Azure CNI vs kubenet) is permanent
+      - System node pool minimum VM size is Standard_B2s
+      - AcrPull role must be on kubelet identity, not cluster identity
+      - Private cluster requires VPN/bastion for API server access
+
+  virtual-machines:
+    display_name: Azure Virtual Machines
+    resource_provider: Microsoft.Compute
+    terraform_resource: azurerm_linux_virtual_machine, azurerm_windows_virtual_machine
+    bicep_resource: Microsoft.Compute/virtualMachines
+    bicep_api_version: "2024-03-01"
+    private_endpoint:
+      dns_zone: null
+      group_id: null
+    rbac_roles:
+      contributor: Virtual Machine Contributor
+      admin_login: Virtual Machine Administrator Login
+      user_login: Virtual Machine User Login
+    rbac_role_ids:
+      contributor: 9980e02c-c2be-4d73-94e8-173b1dc7cf3c
+      admin_login: 1c0163c0-47e6-4577-8991-ea5c82e286e4
+      user_login: fb879df8-f326-4884-b1cf-06f3ad86be52
+    authentication:
+      method: SSH key (Linux) or password (Windows) + Azure AD login
+      token_scope: null
+      notes: |
+        - Always use SSH keys for Linux (never passwords)
+        - Managed identity for Azure service access from VM
+        - Azure AD login available as alternative to local accounts
+    sdk_packages:
+      dotnet: [Azure.ResourceManager.Compute, Azure.Identity]
+      python: [azure-mgmt-compute, azure-identity]
+      nodejs: ["@azure/arm-compute", "@azure/identity"]
+    special_considerations:
+      - VMs are IaaS -- require OS patching and security hardening
+      - Always configure auto-shutdown for non-production
+      - Use Azure Bastion instead of public IPs for management
+      - Windows VM names limited to 15 characters
+
+  static-web-apps:
+    display_name: Azure Static Web Apps
+    resource_provider: Microsoft.Web
+    terraform_resource: azurerm_static_web_app
+    bicep_resource: Microsoft.Web/staticSites
+    bicep_api_version: "2023-12-01"
+    private_endpoint:
+      dns_zone: privatelink.azurestaticapps.net
+      group_id: staticSites
+    rbac_roles:
+      contributor: Website Contributor
+    rbac_role_ids: {}
+    authentication:
+      method: Deployment token (API key) for CI/CD
+      token_scope: null
+      notes: |
+        - Built-in auth providers (GitHub, Azure AD, Twitter)
+        - Custom auth available on Standard tier
+        - API key used for deployment, not data access
+    sdk_packages:
+      dotnet: [Azure.ResourceManager.AppService, Azure.Identity]
+      python: [azure-mgmt-web, azure-identity]
+      nodejs: ["@azure/arm-appservice", "@azure/identity"]
+    special_considerations:
+      - Free tier has no SLA
+      - Managed Functions only support Node.js and Python
+      - All API routes must start with /api/
+      - Standard tier required for private endpoints and linked backends
+
+  # ---------------------------------------------------------------------------
+  # Networking
+  # ---------------------------------------------------------------------------
+
+  front-door:
+    display_name: Azure Front Door
+    resource_provider: Microsoft.Cdn
+    terraform_resource: azurerm_cdn_frontdoor_profile, azurerm_cdn_frontdoor_endpoint
+    bicep_resource: Microsoft.Cdn/profiles
+    bicep_api_version: "2024-02-01"
+    private_endpoint:
+      dns_zone: null
+      group_id: null
+    rbac_roles:
+      contributor: CDN Profile Contributor
+      reader: CDN Profile Reader
+    rbac_role_ids: {}
+    authentication:
+      method: null
+      token_scope: null
+      notes: |
+        - Front Door is a reverse proxy; no data-plane auth
+        - WAF policies for request filtering (Premium tier)
+        - Private Link origins for secure backend connectivity (Premium tier)
+    sdk_packages:
+      dotnet: [Azure.ResourceManager.Cdn, Azure.Identity]
+      python: [azure-mgmt-cdn, azure-identity]
+      nodejs: ["@azure/arm-cdn", "@azure/identity"]
+    special_considerations:
+      - Standard = CDN + routing; Premium = WAF + Private Link origins
+      - Profile changes take 10-20 minutes to propagate globally
+      - WAF policy names cannot contain hyphens
+      - DNS CNAME validation required for custom domains
+
+  # ---------------------------------------------------------------------------
+  # Data & Analytics
+  # ---------------------------------------------------------------------------
+
+  postgresql:
+    display_name: Azure Database for PostgreSQL (Flexible Server)
+    resource_provider: Microsoft.DBforPostgreSQL
+    terraform_resource: azurerm_postgresql_flexible_server, azurerm_postgresql_flexible_server_database
+    bicep_resource: Microsoft.DBforPostgreSQL/flexibleServers
+    bicep_api_version: "2023-12-01-preview"
+    private_endpoint:
+      dns_zone: privatelink.postgres.database.azure.com
+      group_id: postgresqlServer
+    rbac_roles:
+      data_read: db_datareader (contained user)
+      data_write: db_datawriter (contained user)
+      admin: azure_pg_admin (server role)
+    rbac_role_ids: {}
+    authentication:
+      method: Azure AD with Managed Identity + password for admin
+      token_scope: https://ossrdbms-aad.database.windows.net/.default
+      notes: |
+        - AAD auth enabled alongside password auth
+        - Managed identity creates AAD database roles via SQL
+        - Token refresh needed for long connections (~1 hour expiry)
+    sdk_packages:
+      dotnet: [Npgsql, Azure.Identity]
+      python: [psycopg2-binary, azure-identity]
+      nodejs: [pg, "@azure/identity"]
+    special_considerations:
+      - VNet integration (delegated subnet) is set at creation time
+      - AAD role creation requires AAD admin to run SQL commands post-deployment
+      - pgvector extension must be explicitly enabled
+      - Burstable tier has limited IOPS
+
+  azure-ai-search:
+    display_name: Azure AI Search
+    resource_provider: Microsoft.Search
+    terraform_resource: azurerm_search_service
+    bicep_resource: Microsoft.Search/searchServices
+    bicep_api_version: "2024-03-01-preview"
+    private_endpoint:
+      dns_zone: privatelink.search.windows.net
+      group_id: searchService
+    rbac_roles:
+      data_read: Search Index Data Reader
+      data_write: Search Index Data Contributor
+      admin: Search Service Contributor
+    rbac_role_ids:
+      data_read: 1407120a-92aa-4202-b7e9-c0e197c71c8f
+      data_write: 8ebe5a00-799e-43f5-93ac-243d3dce84a7
+      admin: 7ca78c08-252a-4471-8644-bb5ff32d4ba0
+    authentication:
+      method: RBAC with Managed Identity or API key
+      token_scope: https://search.azure.com/.default
+      notes: |
+        - RBAC preferred over API keys for production
+        - Set disableLocalAuth=true when RBAC fully configured
+        - Supports both data-plane and control-plane RBAC
+    sdk_packages:
+      dotnet: [Azure.Search.Documents, Azure.Identity]
+      python: [azure-search-documents, azure-identity]
+      nodejs: ["@azure/search-documents", "@azure/identity"]
+    special_considerations:
+      - Index schema changes may require full reindex
+      - Semantic ranker free tier limited to 1000 queries/month
+      - Vector dimensions must match embedding model
+      - Integrated vectorization is preview; push model more mature
+
+  databricks:
+    display_name: Azure Databricks
+    resource_provider: Microsoft.Databricks
+    terraform_resource: azurerm_databricks_workspace
+    bicep_resource: Microsoft.Databricks/workspaces
+    bicep_api_version: "2024-05-01"
+    private_endpoint:
+      dns_zone: privatelink.azuredatabricks.net
+      group_id: databricks_ui_api
+    rbac_roles:
+      contributor: Contributor (scoped to workspace)
+    rbac_role_ids: {}
+    authentication:
+      method: Azure AD for workspace access; Unity Catalog for data
+      token_scope: 2ff814a6-3304-4ab8-85cb-cd0e6f879c1d/.default
+      notes: |
+        - Workspace access via Azure AD SSO
+        - Data access via Unity Catalog grants (not ARM RBAC)
+        - Databricks secret scopes for credential management
+    sdk_packages:
+      dotnet: [Azure.ResourceManager.Databricks, Azure.Identity]
+      python: [databricks-sdk, azure-identity]
+      nodejs: ["@azure/arm-databricks", "@azure/identity"]
+    special_considerations:
+      - Premium tier required for Unity Catalog, RBAC, audit logs
+      - VNet injection subnet sizing critical (/26 minimum)
+      - DBU pricing varies by workload type (Jobs < All-Purpose)
+      - Managed resource group must not already exist
+
+  data-factory:
+    display_name: Azure Data Factory
+    resource_provider: Microsoft.DataFactory
+    terraform_resource: azurerm_data_factory
+    bicep_resource: Microsoft.DataFactory/factories
+    bicep_api_version: "2018-06-01"
+    private_endpoint:
+      dns_zone: privatelink.datafactory.azure.net
+      group_id: dataFactory
+    rbac_roles:
+      contributor: Data Factory Contributor
+    rbac_role_ids:
+      contributor: 673868aa-7521-48a0-acc6-0f60742d39f5
+    authentication:
+      method: Managed Identity for data source connections
+      token_scope: null
+      notes: |
+        - ADF managed identity authenticates to data sources
+        - Grant identity RBAC roles on each connected resource
+        - Self-hosted IR for on-premises data sources
+    sdk_packages:
+      dotnet: [Azure.ResourceManager.DataFactory, Azure.Identity]
+      python: [azure-mgmt-datafactory, azure-identity]
+      nodejs: ["@azure/arm-datafactory", "@azure/identity"]
+    special_considerations:
+      - Self-hosted integration runtime needed for on-premises
+      - Mapping data flow has 3-5 minute cold start
+      - Pipeline JSON ordering causes Terraform plan drift
+      - Schedule triggers default to UTC timezone
+
+  fabric:
+    display_name: Microsoft Fabric
+    resource_provider: Microsoft.Fabric
+    terraform_resource: azurerm_fabric_capacity
+    bicep_resource: Microsoft.Fabric/capacities
+    bicep_api_version: "2023-11-01"
+    private_endpoint:
+      dns_zone: null
+      group_id: fabric
+    rbac_roles:
+      contributor: Contributor (scoped to capacity)
+    rbac_role_ids: {}
+    authentication:
+      method: Azure AD for Fabric portal; workspace roles for data
+      token_scope: https://api.fabric.microsoft.com/.default
+      notes: |
+        - Capacity is ARM-deployed; workspaces are Fabric-managed
+        - Workspace roles (Admin/Member/Contributor/Viewer) via Fabric API
+        - OneLake access governed by workspace permissions
+    sdk_packages:
+      dotnet: [Azure.ResourceManager.Fabric, Azure.Identity]
+      python: [azure-mgmt-fabric, azure-identity]
+      nodejs: ["@azure/arm-fabric", "@azure/identity"]
+    special_considerations:
+      - Capacity vs workspace distinction (ARM vs SaaS)
+      - F2 is smallest capacity SKU (~$0.36/hr)
+      - 60-day free trial available per tenant
+      - No VNet injection; use managed private endpoints
+      - Workspaces cannot be created via Terraform/Bicep

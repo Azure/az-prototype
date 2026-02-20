@@ -1,0 +1,68 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: cosmos-db
+  category: azure
+  services: [cosmos-db]
+  last_reviewed: "2025-12-01"
+
+rules:
+  - id: CDB-001
+    severity: required
+    description: "Use Microsoft Entra RBAC for data-plane access"
+    rationale: "Key-based auth should be disabled where possible"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer, biz-analyst]
+    template_check:
+      scope: [cosmos-db]
+      require_config: [entra_rbac, local_auth_disabled]
+      error_message: "Service '{service_name}' ({service_type}) missing {config_key}: true"
+
+  - id: CDB-002
+    severity: recommended
+    description: "Configure appropriate consistency level (not Strong unless required)"
+    rationale: "Strong consistency has significant latency and cost implications"
+    applies_to: [cloud-architect, app-developer, biz-analyst]
+    template_check:
+      scope: [cosmos-db]
+      reject_config_value:
+        consistency: strong
+      error_message: "Service '{service_name}' ({service_type}) uses 'strong' consistency — consider session or eventual unless strong is justified"
+
+  - id: CDB-003
+    severity: recommended
+    description: "Use autoscale throughput for variable workloads"
+    rationale: "Avoids over-provisioning while handling traffic spikes"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, cost-analyst]
+    template_check:
+      scope: [cosmos-db]
+      require_config: [autoscale]
+      error_message: "Service '{service_name}' ({service_type}) missing autoscale: true for throughput scaling"
+
+  - id: CDB-004
+    severity: recommended
+    description: "Design partition keys based on query patterns, not just cardinality"
+    rationale: "Poor partition keys cause hot partitions and throttling"
+    applies_to: [cloud-architect, app-developer, biz-analyst]
+    template_check:
+      scope: [cosmos-db]
+      require_config: [partition_key]
+      error_message: "Service '{service_name}' ({service_type}) missing partition_key definition"
+
+patterns:
+  - name: "Cosmos DB with RBAC"
+    description: "Disable key-based auth and use Entra RBAC"
+    example: |
+      resource "azurerm_cosmosdb_account" "main" {
+        local_authentication_disabled = true
+      }
+
+anti_patterns:
+  - description: "Do not use account-level keys for application access"
+    instead: "Use Microsoft Entra RBAC with managed identity"
+  - description: "Do not use unlimited containers without TTL policy"
+    instead: "Set TTL on containers with transient data"
+
+references:
+  - title: "Cosmos DB security baseline"
+    url: "https://learn.microsoft.com/azure/cosmos-db/security-baseline"

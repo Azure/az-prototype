@@ -1,0 +1,75 @@
+# Python application standards.
+#
+# These standards apply to generated Python application code
+# (APIs, functions, background workers).
+
+domain: Python Application Standards
+category: application
+description: >-
+  Standards for generated Python application code, including project
+  structure, dependency management, and Azure SDK patterns.
+
+principles:
+  - id: PY-001
+    name: Use Azure SDK with DefaultAzureCredential
+    description: >-
+      Always use DefaultAzureCredential from azure-identity for
+      authenticating to Azure services.  This works with managed
+      identity in Azure and developer credentials locally.
+    applies_to:
+      - app-developer
+    examples:
+      - "from azure.identity import DefaultAzureCredential"
+      - "credential = DefaultAzureCredential()"
+      - "Never pass connection strings when managed identity is available"
+
+  - id: PY-002
+    name: Project Structure
+    description: >-
+      Python projects must have a clear structure: src/ for application
+      code, tests/ for tests, requirements.txt or pyproject.toml for
+      dependencies.  Use packages (directories with __init__.py) for
+      logical grouping.
+    applies_to:
+      - app-developer
+    examples:
+      - "src/app/ — application package"
+      - "src/app/main.py — entry point"
+      - "src/app/routes/ — API route handlers"
+      - "src/app/services/ — business logic"
+      - "tests/ — test files"
+
+  - id: PY-003
+    name: Configuration via Environment Variables
+    description: >-
+      Use environment variables for all configuration (loaded via
+      os.environ or a settings class).  Never hardcode service URLs,
+      ports, or feature flags.
+    applies_to:
+      - app-developer
+    examples:
+      - "import os; port = int(os.environ.get('PORT', 8080))"
+      - "Use pydantic Settings class for type-safe config"
+
+  - id: PY-004
+    name: Async for I/O-Bound Operations
+    description: >-
+      Use async/await for HTTP handlers, database queries, and
+      external API calls.  Synchronous I/O blocks the event loop
+      and reduces throughput.
+    applies_to:
+      - app-developer
+    examples:
+      - "async def get_items(db: AsyncSession) -> list[Item]:"
+      - "Use aiohttp or httpx for async HTTP clients"
+
+  - id: PY-005
+    name: Type Annotations
+    description: >-
+      Use type annotations on all function signatures and return types.
+      This enables IDE support, documentation, and static analysis.
+    applies_to:
+      - app-developer
+    examples:
+      - "def get_user(user_id: str) -> User | None:"
+      - "async def create_order(order: OrderCreate) -> OrderResponse:"

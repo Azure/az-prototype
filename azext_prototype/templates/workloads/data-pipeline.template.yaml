@@ -1,0 +1,93 @@
+# yaml-language-server: $schema=../template.schema.json
+#
+# Data Pipeline template — Functions + Cosmos DB + Storage + Event Grid
+# Adheres to: CDB-001..004, MI-001..004, NET-001..004
+# -------------------------------------------------------------------
+metadata:
+  name: data-pipeline
+  display_name: "Data Pipeline"
+  description: >
+    An event-driven data pipeline using Azure Functions for processing,
+    Cosmos DB for storage, and Event Grid for orchestration. All services
+    use managed identity and private endpoints.
+  category: data-pipeline
+  tags: [functions, cosmos-db, storage, event-grid, data]
+
+services:
+  - name: processor
+    type: functions
+    tier: consumption
+    config:
+      runtime: python
+      identity: system-assigned  # MI-001
+      vnet_integrated: true      # NET-002
+      https_only: true           # AS-001
+      min_tls_version: "1.2"     # AS-002
+
+  - name: datastore
+    type: cosmos-db
+    tier: serverless
+    config:
+      api: nosql
+      entra_rbac: true                   # CDB-001 — Entra RBAC for data plane
+      local_auth_disabled: true          # CDB-001 — disable key-based auth
+      consistency: session               # CDB-002 — session, not strong
+      autoscale: true                    # CDB-003 — autoscale throughput
+      partition_key: "/tenantId"         # CDB-004 — query-aligned partition key
+      private_endpoint: true             # NET-001
+
+  - name: ingest
+    type: storage
+    tier: standard-lrs
+    config:
+      identity: system-assigned    # MI-001
+      private_endpoint: true       # NET-001
+      blob_versioning: true
+      shared_key_disabled: true    # ST-001
+      public_access_disabled: true # ST-002
+      min_tls_version: "TLS1_2"   # ST-003
+
+  - name: events
+    type: event-grid
+    config:
+      identity: system-assigned
+      topic_type: custom
+
+  - name: secrets
+    type: key-vault
+    tier: standard
+    config:
+      rbac_authorization: true
+      soft_delete: true
+      purge_protection: true
+      private_endpoint: true
+      diagnostics: true          # KV-004 — Log Analytics
+
+  - name: network
+    type: virtual-network
+    config:
+      subnets:
+        - name: functions
+          delegation: functions
+        - name: private-endpoints
+
+  - name: monitoring
+    type: log-analytics
+    config:
+      retention_days: 30
+
+iac_defaults:
+  resource_group_name: "rg-{project}-{env}"
+  tags:
+    managed_by: az-prototype
+    template: data-pipeline
+
+requirements: |
+  Build an event-driven data pipeline with:
+  - Azure Functions (Python) for event processing
+  - Azure Cosmos DB (NoSQL API, session consistency) for data storage
+  - Azure Blob Storage for raw data ingestion
+  - Azure Event Grid for event orchestration
+  - Azure Key Vault for secrets
+  - All services use managed identity and private endpoints
+  - Cosmos DB uses Entra RBAC with local auth disabled

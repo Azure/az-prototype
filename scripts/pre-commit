@@ -1,0 +1,46 @@
+#!/usr/bin/env python
+"""Git pre-commit hook that validates governance files.
+
+Validates staged files across all four governance domains:
+  1. Policies (.policy.yaml)
+  2. Workload templates (.template.yaml)
+  3. Anti-patterns (anti_patterns/*.yaml)
+  4. Standards (standards/**/*.yaml)
+
+Install by running:
+    python scripts/install-hooks.py
+
+Or manually:
+    copy scripts\pre-commit .git\hooks\pre-commit    (Windows)
+    cp scripts/pre-commit .git/hooks/pre-commit       (Linux/Mac)
+    chmod +x .git/hooks/pre-commit                     (Linux/Mac)
+"""
+
+import subprocess
+import sys
+
+
+def main() -> int:
+    """Run all governance validators on staged files."""
+    validators = [
+        ("policies", [sys.executable, "-m", "azext_prototype.governance.policies.validate", "--hook", "--strict"]),
+        ("templates", [sys.executable, "-m", "azext_prototype.templates.validate", "--hook", "--strict"]),
+        ("anti-patterns", [sys.executable, "-m", "azext_prototype.governance.anti_patterns.validate", "--hook", "--strict"]),
+        ("standards", [sys.executable, "-m", "azext_prototype.governance.standards.validate", "--hook", "--strict"]),
+    ]
+
+    failed = []
+    for name, cmd in validators:
+        result = subprocess.run(cmd, capture_output=False)
+        if result.returncode != 0:
+            failed.append(name)
+
+    if failed:
+        sys.stderr.write(f"\nPre-commit validation failed for: {', '.join(failed)}\n")
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

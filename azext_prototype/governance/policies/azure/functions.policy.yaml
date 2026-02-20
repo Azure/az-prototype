@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: functions
+  category: azure
+  services: [functions]
+  last_reviewed: "2026-02-01"
+
+rules:
+  - id: FN-001
+    severity: required
+    description: "Use managed identity for accessing Azure resources from Functions"
+    rationale: "Eliminates connection strings and secrets in function configuration"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer, biz-analyst]
+    template_check:
+      scope: [functions]
+      require_config: [identity]
+      error_message: "Service '{service_name}' ({service_type}) missing managed identity configuration"
+
+  - id: FN-002
+    severity: required
+    description: "Store function app secrets in Key Vault with Key Vault references"
+    rationale: "App Settings plaintext secrets leak through Kudu, deployment logs, and ARM exports"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer]
+
+  - id: FN-003
+    severity: required
+    description: "Enforce HTTPS-only and minimum TLS 1.2"
+    rationale: "Same baseline as App Service — prevents cleartext transmission"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+
+  - id: FN-004
+    severity: recommended
+    description: "Use Consumption plan for event-driven, variable workloads; Premium for VNET or sustained load"
+    rationale: "Consumption plan has cold starts but costs nothing at idle; Premium provides VNET integration"
+    applies_to: [cloud-architect, cost-analyst, biz-analyst]
+
+  - id: FN-005
+    severity: recommended
+    description: "Enable Application Insights for function monitoring and distributed tracing"
+    rationale: "Functions are inherently distributed — observability is critical for debugging"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, monitoring-agent, app-developer]
+
+  - id: FN-006
+    severity: recommended
+    description: "Use durable functions or Service Bus for long-running orchestrations"
+    rationale: "Regular functions have a 5-10 minute timeout; durable functions handle complex workflows"
+    applies_to: [cloud-architect, app-developer, biz-analyst]
+
+  - id: FN-007
+    severity: required
+    description: "C# Azure Functions must use the isolated worker model (not in-process)"
+    rationale: "In-process model is deprecated; isolated worker provides better performance, dependency isolation, and long-term support"
+    applies_to: [cloud-architect, app-developer]
+
+patterns:
+  - name: "Function App with managed identity"
+    description: "Standard Function App deployment with identity and monitoring"
+    example: |
+      resource "azurerm_linux_function_app" "main" {
+        https_only = true
+        identity {
+          type = "SystemAssigned"
+        }
+        site_config {
+          minimum_tls_version = "1.2"
+          application_insights_connection_string = azurerm_application_insights.main.connection_string
+        }
+      }
+
+anti_patterns:
+  - description: "Do not store connection strings in Function App Settings as plaintext"
+    instead: "Use Key Vault references: @Microsoft.KeyVault(SecretUri=...)"
+  - description: "Do not use Consumption plan when VNET integration is required"
+    instead: "Use Premium plan (EP1+) or App Service plan for VNET-integrated functions"
+
+references:
+  - title: "Azure Functions security"
+    url: "https://learn.microsoft.com/azure/azure-functions/security-concepts"
+  - title: "Functions networking options"
+    url: "https://learn.microsoft.com/azure/azure-functions/functions-networking-options"

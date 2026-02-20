@@ -1,0 +1,47 @@
+# Anti-pattern detection — Networking domain
+#
+# Detects overly permissive network configurations, missing private
+# endpoints, and public exposure in AI-generated output.
+
+domain: networking
+description: Network isolation, firewall rules, and public exposure detection
+
+patterns:
+  - search_patterns:
+      - "public_network_access_enabled = true"
+      - "public_network_access = \"enabled\""
+      - "publicnetworkaccess = \"enabled\""
+    safe_patterns: []
+    warning_message: "Public network access is enabled — disable public access and use private endpoints or service endpoints."
+
+  - search_patterns:
+      - "0.0.0.0/0"
+      - "0.0.0.0-255.255.255.255"
+    safe_patterns:
+      - "do not allow 0.0.0.0"
+      - "avoid 0.0.0.0"
+    warning_message: "Overly permissive network rule detected (0.0.0.0/0) — use specific IP ranges or service tags."
+
+  - search_patterns:
+      - "ingress_type = \"external\""
+      - "external_enabled = true"
+    safe_patterns:
+      - "apim"
+      - "api management"
+      - "front door"
+      - "application gateway"
+    warning_message: "Direct external ingress detected — consider using API Management or Front Door as a gateway."
+
+  - search_patterns:
+      - "vnet_route_all_enabled = false"
+      - "virtual_network_subnet_id = null"
+    safe_patterns: []
+    warning_message: "VNET integration disabled — enable VNET integration for backend connectivity to private resources."
+
+  - search_patterns:
+      - "ip_restriction = []"
+      - "scm_ip_restriction = []"
+    safe_patterns:
+      - "allow all"
+      - "development"
+    warning_message: "Empty IP restrictions — configure IP restrictions or use VNET integration to limit access."

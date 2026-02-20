@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: app-service
+  category: azure
+  services: [app-service, functions]
+  last_reviewed: "2026-02-01"
+
+rules:
+  - id: AS-001
+    severity: required
+    description: "Enforce HTTPS-only — redirect all HTTP traffic to HTTPS"
+    rationale: "Prevents cleartext data transmission and man-in-the-middle attacks"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer, biz-analyst]
+    template_check:
+      scope: [app-service, functions]
+      require_config: [https_only]
+      error_message: "Service '{service_name}' ({service_type}) missing https_only: true"
+
+  - id: AS-002
+    severity: required
+    description: "Set minimum TLS version to 1.2"
+    rationale: "TLS 1.0 and 1.1 have known vulnerabilities"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    template_check:
+      scope: [app-service, functions]
+      require_config: [min_tls_version]
+      error_message: "Service '{service_name}' ({service_type}) missing min_tls_version: '1.2'"
+
+  - id: AS-003
+    severity: required
+    description: "Use managed identity for accessing Azure resources"
+    rationale: "Eliminates credential management; SDK handles token acquisition"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer, biz-analyst]
+    template_check:
+      scope: [app-service, functions]
+      require_config: [identity]
+      error_message: "Service '{service_name}' ({service_type}) missing managed identity configuration"
+
+  - id: AS-004
+    severity: required
+    description: "Deploy into a VNET-integrated subnet for backend connectivity"
+    rationale: "Enables private access to databases, Key Vault, and other PaaS services"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, biz-analyst]
+
+  - id: AS-005
+    severity: recommended
+    description: "Use deployment slots for zero-downtime deployments in production"
+    rationale: "Slot swaps are atomic and support rollback"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+
+  - id: AS-006
+    severity: recommended
+    description: "Enable diagnostic logging to Log Analytics workspace"
+    rationale: "Enables monitoring, alerting, and incident investigation"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, monitoring-agent]
+
+  - id: AS-007
+    severity: recommended
+    description: "Use App Service Authentication (EasyAuth) or custom middleware for user-facing apps"
+    rationale: "Built-in auth handles token validation without custom code"
+    applies_to: [cloud-architect, app-developer, biz-analyst]
+
+patterns:
+  - name: "App Service with managed identity and VNET"
+    description: "Standard App Service deployment with security baseline"
+    example: |
+      resource "azurerm_linux_web_app" "main" {
+        https_only = true
+        identity {
+          type = "SystemAssigned"
+        }
+        site_config {
+          minimum_tls_version = "1.2"
+          vnet_route_all_enabled = true
+        }
+      }
+
+anti_patterns:
+  - description: "Do not set https_only = false or omit HTTPS enforcement"
+    instead: "Always set https_only = true on App Service and Functions"
+  - description: "Do not store secrets in App Settings as plaintext"
+    instead: "Use Key Vault references (@Microsoft.KeyVault(SecretUri=...))"
+
+references:
+  - title: "App Service security best practices"
+    url: "https://learn.microsoft.com/azure/app-service/overview-security"
+  - title: "App Service VNET integration"
+    url: "https://learn.microsoft.com/azure/app-service/overview-vnet-integration"

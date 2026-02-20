@@ -1,0 +1,60 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: managed-identity
+  category: security
+  services: [container-apps, app-service, functions, key-vault, sql-database, cosmos-db, storage]
+  last_reviewed: "2025-12-01"
+
+rules:
+  - id: MI-001
+    severity: required
+    description: "Use system-assigned managed identity for single-service resources"
+    rationale: "Lifecycle tied to the resource, no orphaned identities"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, biz-analyst]
+    template_check:
+      scope: [container-apps, functions, app-service, api-management, container-registry]
+      require_config: [identity]
+      error_message: "Service '{service_name}' ({service_type}) does not configure managed identity"
+
+  - id: MI-002
+    severity: required
+    description: "Use user-assigned managed identity when identity is shared across resources"
+    rationale: "Avoids role assignment duplication and simplifies rotation"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+
+  - id: MI-003
+    severity: required
+    description: "Never use service principal client secrets for service-to-service auth"
+    rationale: "Secrets expire, rotate, and leak; managed identity eliminates this"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer, biz-analyst]
+
+  - id: MI-004
+    severity: recommended
+    description: "Assign least-privilege RBAC roles, never Owner or Contributor at resource group scope"
+    rationale: "Principle of least privilege reduces blast radius"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, biz-analyst]
+
+patterns:
+  - name: "System-assigned identity with role"
+    description: "Enable system identity and assign a specific role"
+    example: |
+      resource "azurerm_container_app" "app" {
+        identity {
+          type = "SystemAssigned"
+        }
+      }
+      resource "azurerm_role_assignment" "kv_reader" {
+        principal_id = azurerm_container_app.app.identity[0].principal_id
+        role_definition_name = "Key Vault Secrets User"
+        scope = azurerm_key_vault.main.id
+      }
+
+anti_patterns:
+  - description: "Do not store client secrets or certificates in application config"
+    instead: "Use managed identity; the Azure SDK handles token acquisition automatically"
+
+references:
+  - title: "Managed identities overview"
+    url: "https://learn.microsoft.com/entra/identity/managed-identities-azure-resources/overview"

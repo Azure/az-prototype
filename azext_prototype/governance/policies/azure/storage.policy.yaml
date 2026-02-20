@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: storage
+  category: azure
+  services: [storage]
+  last_reviewed: "2026-02-01"
+
+rules:
+  - id: ST-001
+    severity: required
+    description: "Disable shared key access — use Microsoft Entra RBAC for all data-plane operations"
+    rationale: "Shared keys grant full account access and cannot be scoped"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer, biz-analyst]
+    template_check:
+      scope: [storage]
+      require_config: [shared_key_disabled]
+      error_message: "Service '{service_name}' ({service_type}) missing shared_key_disabled: true"
+
+  - id: ST-002
+    severity: required
+    description: "Disable public blob access unless explicitly required"
+    rationale: "Prevents accidental data exposure via anonymous access"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, biz-analyst]
+    template_check:
+      scope: [storage]
+      require_config: [public_access_disabled]
+      error_message: "Service '{service_name}' ({service_type}) missing public_access_disabled: true"
+
+  - id: ST-003
+    severity: required
+    description: "Enforce TLS 1.2 minimum for all storage connections"
+    rationale: "Older TLS versions have known vulnerabilities"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    template_check:
+      scope: [storage]
+      require_config: [min_tls_version]
+      error_message: "Service '{service_name}' ({service_type}) missing min_tls_version: 'TLS1_2'"
+
+  - id: ST-004
+    severity: required
+    description: "Enable infrastructure encryption (double encryption) for sensitive data"
+    rationale: "Provides defense-in-depth with separate encryption keys at infra layer"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+
+  - id: ST-005
+    severity: recommended
+    description: "Use private endpoints for storage access from Azure services"
+    rationale: "Eliminates public internet exposure for the data plane"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, biz-analyst]
+    template_check:
+      scope: [storage]
+      require_config: [private_endpoint]
+      error_message: "Service '{service_name}' ({service_type}) missing private_endpoint: true"
+
+  - id: ST-006
+    severity: recommended
+    description: "Enable blob versioning and soft delete for data protection"
+    rationale: "Allows recovery from accidental deletion or overwrites"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+
+  - id: ST-007
+    severity: recommended
+    description: "Configure lifecycle management policies for cost optimization"
+    rationale: "Automatically tier or delete blobs based on age and access patterns"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, cost-analyst]
+
+patterns:
+  - name: "Storage account with security baseline"
+    description: "Standard storage deployment with RBAC and private endpoints"
+    example: |
+      resource "azurerm_storage_account" "main" {
+        account_tier             = "Standard"
+        account_replication_type = "LRS"
+        min_tls_version          = "TLS1_2"
+        shared_access_key_enabled = false
+        allow_nested_items_to_be_public = false
+        infrastructure_encryption_enabled = true
+      }
+
+anti_patterns:
+  - description: "Do not use shared key or account key for application access"
+    instead: "Use managed identity with Storage Blob Data Reader/Contributor role"
+  - description: "Do not enable public blob access for internal data"
+    instead: "Disable public access and use private endpoints with managed identity"
+
+references:
+  - title: "Storage security recommendations"
+    url: "https://learn.microsoft.com/azure/storage/blobs/security-recommendations"
+  - title: "Storage account overview"
+    url: "https://learn.microsoft.com/azure/storage/common/storage-account-overview"

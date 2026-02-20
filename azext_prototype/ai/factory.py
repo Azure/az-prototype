@@ -33,9 +33,9 @@ BLOCKED_PROVIDERS = frozenset({
 # Models that require a specific provider.  Any model whose ID starts
 # with one of these prefixes will be rejected when paired with an
 # incompatible provider.
-_COPILOT_ONLY_PREFIXES = ("claude-",)
+_COPILOT_ONLY_PREFIXES = ("claude-", "gemini-")
 _PROVIDER_DEFAULT_MODELS: dict[str, str] = {
-    "copilot": "claude-sonnet-4.5",
+    "copilot": "claude-sonnet-4",
     "github-models": "gpt-4o",
     "azure-openai": "gpt-4o",
 }

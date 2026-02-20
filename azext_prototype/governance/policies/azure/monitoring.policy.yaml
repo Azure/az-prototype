@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: monitoring
+  category: azure
+  services: [app-service, functions, container-apps, key-vault, sql-database, cosmos-db, storage, api-management]
+  last_reviewed: "2026-02-01"
+
+rules:
+  - id: MON-001
+    severity: recommended
+    description: "Deploy a Log Analytics workspace and route all diagnostic logs to it"
+    rationale: "Centralized logging is required for incident investigation and compliance"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, monitoring-agent, biz-analyst]
+    template_check:
+      require_service: [log-analytics]
+      error_message: "Template missing a log-analytics service for centralized logging"
+
+  - id: MON-002
+    severity: recommended
+    description: "Enable Application Insights for all web apps, APIs, and functions"
+    rationale: "Distributed tracing, performance monitoring, and failure detection"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, monitoring-agent, app-developer]
+    template_check:
+      when_services_present: [app-service, functions, container-apps]
+      require_service: [application-insights]
+      error_message: "Template with compute services should include application-insights"
+
+  - id: MON-003
+    severity: required
+    description: "Enable diagnostic settings on all PaaS resources"
+    rationale: "Without diagnostic settings, resource-level logs are not captured"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, monitoring-agent]
+
+  - id: MON-004
+    severity: recommended
+    description: "Configure alerts for critical metrics (response time, error rate, CPU, memory)"
+    rationale: "Proactive detection of issues before they impact users"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, monitoring-agent]
+
+  - id: MON-005
+    severity: recommended
+    description: "Set up action groups for alert notification routing"
+    rationale: "Ensures the right team is notified when issues occur"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, monitoring-agent]
+
+  - id: MON-006
+    severity: recommended
+    description: "Enable Container Apps system logs and console logs"
+    rationale: "Container Apps require explicit log configuration for stdout/stderr capture"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, monitoring-agent]
+
+patterns:
+  - name: "Log Analytics with diagnostic settings"
+    description: "Central Log Analytics workspace with diagnostic settings for all resources"
+    example: |
+      resource "azurerm_log_analytics_workspace" "main" {
+        name                = "log-${var.project}"
+        sku                 = "PerGB2018"
+        retention_in_days   = 30
+      }
+      resource "azurerm_monitor_diagnostic_setting" "kv" {
+        name                       = "diag-kv"
+        target_resource_id         = azurerm_key_vault.main.id
+        log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
+        enabled_log { category = "AuditEvent" }
+        metric { category = "AllMetrics" }
+      }
+
+anti_patterns:
+  - description: "Do not deploy resources without diagnostic settings"
+    instead: "Configure azurerm_monitor_diagnostic_setting for every PaaS resource"
+  - description: "Do not rely solely on portal metrics — capture logs for post-incident analysis"
+    instead: "Route logs to Log Analytics for queryable, long-term storage"
+
+references:
+  - title: "Azure Monitor overview"
+    url: "https://learn.microsoft.com/azure/azure-monitor/overview"
+  - title: "Diagnostic settings in Azure Monitor"
+    url: "https://learn.microsoft.com/azure/azure-monitor/essentials/diagnostic-settings"

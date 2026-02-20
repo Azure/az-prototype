@@ -1,0 +1,196 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Governance Policy",
+  "description": "Schema for .policy.yaml governance files used by azext-prototype agents.",
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "enum": ["v1"],
+      "description": "Schema version. Currently only 'v1' is supported."
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["policy"],
+      "description": "Document kind. Must be 'policy'."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Policy metadata.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Policy name (e.g. 'container-apps')."
+        },
+        "category": {
+          "type": "string",
+          "enum": ["azure", "security", "integration", "cost", "data", "general"],
+          "description": "Policy category."
+        },
+        "services": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Azure services this policy applies to."
+        },
+        "last_reviewed": {
+          "type": "string",
+          "description": "Date the policy was last reviewed (YYYY-MM-DD)."
+        }
+      },
+      "required": ["name", "category", "services"],
+      "additionalProperties": false
+    },
+    "rules": {
+      "type": "array",
+      "description": "Governance rules agents must follow.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique rule identifier (e.g. 'CA-001')."
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["required", "recommended", "optional"],
+            "description": "Rule severity level."
+          },
+          "description": {
+            "type": "string",
+            "description": "What the rule requires."
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Why this rule exists."
+          },
+          "applies_to": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1,
+            "description": "Agent names this rule applies to."
+          },
+          "template_check": {
+            "type": "object",
+            "description": "Optional automated compliance check applied to workload templates. Rules without this block are guidance-only.",
+            "properties": {
+              "scope": {
+                "oneOf": [
+                  { "type": "string" },
+                  { "type": "array", "items": { "type": "string" } }
+                ],
+                "description": "Service types to check (per-service). Only services matching these types are evaluated."
+              },
+              "require_config": {
+                "oneOf": [
+                  { "type": "string" },
+                  { "type": "array", "items": { "type": "string" } }
+                ],
+                "description": "Config keys that must be truthy on matching services."
+              },
+              "require_config_value": {
+                "type": "object",
+                "description": "Config key-value pairs that must match exactly.",
+                "additionalProperties": true
+              },
+              "reject_config_value": {
+                "type": "object",
+                "description": "Config key-value pairs that must NOT match.",
+                "additionalProperties": true
+              },
+              "require_service": {
+                "oneOf": [
+                  { "type": "string" },
+                  { "type": "array", "items": { "type": "string" } }
+                ],
+                "description": "Service types that must exist in the template (template-level check)."
+              },
+              "when_services_present": {
+                "oneOf": [
+                  { "type": "string" },
+                  { "type": "array", "items": { "type": "string" } }
+                ],
+                "description": "Only apply this check when ALL listed service types are present in the template."
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["error", "warning"],
+                "description": "Override violation severity. Defaults to 'error' for required rules, 'warning' for recommended/optional."
+              },
+              "error_message": {
+                "type": "string",
+                "description": "Templated error message. Placeholders: {service_name}, {service_type}, {config_key}, {expected_value}, {actual_value}, {rejected_value}, {rule_id}."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": ["id", "severity", "description", "applies_to"],
+        "additionalProperties": false
+      }
+    },
+    "patterns": {
+      "type": "array",
+      "description": "Implementation patterns agents should generate.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Pattern name."
+          },
+          "description": {
+            "type": "string",
+            "description": "When to use this pattern."
+          },
+          "example": {
+            "type": "string",
+            "description": "Code example."
+          }
+        },
+        "required": ["name", "description"],
+        "additionalProperties": false
+      }
+    },
+    "anti_patterns": {
+      "type": "array",
+      "description": "Anti-patterns agents must avoid.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "What NOT to do."
+          },
+          "instead": {
+            "type": "string",
+            "description": "What to do instead."
+          }
+        },
+        "required": ["description"],
+        "additionalProperties": false
+      }
+    },
+    "references": {
+      "type": "array",
+      "description": "Documentation references for agents to cite.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Document title."
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to the reference."
+          }
+        },
+        "required": ["title", "url"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["metadata", "rules"],
+  "additionalProperties": false
+}

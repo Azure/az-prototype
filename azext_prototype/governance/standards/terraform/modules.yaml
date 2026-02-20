@@ -1,0 +1,159 @@
+# Terraform module structure standards.
+#
+# These standards define how Terraform modules should be organized
+# and structured for consistency across all generated IaC.
+
+domain: Terraform Module Structure
+category: terraform
+description: >-
+  Standards for Terraform module layout, variable naming, and resource
+  organization that all terraform-agent output must follow.
+
+principles:
+  - id: TF-001
+    name: Standard File Layout
+    description: >-
+      Every Terraform module must use the standard file layout:
+      main.tf (resources only), variables.tf (inputs), outputs.tf (outputs),
+      locals.tf (computed values), providers.tf (terraform {}, required_providers,
+      provider config, and backend).  The terraform {} block — including
+      required_providers — MUST appear in exactly ONE file (providers.tf).
+      Do NOT create a separate versions.tf.  main.tf must NOT contain
+      terraform {} or provider {} blocks.  Additional files are allowed
+      for complex modules but must be logically named (e.g., networking.tf,
+      iam.tf).
+    applies_to:
+      - terraform-agent
+    examples:
+      - "main.tf — resource definitions only (no terraform {} or provider {} blocks)"
+      - "variables.tf — all input variable declarations with descriptions and types"
+      - "outputs.tf — all output value declarations"
+      - "locals.tf — computed local values and naming conventions"
+      - "providers.tf — terraform {}, required_providers, backend, and provider configuration (ONE file, never duplicated)"
+
+  - id: TF-002
+    name: Variable Conventions
+    description: >-
+      All variables must have a description and a type constraint.
+      Use snake_case for variable names.  Provide defaults for optional
+      values.  Use validation blocks for constrained inputs.
+    applies_to:
+      - terraform-agent
+    examples:
+      - "variable \"location\" { type = string; description = \"Azure region\" }"
+      - "Use validation blocks for SKU names, IP ranges, etc."
+
+  - id: TF-003
+    name: Resource Naming via Locals
+    description: >-
+      Define resource names in a locals block using a consistent naming
+      pattern.  Never hardcode resource names in resource blocks.
+    applies_to:
+      - terraform-agent
+    examples:
+      - "locals { rg_name = \"rg-${var.project}-${var.environment}\" }"
+      - "resource \"azurerm_resource_group\" \"main\" { name = local.rg_name }"
+
+  - id: TF-004
+    name: One Resource Type Per File for Complex Modules
+    description: >-
+      When a module manages more than 5 resources, split logically
+      related resources into separate files (e.g., networking.tf for
+      subnets and NSGs, iam.tf for role assignments).
+    applies_to:
+      - terraform-agent
+    examples:
+      - "networking.tf — VNet, subnets, NSGs, route tables"
+      - "iam.tf — role assignments, managed identities"
+      - "monitoring.tf — diagnostic settings, alerts"
+
+  - id: TF-005
+    name: Use Data Sources for Existing Resources
+    description: >-
+      Reference existing resources (resource groups, VNets, identities)
+      via data sources, not by hardcoding IDs.  Pass resource IDs as
+      variables only when the resource is managed outside the module.
+    applies_to:
+      - terraform-agent
+    examples:
+      - "data \"azurerm_client_config\" \"current\" {} for tenant/subscription IDs"
+      - "data \"azurerm_resource_group\" \"existing\" { name = var.rg_name }"
+
+  - id: TF-006
+    name: Cross-Stage Dependencies via Remote State
+    description: >-
+      Multi-stage deployments MUST use terraform_remote_state data sources
+      to read outputs from prior stages. NEVER hardcode resource names,
+      IDs, or keys that belong to another stage. Each stage reads what it
+      needs from prior stage state files and passes values via
+      data.terraform_remote_state.<stage>.outputs.<name>.
+    applies_to:
+      - terraform-agent
+      - cloud-architect
+    examples:
+      - "data \"terraform_remote_state\" \"stage1\" { backend = \"azurerm\"; config = { key = \"stage1.tfstate\" } }"
+      - "data \"azurerm_resource_group\" \"main\" { name = data.terraform_remote_state.stage1.outputs.resource_group_name }"
+
+  - id: TF-007
+    name: Consistent Backend Configuration
+    description: >-
+      Backend configuration must be consistent across all stages.  For POC
+      deployments, use local state (no backend block or backend "local" with
+      a path).  For production, use backend "azurerm" with ALL required
+      fields populated with literal values (resource_group_name,
+      storage_account_name, container_name, key).  NEVER use variable
+      references (var.*) in backend config — Terraform does not support
+      them.  NEVER leave required backend fields empty.  If using remote
+      backend, all stages must reference the same storage account and
+      container, differing only in key.
+    applies_to:
+      - terraform-agent
+    examples:
+      - "POC: omit backend block entirely (local state by default)"
+      - "POC multi-stage: backend \"local\" { path = \"../.terraform-state/stage1.tfstate\" }"
+      - "Production: backend \"azurerm\" { resource_group_name = \"terraform-state-rg\"; storage_account_name = \"tfstate12345\"; container_name = \"tfstate\"; key = \"stage1.tfstate\" }"
+
+  - id: TF-008
+    name: Complete Stage Outputs
+    description: >-
+      Every stage's outputs.tf MUST export all resource names, IDs, and
+      endpoints that ANY downstream stage or application needs. At minimum:
+      resource group name(s), managed identity client_id/principal_id,
+      service endpoints, workspace IDs. NEVER output sensitive values
+      (keys, connection strings) — if local auth is disabled, omit keys entirely.
+    applies_to:
+      - terraform-agent
+    examples:
+      - "output \"resource_group_name\" { value = azurerm_resource_group.main.name }"
+      - "output \"managed_identity_client_id\" { value = azurerm_user_assigned_identity.app.client_id }"
+      - "# Do NOT output primary_key when local auth is disabled"
+
+  - id: TF-009
+    name: Complete and Robust deploy.sh
+    description: >-
+      Every stage MUST include a deploy.sh that is syntactically complete
+      and runnable. It must use set -euo pipefail, include Azure login
+      verification, run terraform init/plan/apply, export outputs to JSON,
+      and include error handling via trap. NEVER truncate the script or
+      leave strings unclosed.
+    applies_to:
+      - terraform-agent
+    examples:
+      - "#!/bin/bash\\nset -euo pipefail\\ntrap 'echo Deploy failed' ERR"
+      - "terraform output -json > stage-1-outputs.json"
+
+  - id: TF-010
+    name: Companion Resources for Disabled Auth
+    description: >-
+      When disabling local/key-based authentication on any service
+      (local_authentication_disabled = true, shared_access_key_enabled = false),
+      the SAME stage MUST also create: (1) a user-assigned managed identity,
+      (2) RBAC role assignments granting that identity access, (3) outputs
+      for the identity's client_id and principal_id. Without these companion
+      resources, applications cannot authenticate and the deployment is broken.
+    applies_to:
+      - terraform-agent
+      - cloud-architect
+    examples:
+      - "resource \"azurerm_user_assigned_identity\" \"app\" { ... }"
+      - "resource \"azurerm_cosmosdb_sql_role_assignment\" \"app\" { principal_id = azurerm_user_assigned_identity.app.principal_id }"

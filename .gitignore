@@ -1,0 +1,77 @@
+# --- Build & Distribution ---
+build/
+dist/
+*.egg-info/
+*.egg
+*.whl
+eggs/
+sdist/
+wheels/
+
+# --- Python bytecode ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# --- Virtual environments ---
+.venv/
+venv/
+ENV/
+env/
+
+# --- IDE / Editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# --- Testing & Coverage ---
+.pytest_cache/
+.coverage
+coverage.json
+cov_summary.txt
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.lcov
+
+# --- mypy ---
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# --- ruff ---
+.ruff_cache/
+
+# --- OS artifacts ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+.claude/
+
+# --- Misc ---
+ISSUES.md
+issues/
+
+# --- Distribution / packaging ---
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+MANIFEST
+
+# --- Environments ---
+*.env
+.env.local
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- Logs ---
+*.log

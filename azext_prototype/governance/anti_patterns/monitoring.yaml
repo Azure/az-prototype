@@ -1,0 +1,20 @@
+# Anti-pattern detection — Monitoring domain
+#
+# Detects missing or disabled observability configurations in AI-generated output.
+
+domain: monitoring
+description: Logging, diagnostics, and observability gap detection
+
+patterns:
+  - search_patterns:
+      - "retention_in_days = 0"
+      - "retention_days = 0"
+    safe_patterns: []
+    warning_message: "Log retention set to 0 days — configure at least 30 days for compliance and incident investigation."
+
+  - search_patterns:
+      - "enabled_log_category = []"
+      - "logs_enabled = false"
+      - "metrics_enabled = false"
+    safe_patterns: []
+    warning_message: "Diagnostic logs or metrics disabled — enable logging for all PaaS resources."

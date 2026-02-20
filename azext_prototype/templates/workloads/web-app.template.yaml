@@ -1,0 +1,81 @@
+# yaml-language-server: $schema=../template.schema.json
+#
+# Web App template — Container Apps + SQL + Key Vault fronted by APIM
+# Adheres to: CA-001..004, KV-001..005, SQL-001..005, MI-001..004,
+#             NET-001..004, INT-001..004
+# -------------------------------------------------------------------
+metadata:
+  name: web-app
+  display_name: "Web Application"
+  description: >
+    A containerised web app with SQL backend, Key Vault for secrets,
+    and API Management as the public gateway. Follows all security and
+    network-isolation policies by default.
+  category: web-app
+  tags: [container-apps, sql, key-vault, apim, web]
+
+services:
+  - name: api
+    type: container-apps
+    tier: consumption
+    config:
+      ingress: internal          # INT-003 — internal-only behind APIM
+      identity: system-assigned  # MI-001 — system-assigned for single-service
+      min_replicas: 0            # CA-004 — zero replicas in dev
+      health_probes: true        # CA patterns — liveness + readiness
+
+  - name: gateway
+    type: api-management
+    tier: consumption
+    config:
+      identity: system-assigned  # INT-002 — APIM uses MI to reach backend
+      caching: true              # INT-004 — cache read-heavy endpoints
+
+  - name: database
+    type: sql-database
+    tier: serverless
+    config:
+      entra_auth_only: true      # SQL-001 — Entra auth, no SQL auth
+      tde_enabled: true          # SQL-002 — TDE mandatory
+      threat_protection: true    # SQL-003 — Advanced Threat Protection
+      private_endpoint: true     # NET-001 — private endpoint for data services
+
+  - name: secrets
+    type: key-vault
+    tier: standard
+    config:
+      rbac_authorization: true   # KV-002 — RBAC model
+      soft_delete: true          # KV-001 — soft-delete + purge protection
+      purge_protection: true
+      private_endpoint: true     # KV-005 / NET-001
+      diagnostics: true          # KV-004 — Log Analytics
+
+  - name: network
+    type: virtual-network
+    config:
+      subnets:
+        - name: apps
+          delegation: container-apps
+        - name: private-endpoints
+        - name: apim
+
+  - name: monitoring
+    type: log-analytics
+    config:
+      retention_days: 30
+
+iac_defaults:
+  resource_group_name: "rg-{project}-{env}"
+  tags:
+    managed_by: az-prototype
+    template: web-app
+
+requirements: |
+  Build a containerised web application with:
+  - A REST API running on Azure Container Apps (internal ingress)
+  - Azure API Management as the external gateway
+  - Azure SQL Database (serverless, Entra-only auth) for persistence
+  - Azure Key Vault (RBAC mode) for secrets management
+  - All PaaS services connected via private endpoints
+  - System-assigned managed identity for service-to-service auth
+  - Deployed inside a VNET with dedicated subnets

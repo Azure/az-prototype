@@ -14,7 +14,7 @@ from typing import Any
 
 from knack.util import CLIError
 
-from azext_prototype.ai.provider import AIProvider, AIMessage, AIResponse
+from azext_prototype.ai.provider import AIProvider, AIMessage, AIResponse, ToolCall
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +134,40 @@ class AzureOpenAIProvider(AIProvider):
                 "Ensure you are logged in via 'az login' or have managed identity configured."
             )
 
+    @staticmethod
+    def _messages_to_dicts(messages: list[AIMessage]) -> list[dict[str, Any]]:
+        """Convert AIMessage list to OpenAI-style message dicts."""
+        result = []
+        for m in messages:
+            msg: dict[str, Any] = {"role": m.role, "content": m.content}
+            if m.tool_calls:
+                msg["tool_calls"] = [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {"name": tc.name, "arguments": tc.arguments},
+                    }
+                    for tc in m.tool_calls
+                ]
+            if m.tool_call_id:
+                msg["tool_call_id"] = m.tool_call_id
+            result.append(msg)
+        return result
+
+    @staticmethod
+    def _extract_tool_calls(choice: Any) -> list[ToolCall] | None:
+        """Extract tool calls from an OpenAI SDK response choice."""
+        if not hasattr(choice.message, "tool_calls") or not choice.message.tool_calls:
+            return None
+        return [
+            ToolCall(
+                id=tc.id,
+                name=tc.function.name,
+                arguments=tc.function.arguments or "{}",
+            )
+            for tc in choice.message.tool_calls
+        ]
+
     def chat(
         self,
         messages: list[AIMessage],
@@ -141,12 +175,11 @@ class AzureOpenAIProvider(AIProvider):
         temperature: float = 0.7,
         max_tokens: int = 4096,
         response_format: dict | None = None,
+        tools: list[dict] | None = None,
     ) -> AIResponse:
         """Send a chat completion via Azure OpenAI."""
         deployment = model or self._deployment
-        api_messages: list[dict[str, Any]] = [
-            {"role": m.role, "content": m.content} for m in messages
-        ]
+        api_messages = self._messages_to_dicts(messages)
 
         kwargs: dict[str, Any] = {
             "model": deployment,
@@ -157,6 +190,9 @@ class AzureOpenAIProvider(AIProvider):
 
         if response_format:
             kwargs["response_format"] = response_format
+
+        if tools:
+            kwargs["tools"] = tools
 
         try:
             response = self._client.chat.completions.create(**kwargs)
@@ -178,6 +214,7 @@ class AzureOpenAIProvider(AIProvider):
             model=response.model,
             usage=usage,
             finish_reason=choice.finish_reason or "stop",
+            tool_calls=self._extract_tool_calls(choice),
         )
 
     def stream_chat(

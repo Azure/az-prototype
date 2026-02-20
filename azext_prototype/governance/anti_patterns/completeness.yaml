@@ -1,0 +1,70 @@
+# Anti-pattern detection — Completeness domain
+#
+# Detects structural gaps, incomplete scripts, and missing companion
+# resources in AI-generated output.  These patterns catch issues that
+# indicate the generated code is not deployment-ready.
+
+domain: completeness
+description: Structural gaps, incomplete scripts, and missing companion resources
+
+patterns:
+  - search_patterns:
+      - "local_authentication_disabled = true"
+      - "local_auth_disabled = true"
+      - "disableLocalAuth: true"
+      - "shared_access_key_enabled = false"
+      - "allowSharedKeyAccess: false"
+    safe_patterns:
+      - "azurerm_user_assigned_identity"
+      - "azurerm_role_assignment"
+      - "azurerm_cosmosdb_sql_role_assignment"
+      - "Microsoft.ManagedIdentity/userAssignedIdentities"
+      - "roleAssignments"
+      - "user_assigned_identity"
+    warning_message: "Local/key-based authentication is disabled but no managed identity or RBAC role assignment found in the same stage. Applications will be unable to authenticate."
+
+  - search_patterns:
+      - "echo -e \"${YELLOW}"
+      - "echo -e \"${RED}"
+      - "echo -e \"${GREEN}"
+      - "echo \""
+    safe_patterns:
+      - "echo \"\""
+    warning_message: "Possible incomplete echo statement in deploy script — verify all strings are properly closed."
+
+  - search_patterns:
+      - "terraform_remote_state"
+    safe_patterns: []
+    warning_message: ""
+
+  - search_patterns:
+      - "data \"azurerm_resource_group\""
+      - "data \"azurerm_log_analytics_workspace\""
+      - "data \"azurerm_key_vault\""
+    safe_patterns:
+      - "terraform_remote_state"
+      - "data.terraform_remote_state"
+      - "var."
+    warning_message: "Data source references existing resource by hardcoded name — use terraform_remote_state or variables to reference resources from prior stages."
+
+  - search_patterns:
+      - "versions.tf"
+    safe_patterns:
+      - "providers.tf"
+    warning_message: "Terraform config uses versions.tf — this WILL cause deployment failure. Provider configuration (terraform {}, required_providers, backend) must be in providers.tf only. Using both files causes duplicate required_providers blocks that break terraform init. Remove versions.tf and consolidate into providers.tf."
+
+  - search_patterns:
+      - "var.tfstate_storage_account"
+      - "var.backend_storage_account"
+      - "var.state_storage_account"
+    safe_patterns: []
+    warning_message: "Backend config uses variable references — Terraform does not support variables in backend blocks. Use literal values or omit the backend to use local state."
+
+  - search_patterns:
+      - "storage_account_name = \"\""
+      - "container_name = \"\""
+      - "key = \"\""
+      - "resource_group_name = \"\""
+    safe_patterns:
+      - "backend \"local\""
+    warning_message: "Backend config has empty required fields — terraform init will fail. Either provide literal values or omit the backend block to use local state."

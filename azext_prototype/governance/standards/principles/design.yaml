@@ -1,0 +1,84 @@
+# Design principles — universal standards for all generated code and IaC.
+#
+# These principles apply to all agents that generate code, whether
+# application code (Python, .NET, Node.js) or infrastructure-as-code
+# (Terraform, Bicep).
+
+domain: Design Principles
+category: principles
+description: >-
+  Universal design principles that all generated code and infrastructure
+  must follow.  These are not suggestions — they are standards.
+
+principles:
+  - id: DES-001
+    name: Single Responsibility
+    description: >-
+      Every function, method, class, and module must have exactly one
+      responsibility.  If a function does more than one thing, split it.
+    applies_to:
+      - terraform-agent
+      - bicep-agent
+      - app-developer
+      - cloud-architect
+    examples:
+      - "Terraform: one resource per module when the resource has complex configuration"
+      - "Application: a function that fetches data should not also format it for display"
+      - "Bicep: separate networking resources from compute resources into distinct modules"
+
+  - id: DES-002
+    name: DRY (Don't Repeat Yourself)
+    description: >-
+      Extract repeated logic into shared functions, modules, or variables.
+      Duplication is acceptable only when the duplicated code serves
+      genuinely different purposes that may evolve independently.
+    applies_to:
+      - terraform-agent
+      - bicep-agent
+      - app-developer
+    examples:
+      - "Terraform: use locals and variables instead of repeating values"
+      - "Application: extract common HTTP client setup into a shared utility"
+      - "Bicep: use modules for repeated resource patterns"
+
+  - id: DES-003
+    name: Open/Closed Principle
+    description: >-
+      Modules and classes should be open for extension but closed for
+      modification.  Use variables, parameters, and composition to allow
+      customization without changing the core implementation.
+    applies_to:
+      - terraform-agent
+      - bicep-agent
+      - app-developer
+    examples:
+      - "Terraform: use variable maps for optional features instead of hard-coded conditionals"
+      - "Application: use dependency injection instead of hard-coded implementations"
+
+  - id: DES-004
+    name: Least Privilege
+    description: >-
+      Grant only the minimum permissions required.  Every role assignment,
+      network rule, and access grant should be as narrow as possible.
+    applies_to:
+      - terraform-agent
+      - bicep-agent
+      - cloud-architect
+      - security-reviewer
+    examples:
+      - "Use 'Storage Blob Data Reader' instead of 'Contributor' for read-only access"
+      - "Scope role assignments to the specific resource, not the resource group"
+
+  - id: DES-005
+    name: Explicit Over Implicit
+    description: >-
+      Be explicit about configuration, dependencies, and behavior.
+      Avoid relying on defaults that may change or on implicit ordering.
+    applies_to:
+      - terraform-agent
+      - bicep-agent
+      - app-developer
+    examples:
+      - "Terraform: always set explicit depends_on when resource ordering matters"
+      - "Bicep: declare parameter defaults explicitly"
+      - "Application: use explicit type annotations and return types"

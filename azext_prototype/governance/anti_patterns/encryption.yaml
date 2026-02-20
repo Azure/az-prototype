@@ -1,0 +1,29 @@
+# Anti-pattern detection — Encryption domain
+#
+# Detects disabled or weak encryption settings in AI-generated output.
+
+domain: encryption
+description: TLS enforcement, encryption at rest, and transport security detection
+
+patterns:
+  - search_patterns:
+      - "min_tls_version = \"1.0\""
+      - "min_tls_version = \"1.1\""
+      - "minimum_tls_version = \"1.0\""
+      - "minimum_tls_version = \"1.1\""
+      - "tls1_0"
+      - "tls1_1"
+    safe_patterns: []
+    warning_message: "Outdated TLS version detected — enforce minimum TLS 1.2 for all connections."
+
+  - search_patterns:
+      - "https_only = false"
+      - "https_required = false"
+    safe_patterns: []
+    warning_message: "HTTPS enforcement disabled — set https_only = true to redirect all HTTP to HTTPS."
+
+  - search_patterns:
+      - "ssl_enforcement_enabled = false"
+      - "ssl_minimal_tls_version_enforced = \"tldisabled\""
+    safe_patterns: []
+    warning_message: "SSL enforcement disabled — enable SSL enforcement with TLS 1.2 minimum."

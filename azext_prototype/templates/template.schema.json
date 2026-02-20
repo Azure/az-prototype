@@ -1,0 +1,88 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Project Template",
+  "description": "Schema for .template.yaml project templates used by azext-prototype.",
+  "type": "object",
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "description": "Template metadata.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Template short name used with --template (e.g. 'web-app')."
+        },
+        "display_name": {
+          "type": "string",
+          "description": "Human-friendly display name."
+        },
+        "description": {
+          "type": "string",
+          "description": "Brief description of what the template provides."
+        },
+        "category": {
+          "type": "string",
+          "description": "Template category.",
+          "enum": ["web-app", "data-pipeline", "ai-app", "microservices", "serverless"]
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Searchable tags."
+        }
+      },
+      "required": ["name", "display_name", "description", "category"],
+      "additionalProperties": false
+    },
+    "services": {
+      "type": "array",
+      "description": "Azure services that make up the project.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Logical service name (e.g. 'api', 'database')."
+          },
+          "type": {
+            "type": "string",
+            "description": "Azure service type (e.g. 'container-apps', 'sql-database')."
+          },
+          "tier": {
+            "type": "string",
+            "description": "SKU or pricing tier (e.g. 'consumption', 'serverless', 'standard')."
+          },
+          "config": {
+            "type": "object",
+            "description": "Service-specific configuration values.",
+            "additionalProperties": true
+          }
+        },
+        "required": ["name", "type"],
+        "additionalProperties": false
+      }
+    },
+    "iac_defaults": {
+      "type": "object",
+      "description": "Defaults passed to IaC code generation.",
+      "properties": {
+        "resource_group_name": {
+          "type": "string",
+          "description": "Resource group name pattern. Supports {project} and {env} placeholders."
+        },
+        "tags": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Default Azure resource tags."
+        }
+      },
+      "additionalProperties": true
+    },
+    "requirements": {
+      "type": "string",
+      "description": "Natural-language requirements blurb that seeds the design stage."
+    }
+  },
+  "required": ["metadata", "services", "requirements"],
+  "additionalProperties": false
+}

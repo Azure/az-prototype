@@ -1,0 +1,65 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: network-isolation
+  category: security
+  services: [container-apps, app-service, key-vault, sql-database, cosmos-db, storage]
+  last_reviewed: "2025-12-01"
+
+rules:
+  - id: NET-001
+    severity: required
+    description: "Use private endpoints for all PaaS data services in production"
+    rationale: "Eliminates public internet exposure for data plane"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, biz-analyst]
+    template_check:
+      scope: [key-vault, sql-database, cosmos-db, storage]
+      require_config: [private_endpoint]
+      error_message: "Service '{service_name}' ({service_type}) missing private_endpoint: true"
+
+  - id: NET-002
+    severity: required
+    description: "Deploy workloads in a dedicated subnet within the landing zone VNET"
+    rationale: "Network segmentation enables NSG and route table controls"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, biz-analyst]
+    template_check:
+      require_service: [virtual-network]
+      error_message: "Template missing a virtual-network service for network isolation"
+
+  - id: NET-003
+    severity: recommended
+    description: "Use NSGs to restrict traffic between subnets to only required ports"
+    rationale: "Defence in depth beyond private endpoints"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+
+  - id: NET-004
+    severity: recommended
+    description: "Enable diagnostic logging on NSGs for traffic auditing"
+    rationale: "Required for incident investigation and compliance"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+
+patterns:
+  - name: "Private endpoint for Key Vault"
+    description: "Create private endpoint and disable public access"
+    example: |
+      resource "azurerm_private_endpoint" "kv" {
+        name                = "pe-kv-${var.project}"
+        subnet_id           = azurerm_subnet.private.id
+        private_service_connection {
+          name                           = "kv-connection"
+          private_connection_resource_id = azurerm_key_vault.main.id
+          subresource_names              = ["vault"]
+          is_manual_connection           = false
+        }
+      }
+
+anti_patterns:
+  - description: "Do not allow 0.0.0.0/0 in any NSG or firewall rule"
+    instead: "Use specific IP ranges or service tags"
+  - description: "Do not rely solely on service firewalls without VNET integration"
+    instead: "Use private endpoints + VNET integration for defense in depth"
+
+references:
+  - title: "Private Link overview"
+    url: "https://learn.microsoft.com/azure/private-link/private-link-overview"

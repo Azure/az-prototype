@@ -5,8 +5,9 @@ Authenticates using the existing credential resolution in
 Copilot completions API directly with the raw OAuth token.
 
 The raw ``gho_`` / ``ghu_`` / ``ghp_`` token is sent as a Bearer
-token with editor-identification headers — the ``copilot_internal``
-token exchange is **not** required.
+token with editor-identification headers to the **enterprise**
+endpoint (``api.enterprise.githubcopilot.com``).  No JWT exchange
+is required.
 
 No SDK subprocess, no async, no background threads — just a plain
 ``requests.post``.
@@ -27,17 +28,24 @@ from knack.util import CLIError
 from azext_prototype.ai.copilot_auth import (
     get_copilot_token,
 )
-from azext_prototype.ai.provider import AIProvider, AIMessage, AIResponse
+from azext_prototype.ai.provider import AIProvider, AIMessage, AIResponse, ToolCall
 
 logger = logging.getLogger(__name__)
 
-# Copilot chat completions endpoint (OpenAI-compatible).
-_COMPLETIONS_URL = "https://api.githubcopilot.com/chat/completions"
+# Copilot API base URL.  The enterprise endpoint exposes the
+# full model catalogue (Claude, GPT, Gemini) whereas the non-
+# enterprise endpoint only returns a handful of GPT models.
+_BASE_URL = os.environ.get(
+    "COPILOT_BASE_URL",
+    "https://api.enterprise.githubcopilot.com",
+)
 
-# Default request timeout in seconds.  Large prompts (e.g. VTT
-# transcripts) can make the model think for a while, but the HTTP
-# connection itself shouldn't take more than ~2 minutes.
-_DEFAULT_TIMEOUT = 120
+_COMPLETIONS_URL = f"{_BASE_URL}/chat/completions"
+_MODELS_URL = f"{_BASE_URL}/models"
+
+# Default request timeout in seconds.  Architecture generation and
+# large prompts can take several minutes; 5 minutes is a safe default.
+_DEFAULT_TIMEOUT = 300
 
 
 class CopilotProvider(AIProvider):
@@ -47,9 +55,13 @@ class CopilotProvider(AIProvider):
     resolved by ``copilot_auth``.  The token is sent as a ``Bearer``
     header alongside editor-identification headers that identify us
     as an approved Copilot integration.
+
+    The enterprise endpoint (``api.enterprise.githubcopilot.com``)
+    exposes the full model catalogue including Claude, GPT, and
+    Gemini families.
     """
 
-    DEFAULT_MODEL = "claude-sonnet-4.5"
+    DEFAULT_MODEL = "claude-sonnet-4"
 
     def __init__(
         self,
@@ -70,25 +82,40 @@ class CopilotProvider(AIProvider):
 
         The raw OAuth token is sent directly as ``Bearer`` — no JWT
         exchange required.  The editor-identification headers
-        (``Editor-Version``, ``Copilot-Integration-Id``, ``User-Agent``)
-        are required by the Copilot API to identify approved clients.
+        mirror those used by the official Copilot CLI to identify
+        us as an approved integration.
         """
         token = get_copilot_token()
         return {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": "GithubCopilot/1.300.0",
-            "Copilot-Integration-Id": "vscode-chat",
-            "Editor-Version": "vscode/1.100.0",
-            "Editor-Plugin-Version": "copilot-chat/0.37.5",
+            "User-Agent": "copilot/0.0.410",
+            "Copilot-Integration-Id": "copilot-developer-cli",
+            "Editor-Version": "copilot/0.0.410",
+            "Editor-Plugin-Version": "copilot/0.0.410",
             "X-Request-Id": str(uuid.uuid4()),
         }
 
     @staticmethod
-    def _messages_to_dicts(messages: list[AIMessage]) -> list[dict[str, str]]:
+    def _messages_to_dicts(messages: list[AIMessage]) -> list[dict[str, Any]]:
         """Convert ``AIMessage`` list to OpenAI-style message dicts."""
-        return [{"role": m.role, "content": m.content} for m in messages]
+        result = []
+        for m in messages:
+            msg: dict[str, Any] = {"role": m.role, "content": m.content}
+            if m.tool_calls:
+                msg["tool_calls"] = [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {"name": tc.name, "arguments": tc.arguments},
+                    }
+                    for tc in m.tool_calls
+                ]
+            if m.tool_call_id:
+                msg["tool_call_id"] = m.tool_call_id
+            result.append(msg)
+        return result
 
     # ------------------------------------------------------------------
     # AIProvider interface
@@ -101,6 +128,7 @@ class CopilotProvider(AIProvider):
         temperature: float = 0.7,
         max_tokens: int = 4096,
         response_format: dict | None = None,
+        tools: list[dict] | None = None,
     ) -> AIResponse:
         """Send a chat completion request to the Copilot API."""
         target_model = model or self._model
@@ -111,7 +139,14 @@ class CopilotProvider(AIProvider):
             "max_tokens": max_tokens,
         }
 
-        prompt_chars = sum(len(m.content) for m in messages)
+        if tools:
+            payload["tools"] = tools
+
+        prompt_chars = sum(
+            len(m.content) if isinstance(m.content, str)
+            else sum(len(p.get("text", "")) for p in m.content if isinstance(p, dict))
+            for m in messages
+        )
         logger.debug(
             "Copilot request: model=%s, msgs=%d, chars=%d",
             target_model, len(messages), prompt_chars,
@@ -128,7 +163,7 @@ class CopilotProvider(AIProvider):
             raise CLIError(
                 f"Copilot API timed out after {self._timeout}s.\n"
                 "For very large prompts, increase the timeout:\n"
-                "  set COPILOT_TIMEOUT=300"
+                "  set COPILOT_TIMEOUT=600"
             )
         except requests.RequestException as exc:
             raise CLIError(
@@ -167,8 +202,23 @@ class CopilotProvider(AIProvider):
             raise CLIError("Copilot API returned invalid JSON.") from exc
 
         content = ""
+        tool_calls_data = None
+        finish = "stop"
         try:
-            content = data["choices"][0]["message"]["content"]
+            choice = data["choices"][0]
+            message = choice.get("message", {})
+            content = message.get("content") or ""
+            finish = choice.get("finish_reason") or "stop"
+            raw_tool_calls = message.get("tool_calls")
+            if raw_tool_calls:
+                tool_calls_data = [
+                    ToolCall(
+                        id=tc["id"],
+                        name=tc["function"]["name"],
+                        arguments=tc["function"].get("arguments", "{}"),
+                    )
+                    for tc in raw_tool_calls
+                ]
         except (KeyError, IndexError):
             logger.warning("Copilot response had no content: %s", data)
 
@@ -181,7 +231,8 @@ class CopilotProvider(AIProvider):
                 "prompt_tokens": usage.get("prompt_tokens", 0),
                 "completion_tokens": usage.get("completion_tokens", 0),
             },
-            finish_reason="stop",
+            finish_reason=finish,
+            tool_calls=tool_calls_data,
         )
 
     def stream_chat(
@@ -238,15 +289,41 @@ class CopilotProvider(AIProvider):
                 continue
 
     def list_models(self) -> list[dict]:
-        """List models available through the Copilot API."""
-        # The completions API doesn't have a models endpoint; return
-        # a curated list of known-good models.
+        """List models available through the Copilot API.
+
+        Queries the ``/models`` endpoint dynamically.  Falls back to
+        a curated list only if the request fails.
+        """
+        try:
+            headers = self._headers()
+            resp = requests.get(_MODELS_URL, headers=headers, timeout=15)
+            if resp.status_code == 200:
+                data = resp.json().get("data", [])
+                models = []
+                for m in data:
+                    mid = m.get("id", "")
+                    family = m.get("capabilities", {}).get("family", mid)
+                    # Skip embedding-only models
+                    if "embedding" in mid:
+                        continue
+                    models.append({"id": mid, "name": family})
+                if models:
+                    return models
+                logger.debug("Models endpoint returned empty list")
+            else:
+                logger.debug(
+                    "Models endpoint returned %d, using fallback",
+                    resp.status_code,
+                )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Failed to fetch models: %s", exc)
+
+        # Fallback curated list
         return [
-            {"id": "claude-sonnet-4.5", "name": "Claude Sonnet 4.5"},
             {"id": "claude-sonnet-4", "name": "Claude Sonnet 4"},
-            {"id": "gpt-4o", "name": "GPT-4o"},
+            {"id": "claude-sonnet-4.5", "name": "Claude Sonnet 4.5"},
             {"id": "gpt-4.1", "name": "GPT-4.1"},
-            {"id": "o3-mini", "name": "o3-mini"},
+            {"id": "gpt-5-mini", "name": "GPT-5 Mini"},
             {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro"},
         ]
 

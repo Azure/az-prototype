@@ -1,0 +1,73 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: container-apps
+  category: azure
+  services: [container-apps, container-registry]
+  last_reviewed: "2025-12-01"
+
+rules:
+  - id: CA-001
+    severity: required
+    description: "Use managed identity for all service-to-service auth"
+    rationale: "Eliminates credential rotation burden and secret sprawl"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer, biz-analyst]
+    template_check:
+      scope: [container-apps, container-registry]
+      require_config: [identity]
+      error_message: "Service '{service_name}' ({service_type}) missing managed identity configuration"
+
+  - id: CA-002
+    severity: required
+    description: "Deploy Container Apps in a VNET-integrated environment"
+    rationale: "Network isolation is mandatory for internal workloads"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, biz-analyst]
+    template_check:
+      when_services_present: [container-apps]
+      require_service: [virtual-network]
+      error_message: "Template with container-apps must include a virtual-network service for VNET integration"
+
+  - id: CA-003
+    severity: recommended
+    description: "Use consumption plan for dev/test, dedicated for production"
+    rationale: "Cost optimization without sacrificing prod reliability"
+    applies_to: [cloud-architect, cost-analyst, biz-analyst]
+
+  - id: CA-004
+    severity: recommended
+    description: "Set min replicas to 0 for non-critical services in dev"
+    rationale: "Avoids unnecessary spend during idle periods"
+    applies_to: [terraform-agent, bicep-agent, cost-analyst]
+
+patterns:
+  - name: "Container App with Key Vault references"
+    description: "Use Key Vault references for secrets instead of environment variables"
+    example: |
+      secrets:
+        - name: db-connection
+          keyVaultUrl: https://{kv-name}.vault.azure.net/secrets/db-connection
+          identity: system
+
+  - name: "Health probes"
+    description: "Always configure liveness and readiness probes"
+    example: |
+      probes:
+        - type: liveness
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+
+anti_patterns:
+  - description: "Do not store secrets in environment variables or app settings"
+    instead: "Use Key Vault references with managed identity"
+  - description: "Do not use admin credentials for container registry"
+    instead: "Use managed identity with AcrPull role assignment"
+
+references:
+  - title: "Container Apps landing zone accelerator"
+    url: "https://learn.microsoft.com/azure/container-apps/landing-zone-accelerator"
+  - title: "Container Apps networking"
+    url: "https://learn.microsoft.com/azure/container-apps/networking"

@@ -1,0 +1,24 @@
+# Anti-pattern detection — Storage domain
+#
+# Detects insecure storage and data service configurations in
+# AI-generated output.
+
+domain: storage
+description: Storage account, Cosmos DB, and data service configuration detection
+
+patterns:
+  - search_patterns:
+      - "account-level keys"
+      - "account_key_enabled"
+      - "shared_key_access = true"
+    safe_patterns:
+      - "do not use account-level keys"
+      - "disable shared key"
+    warning_message: "Account-level key access detected — use Microsoft Entra RBAC with managed identity instead."
+
+  - search_patterns:
+      - "allow_blob_public_access = true"
+      - "public_access = \"blob\""
+      - "public_access = \"container\""
+    safe_patterns: []
+    warning_message: "Public blob access enabled — disable public access and use SAS tokens or managed identity."

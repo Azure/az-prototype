@@ -1,0 +1,27 @@
+# Anti-pattern detection — Containers domain
+#
+# Detects insecure container and registry configurations in
+# AI-generated output.
+
+domain: containers
+description: Container Apps, ACR, and container runtime configuration detection
+
+patterns:
+  - search_patterns:
+      - "environment_variable"
+      - "env_var"
+    safe_patterns:
+      - "key vault"
+      - "keyvault"
+      - "managed identity"
+      - "secret_ref"
+      - "secretref"
+    warning_message: "Secrets in environment variables detected — use Key Vault references with managed identity instead."
+
+  - search_patterns:
+      - "admin_user_enabled = true"
+      - "acrpush"
+    safe_patterns:
+      - "managed identity"
+      - "acrpull"
+    warning_message: "Container registry admin credentials detected — use managed identity with AcrPull role assignment."

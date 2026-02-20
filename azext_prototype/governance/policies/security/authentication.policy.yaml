@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: authentication
+  category: security
+  services: [container-apps, app-service, functions, api-management, sql-database, cosmos-db]
+  last_reviewed: "2026-02-01"
+
+rules:
+  - id: AUTH-001
+    severity: required
+    description: "Never hardcode credentials, API keys, or secrets in source code, config files, or environment variables"
+    rationale: "Hardcoded secrets leak through source control, logs, and error messages"
+    applies_to: [cloud-architect, app-developer, terraform-agent, bicep-agent, biz-analyst]
+
+  - id: AUTH-002
+    severity: recommended
+    description: "Assign least-privilege RBAC roles for all service principals and user accounts"
+    rationale: "Principle of least privilege limits blast radius of compromised credentials"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, biz-analyst]
+
+  - id: AUTH-003
+    severity: recommended
+    description: "Prefer app registrations with scoped permissions over shared API keys for client authentication"
+    rationale: "App registrations support scoped permissions, token expiry, and audit logging"
+    applies_to: [cloud-architect, app-developer, biz-analyst]
+
+patterns:
+  - name: "Managed identity for service-to-service"
+    description: "Use managed identity to avoid storing credentials"
+    example: |
+      from azure.identity import DefaultAzureCredential
+      credential = DefaultAzureCredential()
+      # Works with managed identity in Azure, developer credentials locally
+
+  - name: "Key Vault for external secrets"
+    description: "Store third-party API keys or connection strings in Key Vault"
+    example: |
+      from azure.keyvault.secrets import SecretClient
+      client = SecretClient(vault_url="https://myvault.vault.azure.net/", credential=credential)
+      secret = client.get_secret("external-api-key")
+
+anti_patterns:
+  - description: "Do not embed API keys or passwords in application source code"
+    instead: "Use managed identity for Azure services or Key Vault for external secrets"
+  - description: "Do not assign Owner or Contributor roles at subscription or resource group scope"
+    instead: "Use the most specific built-in role at the narrowest scope possible"
+
+references:
+  - title: "Azure RBAC best practices"
+    url: "https://learn.microsoft.com/azure/role-based-access-control/best-practices"
+  - title: "DefaultAzureCredential overview"
+    url: "https://learn.microsoft.com/python/api/azure-identity/azure.identity.defaultazurecredential"

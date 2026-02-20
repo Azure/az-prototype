@@ -1,0 +1,111 @@
+# yaml-language-server: $schema=../template.schema.json
+#
+# Microservices template — Multiple Container Apps + Service Bus + APIM
+# Adheres to: CA-001..004, MI-001..004, NET-001..004, INT-001..004
+# -------------------------------------------------------------------
+metadata:
+  name: microservices
+  display_name: "Microservices"
+  description: >
+    A microservices architecture with multiple Container Apps
+    communicating via Azure Service Bus, fronted by API Management.
+    Uses user-assigned managed identity shared across services.
+  category: microservices
+  tags: [container-apps, service-bus, apim, microservices]
+
+services:
+  - name: api-gateway
+    type: api-management
+    tier: consumption
+    config:
+      identity: system-assigned
+      caching: true
+
+  - name: frontend-api
+    type: container-apps
+    tier: consumption
+    config:
+      ingress: internal          # INT-003
+      identity: user-assigned    # MI-002 — shared identity across services
+      min_replicas: 1
+      health_probes: true
+
+  - name: order-service
+    type: container-apps
+    tier: consumption
+    config:
+      ingress: internal
+      identity: user-assigned    # MI-002
+      min_replicas: 0            # CA-004
+      health_probes: true
+
+  - name: notification-service
+    type: container-apps
+    tier: consumption
+    config:
+      ingress: internal
+      identity: user-assigned    # MI-002
+      min_replicas: 0            # CA-004
+      health_probes: true
+
+  - name: messaging
+    type: service-bus
+    tier: standard
+    config:
+      identity: user-assigned
+      private_endpoint: true     # NET-001
+      queues:
+        - name: orders
+        - name: notifications
+
+  - name: shared-identity
+    type: managed-identity
+    config:
+      type: user-assigned        # MI-002 — shared across resources
+
+  - name: secrets
+    type: key-vault
+    tier: standard
+    config:
+      rbac_authorization: true
+      soft_delete: true
+      purge_protection: true
+      private_endpoint: true
+      diagnostics: true          # KV-004 — Log Analytics
+
+  - name: registry
+    type: container-registry
+    tier: basic
+    config:
+      admin_enabled: false       # CA anti-pattern — no admin credentials
+      identity: user-assigned
+
+  - name: network
+    type: virtual-network
+    config:
+      subnets:
+        - name: apps
+          delegation: container-apps
+        - name: private-endpoints
+        - name: apim
+
+  - name: monitoring
+    type: log-analytics
+    config:
+      retention_days: 30
+
+iac_defaults:
+  resource_group_name: "rg-{project}-{env}"
+  tags:
+    managed_by: az-prototype
+    template: microservices
+
+requirements: |
+  Build a microservices application with:
+  - Three Azure Container Apps (frontend-api, order-service, notification-service)
+  - Azure Service Bus for async messaging between services
+  - Azure API Management as the external gateway
+  - User-assigned managed identity shared across all services
+  - Azure Container Registry with no admin credentials (MI + AcrPull)
+  - Azure Key Vault for secrets
+  - All services in a VNET with private endpoints for data services
