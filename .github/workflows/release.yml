@@ -21,6 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     # Extra guard: only run when the tag points at main
     if: github.ref_type == 'tag'
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
 
     steps:
       - uses: actions/checkout@v4
@@ -258,6 +260,7 @@ jobs:
       - name: Create PR against Azure/azure-cli-extensions
         working-directory: azure-cli-extensions
         run: |
+          gh auth setup-git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           VERSION="${{ steps.meta.outputs.version }}"
