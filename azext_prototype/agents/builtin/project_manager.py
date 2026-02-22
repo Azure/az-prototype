@@ -12,7 +12,12 @@ Invoked via: az prototype generate backlog
 import json
 import logging
 
-from azext_prototype.agents.base import BaseAgent, AgentCapability, AgentContext, AgentContract
+from azext_prototype.agents.base import (
+    AgentCapability,
+    AgentContext,
+    AgentContract,
+    BaseAgent,
+)
 from azext_prototype.ai.provider import AIMessage, AIResponse
 
 logger = logging.getLogger(__name__)
@@ -26,10 +31,21 @@ class ProjectManagerAgent(BaseAgent):
     _include_templates = False
     _include_standards = False
     _keywords = [
-        "backlog", "story", "stories", "task", "tasks",
-        "issue", "issues", "work item", "user story",
-        "acceptance criteria", "sprint", "epics",
-        "github", "devops", "board",
+        "backlog",
+        "story",
+        "stories",
+        "task",
+        "tasks",
+        "issue",
+        "issues",
+        "work item",
+        "user story",
+        "acceptance criteria",
+        "sprint",
+        "epics",
+        "github",
+        "devops",
+        "board",
     ]
     _keyword_weight = 0.12
     _contract = AgentContract(
@@ -99,7 +115,9 @@ class ProjectManagerAgent(BaseAgent):
         messages.append(AIMessage(role="user", content=decompose_task))
 
         decompose_response = context.ai_provider.chat(
-            messages, temperature=0.3, max_tokens=8192,
+            messages,
+            temperature=0.3,
+            max_tokens=8192,
         )
 
         # Step 2 — parse structured items
@@ -114,19 +132,23 @@ class ProjectManagerAgent(BaseAgent):
         else:
             format_instructions = DEVOPS_FORMAT_INSTRUCTIONS
 
-        format_messages.append(AIMessage(
-            role="user",
-            content=(
-                f"Format the following backlog items for **{provider}**.\n\n"
-                f"{format_instructions}\n\n"
-                f"## Backlog Items\n```json\n{json.dumps(items, indent=2)}\n```\n\n"
-                f"## Original Architecture\n{task}\n\n"
-                "Produce the complete, formatted output now."
-            ),
-        ))
+        format_messages.append(
+            AIMessage(
+                role="user",
+                content=(
+                    f"Format the following backlog items for **{provider}**.\n\n"
+                    f"{format_instructions}\n\n"
+                    f"## Backlog Items\n```json\n{json.dumps(items, indent=2)}\n```\n\n"
+                    f"## Original Architecture\n{task}\n\n"
+                    "Produce the complete, formatted output now."
+                ),
+            )
+        )
 
         response = context.ai_provider.chat(
-            format_messages, temperature=0.3, max_tokens=self._max_tokens,
+            format_messages,
+            temperature=0.3,
+            max_tokens=self._max_tokens,
         )
 
         # Post-response governance check
@@ -134,9 +156,7 @@ class ProjectManagerAgent(BaseAgent):
         if warnings:
             for w in warnings:
                 logger.warning("Governance: %s", w)
-            block = "\n\n---\n⚠ **Governance warnings:**\n" + "\n".join(
-                f"- {w}" for w in warnings
-            )
+            block = "\n\n---\n⚠ **Governance warnings:**\n" + "\n".join(f"- {w}" for w in warnings)
             response = AIResponse(
                 content=response.content + block,
                 model=response.model,

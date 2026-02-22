@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 # Execution Primitives
 # ======================================================================
 
+
 def _find_az() -> str:
     """Resolve the ``az`` CLI executable path.
 
@@ -78,7 +79,7 @@ DEPLOY_ENV_MAPPING: dict[str, list[str]] = {
     "subscription": [
         "ARM_SUBSCRIPTION_ID",
         "TF_VAR_subscription_id",
-        "SUBSCRIPTION_ID",          # legacy, for deploy.sh scripts
+        "SUBSCRIPTION_ID",  # legacy, for deploy.sh scripts
     ],
     "tenant": [
         "ARM_TENANT_ID",
@@ -134,10 +135,15 @@ def build_deploy_env(
 _SECRET_VAR_SUFFIXES = ("_secret", "_password")
 
 # Variables already handled by DEPLOY_ENV_MAPPING or _lookup_deployer_object_id
-_KNOWN_VARS = frozenset({
-    "subscription_id", "tenant_id", "client_id", "client_secret",
-    "deployer_object_id",
-})
+_KNOWN_VARS = frozenset(
+    {
+        "subscription_id",
+        "tenant_id",
+        "client_id",
+        "client_secret",
+        "deployer_object_id",
+    }
+)
 
 # Regex to find `variable "<name>" {` blocks and optional `default` values.
 _TF_VAR_BLOCK_RE = re.compile(
@@ -218,7 +224,9 @@ def check_az_login() -> bool:
     try:
         result = subprocess.run(
             [_az(), "account", "show"],
-            capture_output=True, text=True, check=False,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         return result.returncode == 0
     except FileNotFoundError:
@@ -230,7 +238,9 @@ def get_current_subscription() -> str:
     try:
         result = subprocess.run(
             [_az(), "account", "show", "--query", "id", "-o", "tsv"],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         )
         return result.stdout.strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
@@ -242,7 +252,9 @@ def get_current_tenant() -> str:
     try:
         result = subprocess.run(
             [_az(), "account", "show", "--query", "tenantId", "-o", "tsv"],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         )
         return result.stdout.strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
@@ -259,12 +271,19 @@ def login_service_principal(client_id: str, client_secret: str, tenant_id: str) 
     try:
         result = subprocess.run(
             [
-                _az(), "login", "--service-principal",
-                "-u", client_id,
-                "-p", client_secret,
-                "--tenant", tenant_id,
+                _az(),
+                "login",
+                "--service-principal",
+                "-u",
+                client_id,
+                "-p",
+                client_secret,
+                "--tenant",
+                tenant_id,
             ],
-            capture_output=True, text=True, check=False,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         if result.returncode != 0:
             error = result.stderr.strip() or result.stdout.strip()
@@ -356,8 +375,11 @@ def _terraform_init(infra_dir: Path, env: dict[str, str] | None = None) -> dict:
     """
     result = subprocess.run(
         ["terraform", "init", "-input=false", "-no-color"],
-        capture_output=True, text=True,
-        cwd=str(infra_dir), check=False, env=env,
+        capture_output=True,
+        text=True,
+        cwd=str(infra_dir),
+        check=False,
+        env=env,
     )
     if result.returncode == 0:
         return {"ok": True}
@@ -371,8 +393,11 @@ def _terraform_init(infra_dir: Path, env: dict[str, str] | None = None) -> dict:
         # Retry after dedup
         result = subprocess.run(
             ["terraform", "init", "-input=false", "-no-color"],
-            capture_output=True, text=True,
-            cwd=str(infra_dir), check=False, env=env,
+            capture_output=True,
+            text=True,
+            cwd=str(infra_dir),
+            check=False,
+            env=env,
         )
         if result.returncode == 0:
             return {"ok": True}
@@ -387,8 +412,11 @@ def _terraform_init(infra_dir: Path, env: dict[str, str] | None = None) -> dict:
         )
         result = subprocess.run(
             ["terraform", "init", "-input=false", "-no-color", "-backend=false"],
-            capture_output=True, text=True,
-            cwd=str(infra_dir), check=False, env=env,
+            capture_output=True,
+            text=True,
+            cwd=str(infra_dir),
+            check=False,
+            env=env,
         )
         if result.returncode == 0:
             return {"ok": True, "warning": "Using local state (remote backend config incomplete)."}
@@ -429,7 +457,7 @@ def _deduplicate_providers(infra_dir: Path) -> None:
     # The simple approach: remove the entire terraform { required_providers { ... } }
     # wrapper from secondary files, since the primary already has it.
     pattern = re.compile(
-        r'terraform\s*\{[^}]*required_providers\s*\{[^}]*\}[^}]*\}',
+        r"terraform\s*\{[^}]*required_providers\s*\{[^}]*\}[^}]*\}",
         re.DOTALL,
     )
 
@@ -454,8 +482,11 @@ def _terraform_validate(infra_dir: Path, env: dict[str, str] | None = None) -> d
     """
     result = subprocess.run(
         ["terraform", "validate", "-no-color"],
-        capture_output=True, text=True,
-        cwd=str(infra_dir), check=False, env=env,
+        capture_output=True,
+        text=True,
+        cwd=str(infra_dir),
+        check=False,
+        env=env,
     )
     if result.returncode == 0:
         return {"ok": True}
@@ -464,7 +495,9 @@ def _terraform_validate(infra_dir: Path, env: dict[str, str] | None = None) -> d
 
 
 def deploy_terraform(
-    infra_dir: Path, subscription: str, env: dict[str, str] | None = None,
+    infra_dir: Path,
+    subscription: str,
+    env: dict[str, str] | None = None,
 ) -> dict:
     """Execute Terraform deployment in the given directory.
 
@@ -488,8 +521,7 @@ def deploy_terraform(
 
     # Phase 3: plan + apply
     commands = [
-        ["terraform", "plan", "-input=false", "-no-color",
-         "-var", f"subscription_id={subscription}", "-out=tfplan"],
+        ["terraform", "plan", "-input=false", "-no-color", "-var", f"subscription_id={subscription}", "-out=tfplan"],
         ["terraform", "apply", "-input=false", "-no-color", "tfplan"],
     ]
 
@@ -497,8 +529,12 @@ def deploy_terraform(
         cmd_str = " ".join(cmd)
         logger.info("Running: %s (cwd=%s)", cmd_str, infra_dir)
         result = subprocess.run(
-            cmd, capture_output=True, text=True,
-            cwd=str(infra_dir), check=False, env=env,
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=str(infra_dir),
+            check=False,
+            env=env,
         )
         if result.returncode != 0:
             error = result.stderr.strip() or result.stdout.strip()
@@ -509,7 +545,9 @@ def deploy_terraform(
 
 
 def deploy_bicep(
-    infra_dir: Path, subscription: str, resource_group: str,
+    infra_dir: Path,
+    subscription: str,
+    resource_group: str,
     env: dict[str, str] | None = None,
 ) -> dict:
     """Execute Bicep deployment for a stage directory.
@@ -530,19 +568,31 @@ def deploy_bicep(
 
     if sub_scoped:
         cmd_parts = [
-            _az(), "deployment", "sub", "create",
-            "--location", get_deploy_location(infra_dir) or "eastus",
-            "--template-file", str(main_bicep),
-            "--subscription", subscription,
+            _az(),
+            "deployment",
+            "sub",
+            "create",
+            "--location",
+            get_deploy_location(infra_dir) or "eastus",
+            "--template-file",
+            str(main_bicep),
+            "--subscription",
+            subscription,
         ]
     else:
         if not resource_group:
             return {"status": "failed", "error": "Resource group required for resource-group-scoped Bicep deployment."}
         cmd_parts = [
-            _az(), "deployment", "group", "create",
-            "--resource-group", resource_group,
-            "--template-file", str(main_bicep),
-            "--subscription", subscription,
+            _az(),
+            "deployment",
+            "group",
+            "create",
+            "--resource-group",
+            resource_group,
+            "--template-file",
+            str(main_bicep),
+            "--subscription",
+            subscription,
         ]
 
     if env and env.get("ARM_TENANT_ID"):
@@ -569,7 +619,9 @@ def deploy_bicep(
 
 
 def plan_terraform(
-    infra_dir: Path, subscription: str, env: dict[str, str] | None = None,
+    infra_dir: Path,
+    subscription: str,
+    env: dict[str, str] | None = None,
 ) -> dict:
     """Run ``terraform plan`` for display (no ``-out``).
 
@@ -580,10 +632,12 @@ def plan_terraform(
         return {"status": "failed", "error": init["error"]}
 
     result = subprocess.run(
-        ["terraform", "plan", "-input=false", "-no-color",
-         "-var", f"subscription_id={subscription}"],
-        capture_output=True, text=True,
-        cwd=str(infra_dir), check=False, env=env,
+        ["terraform", "plan", "-input=false", "-no-color", "-var", f"subscription_id={subscription}"],
+        capture_output=True,
+        text=True,
+        cwd=str(infra_dir),
+        check=False,
+        env=env,
     )
 
     return {
@@ -594,7 +648,9 @@ def plan_terraform(
 
 
 def whatif_bicep(
-    infra_dir: Path, subscription: str, resource_group: str,
+    infra_dir: Path,
+    subscription: str,
+    resource_group: str,
     env: dict[str, str] | None = None,
 ) -> dict:
     """Run ``az deployment group what-if`` to preview Bicep changes."""
@@ -610,19 +666,31 @@ def whatif_bicep(
 
     if sub_scoped:
         cmd_parts = [
-            _az(), "deployment", "sub", "what-if",
-            "--location", get_deploy_location(infra_dir) or "eastus",
-            "--template-file", str(main_bicep),
-            "--subscription", subscription,
+            _az(),
+            "deployment",
+            "sub",
+            "what-if",
+            "--location",
+            get_deploy_location(infra_dir) or "eastus",
+            "--template-file",
+            str(main_bicep),
+            "--subscription",
+            subscription,
         ]
     else:
         if not resource_group:
             return {"status": "skipped", "reason": "Resource group required for what-if."}
         cmd_parts = [
-            _az(), "deployment", "group", "what-if",
-            "--resource-group", resource_group,
-            "--template-file", str(main_bicep),
-            "--subscription", subscription,
+            _az(),
+            "deployment",
+            "group",
+            "what-if",
+            "--resource-group",
+            resource_group,
+            "--template-file",
+            str(main_bicep),
+            "--subscription",
+            subscription,
         ]
 
     if env and env.get("ARM_TENANT_ID"):
@@ -641,7 +709,9 @@ def whatif_bicep(
 
 
 def deploy_app_stage(
-    stage_dir: Path, subscription: str, resource_group: str,
+    stage_dir: Path,
+    subscription: str,
+    resource_group: str,
     env: dict[str, str] | None = None,
 ) -> dict:
     """Deploy a single application stage directory.
@@ -658,7 +728,9 @@ def deploy_app_stage(
         logger.info("Running deploy script: %s", deploy_script)
         result = subprocess.run(
             ["bash", str(deploy_script)],
-            capture_output=True, text=True, check=False,
+            capture_output=True,
+            text=True,
+            check=False,
             cwd=str(stage_dir),
             env=app_env,
         )
@@ -675,7 +747,9 @@ def deploy_app_stage(
                 logger.info("Deploying app: %s", app_dir.name)
                 result = subprocess.run(
                     ["bash", str(app_deploy)],
-                    capture_output=True, text=True, check=False,
+                    capture_output=True,
+                    text=True,
+                    check=False,
                     cwd=str(app_dir),
                     env=app_env,
                 )
@@ -694,8 +768,11 @@ def rollback_terraform(infra_dir: Path, env: dict[str, str] | None = None) -> di
     """Run ``terraform destroy`` to roll back a Terraform stage."""
     result = subprocess.run(
         ["terraform", "destroy", "-auto-approve", "-input=false", "-no-color"],
-        capture_output=True, text=True,
-        cwd=str(infra_dir), check=False, env=env,
+        capture_output=True,
+        text=True,
+        cwd=str(infra_dir),
+        check=False,
+        env=env,
     )
     if result.returncode != 0:
         error = result.stderr.strip() or result.stdout.strip()
@@ -704,7 +781,9 @@ def rollback_terraform(infra_dir: Path, env: dict[str, str] | None = None) -> di
 
 
 def rollback_bicep(
-    infra_dir: Path, subscription: str, resource_group: str,
+    infra_dir: Path,
+    subscription: str,
+    resource_group: str,
     env: dict[str, str] | None = None,
 ) -> dict:
     """Roll back a Bicep stage by redeploying with ``--mode Complete`` and an empty template.
@@ -717,18 +796,28 @@ def rollback_bicep(
         return {"status": "failed", "error": "Resource group required for Bicep rollback."}
 
     cmd_parts = [
-        _az(), "deployment", "group", "create",
-        "--resource-group", resource_group,
-        "--template-file", str(infra_dir / "main.bicep"),
-        "--mode", "Complete",
-        "--subscription", subscription,
+        _az(),
+        "deployment",
+        "group",
+        "create",
+        "--resource-group",
+        resource_group,
+        "--template-file",
+        str(infra_dir / "main.bicep"),
+        "--mode",
+        "Complete",
+        "--subscription",
+        subscription,
     ]
     if env and env.get("ARM_TENANT_ID"):
         cmd_parts.extend(["--tenant", env["ARM_TENANT_ID"]])
 
     result = subprocess.run(
         cmd_parts,
-        capture_output=True, text=True, check=False, env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
     )
     if result.returncode != 0:
         error = result.stderr.strip() or result.stdout.strip()
@@ -739,6 +828,7 @@ def rollback_bicep(
 # ======================================================================
 # Output Capture
 # ======================================================================
+
 
 class DeploymentOutputCapture:
     """Capture and persist deployment outputs from Terraform / Bicep.
@@ -775,7 +865,9 @@ class DeploymentOutputCapture:
         try:
             result = subprocess.run(
                 ["terraform", "output", "-json"],
-                capture_output=True, text=True, check=True,
+                capture_output=True,
+                text=True,
+                check=True,
                 cwd=str(infra_dir),
             )
             outputs = json.loads(result.stdout)
@@ -861,6 +953,7 @@ class DeploymentOutputCapture:
 # ======================================================================
 # Deploy Script Generator
 # ======================================================================
+
 
 class DeployScriptGenerator:
     """Generate deploy.sh scripts for application directories.
@@ -1008,6 +1101,7 @@ echo "✅ Function App deployment complete: $FUNC_NAME"
 # Rollback Manager
 # ======================================================================
 
+
 class RollbackManager:
     """Track deployment state for rollback capability.
 
@@ -1055,32 +1149,36 @@ class RollbackManager:
         iac_tool = latest.get("iac_tool", "terraform")
 
         if iac_tool == "terraform":
-            instructions.extend([
-                "# Terraform rollback options:",
-                "cd concept/infra/terraform",
-                "",
-                "# Option 1: Revert to previous state",
-                "terraform state pull > current.tfstate.backup",
-                "terraform apply -target=<resource>  # selective revert",
-                "",
-                "# Option 2: Destroy and re-deploy",
-                "terraform destroy -auto-approve",
-                "az prototype deploy --force",
-            ])
+            instructions.extend(
+                [
+                    "# Terraform rollback options:",
+                    "cd concept/infra/terraform",
+                    "",
+                    "# Option 1: Revert to previous state",
+                    "terraform state pull > current.tfstate.backup",
+                    "terraform apply -target=<resource>  # selective revert",
+                    "",
+                    "# Option 2: Destroy and re-deploy",
+                    "terraform destroy -auto-approve",
+                    "az prototype deploy --force",
+                ]
+            )
         else:
-            instructions.extend([
-                "# Bicep rollback options:",
-                "",
-                "# Option 1: Re-deploy previous version",
-                "az deployment group create \\",
-                "    --resource-group <rg-name> \\",
-                "    --template-file concept/infra/bicep/main.bicep \\",
-                "    --mode Complete  # removes resources not in template",
-                "",
-                "# Option 2: Delete resource group",
-                "az group delete --name <rg-name> --yes --no-wait",
-                "az prototype deploy --force",
-            ])
+            instructions.extend(
+                [
+                    "# Bicep rollback options:",
+                    "",
+                    "# Option 1: Re-deploy previous version",
+                    "az deployment group create \\",
+                    "    --resource-group <rg-name> \\",
+                    "    --template-file concept/infra/bicep/main.bicep \\",
+                    "    --mode Complete  # removes resources not in template",
+                    "",
+                    "# Option 2: Delete resource group",
+                    "az group delete --name <rg-name> --yes --no-wait",
+                    "az prototype deploy --force",
+                ]
+            )
 
         return instructions
 

@@ -1,8 +1,8 @@
 """GitHub authentication manager using gh CLI."""
 
 import json
-import subprocess
 import logging
+import subprocess
 
 from knack.util import CLIError
 
@@ -90,8 +90,7 @@ class GitHubAuthManager:
         self._run_gh(args)
 
         # Fetch repo details
-        result = self._run_gh(["repo", "view", name, "--json",
-                               "url,sshUrl,name,owner"])
+        result = self._run_gh(["repo", "view", name, "--json", "url,sshUrl,name,owner"])
         return json.loads(result.stdout)
 
     def clone_repo(self, repo: str, directory: str | None = None) -> str:
@@ -126,8 +125,7 @@ class GitHubAuthManager:
             )
         except FileNotFoundError:
             raise CLIError(
-                "GitHub CLI (gh) is not installed. "
-                "Install it from https://cli.github.com/ and run 'gh auth login'."
+                "GitHub CLI (gh) is not installed. " "Install it from https://cli.github.com/ and run 'gh auth login'."
             )
 
     def _initiate_login(self):
@@ -138,9 +136,7 @@ class GitHubAuthManager:
             check=False,
         )
         if result.returncode != 0:
-            raise CLIError(
-                "GitHub authentication failed. Run 'gh auth login' manually and retry."
-            )
+            raise CLIError("GitHub authentication failed. Run 'gh auth login' manually and retry.")
 
     def _get_user_info(self) -> dict:
         """Fetch authenticated user profile."""

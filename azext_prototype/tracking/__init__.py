@@ -82,11 +82,13 @@ class ChangeTracker:
         if "deployments" not in self._manifest:
             self._manifest["deployments"] = []
 
-        self._manifest["deployments"].append({
-            "scope": scope,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "files_count": len(current_files),
-        })
+        self._manifest["deployments"].append(
+            {
+                "scope": scope,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "files_count": len(current_files),
+            }
+        )
 
         self._save_manifest()
         logger.info("Deployment recorded for scope '%s' — %d files tracked.", scope, len(current_files))
@@ -166,8 +168,13 @@ class ChangeTracker:
     def _should_ignore(self, path: Path) -> bool:
         """Check if a file should be ignored from tracking."""
         ignore_patterns = {
-            ".git", "__pycache__", ".terraform", ".prototype",
-            "node_modules", ".env", ".DS_Store",
+            ".git",
+            "__pycache__",
+            ".terraform",
+            ".prototype",
+            "node_modules",
+            ".env",
+            ".DS_Store",
         }
         parts = path.parts
         return any(part in ignore_patterns for part in parts)

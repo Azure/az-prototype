@@ -31,7 +31,8 @@ from azext_prototype.ai.provider import AIMessage
 from azext_prototype.ai.token_tracker import TokenTracker
 from azext_prototype.stages.discovery_state import DiscoveryState
 from azext_prototype.stages.qa_router import route_error_to_qa
-from azext_prototype.ui.console import Console, DiscoveryPrompt, console as default_console
+from azext_prototype.ui.console import Console, DiscoveryPrompt
+from azext_prototype.ui.console import console as default_console
 
 logger = logging.getLogger(__name__)
 
@@ -57,12 +58,16 @@ _READY_MARKER = "[READY]"
 # DiscoveryResult — public interface consumed by DesignStage
 # -------------------------------------------------------------------- #
 
+
 class DiscoveryResult:
     """Result of a discovery session."""
 
     __slots__ = (
-        "requirements", "conversation", "policy_overrides",
-        "exchange_count", "cancelled",
+        "requirements",
+        "conversation",
+        "policy_overrides",
+        "exchange_count",
+        "cancelled",
     )
 
     def __init__(
@@ -83,6 +88,7 @@ class DiscoveryResult:
 # -------------------------------------------------------------------- #
 # DiscoverySession
 # -------------------------------------------------------------------- #
+
 
 class DiscoverySession:
     """Organic, multi-turn discovery conversation.
@@ -174,7 +180,6 @@ class DiscoverySession:
         # Use injected I/O for tests, otherwise use styled console
         use_styled = input_fn is None and print_fn is None
         _input = input_fn or (lambda p: self._prompt.prompt(p))
-        _print = print_fn or self._console.print
 
         # Load existing discovery state for context
         existing_context = ""
@@ -348,10 +353,12 @@ class DiscoverySession:
 
         # System messages: biz-analyst prompt + governance + architect context
         full = self._biz_agent.get_system_messages()
-        full.append(AIMessage(
-            role="system",
-            content=f"Today's date is {date.today().strftime('%B %d, %Y')}.",
-        ))
+        full.append(
+            AIMessage(
+                role="system",
+                content=f"Today's date is {date.today().strftime('%B %d, %Y')}.",
+            )
+        )
         architect_context = self._build_architect_context()
         if architect_context:
             full.append(AIMessage(role="system", content=architect_context))
@@ -386,8 +393,11 @@ class DiscoverySession:
                 )
             else:
                 route_error_to_qa(
-                    exc, "Discovery conversation",
-                    self._qa_agent, self._context, self._token_tracker,
+                    exc,
+                    "Discovery conversation",
+                    self._qa_agent,
+                    self._context,
+                    self._token_tracker,
                     lambda msg: logger.info(msg),
                 )
                 raise
@@ -440,26 +450,29 @@ class DiscoverySession:
         elif seed_context:
             parts.append(seed_context)
         elif artifacts:
-            parts.append(
-                "I have some requirement documents for you to review:\n\n"
-                + artifacts
-            )
+            parts.append("I have some requirement documents for you to review:\n\n" + artifacts)
         elif not existing_context:
             parts.append("I'd like to design a new Azure prototype.")
 
-        text = "\n\n---\n\n".join(parts) if len(parts) > 1 else (parts[0] if parts else "I'd like to design a new Azure prototype.")
+        text = (
+            "\n\n---\n\n".join(parts)
+            if len(parts) > 1
+            else (parts[0] if parts else "I'd like to design a new Azure prototype.")
+        )
 
         # If images are present, build a multi-modal content array
         if images:
             content: list[dict] = [{"type": "text", "text": text}]
             for img in images:
-                content.append({
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:{img['mime']};base64,{img['data']}",
-                        "detail": "high",
-                    },
-                })
+                content.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{img['mime']};base64,{img['data']}",
+                            "detail": "high",
+                        },
+                    }
+                )
             return content
 
         return text
@@ -512,7 +525,7 @@ class DiscoverySession:
             "technical detail in each of these areas to produce a deployable "
             "design.  Ask **open-ended** questions that invite the user to "
             "describe their thinking, not just pick from a menu.  Use "
-            "\"how\", \"what\", \"tell me about\", \"walk me through\" "
+            '"how", "what", "tell me about", "walk me through" '
             "phrasing:\n"
             "\n"
             "**Compute & hosting** — How do you picture the application "
@@ -582,9 +595,7 @@ class DiscoverySession:
         return the raw conversation text.
         """
         if self._exchange_count == 0:
-            user_msgs = [
-                m.content for m in self._messages if m.role == "user"
-            ]
+            user_msgs = [m.content for m in self._messages if m.role == "user"]
             return "\n\n".join(user_msgs).strip()
 
         summary = self._chat(
@@ -765,12 +776,14 @@ class DiscoverySession:
             name = parts[0].strip().strip("*").strip()
             reason = parts[1].strip() if len(parts) > 1 else ""
             if name:
-                overrides.append({
-                    "rule_id": name,
-                    "policy_name": name,
-                    "description": reason or "User chose to override",
-                    "recommendation": "",
-                    "user_text": reason,
-                })
+                overrides.append(
+                    {
+                        "rule_id": name,
+                        "policy_name": name,
+                        "description": reason or "User chose to override",
+                        "recommendation": "",
+                        "user_text": reason,
+                    }
+                )
 
         return overrides

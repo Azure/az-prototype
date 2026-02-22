@@ -90,25 +90,28 @@ def _safe_load_yaml(stream: Any) -> dict | None:
             stream.seek(0)
 
         data = yaml.load(stream, Loader=_RepairLoader)  # noqa: S506
-        logger.warning(
-            "Repaired legacy config — re-saving without Python type tags."
-        )
+        logger.warning("Repaired legacy config — re-saving without Python type tags.")
         return _sanitize_for_yaml(data) if data else data
 
 
 # --- Azure-only constraint validation helpers ---
 
-_AZURE_OPENAI_ENDPOINT_PATTERN = re.compile(
-    r"^https://[a-zA-Z0-9][a-zA-Z0-9\-]*\.openai\.azure\.com/?$"
-)
+_AZURE_OPENAI_ENDPOINT_PATTERN = re.compile(r"^https://[a-zA-Z0-9][a-zA-Z0-9\-]*\.openai\.azure\.com/?$")
 
 _ALLOWED_AI_PROVIDERS = frozenset({"github-models", "azure-openai", "copilot"})
 
-_BLOCKED_AI_PROVIDERS = frozenset({
-    "openai", "chatgpt", "public-openai",
-    "anthropic", "cohere", "google",
-    "aws-bedrock", "huggingface",
-})
+_BLOCKED_AI_PROVIDERS = frozenset(
+    {
+        "openai",
+        "chatgpt",
+        "public-openai",
+        "anthropic",
+        "cohere",
+        "google",
+        "aws-bedrock",
+        "huggingface",
+    }
+)
 
 _BLOCKED_ENDPOINTS = [
     "api.openai.com",
@@ -121,27 +124,57 @@ _ALLOWED_IAC_TOOLS = frozenset({"terraform", "bicep"})
 
 # Known Azure regions (from naming module's REGION_SHORT_CODES + common extras).
 # Not exhaustive but covers all GA regions as of 2025.
-_KNOWN_AZURE_REGIONS = frozenset({
-    "eastus", "eastus2", "westus", "westus2", "westus3",
-    "centralus", "northcentralus", "southcentralus", "westcentralus",
-    "canadacentral", "canadaeast", "brazilsouth",
-    "northeurope", "westeurope",
-    "uksouth", "ukwest",
-    "francecentral", "francesouth",
-    "germanywestcentral", "norwayeast", "swedencentral",
-    "switzerlandnorth",
-    "australiaeast", "australiasoutheast",
-    "eastasia", "southeastasia",
-    "japaneast", "japanwest",
-    "koreacentral", "koreasouth",
-    "centralindia", "southindia", "westindia",
-    "southafricanorth", "uaenorth",
-    # Additional GA regions
-    "brazilsoutheast", "norwaywest", "switzerlandwest",
-    "germanynorth", "polandcentral", "italynorth",
-    "israelcentral", "qatarcentral", "mexicocentral",
-    "spaincentral", "newzealandnorth",
-})
+_KNOWN_AZURE_REGIONS = frozenset(
+    {
+        "eastus",
+        "eastus2",
+        "westus",
+        "westus2",
+        "westus3",
+        "centralus",
+        "northcentralus",
+        "southcentralus",
+        "westcentralus",
+        "canadacentral",
+        "canadaeast",
+        "brazilsouth",
+        "northeurope",
+        "westeurope",
+        "uksouth",
+        "ukwest",
+        "francecentral",
+        "francesouth",
+        "germanywestcentral",
+        "norwayeast",
+        "swedencentral",
+        "switzerlandnorth",
+        "australiaeast",
+        "australiasoutheast",
+        "eastasia",
+        "southeastasia",
+        "japaneast",
+        "japanwest",
+        "koreacentral",
+        "koreasouth",
+        "centralindia",
+        "southindia",
+        "westindia",
+        "southafricanorth",
+        "uaenorth",
+        # Additional GA regions
+        "brazilsoutheast",
+        "norwaywest",
+        "switzerlandwest",
+        "germanynorth",
+        "polandcentral",
+        "italynorth",
+        "israelcentral",
+        "qatarcentral",
+        "mexicocentral",
+        "spaincentral",
+        "newzealandnorth",
+    }
+)
 
 # Keys whose values are considered sensitive and belong in the secrets file.
 # A key matches if it starts with any of these prefixes.
@@ -252,8 +285,7 @@ class ProjectConfig:
         """
         if not self.config_path.exists():
             raise CLIError(
-                f"Configuration file not found: {self.config_path}\n"
-                "Run 'az prototype init' to create a project."
+                f"Configuration file not found: {self.config_path}\n" "Run 'az prototype init' to create a project."
             )
 
         with open(self.config_path, "r", encoding="utf-8") as f:
@@ -392,8 +424,7 @@ class ProjectConfig:
             tool = str(value).lower().strip()
             if tool not in _ALLOWED_IAC_TOOLS:
                 raise CLIError(
-                    f"Unknown IaC tool: '{value}'.\n"
-                    f"Supported tools: {', '.join(sorted(_ALLOWED_IAC_TOOLS))}"
+                    f"Unknown IaC tool: '{value}'.\n" f"Supported tools: {', '.join(sorted(_ALLOWED_IAC_TOOLS))}"
                 )
 
         if key == "project.location":
@@ -446,6 +477,7 @@ class ProjectConfig:
 
     def _apply_overrides_to(self, base: dict, overlay: dict):
         """Recursively merge *overlay* into *base*."""
+
         def merge(b: dict, o: dict):
             for key, value in o.items():
                 if isinstance(value, dict) and isinstance(b.get(key), dict):

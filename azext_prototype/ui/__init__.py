@@ -8,8 +8,8 @@ Provides Rich-based console output with:
 
 from azext_prototype.ui.console import (
     Console,
-    console,
     DiscoveryPrompt,
+    console,
 )
 
 __all__ = [

@@ -107,7 +107,8 @@ def route_error_to_qa(
     if escalation_tracker is not None:
         try:
             escalation_tracker.record_blocker(
-                context_label, error_text,
+                context_label,
+                error_text,
                 source_agent=source_agent or "qa-engineer",
                 source_stage=source_stage,
             )
@@ -125,14 +126,19 @@ def _submit_knowledge(
 ) -> None:
     """Fire-and-forget knowledge contribution from QA diagnosis."""
     try:
-        from azext_prototype.stages.knowledge_contributor import build_finding_from_qa, submit_if_gap
         from azext_prototype.knowledge import KnowledgeLoader
+        from azext_prototype.stages.knowledge_contributor import (
+            build_finding_from_qa,
+            submit_if_gap,
+        )
 
         loader = KnowledgeLoader()
         svc_list = services or []
         for svc in svc_list:
             finding = build_finding_from_qa(
-                qa_content, service=svc, source=context_label,
+                qa_content,
+                service=svc,
+                source=context_label,
             )
             submit_if_gap(finding, loader, print_fn=print_fn)
     except Exception:

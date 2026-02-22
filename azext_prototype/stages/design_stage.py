@@ -18,18 +18,17 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-import yaml
-
 from knack.util import CLIError
 
-from azext_prototype.agents.base import AgentContext, AgentCapability
-from azext_prototype.agents.registry import AgentRegistry
+from azext_prototype.agents.base import AgentCapability, AgentContext
 from azext_prototype.agents.orchestrator import AgentOrchestrator
+from azext_prototype.agents.registry import AgentRegistry
 from azext_prototype.config import ProjectConfig
 from azext_prototype.stages.base import BaseStage, StageGuard, StageState
-from azext_prototype.stages.discovery import DiscoverySession, DiscoveryResult
+from azext_prototype.stages.discovery import DiscoveryResult, DiscoverySession
 from azext_prototype.stages.discovery_state import DiscoveryState
-from azext_prototype.ui.console import Console, console as default_console
+from azext_prototype.ui.console import Console
+from azext_prototype.ui.console import console as default_console
 
 logger = logging.getLogger(__name__)
 
@@ -147,11 +146,13 @@ class DesignStage(BaseStage):
                 _print("  (no files found)")
             _print("")
 
-            design_state["artifacts"].append({
-                "path": artifacts_path,
-                "content_summary": artifact_content[:500],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            })
+            design_state["artifacts"].append(
+                {
+                    "path": artifacts_path,
+                    "content_summary": artifact_content[:500],
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            )
             agent_context.add_artifact("requirements", artifact_content)
         else:
             artifact_content = ""
@@ -208,7 +209,8 @@ class DesignStage(BaseStage):
             #    If context_only=True and the context is clear, the agent may
             #    skip interactive conversation and proceed directly to design.
             discovery = DiscoverySession(
-                agent_context, registry,
+                agent_context,
+                registry,
                 console=ui,
                 discovery_state=discovery_state,
             )
@@ -231,8 +233,7 @@ class DesignStage(BaseStage):
         # Persist any policy overrides
         if discovery_result.policy_overrides:
             design_state["policy_overrides"] = (
-                design_state.get("policy_overrides", [])
-                + discovery_result.policy_overrides
+                design_state.get("policy_overrides", []) + discovery_result.policy_overrides
             )
 
         # 3. Build the design prompt
@@ -244,12 +245,21 @@ class DesignStage(BaseStage):
 
         # 4. Plan and generate architecture iteratively (per-section)
         sections = self._plan_architecture(
-            ui, agent_context, primary_architect, config,
-            additional_context, _print,
+            ui,
+            agent_context,
+            primary_architect,
+            config,
+            additional_context,
+            _print,
         )
         design_output, _usage = self._generate_architecture_sections(
-            ui, agent_context, primary_architect, config,
-            sections, additional_context, _print,
+            ui,
+            agent_context,
+            primary_architect,
+            config,
+            sections,
+            additional_context,
+            _print,
         )
 
         # 5. Run supporting IaC review
@@ -257,12 +267,20 @@ class DesignStage(BaseStage):
         if ui:
             with ui.spinner(f"Reviewing {iac_tool} feasibility..."):
                 self._run_iac_review(
-                    agent_context, registry, config, primary_architect, design_output,
+                    agent_context,
+                    registry,
+                    config,
+                    primary_architect,
+                    design_output,
                 )
         else:
             _print(f"\nReviewing {iac_tool} feasibility...")
             self._run_iac_review(
-                agent_context, registry, config, primary_architect, design_output,
+                agent_context,
+                registry,
+                config,
+                primary_architect,
+                design_output,
             )
 
         # 6. Parse and store design output
@@ -287,7 +305,10 @@ class DesignStage(BaseStage):
         # 10. Interactive refinement loop (if requested)
         if interactive:
             design_output = self._refine_architecture_loop(
-                agent_context, primary_architect, design_state, config,
+                agent_context,
+                primary_architect,
+                design_state,
+                config,
                 print_fn=print_fn,
             )
 
@@ -373,11 +394,13 @@ class DesignStage(BaseStage):
                 break
 
             design_state["decisions"] = design_state.get("decisions", [])
-            design_state["decisions"].append({
-                "feedback": feedback,
-                "iteration": design_state["iteration"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            })
+            design_state["decisions"].append(
+                {
+                    "feedback": feedback,
+                    "iteration": design_state["iteration"],
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            )
 
             # Build a refinement prompt
             refinement_task = (
@@ -428,10 +451,7 @@ class DesignStage(BaseStage):
         on *agent_context* for later stages.
         """
         iac_tool = config.get("project.iac_tool", "terraform")
-        iac_capability = (
-            AgentCapability.TERRAFORM if iac_tool == "terraform"
-            else AgentCapability.BICEP
-        )
+        iac_capability = AgentCapability.TERRAFORM if iac_tool == "terraform" else AgentCapability.BICEP
         iac_agents = registry.find_by_capability(iac_capability)
         if not iac_agents:
             return
@@ -519,9 +539,7 @@ class DesignStage(BaseStage):
 
         try:
             sections = json.loads(json_str)
-            if isinstance(sections, list) and all(
-                isinstance(s, dict) and "name" in s for s in sections
-            ):
+            if isinstance(sections, list) and all(isinstance(s, dict) and "name" in s for s in sections):
                 # Ensure each section has a context field
                 for s in sections:
                     s.setdefault("context", "")
@@ -553,9 +571,7 @@ class DesignStage(BaseStage):
         region = cfg.get("project", {}).get("location", "eastus")
         iac_tool = cfg.get("project", {}).get("iac_tool", "terraform")
 
-        plan_summary = "\n".join(
-            f"- {s['name']}: {s.get('context', '')}" for s in sections
-        )
+        plan_summary = "\n".join(f"- {s['name']}: {s.get('context', '')}" for s in sections)
 
         accumulated: list[str] = []
         merged_usage: dict[str, int] = {}
@@ -592,11 +608,7 @@ class DesignStage(BaseStage):
                         )
                         summaries.append(heading + " *(see above — omitted for brevity)*")
                     context_parts = summaries + list(recent)
-                prompt += (
-                    "## Architecture So Far\n"
-                    + "\n\n".join(context_parts)
-                    + "\n\n"
-                )
+                prompt += "## Architecture So Far\n" + "\n\n".join(context_parts) + "\n\n"
             prompt += (
                 f"## Instructions\n"
                 f'Generate ONLY the "{section_name}" section. Use markdown with a ## heading.\n'
@@ -653,7 +665,10 @@ class DesignStage(BaseStage):
         When console is provided, shows a progress bar during file reading.
         Falls back to _read_artifacts when no console is available.
         """
-        from azext_prototype.parsers.binary_reader import FileCategory, MAX_IMAGES_PER_DIR
+        from azext_prototype.parsers.binary_reader import (
+            MAX_IMAGES_PER_DIR,
+            FileCategory,
+        )
 
         artifacts_dir = Path(path)
         if not artifacts_dir.exists():
@@ -737,7 +752,10 @@ class DesignStage(BaseStage):
             ``read``     – list of relative paths that were read
             ``failed``   – list of ``(relative_path, reason)`` tuples
         """
-        from azext_prototype.parsers.binary_reader import FileCategory, MAX_IMAGES_PER_DIR
+        from azext_prototype.parsers.binary_reader import (
+            MAX_IMAGES_PER_DIR,
+            FileCategory,
+        )
 
         artifacts_dir = Path(path)
         if not artifacts_dir.exists():
@@ -797,6 +815,7 @@ class DesignStage(BaseStage):
         Returns a ``ReadResult`` from the binary reader module.
         """
         from azext_prototype.parsers.binary_reader import read_file
+
         return read_file(path)
 
     # ------------------------------------------------------------------
@@ -828,8 +847,7 @@ class DesignStage(BaseStage):
             with open(state_path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except (json.JSONDecodeError, IOError):
-            return {"iteration": 0, "artifacts": [], "architecture": None,
-                    "decisions": [], "last_updated": None}
+            return {"iteration": 0, "artifacts": [], "architecture": None, "decisions": [], "last_updated": None}
 
     def _save_design_state(self, project_dir: str, state: dict):
         """Persist design state."""
@@ -989,8 +1007,7 @@ class DesignStage(BaseStage):
         if design_state.get("policy_overrides"):
             for override in design_state["policy_overrides"]:
                 learnings["constraints"].append(
-                    f"Policy override: {override.get('policy_name', 'unknown')} - "
-                    f"{override.get('description', '')}"
+                    f"Policy override: {override.get('policy_name', 'unknown')} - " f"{override.get('description', '')}"
                 )
 
         return learnings

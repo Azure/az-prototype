@@ -279,10 +279,15 @@ def load_arguments(self, _):
         c.argument(
             "contribution_type",
             options_list=["--type"],
-            arg_type=get_enum_type([
-                "Service pattern update", "New service",
-                "Tool pattern", "Language pattern", "Pitfall",
-            ]),
+            arg_type=get_enum_type(
+                [
+                    "Service pattern update",
+                    "New service",
+                    "Tool pattern",
+                    "Language pattern",
+                    "Pitfall",
+                ]
+            ),
             help="Type of knowledge contribution.",
             default="Pitfall",
         )

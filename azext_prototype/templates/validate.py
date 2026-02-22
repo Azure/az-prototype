@@ -47,7 +47,6 @@ from typing import Any
 
 import yaml
 
-
 # ------------------------------------------------------------------ #
 # Compliance violation
 # ------------------------------------------------------------------ #
@@ -100,11 +99,13 @@ def _load_template_checks(policy_dirs: list[Path]) -> list[dict[str, Any]]:
                 tc = rule.get("template_check")
                 if not isinstance(tc, dict):
                     continue
-                checks.append({
-                    "rule_id": str(rule.get("id", "")),
-                    "policy_severity": str(rule.get("severity", "optional")),
-                    "template_check": tc,
-                })
+                checks.append(
+                    {
+                        "rule_id": str(rule.get("id", "")),
+                        "policy_severity": str(rule.get("severity", "optional")),
+                        "template_check": tc,
+                    }
+                )
     return checks
 
 
@@ -160,10 +161,14 @@ def _evaluate_check(
                 service_name="",
                 config_key="",
             )
-            violations.append(ComplianceViolation(
-                template=template_name, rule_id=rule_id,
-                severity=severity, message=msg,
-            ))
+            violations.append(
+                ComplianceViolation(
+                    template=template_name,
+                    rule_id=rule_id,
+                    severity=severity,
+                    message=msg,
+                )
+            )
 
     # --- per-service checks (scope-based) ---
     scope = _as_list(tc.get("scope"))
@@ -197,10 +202,14 @@ def _evaluate_check(
                     service_type=svc_type,
                     config_key=key,
                 )
-                violations.append(ComplianceViolation(
-                    template=template_name, rule_id=rule_id,
-                    severity=severity, message=msg,
-                ))
+                violations.append(
+                    ComplianceViolation(
+                        template=template_name,
+                        rule_id=rule_id,
+                        severity=severity,
+                        message=msg,
+                    )
+                )
 
         # require_config_value — keys that must equal a specific value
         for key, expected in require_config_value.items():
@@ -215,10 +224,14 @@ def _evaluate_check(
                     expected_value=expected,
                     actual_value=actual,
                 )
-                violations.append(ComplianceViolation(
-                    template=template_name, rule_id=rule_id,
-                    severity=severity, message=msg,
-                ))
+                violations.append(
+                    ComplianceViolation(
+                        template=template_name,
+                        rule_id=rule_id,
+                        severity=severity,
+                        message=msg,
+                    )
+                )
 
         # reject_config_value — keys that must NOT equal a specific value
         for key, rejected in reject_config_value.items():
@@ -233,10 +246,14 @@ def _evaluate_check(
                     rejected_value=rejected,
                     actual_value=actual,
                 )
-                violations.append(ComplianceViolation(
-                    template=template_name, rule_id=rule_id,
-                    severity=severity, message=msg,
-                ))
+                violations.append(
+                    ComplianceViolation(
+                        template=template_name,
+                        rule_id=rule_id,
+                        severity=severity,
+                        message=msg,
+                    )
+                )
 
     return violations
 
@@ -244,6 +261,7 @@ def _evaluate_check(
 # ------------------------------------------------------------------ #
 # Public API
 # ------------------------------------------------------------------ #
+
 
 def validate_template_compliance(
     path: Path,
@@ -269,23 +287,35 @@ def validate_template_compliance(
     try:
         data: dict[str, Any] = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError as exc:
-        violations.append(ComplianceViolation(
-            template=filename, rule_id="PARSE", severity="error",
-            message=f"Invalid YAML: {exc}",
-        ))
+        violations.append(
+            ComplianceViolation(
+                template=filename,
+                rule_id="PARSE",
+                severity="error",
+                message=f"Invalid YAML: {exc}",
+            )
+        )
         return violations
     except OSError as exc:
-        violations.append(ComplianceViolation(
-            template=filename, rule_id="IO", severity="error",
-            message=f"Cannot read file: {exc}",
-        ))
+        violations.append(
+            ComplianceViolation(
+                template=filename,
+                rule_id="IO",
+                severity="error",
+                message=f"Cannot read file: {exc}",
+            )
+        )
         return violations
 
     if not isinstance(data, dict):
-        violations.append(ComplianceViolation(
-            template=filename, rule_id="PARSE", severity="error",
-            message="Root element must be a mapping",
-        ))
+        violations.append(
+            ComplianceViolation(
+                template=filename,
+                rule_id="PARSE",
+                severity="error",
+                message="Root element must be a mapping",
+            )
+        )
         return violations
 
     metadata = data.get("metadata", {})
@@ -293,27 +323,27 @@ def validate_template_compliance(
 
     services: list[dict[str, Any]] = data.get("services", [])
     if not isinstance(services, list):
-        violations.append(ComplianceViolation(
-            template=template_name, rule_id="SCHEMA", severity="error",
-            message="'services' must be a list",
-        ))
+        violations.append(
+            ComplianceViolation(
+                template=template_name,
+                rule_id="SCHEMA",
+                severity="error",
+                message="'services' must be a list",
+            )
+        )
         return violations
 
     all_types = [s.get("type", "") for s in services if isinstance(s, dict)]
 
     # Load template_check rules from policies (or use pre-loaded checks)
-    checks = _checks if _checks is not None else _load_template_checks(
-        policy_dirs or [_DEFAULT_POLICY_DIR]
-    )
+    checks = _checks if _checks is not None else _load_template_checks(policy_dirs or [_DEFAULT_POLICY_DIR])
 
     # Evaluate each check
     for check_info in checks:
         rule_id = check_info["rule_id"]
         tc = check_info["template_check"]
         severity = _resolve_severity(check_info["policy_severity"], tc)
-        violations.extend(
-            _evaluate_check(rule_id, severity, tc, template_name, services, all_types)
-        )
+        violations.extend(_evaluate_check(rule_id, severity, tc, template_name, services, all_types))
 
     return violations
 
@@ -334,9 +364,7 @@ def validate_template_directory(
     checks = _load_template_checks(policy_dirs or [_DEFAULT_POLICY_DIR])
 
     for template_file in sorted(directory.rglob("*.template.yaml")):
-        all_violations.extend(
-            validate_template_compliance(template_file, policy_dirs, _checks=checks)
-        )
+        all_violations.extend(validate_template_compliance(template_file, policy_dirs, _checks=checks))
 
     return all_violations
 
@@ -344,6 +372,7 @@ def validate_template_directory(
 # ------------------------------------------------------------------ #
 # CLI
 # ------------------------------------------------------------------ #
+
 
 def _get_staged_template_files() -> list[Path]:
     """Return staged .template.yaml files from the git index."""
@@ -357,18 +386,12 @@ def _get_staged_template_files() -> list[Path]:
     except (subprocess.CalledProcessError, FileNotFoundError):
         return []
 
-    return [
-        Path(f)
-        for f in result.stdout.strip().splitlines()
-        if f.endswith(".template.yaml")
-    ]
+    return [Path(f) for f in result.stdout.strip().splitlines() if f.endswith(".template.yaml")]
 
 
 def main(argv: list[str] | None = None) -> int:
     """Entry point for the template compliance validator."""
-    parser = argparse.ArgumentParser(
-        description="Validate workload templates against governance policies."
-    )
+    parser = argparse.ArgumentParser(description="Validate workload templates against governance policies.")
     parser.add_argument(
         "files",
         nargs="*",

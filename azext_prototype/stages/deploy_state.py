@@ -232,24 +232,15 @@ class DeployState:
 
     def get_pending_stages(self) -> list[dict]:
         """Return stages not yet deployed."""
-        return [
-            s for s in self._state["deployment_stages"]
-            if s.get("deploy_status") == "pending"
-        ]
+        return [s for s in self._state["deployment_stages"] if s.get("deploy_status") == "pending"]
 
     def get_deployed_stages(self) -> list[dict]:
         """Return stages that have been deployed."""
-        return [
-            s for s in self._state["deployment_stages"]
-            if s.get("deploy_status") == "deployed"
-        ]
+        return [s for s in self._state["deployment_stages"] if s.get("deploy_status") == "deployed"]
 
     def get_failed_stages(self) -> list[dict]:
         """Return stages that failed deployment."""
-        return [
-            s for s in self._state["deployment_stages"]
-            if s.get("deploy_status") == "failed"
-        ]
+        return [s for s in self._state["deployment_stages"] if s.get("deploy_status") == "failed"]
 
     def get_rollback_candidates(self) -> list[dict]:
         """Return deployed stages in reverse order (highest stage number first).
@@ -286,48 +277,57 @@ class DeployState:
 
     def get_preflight_failures(self) -> list[dict]:
         """Return preflight results where status is ``'fail'``."""
-        return [
-            r for r in self._state.get("preflight_results", [])
-            if r.get("status") == "fail"
-        ]
+        return [r for r in self._state.get("preflight_results", []) if r.get("status") == "fail"]
 
     # ------------------------------------------------------------------ #
     # Audit logging
     # ------------------------------------------------------------------ #
 
     def add_deploy_log_entry(
-        self, stage_num: int, action: str, detail: str = "",
+        self,
+        stage_num: int,
+        action: str,
+        detail: str = "",
     ) -> None:
         """Append an entry to the deploy audit log."""
-        self._state["deploy_log"].append({
-            "stage": stage_num,
-            "action": action,
-            "detail": detail,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        self._state["deploy_log"].append(
+            {
+                "stage": stage_num,
+                "action": action,
+                "detail": detail,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
 
     def add_rollback_log_entry(self, stage_num: int, detail: str = "") -> None:
         """Append an entry to the rollback audit log."""
-        self._state["rollback_log"].append({
-            "stage": stage_num,
-            "detail": detail,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        self._state["rollback_log"].append(
+            {
+                "stage": stage_num,
+                "detail": detail,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
 
     # ------------------------------------------------------------------ #
     # Conversation tracking
     # ------------------------------------------------------------------ #
 
     def update_from_exchange(
-        self, user_input: str, agent_response: str, exchange_number: int,
+        self,
+        user_input: str,
+        agent_response: str,
+        exchange_number: int,
     ) -> None:
         """Record a conversation exchange."""
-        self._state["conversation_history"].append({
-            "exchange": exchange_number,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "user": user_input,
-            "assistant": agent_response,
-        })
+        self._state["conversation_history"].append(
+            {
+                "exchange": exchange_number,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "user": user_input,
+                "assistant": agent_response,
+            }
+        )
         self.save()
 
     # ------------------------------------------------------------------ #
@@ -356,9 +356,11 @@ class DeployState:
         failed = len([s for s in stages if s.get("deploy_status") == "failed"])
         rolled = len([s for s in stages if s.get("deploy_status") == "rolled_back"])
 
-        lines.append(f"  Stages: {len(stages)} total, {deployed} deployed"
-                      f"{f', {failed} failed' if failed else ''}"
-                      f"{f', {rolled} rolled back' if rolled else ''}")
+        lines.append(
+            f"  Stages: {len(stages)} total, {deployed} deployed"
+            f"{f', {failed} failed' if failed else ''}"
+            f"{f', {rolled} rolled back' if rolled else ''}"
+        )
         lines.append("")
 
         for stage in stages:

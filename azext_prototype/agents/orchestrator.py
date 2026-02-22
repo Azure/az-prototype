@@ -106,9 +106,7 @@ class AgentOrchestrator:
             "You are a project planner. Decompose the following objective "
             "into discrete tasks and assign each to exactly one agent.\n\n"
             f"Objective: {objective}\n\n"
-            "Available agents:\n"
-            + "\n".join(agent_descriptions)
-            + "\n\n"
+            "Available agents:\n" + "\n".join(agent_descriptions) + "\n\n"
             "Respond as a numbered list. Prefix each task with the agent "
             "name in square brackets.  Indent sub-tasks under their parent.\n"
             "Example:\n"
@@ -220,10 +218,7 @@ class AgentOrchestrator:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             while remaining:
                 # Find tasks whose dependencies are all completed
-                ready = [
-                    i for i in remaining
-                    if depends_on[i].issubset(completed_indices)
-                ]
+                ready = [i for i in remaining if depends_on[i].issubset(completed_indices)]
 
                 if not ready:
                     # Cycle detected or all remaining tasks are blocked
@@ -247,7 +242,8 @@ class AgentOrchestrator:
                     except Exception as exc:
                         logger.error(
                             "Parallel task %d failed: %s",
-                            idx, exc,
+                            idx,
+                            exc,
                         )
                         plan.tasks[idx].status = "failed"
                     completed_indices.add(idx)
@@ -284,12 +280,14 @@ class AgentOrchestrator:
                 usage={},
             )
 
-        self._execution_log.append({
-            "type": "delegation",
-            "from": from_agent,
-            "to": to_agent_name,
-            "task": sub_task,
-        })
+        self._execution_log.append(
+            {
+                "type": "delegation",
+                "from": from_agent,
+                "to": to_agent_name,
+                "task": sub_task,
+            }
+        )
 
         # Build a sub-context that carries the parent conversation forward
         sub_context = AgentContext(
@@ -330,11 +328,13 @@ class AgentOrchestrator:
             return
 
         task.status = "running"
-        self._execution_log.append({
-            "type": "execution",
-            "agent": agent_name,
-            "task": task.description,
-        })
+        self._execution_log.append(
+            {
+                "type": "execution",
+                "agent": agent_name,
+                "task": task.description,
+            }
+        )
 
         try:
             enriched_task = self._enrich_task_with_prior_results(task)
@@ -372,10 +372,7 @@ class AgentOrchestrator:
 
         if prior:
             context_block = "\n".join(prior)
-            return (
-                f"Previous agent work:\n{context_block}\n\n"
-                f"Your task: {task.description}"
-            )
+            return f"Previous agent work:\n{context_block}\n\n" f"Your task: {task.description}"
         return task.description
 
     # ------------------------------------------------------------------
@@ -402,9 +399,7 @@ class AgentOrchestrator:
                 continue
 
             # Detect sub-task (indented or numbered like 1a, 2b, ...)
-            is_sub = line.startswith((" ", "\t")) or bool(
-                re.match(r"^\d+[a-z]\.", stripped)
-            )
+            is_sub = line.startswith((" ", "\t")) or bool(re.match(r"^\d+[a-z]\.", stripped))
 
             new_task = AgentTask(
                 description=description,

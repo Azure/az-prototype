@@ -20,14 +20,12 @@ from pathlib import Path
 
 from knack.util import CLIError
 
-from azext_prototype.agents.base import AgentContext, AgentCapability
+from azext_prototype.agents.base import AgentContext
 from azext_prototype.agents.registry import AgentRegistry
-from azext_prototype.agents.orchestrator import AgentOrchestrator
 from azext_prototype.config import ProjectConfig
-from azext_prototype.parsers.file_extractor import parse_file_blocks, write_parsed_files
 from azext_prototype.stages.base import BaseStage, StageGuard, StageState
+from azext_prototype.stages.build_session import BuildSession
 from azext_prototype.stages.build_state import BuildState
-from azext_prototype.stages.build_session import BuildSession, BuildResult
 from azext_prototype.ui.console import console as default_console
 
 logger = logging.getLogger(__name__)
@@ -73,10 +71,7 @@ class BuildStage(BaseStage):
                 name="discovery_complete",
                 description="Discovery must be completed",
                 check_fn=lambda: Path(".prototype/state/discovery.yaml").is_file(),
-                error_message=(
-                    "No discovery state found. "
-                    "Run 'az prototype design' to complete discovery first."
-                ),
+                error_message=("No discovery state found. " "Run 'az prototype design' to complete discovery first."),
             ),
             StageGuard(
                 name="design_complete",
@@ -139,13 +134,19 @@ class BuildStage(BaseStage):
         if dry_run:
             # Non-interactive dry run
             return self._execute_dry_run(
-                agent_context, registry, design, config, scope, templates,
+                agent_context,
+                registry,
+                design,
+                config,
+                scope,
+                templates,
                 print_fn=print_fn,
             )
 
         # Interactive build session (default)
         session = BuildSession(
-            agent_context, registry,
+            agent_context,
+            registry,
             console=default_console if print_fn is None else None,
             build_state=build_state,
             auto_accept=auto_accept,
@@ -232,10 +233,7 @@ class BuildStage(BaseStage):
             if not service_types:
                 continue
 
-            matches = sum(
-                1 for st in service_types
-                if st.replace("-", " ") in architecture or st in architecture
-            )
+            matches = sum(1 for st in service_types if st.replace("-", " ") in architecture or st in architecture)
             score = matches / len(service_types)
             if score >= _TEMPLATE_MATCH_THRESHOLD:
                 scored.append((score, tmpl))
@@ -262,7 +260,6 @@ class BuildStage(BaseStage):
         _print = print_fn or default_console.print
 
         iac_tool = config.get("project.iac_tool", "terraform")
-        project_name = config.get("project.name", "prototype")
 
         _print("")
         _print(f"  Build Stage — DRY RUN (scope: {scope})")

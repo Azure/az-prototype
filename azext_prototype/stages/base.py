@@ -57,10 +57,12 @@ class BaseStage(ABC):
     @state.setter
     def state(self, value: StageState):
         self._state = value
-        self._history.append({
-            "state": value.value,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        self._history.append(
+            {
+                "state": value.value,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
 
     @abstractmethod
     def get_guards(self) -> list[StageGuard]:

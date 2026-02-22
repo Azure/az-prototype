@@ -14,7 +14,12 @@ Runs automatically before the deploy stage.
 
 import logging
 
-from azext_prototype.agents.base import BaseAgent, AgentCapability, AgentContext, AgentContract
+from azext_prototype.agents.base import (
+    AgentCapability,
+    AgentContext,
+    AgentContract,
+    BaseAgent,
+)
 from azext_prototype.ai.provider import AIMessage, AIResponse
 
 logger = logging.getLogger(__name__)
@@ -28,10 +33,25 @@ class SecurityReviewerAgent(BaseAgent):
     _include_templates = False
     _knowledge_role = "security-reviewer"
     _keywords = [
-        "security", "review", "scan", "audit", "vulnerability",
-        "rbac", "identity", "encryption", "tls", "firewall",
-        "public", "endpoint", "secret", "credential", "hardcoded",
-        "compliance", "policy", "private", "network",
+        "security",
+        "review",
+        "scan",
+        "audit",
+        "vulnerability",
+        "rbac",
+        "identity",
+        "encryption",
+        "tls",
+        "firewall",
+        "public",
+        "endpoint",
+        "secret",
+        "credential",
+        "hardcoded",
+        "compliance",
+        "policy",
+        "private",
+        "network",
     ]
     _keyword_weight = 0.12
     _contract = AgentContract(
@@ -72,23 +92,27 @@ class SecurityReviewerAgent(BaseAgent):
         project_config = context.project_config
         iac_tool = project_config.get("project", {}).get("iac_tool", "terraform")
         environment = project_config.get("project", {}).get("environment", "dev")
-        messages.append(AIMessage(
-            role="system",
-            content=(
-                f"PROJECT CONTEXT:\n"
-                f"- IaC Tool: {iac_tool}\n"
-                f"- Environment: {environment}\n"
-                f"- This is a {'prototype/POC' if environment == 'dev' else 'production'} deployment\n"
-            ),
-        ))
+        messages.append(
+            AIMessage(
+                role="system",
+                content=(
+                    f"PROJECT CONTEXT:\n"
+                    f"- IaC Tool: {iac_tool}\n"
+                    f"- Environment: {environment}\n"
+                    f"- This is a {'prototype/POC' if environment == 'dev' else 'production'} deployment\n"
+                ),
+            )
+        )
 
         # Include any architecture artifacts for cross-reference
         architecture = context.get_artifact("architecture")
         if architecture:
-            messages.append(AIMessage(
-                role="system",
-                content=f"ARCHITECTURE CONTEXT:\n{architecture}",
-            ))
+            messages.append(
+                AIMessage(
+                    role="system",
+                    content=f"ARCHITECTURE CONTEXT:\n{architecture}",
+                )
+            )
 
         messages.extend(context.conversation_history)
         messages.append(AIMessage(role="user", content=task))
@@ -104,11 +128,7 @@ class SecurityReviewerAgent(BaseAgent):
         if warnings:
             for w in warnings:
                 logger.warning("Governance: %s", w)
-            warning_block = (
-                "\n\n---\n"
-                "**\u26a0 Governance warnings:**\n"
-                + "\n".join(f"- {w}" for w in warnings)
-            )
+            warning_block = "\n\n---\n" "**\u26a0 Governance warnings:**\n" + "\n".join(f"- {w}" for w in warnings)
             response = AIResponse(
                 content=response.content + warning_block,
                 model=response.model,

@@ -69,10 +69,7 @@ class MCPRegistry:
         agent: str | None = None,
     ) -> list[MCPHandler]:
         """Return handlers matching the given stage+agent scope."""
-        return [
-            h for h in self.list_all()
-            if h.matches_scope(stage, agent)
-        ]
+        return [h for h in self.list_all() if h.matches_scope(stage, agent)]
 
     def __len__(self) -> int:
         return len(self.list_all())

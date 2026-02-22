@@ -20,7 +20,7 @@ import json
 import logging
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from typing import Callable, Iterator
 
 from azext_prototype.agents.base import AgentCapability, AgentContext
 from azext_prototype.agents.registry import AgentRegistry
@@ -28,16 +28,15 @@ from azext_prototype.ai.token_tracker import TokenTracker
 from azext_prototype.stages.backlog_push import (
     check_devops_ext,
     check_gh_auth,
-    format_github_body,
     push_devops_feature,
     push_devops_story,
-    push_devops_task,
     push_github_issue,
 )
 from azext_prototype.stages.backlog_state import BacklogState
 from azext_prototype.stages.escalation import EscalationTracker
 from azext_prototype.stages.qa_router import route_error_to_qa
-from azext_prototype.ui.console import Console, DiscoveryPrompt, console as default_console
+from azext_prototype.ui.console import Console, DiscoveryPrompt
+from azext_prototype.ui.console import console as default_console
 
 logger = logging.getLogger(__name__)
 
@@ -47,22 +46,36 @@ logger = logging.getLogger(__name__)
 
 _QUIT_WORDS = frozenset({"q", "quit", "exit"})
 _DONE_WORDS = frozenset({"done", "finish", "accept", "lgtm"})
-_SLASH_COMMANDS = frozenset({
-    "/list", "/show", "/add", "/remove", "/preview",
-    "/save", "/push", "/status", "/help", "/quit",
-})
+_SLASH_COMMANDS = frozenset(
+    {
+        "/list",
+        "/show",
+        "/add",
+        "/remove",
+        "/preview",
+        "/save",
+        "/push",
+        "/status",
+        "/help",
+        "/quit",
+    }
+)
 
 
 # -------------------------------------------------------------------- #
 # BacklogResult — public interface consumed by custom.py
 # -------------------------------------------------------------------- #
 
+
 class BacklogResult:
     """Result of a backlog session."""
 
     __slots__ = (
-        "items_generated", "items_pushed", "items_failed",
-        "push_urls", "cancelled",
+        "items_generated",
+        "items_pushed",
+        "items_failed",
+        "push_urls",
+        "cancelled",
     )
 
     def __init__(
@@ -83,6 +96,7 @@ class BacklogResult:
 # -------------------------------------------------------------------- #
 # BacklogSession
 # -------------------------------------------------------------------- #
+
 
 class BacklogSession:
     """Interactive, multi-phase backlog conversation.
@@ -183,11 +197,7 @@ class BacklogSession:
 
         # ---- Phase 1: Load or generate ----
         existing_items = self._backlog_state._state.get("items", [])
-        has_cache = (
-            existing_items
-            and not refresh
-            and self._backlog_state.matches_context(design_context, scope)
-        )
+        has_cache = existing_items and not refresh and self._backlog_state.matches_context(design_context, scope)
 
         if has_cache:
             _print("")
@@ -218,7 +228,10 @@ class BacklogSession:
                 route_error_to_qa(
                     "AI returned no parseable backlog items",
                     "Backlog generation",
-                    self._qa_agent, self._context, self._token_tracker, _print,
+                    self._qa_agent,
+                    self._context,
+                    self._token_tracker,
+                    _print,
                 )
                 _print("  Could not generate backlog items.")
                 return BacklogResult(cancelled=True)
@@ -239,8 +252,13 @@ class BacklogSession:
         # ---- Quick mode: confirm and push ----
         if quick:
             return self._run_quick_mode(
-                provider, org, project, items_count,
-                _input, _print, use_styled,
+                provider,
+                org,
+                project,
+                items_count,
+                _input,
+                _print,
+                use_styled,
             )
 
         # ---- Phase 3: Interactive review/refine loop ----
@@ -284,8 +302,13 @@ class BacklogSession:
             # Slash commands
             if lower.startswith("/"):
                 handled = self._handle_slash_command(
-                    lower, provider, org, project,
-                    _input, _print, use_styled,
+                    lower,
+                    provider,
+                    org,
+                    project,
+                    _input,
+                    _print,
+                    use_styled,
                 )
                 if handled == "pushed":
                     break
@@ -299,7 +322,9 @@ class BacklogSession:
             if updated is not None:
                 self._backlog_state.set_items(updated)
                 self._backlog_state.update_from_exchange(
-                    user_input, f"Updated {len(updated)} items", exchange,
+                    user_input,
+                    f"Updated {len(updated)} items",
+                    exchange,
                 )
                 self._backlog_state.save()
                 _print("")
@@ -391,7 +416,9 @@ class BacklogSession:
             if out_scope:
                 scope_text += "\n## Out of Scope (DO NOT include)\n" + "\n".join(f"- {s}" for s in out_scope)
             if deferred:
-                scope_text += "\n## Deferred (separate 'Deferred / Future Work' epic)\n" + "\n".join(f"- {s}" for s in deferred)
+                scope_text += "\n## Deferred (separate 'Deferred / Future Work' epic)\n" + "\n".join(
+                    f"- {s}" for s in deferred
+                )
 
         task = (
             "Analyze the following architecture and produce a comprehensive "
@@ -444,7 +471,9 @@ class BacklogSession:
         messages.append(AIMessage(role="user", content=task))
 
         response = self._context.ai_provider.chat(
-            messages, temperature=0.3, max_tokens=8192,
+            messages,
+            temperature=0.3,
+            max_tokens=8192,
         )
         self._token_tracker.record(response)
 
@@ -464,19 +493,23 @@ class BacklogSession:
         current_items = self._backlog_state._state.get("items", [])
         messages = self._pm_agent.get_system_messages()
 
-        messages.append(AIMessage(
-            role="user",
-            content=(
-                "Here is the current backlog as JSON:\n"
-                f"```json\n{json.dumps(current_items, indent=2)}\n```\n\n"
-                f"User request: {user_input}\n\n"
-                "Apply the requested change and return the COMPLETE updated JSON array. "
-                "Return ONLY the JSON array, no explanation."
-            ),
-        ))
+        messages.append(
+            AIMessage(
+                role="user",
+                content=(
+                    "Here is the current backlog as JSON:\n"
+                    f"```json\n{json.dumps(current_items, indent=2)}\n```\n\n"
+                    f"User request: {user_input}\n\n"
+                    "Apply the requested change and return the COMPLETE updated JSON array. "
+                    "Return ONLY the JSON array, no explanation."
+                ),
+            )
+        )
 
         response = self._context.ai_provider.chat(
-            messages, temperature=0.2, max_tokens=8192,
+            messages,
+            temperature=0.2,
+            max_tokens=8192,
         )
         self._token_tracker.record(response)
 
@@ -559,8 +592,12 @@ class BacklogSession:
                 _print(f"    x {title}: {result['error']}")
                 self._backlog_state.mark_item_failed(idx, result["error"])
                 route_error_to_qa(
-                    result["error"], f"Backlog push: {title}",
-                    self._qa_agent, self._context, self._token_tracker, _print,
+                    result["error"],
+                    f"Backlog push: {title}",
+                    self._qa_agent,
+                    self._context,
+                    self._token_tracker,
+                    _print,
                 )
                 failed_count += 1
             else:
@@ -577,7 +614,10 @@ class BacklogSession:
                     children = item.get("children", [])
                     for child in children:
                         child_result = push_devops_story(
-                            org, project, child, parent_id=parent_id,
+                            org,
+                            project,
+                            child,
+                            parent_id=parent_id,
                         )
                         if "error" not in child_result:
                             child_url = child_result.get("url", "")
@@ -778,21 +818,25 @@ class BacklogSession:
         from azext_prototype.ai.provider import AIMessage
 
         messages = self._pm_agent.get_system_messages()
-        messages.append(AIMessage(
-            role="user",
-            content=(
-                "Create a structured backlog item from this description:\n\n"
-                f"{description}\n\n"
-                "Return ONLY a JSON object with these fields:\n"
-                '{"epic": "...", "title": "...", "description": "...", '
-                '"acceptance_criteria": ["AC1", "AC2"], '
-                '"tasks": ["Task 1", "Task 2"], "effort": "S|M|L|XL"}\n'
-            ),
-        ))
+        messages.append(
+            AIMessage(
+                role="user",
+                content=(
+                    "Create a structured backlog item from this description:\n\n"
+                    f"{description}\n\n"
+                    "Return ONLY a JSON object with these fields:\n"
+                    '{"epic": "...", "title": "...", "description": "...", '
+                    '"acceptance_criteria": ["AC1", "AC2"], '
+                    '"tasks": ["Task 1", "Task 2"], "effort": "S|M|L|XL"}\n'
+                ),
+            )
+        )
 
         try:
             response = self._context.ai_provider.chat(
-                messages, temperature=0.2, max_tokens=2048,
+                messages,
+                temperature=0.2,
+                max_tokens=2048,
             )
             self._token_tracker.record(response)
 

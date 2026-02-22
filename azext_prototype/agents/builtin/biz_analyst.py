@@ -6,7 +6,7 @@ what they want to build and surface anything unclear — not to march
 through a checklist.
 """
 
-from azext_prototype.agents.base import BaseAgent, AgentCapability, AgentContract
+from azext_prototype.agents.base import AgentCapability, AgentContract, BaseAgent
 
 
 class BizAnalystAgent(BaseAgent):
@@ -18,9 +18,20 @@ class BizAnalystAgent(BaseAgent):
     _include_standards = False
     _knowledge_role = "analyst"
     _keywords = [
-        "requirement", "gap", "missing", "assumption", "clarif",
-        "business", "stakeholder", "scope", "user story", "acceptance",
-        "nfr", "non-functional", "compliance", "regulation",
+        "requirement",
+        "gap",
+        "missing",
+        "assumption",
+        "clarif",
+        "business",
+        "stakeholder",
+        "scope",
+        "user story",
+        "acceptance",
+        "nfr",
+        "non-functional",
+        "compliance",
+        "regulation",
     ]
     _keyword_weight = 0.1
     _contract = AgentContract(

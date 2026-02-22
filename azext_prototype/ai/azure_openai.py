@@ -14,15 +14,13 @@ from typing import Any
 
 from knack.util import CLIError
 
-from azext_prototype.ai.provider import AIProvider, AIMessage, AIResponse, ToolCall
+from azext_prototype.ai.provider import AIMessage, AIProvider, AIResponse, ToolCall
 
 logger = logging.getLogger(__name__)
 
 # Only endpoints matching this pattern are allowed.
 # Format: https://<resource-name>.openai.azure.com
-_AZURE_OPENAI_ENDPOINT_PATTERN = re.compile(
-    r"^https://[a-zA-Z0-9][a-zA-Z0-9\-]*\.openai\.azure\.com/?$"
-)
+_AZURE_OPENAI_ENDPOINT_PATTERN = re.compile(r"^https://[a-zA-Z0-9][a-zA-Z0-9\-]*\.openai\.azure\.com/?$")
 
 # Endpoints that are explicitly forbidden, regardless of pattern.
 _BLOCKED_ENDPOINTS = [
@@ -110,7 +108,10 @@ class AzureOpenAIProvider(AIProvider):
         from openai import AzureOpenAI
 
         try:
-            from azure.identity import DefaultAzureCredential, get_bearer_token_provider  # type: ignore[import-untyped]
+            from azure.identity import (  # type: ignore[import-untyped]
+                DefaultAzureCredential,
+                get_bearer_token_provider,
+            )
 
             credential = DefaultAzureCredential()
             token_provider = get_bearer_token_provider(
@@ -226,9 +227,7 @@ class AzureOpenAIProvider(AIProvider):
     ):
         """Stream a chat completion response from Azure OpenAI."""
         deployment = model or self._deployment
-        api_messages: list[dict[str, Any]] = [
-            {"role": m.role, "content": m.content} for m in messages
-        ]
+        api_messages: list[dict[str, Any]] = [{"role": m.role, "content": m.content} for m in messages]
 
         try:
             stream = self._client.chat.completions.create(

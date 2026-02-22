@@ -1,6 +1,6 @@
 """Terraform built-in agent — infrastructure-as-code generation."""
 
-from azext_prototype.agents.base import BaseAgent, AgentCapability, AgentContract
+from azext_prototype.agents.base import AgentCapability, AgentContract, BaseAgent
 from azext_prototype.ai.provider import AIMessage
 
 
@@ -45,6 +45,7 @@ class TerraformAgent(BaseAgent):
     def get_system_messages(self):
         messages = super().get_system_messages()
         from azext_prototype.requirements import get_dependency_version
+
         api_ver = get_dependency_version("azure_api")
         azapi_ver = get_dependency_version("azapi")
         if api_ver:
@@ -53,41 +54,47 @@ class TerraformAgent(BaseAgent):
                 provider_pin = (
                     f"\n\nAZAPI PROVIDER VERSION: {azapi_ver}\n"
                     f"Pin the azapi provider to version {azapi_ver} in required_providers:\n"
-                    f'  required_providers {{\n'
-                    f'    azapi = {{\n'
+                    f"  required_providers {{\n"
+                    f"    azapi = {{\n"
                     f'      source  = "azure/azapi"\n'
                     f'      version = "~> {azapi_ver}"\n'
-                    f'    }}\n'
-                    f'  }}'
+                    f"    }}\n"
+                    f"  }}"
                 )
-            messages.append(AIMessage(
-                role="system",
-                content=(
-                    f"AZURE API VERSION: {api_ver}\n\n"
-                    f"You MUST use the azapi provider (azure/azapi). Every Azure resource "
-                    f"is declared as `azapi_resource` with the ARM resource type in the `type` "
-                    f"property, appended with @{api_ver}.\n\n"
-                    f"Example:\n"
-                    f'  resource "azapi_resource" "storage" {{\n'
-                    f'    type      = "Microsoft.Storage/storageAccounts@{api_ver}"\n'
-                    f'    name      = "mystorage"\n'
-                    f'    parent_id = azapi_resource.rg.id\n'
-                    f'    location  = "eastus"\n'
-                    f'    body = {{\n'
-                    f'      properties = {{ ... }}\n'
-                    f'      kind = "StorageV2"\n'
-                    f'      sku  = {{ name = "Standard_LRS" }}\n'
-                    f'    }}\n'
-                    f'  }}\n\n'
-                    f"Reference documentation URL pattern:\n"
-                    f"  https://learn.microsoft.com/en-us/azure/templates/<resource_provider>/{api_ver}/<resource_type>?pivots=deployment-language-terraform\n"
-                    f"Example: Microsoft.Storage/storageAccounts →\n"
-                    f"  https://learn.microsoft.com/en-us/azure/templates/microsoft.storage/{api_ver}/storageaccounts?pivots=deployment-language-terraform\n\n"
-                    f"If uncertain about any property, emit:\n"
-                    f"  [SEARCH: azure arm template <resource_type> {api_ver} properties]"
-                    f"{provider_pin}"
-                ),
-            ))
+            messages.append(
+                AIMessage(
+                    role="system",
+                    content=(
+                        f"AZURE API VERSION: {api_ver}\n\n"
+                        f"You MUST use the azapi provider (azure/azapi). Every Azure resource "
+                        f"is declared as `azapi_resource` with the ARM resource type in the `type` "
+                        f"property, appended with @{api_ver}.\n\n"
+                        f"Example:\n"
+                        f'  resource "azapi_resource" "storage" {{\n'
+                        f'    type      = "Microsoft.Storage/storageAccounts@{api_ver}"\n'
+                        f'    name      = "mystorage"\n'
+                        f"    parent_id = azapi_resource.rg.id\n"
+                        f'    location  = "eastus"\n'
+                        f"    body = {{\n"
+                        f"      properties = {{ ... }}\n"
+                        f'      kind = "StorageV2"\n'
+                        f'      sku  = {{ name = "Standard_LRS" }}\n'
+                        f"    }}\n"
+                        f"  }}\n\n"
+                        f"Reference documentation URL pattern:\n"
+                        f"  https://learn.microsoft.com/en-us/azure/templates/"
+                        f"<resource_provider>/{api_ver}/<resource_type>"
+                        f"?pivots=deployment-language-terraform\n"
+                        f"Example: Microsoft.Storage/storageAccounts →\n"
+                        f"  https://learn.microsoft.com/en-us/azure/templates/"
+                        f"microsoft.storage/{api_ver}/storageaccounts"
+                        f"?pivots=deployment-language-terraform\n\n"
+                        f"If uncertain about any property, emit:\n"
+                        f"  [SEARCH: azure arm template <resource_type> {api_ver} properties]"
+                        f"{provider_pin}"
+                    ),
+                )
+            )
         return messages
 
 

@@ -39,7 +39,8 @@ from azext_prototype.stages.build_state import BuildState
 from azext_prototype.stages.escalation import EscalationTracker
 from azext_prototype.stages.policy_resolver import PolicyResolver
 from azext_prototype.stages.qa_router import route_error_to_qa
-from azext_prototype.ui.console import Console, DiscoveryPrompt, console as default_console
+from azext_prototype.ui.console import Console, DiscoveryPrompt
+from azext_prototype.ui.console import console as default_console
 
 logger = logging.getLogger(__name__)
 
@@ -59,12 +60,17 @@ _MAX_STAGE_REMEDIATION_ATTEMPTS = 2
 # BuildResult — public interface consumed by BuildStage
 # -------------------------------------------------------------------- #
 
+
 class BuildResult:
     """Result of a build session."""
 
     __slots__ = (
-        "files_generated", "deployment_stages", "policy_overrides",
-        "resources", "review_accepted", "cancelled",
+        "files_generated",
+        "deployment_stages",
+        "policy_overrides",
+        "resources",
+        "review_accepted",
+        "cancelled",
     )
 
     def __init__(
@@ -87,6 +93,7 @@ class BuildResult:
 # -------------------------------------------------------------------- #
 # BuildSession
 # -------------------------------------------------------------------- #
+
 
 class BuildSession:
     """Interactive, multi-phase build conversation.
@@ -173,7 +180,9 @@ class BuildSession:
             self._naming = create_naming_strategy(config.to_dict())
         except Exception:
             # Graceful fallback — use simple strategy defaults
-            self._naming = create_naming_strategy({"naming": {"strategy": "simple"}, "project": {"name": self._project_name}})
+            self._naming = create_naming_strategy(
+                {"naming": {"strategy": "simple"}, "project": {"name": self._project_name}}
+            )
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -215,9 +224,7 @@ class BuildSession:
         templates = templates or []
 
         # Persist template + tool choices
-        self._build_state._state["templates_used"] = [
-            t.name for t in templates
-        ] if templates else []
+        self._build_state._state["templates_used"] = [t.name for t in templates] if templates else []
         self._build_state._state["iac_tool"] = self._iac_tool
 
         # ---- Phase 1: Show what we're working with ----
@@ -313,11 +320,16 @@ class BuildSession:
                 _print(f"       Agent error in Stage {stage_num} — routing to QA for diagnosis...")
                 svc_names_list = [s.get("name", "") for s in services if s.get("name")]
                 route_error_to_qa(
-                    exc, f"Build Stage {stage_num}: {stage_name}",
-                    self._qa_agent, self._context, self._token_tracker, _print,
+                    exc,
+                    f"Build Stage {stage_num}: {stage_name}",
+                    self._qa_agent,
+                    self._context,
+                    self._token_tracker,
+                    _print,
                     services=svc_names_list,
                     escalation_tracker=self._escalation_tracker,
-                    source_agent=agent.name, source_stage="build",
+                    source_agent=agent.name,
+                    source_stage="build",
                 )
                 continue
 
@@ -331,10 +343,14 @@ class BuildSession:
                 route_error_to_qa(
                     "Agent returned empty response",
                     f"Build Stage {stage_num}: {stage_name}",
-                    self._qa_agent, self._context, self._token_tracker, _print,
+                    self._qa_agent,
+                    self._context,
+                    self._token_tracker,
+                    _print,
                     services=svc_names_list,
                     escalation_tracker=self._escalation_tracker,
-                    source_agent=agent.name, source_stage="build",
+                    source_agent=agent.name,
+                    source_stage="build",
                 )
             written_paths = self._write_stage_files(stage, content)
 
@@ -352,8 +368,12 @@ class BuildSession:
             # Policy check
             if content:
                 resolutions, needs_regen = self._policy_resolver.check_and_resolve(
-                    agent.name, content, self._build_state, stage_num,
-                    input_fn=input_fn, print_fn=print_fn,
+                    agent.name,
+                    content,
+                    self._build_state,
+                    stage_num,
+                    input_fn=input_fn,
+                    print_fn=print_fn,
                 )
 
                 if needs_regen:
@@ -366,11 +386,16 @@ class BuildSession:
                     except Exception as exc:
                         svc_names_list = [s.get("name", "") for s in services if s.get("name")]
                         route_error_to_qa(
-                            exc, f"Build Stage {stage_num} (regen): {stage_name}",
-                            self._qa_agent, self._context, self._token_tracker, _print,
+                            exc,
+                            f"Build Stage {stage_num} (regen): {stage_name}",
+                            self._qa_agent,
+                            self._context,
+                            self._token_tracker,
+                            _print,
                             services=svc_names_list,
                             escalation_tracker=self._escalation_tracker,
-                            source_agent=agent.name, source_stage="build",
+                            source_agent=agent.name,
+                            source_stage="build",
                         )
                         continue
 
@@ -441,8 +466,12 @@ class BuildSession:
 
             # Fire-and-forget knowledge contribution
             try:
-                from azext_prototype.stages.knowledge_contributor import build_finding_from_qa, submit_if_gap
                 from azext_prototype.knowledge import KnowledgeLoader
+                from azext_prototype.stages.knowledge_contributor import (
+                    build_finding_from_qa,
+                    submit_if_gap,
+                )
+
                 loader = KnowledgeLoader()
                 all_services: set[str] = set()
                 for ds in self._build_state._state.get("deployment_stages", []):
@@ -542,8 +571,12 @@ class BuildSession:
                     # Policy check on regenerated content
                     if content:
                         self._policy_resolver.check_and_resolve(
-                            agent.name, content, self._build_state, stage_num,
-                            input_fn=input_fn, print_fn=print_fn,
+                            agent.name,
+                            content,
+                            self._build_state,
+                            stage_num,
+                            input_fn=input_fn,
+                            print_fn=print_fn,
                         )
 
                 _print("")
@@ -588,16 +621,13 @@ class BuildSession:
         if templates:
             for t in templates:
                 template_context += f"\nTemplate: {t.display_name}\nServices: "
-                template_context += ", ".join(
-                    f"{s.name} ({s.type}, tier={s.tier})" for s in t.services
-                )
+                template_context += ", ".join(f"{s.name} ({s.type}, tier={s.tier})" for s in t.services)
                 template_context += "\n"
 
         naming_instructions = self._naming.to_prompt_instructions()
 
         task = (
-            "Analyze this architecture design and produce a deployment plan.\n\n"
-            f"## Architecture\n{architecture}\n\n"
+            "Analyze this architecture design and produce a deployment plan.\n\n" f"## Architecture\n{architecture}\n\n"
         )
         if template_context:
             task += f"## Template Starting Points\n{template_context}\n\n"
@@ -685,15 +715,17 @@ class BuildSession:
         for s in stages:
             if not isinstance(s, dict):
                 continue
-            normalised.append({
-                "stage": s.get("stage", len(normalised) + 1),
-                "name": s.get("name", f"Stage {len(normalised) + 1}"),
-                "category": s.get("category", "infra"),
-                "dir": s.get("dir", ""),
-                "services": s.get("services", []),
-                "status": "pending",
-                "files": [],
-            })
+            normalised.append(
+                {
+                    "stage": s.get("stage", len(normalised) + 1),
+                    "name": s.get("name", f"Stage {len(normalised) + 1}"),
+                    "category": s.get("category", "infra"),
+                    "dir": s.get("dir", ""),
+                    "services": s.get("services", []),
+                    "status": "pending",
+                    "files": [],
+                }
+            )
         return normalised
 
     def _fallback_deployment_plan(self, templates: list) -> list[dict]:
@@ -707,28 +739,30 @@ class BuildSession:
 
         # Foundation stage (always present)
         stage_num += 1
-        stages.append({
-            "stage": stage_num,
-            "name": "Foundation",
-            "category": "infra",
-            "dir": f"concept/infra/{self._iac_tool}/stage-{stage_num}-foundation",
-            "services": [
-                {
-                    "name": "resource-group",
-                    "computed_name": self._naming.resolve("resource_group", self._project_name),
-                    "resource_type": "Microsoft.Resources/resourceGroups",
-                    "sku": "",
-                },
-                {
-                    "name": "managed-identity",
-                    "computed_name": self._naming.resolve("managed_identity", self._project_name),
-                    "resource_type": "Microsoft.ManagedIdentity/userAssignedIdentities",
-                    "sku": "",
-                },
-            ],
-            "status": "pending",
-            "files": [],
-        })
+        stages.append(
+            {
+                "stage": stage_num,
+                "name": "Foundation",
+                "category": "infra",
+                "dir": f"concept/infra/{self._iac_tool}/stage-{stage_num}-foundation",
+                "services": [
+                    {
+                        "name": "resource-group",
+                        "computed_name": self._naming.resolve("resource_group", self._project_name),
+                        "resource_type": "Microsoft.Resources/resourceGroups",
+                        "sku": "",
+                    },
+                    {
+                        "name": "managed-identity",
+                        "computed_name": self._naming.resolve("managed_identity", self._project_name),
+                        "resource_type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+                        "sku": "",
+                    },
+                ],
+                "status": "pending",
+                "files": [],
+            }
+        )
 
         # Add stages from template services
         if templates:
@@ -756,69 +790,83 @@ class BuildSession:
             for svc in infra_services:
                 stage_num += 1
                 resource_type_key = svc["type"].replace("-", "_")
-                stages.append({
-                    "stage": stage_num,
-                    "name": svc["name"].replace("-", " ").title(),
-                    "category": "infra",
-                    "dir": f"concept/infra/{self._iac_tool}/stage-{stage_num}-{svc['name']}",
-                    "services": [{
-                        "name": svc["name"],
-                        "computed_name": self._naming.resolve(resource_type_key, svc["name"]),
-                        "resource_type": "",
-                        "sku": svc["tier"],
-                    }],
-                    "status": "pending",
-                    "files": [],
-                })
+                stages.append(
+                    {
+                        "stage": stage_num,
+                        "name": svc["name"].replace("-", " ").title(),
+                        "category": "infra",
+                        "dir": f"concept/infra/{self._iac_tool}/stage-{stage_num}-{svc['name']}",
+                        "services": [
+                            {
+                                "name": svc["name"],
+                                "computed_name": self._naming.resolve(resource_type_key, svc["name"]),
+                                "resource_type": "",
+                                "sku": svc["tier"],
+                            }
+                        ],
+                        "status": "pending",
+                        "files": [],
+                    }
+                )
 
             # Data services
             for svc in data_services:
                 stage_num += 1
                 resource_type_key = svc["type"].replace("-", "_")
-                stages.append({
-                    "stage": stage_num,
-                    "name": svc["name"].replace("-", " ").title(),
-                    "category": "data",
-                    "dir": f"concept/infra/{self._iac_tool}/stage-{stage_num}-{svc['name']}",
-                    "services": [{
-                        "name": svc["name"],
-                        "computed_name": self._naming.resolve(resource_type_key, svc["name"]),
-                        "resource_type": "",
-                        "sku": svc["tier"],
-                    }],
-                    "status": "pending",
-                    "files": [],
-                })
+                stages.append(
+                    {
+                        "stage": stage_num,
+                        "name": svc["name"].replace("-", " ").title(),
+                        "category": "data",
+                        "dir": f"concept/infra/{self._iac_tool}/stage-{stage_num}-{svc['name']}",
+                        "services": [
+                            {
+                                "name": svc["name"],
+                                "computed_name": self._naming.resolve(resource_type_key, svc["name"]),
+                                "resource_type": "",
+                                "sku": svc["tier"],
+                            }
+                        ],
+                        "status": "pending",
+                        "files": [],
+                    }
+                )
 
             # Application services
             for svc in app_services:
                 stage_num += 1
-                stages.append({
-                    "stage": stage_num,
-                    "name": svc["name"].replace("-", " ").title(),
-                    "category": "app",
-                    "dir": f"concept/apps/stage-{stage_num}-{svc['name']}",
-                    "services": [{
-                        "name": svc["name"],
-                        "computed_name": "",
-                        "resource_type": "",
-                        "sku": svc["tier"],
-                    }],
-                    "status": "pending",
-                    "files": [],
-                })
+                stages.append(
+                    {
+                        "stage": stage_num,
+                        "name": svc["name"].replace("-", " ").title(),
+                        "category": "app",
+                        "dir": f"concept/apps/stage-{stage_num}-{svc['name']}",
+                        "services": [
+                            {
+                                "name": svc["name"],
+                                "computed_name": "",
+                                "resource_type": "",
+                                "sku": svc["tier"],
+                            }
+                        ],
+                        "status": "pending",
+                        "files": [],
+                    }
+                )
 
         # Documentation stage (always last)
         stage_num += 1
-        stages.append({
-            "stage": stage_num,
-            "name": "Documentation",
-            "category": "docs",
-            "dir": "concept/docs",
-            "services": [],
-            "status": "pending",
-            "files": [],
-        })
+        stages.append(
+            {
+                "stage": stage_num,
+                "name": "Documentation",
+                "category": "docs",
+                "dir": "concept/docs",
+                "services": [],
+                "status": "pending",
+                "files": [],
+            }
+        )
 
         return stages
 
@@ -826,15 +874,30 @@ class BuildSession:
     def _categorise_service(service_type: str) -> str:
         """Categorise a template service type into a stage category."""
         _INFRA_TYPES = {
-            "virtual-network", "key-vault", "container-app-environment",
-            "app-service-plan", "managed-identity", "resource-group",
-            "api-management", "front-door", "cdn-profile", "dns-zone",
-            "application-insights", "log-analytics",
-            "network-security-group", "private-endpoint",
+            "virtual-network",
+            "key-vault",
+            "container-app-environment",
+            "app-service-plan",
+            "managed-identity",
+            "resource-group",
+            "api-management",
+            "front-door",
+            "cdn-profile",
+            "dns-zone",
+            "application-insights",
+            "log-analytics",
+            "network-security-group",
+            "private-endpoint",
         }
         _DATA_TYPES = {
-            "sql-database", "cosmos-db", "redis-cache", "storage-account",
-            "databricks", "data-factory", "event-hub", "service-bus",
+            "sql-database",
+            "cosmos-db",
+            "redis-cache",
+            "storage-account",
+            "databricks",
+            "data-factory",
+            "event-hub",
+            "service-bus",
         }
         if service_type in _INFRA_TYPES:
             return "infra"
@@ -944,9 +1007,7 @@ class BuildSession:
                 prev_svcs = ps.get("services", [])
                 prev_names = [s.get("computed_name") or s.get("name") for s in prev_svcs]
                 names_str = ", ".join(prev_names) if prev_names else "none"
-                prev_context += (
-                    f"- Stage {ps['stage']}: {ps['name']} (resources: {names_str})\n"
-                )
+                prev_context += f"- Stage {ps['stage']}: {ps['name']} (resources: {names_str})\n"
 
         naming_instructions = self._naming.to_prompt_instructions()
         stage_dir = stage.get("dir", "concept")
@@ -981,13 +1042,18 @@ class BuildSession:
             "- Use managed identity (NO connection strings or access keys)\n"
             "- Include proper resource tagging\n"
             "- Follow the naming convention exactly\n"
-            "- Reference outputs from prior stages via terraform_remote_state (Terraform) or parameters (Bicep) — NEVER hardcode resource names from other stages\n"
+            "- Reference outputs from prior stages via terraform_remote_state (Terraform) or "
+            "parameters (Bicep) — NEVER hardcode resource names from other stages\n"
             f"- All files should be relative to {stage_dir}/\n"
-            "- outputs.tf/outputs MUST export ALL resource names, IDs, endpoints, and managed identity IDs needed by downstream stages\n"
-            "- If ANY service disables local/key auth, you MUST also create managed identity + RBAC role assignments in the SAME stage\n"
-            "- Do NOT output sensitive values (keys, connection strings) — omit them entirely when local auth is disabled\n"
+            "- outputs.tf/outputs MUST export ALL resource names, IDs, endpoints, "
+            "and managed identity IDs needed by downstream stages\n"
+            "- If ANY service disables local/key auth, you MUST also create managed identity "
+            "+ RBAC role assignments in the SAME stage\n"
+            "- Do NOT output sensitive values (keys, connection strings) — "
+            "omit them entirely when local auth is disabled\n"
             "- deploy.sh MUST be complete and syntactically valid — never truncate it\n"
-            "- deploy.sh MUST include: set -euo pipefail, Azure login check, error handling (trap), output export to JSON\n"
+            "- deploy.sh MUST include: set -euo pipefail, Azure login check, "
+            "error handling (trap), output export to JSON\n"
         )
 
         # Terraform-specific file structure rules
@@ -995,7 +1061,10 @@ class BuildSession:
             task += (
                 "\n## Terraform File Structure (MANDATORY)\n"
                 "Generate ONLY these files:\n"
-                "- providers.tf — terraform {}, required_providers { azapi = { source = \"azure/azapi\", version pinned } }, backend {}, provider config. This is the ONLY file that may contain a terraform {} block.\n"
+                "- providers.tf — terraform {}, required_providers "
+                '{ azapi = { source = "azure/azapi", version pinned } }, '
+                "backend {}, provider config. "
+                "This is the ONLY file that may contain a terraform {} block.\n"
                 "- main.tf — resource definitions ONLY. No terraform {} or provider {} blocks.\n"
                 "- variables.tf — all input variable declarations\n"
                 "- outputs.tf — all output value declarations\n"
@@ -1006,9 +1075,7 @@ class BuildSession:
                 "Every .tf file must be syntactically complete — every opened block must be closed in the SAME file.\n"
             )
         elif is_iac and self._iac_tool == "bicep":
-            task += (
-                "- Use consistent deployment naming (Bicep)\n"
-            )
+            task += "- Use consistent deployment naming (Bicep)\n"
 
         # Inject app-type scaffolding requirements when applicable
         scaffolding = self._get_app_scaffolding_requirements(stage)
@@ -1044,23 +1111,16 @@ class BuildSession:
             return ""
 
         services = stage.get("services", [])
-        service_types = {
-            s.get("resource_type", "").lower()
-            for s in services
-        }
+        service_types = {s.get("resource_type", "").lower() for s in services}
         service_names = {s.get("name", "").lower() for s in services}
 
         # Detect Azure Functions (by resource type or name heuristic)
-        is_functions = (
-            any("function" in t for t in service_types)
-            or any("function" in n for n in service_names)
-        )
+        is_functions = any("function" in t for t in service_types) or any("function" in n for n in service_names)
 
         # Detect web/container apps
-        is_webapp = (
-            any(t for t in service_types if "containerapp" in t or "web/site" in t or "app-service" in t)
-            or any(n for n in service_names if "container-app" in n or "web-app" in n or "app-service" in n)
-        )
+        is_webapp = any(
+            t for t in service_types if "containerapp" in t or "web/site" in t or "app-service" in t
+        ) or any(n for n in service_names if "container-app" in n or "web-app" in n or "app-service" in n)
 
         if is_functions:
             return (
@@ -1141,9 +1201,9 @@ class BuildSession:
             normalized = filename.replace("\\", "/")
             stage_prefix = stage_dir.replace("\\", "/")
             if normalized.startswith(stage_prefix + "/"):
-                normalized = normalized[len(stage_prefix) + 1:]
+                normalized = normalized[len(stage_prefix) + 1 :]
             elif normalized.startswith(stage_prefix):
-                normalized = normalized[len(stage_prefix):]
+                normalized = normalized[len(stage_prefix) :]
             normalized = normalized or filename
 
             # Drop blocked files (e.g. versions.tf)
@@ -1184,14 +1244,17 @@ class BuildSession:
         if not stages:
             return []
 
-        stage_info = json.dumps([
-            {
-                "stage": s["stage"],
-                "name": s["name"],
-                "services": [svc.get("name", "") for svc in s.get("services", [])],
-            }
-            for s in stages
-        ], indent=2)
+        stage_info = json.dumps(
+            [
+                {
+                    "stage": s["stage"],
+                    "name": s["name"],
+                    "services": [svc.get("name", "") for svc in s.get("services", [])],
+                }
+                for s in stages
+            ],
+            indent=2,
+        )
 
         task = (
             "Given the following deployment stages and user feedback, "
@@ -1351,7 +1414,10 @@ class BuildSession:
         try:
             init = subprocess.run(
                 ["terraform", "init", "-backend=false", "-input=false", "-no-color"],
-                capture_output=True, text=True, cwd=str(stage_dir), check=False,
+                capture_output=True,
+                text=True,
+                cwd=str(stage_dir),
+                check=False,
             )
         except FileNotFoundError:
             logger.debug("terraform not found on PATH — skipping stage validation")
@@ -1362,7 +1428,10 @@ class BuildSession:
 
         val = subprocess.run(
             ["terraform", "validate", "-no-color"],
-            capture_output=True, text=True, cwd=str(stage_dir), check=False,
+            capture_output=True,
+            text=True,
+            cwd=str(stage_dir),
+            check=False,
         )
         if val.returncode != 0:
             return (val.stderr or val.stdout).strip()[:300]
@@ -1370,8 +1439,12 @@ class BuildSession:
         return None
 
     def _run_stage_qa(
-        self, stage: dict, architecture: str, templates: list,
-        use_styled: bool, _print: Callable,
+        self,
+        stage: dict,
+        architecture: str,
+        templates: list,
+        use_styled: bool,
+        _print: Callable,
     ) -> None:
         """Run QA review + remediation loop for a single generated stage."""
         if not self._qa_agent:
@@ -1425,10 +1498,10 @@ class BuildSession:
             qa_content = qa_result.content if qa_result else ""
 
             # 5. Check if issues found
-            has_issues = tf_error or (qa_content and any(
-                kw in qa_content.lower()
-                for kw in ["critical", "error", "missing", "fix", "issue", "broken"]
-            ))
+            has_issues = tf_error or (
+                qa_content
+                and any(kw in qa_content.lower() for kw in ["critical", "error", "missing", "fix", "issue", "broken"])
+            )
 
             if not has_issues:
                 _print(f"       Stage {stage_num} passed QA.")
@@ -1534,7 +1607,10 @@ class BuildSession:
             try:
                 init = subprocess.run(
                     ["terraform", "init", "-backend=false", "-input=false", "-no-color"],
-                    capture_output=True, text=True, cwd=str(stage_dir), check=False,
+                    capture_output=True,
+                    text=True,
+                    cwd=str(stage_dir),
+                    check=False,
                 )
             except FileNotFoundError:
                 logger.debug("terraform not found on PATH — skipping build-time validation")
@@ -1544,7 +1620,10 @@ class BuildSession:
                 continue
             val = subprocess.run(
                 ["terraform", "validate", "-no-color"],
-                capture_output=True, text=True, cwd=str(stage_dir), check=False,
+                capture_output=True,
+                text=True,
+                cwd=str(stage_dir),
+                check=False,
             )
             if val.returncode != 0:
                 errors[stage["stage"]] = (val.stderr or val.stdout).strip()[:300]

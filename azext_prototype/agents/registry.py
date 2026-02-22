@@ -4,7 +4,7 @@ import logging
 
 from knack.util import CLIError
 
-from azext_prototype.agents.base import BaseAgent, AgentCapability
+from azext_prototype.agents.base import AgentCapability, BaseAgent
 
 logger = logging.getLogger(__name__)
 
@@ -90,10 +90,7 @@ class AgentRegistry:
         if name in self._builtin:
             return self._builtin[name]
 
-        raise CLIError(
-            f"Agent '{name}' not found. "
-            f"Available: {', '.join(self.list_names())}"
-        )
+        raise CLIError(f"Agent '{name}' not found. " f"Available: {', '.join(self.list_names())}")
 
     def find_by_capability(self, capability: AgentCapability) -> list[BaseAgent]:
         """Find all agents with a given capability.
@@ -145,22 +142,58 @@ class AgentRegistry:
     # Priority-based resolution
     # ------------------------------------------------------------------
 
-    _ERROR_SIGNALS = frozenset({
-        "error", "fail", "failure", "exception", "bug", "broken", "crash",
-        "traceback", "diagnose", "troubleshoot",
-    })
-    _DOC_SIGNALS = frozenset({
-        "document", "readme", "guide", "runbook", "docs", "documentation",
-    })
-    _COST_SIGNALS = frozenset({
-        "cost", "price", "pricing", "budget", "estimate",
-    })
-    _SCOPE_SIGNALS = frozenset({
-        "scope", "requirement", "backlog", "story", "sprint", "coordinate",
-    })
-    _DISCOVERY_SIGNALS = frozenset({
-        "discover", "requirements", "gap", "assumption", "stakeholder",
-    })
+    _ERROR_SIGNALS = frozenset(
+        {
+            "error",
+            "fail",
+            "failure",
+            "exception",
+            "bug",
+            "broken",
+            "crash",
+            "traceback",
+            "diagnose",
+            "troubleshoot",
+        }
+    )
+    _DOC_SIGNALS = frozenset(
+        {
+            "document",
+            "readme",
+            "guide",
+            "runbook",
+            "docs",
+            "documentation",
+        }
+    )
+    _COST_SIGNALS = frozenset(
+        {
+            "cost",
+            "price",
+            "pricing",
+            "budget",
+            "estimate",
+        }
+    )
+    _SCOPE_SIGNALS = frozenset(
+        {
+            "scope",
+            "requirement",
+            "backlog",
+            "story",
+            "sprint",
+            "coordinate",
+        }
+    )
+    _DISCOVERY_SIGNALS = frozenset(
+        {
+            "discover",
+            "requirements",
+            "gap",
+            "assumption",
+            "stakeholder",
+        }
+    )
 
     def find_agent_for_task(
         self,
@@ -287,11 +320,7 @@ class AgentRegistry:
         """List all agents with metadata including source layer."""
         result = []
 
-        all_names = set(
-            list(self._builtin.keys())
-            + list(self._overrides.keys())
-            + list(self._custom.keys())
-        )
+        all_names = set(list(self._builtin.keys()) + list(self._overrides.keys()) + list(self._custom.keys()))
 
         for name in sorted(all_names):
             agent = self.get(name)

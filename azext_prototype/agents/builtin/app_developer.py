@@ -1,6 +1,6 @@
 """Application Developer built-in agent — generates application code."""
 
-from azext_prototype.agents.base import BaseAgent, AgentCapability, AgentContract
+from azext_prototype.agents.base import AgentCapability, AgentContract, BaseAgent
 
 
 class AppDeveloperAgent(BaseAgent):
@@ -15,9 +15,20 @@ class AppDeveloperAgent(BaseAgent):
     _enable_web_search = True
     _knowledge_role = "developer"
     _keywords = [
-        "application", "app", "code", "api", "function",
-        "web", "backend", "frontend", "container", "docker",
-        "python", "node", "dotnet", "develop",
+        "application",
+        "app",
+        "code",
+        "api",
+        "function",
+        "web",
+        "backend",
+        "frontend",
+        "container",
+        "docker",
+        "python",
+        "node",
+        "dotnet",
+        "develop",
     ]
     _keyword_weight = 0.1
     _contract = AgentContract(

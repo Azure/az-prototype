@@ -53,6 +53,7 @@ _enabled: bool | None = None
 # Azure CLI telemetry opt-out check
 # ---------------------------------------------------------------
 
+
 def _is_cli_telemetry_enabled() -> bool:
     """Return *True* if the user has not disabled Azure CLI telemetry.
 
@@ -96,20 +97,19 @@ def _is_cli_telemetry_enabled() -> bool:
 # Connection string helpers
 # ---------------------------------------------------------------
 
+
 def _get_connection_string() -> str:
     """Return the App Insights connection string.
 
     Priority: environment variable → built-in (build-time injected).
     """
-    return (
-        os.environ.get("APPINSIGHTS_CONNECTION_STRING", "")
-        or _BUILTIN_CONNECTION_STRING
-    )
+    return os.environ.get("APPINSIGHTS_CONNECTION_STRING", "") or _BUILTIN_CONNECTION_STRING
 
 
 # ---------------------------------------------------------------
 # Public API — enabled check
 # ---------------------------------------------------------------
+
 
 def is_enabled() -> bool:
     """Return *True* when telemetry can and should be sent.
@@ -139,6 +139,7 @@ def reset() -> None:
 # ---------------------------------------------------------------
 # Connection string parsing
 # ---------------------------------------------------------------
+
 
 def _parse_connection_string(cs: str) -> tuple[str, str]:
     """Parse an App Insights connection string into (endpoint, ikey).
@@ -176,6 +177,7 @@ def _get_ingestion_config() -> tuple[str, str]:
 # ---------------------------------------------------------------
 # Dimension helpers
 # ---------------------------------------------------------------
+
 
 def _get_extension_version() -> str:
     """Return the installed extension version.
@@ -226,6 +228,7 @@ _DEFAULT_PROVIDER_MODELS: dict[str, str] = {
 # ---------------------------------------------------------------
 # Public API — event tracking
 # ---------------------------------------------------------------
+
 
 def _get_ai_config() -> tuple[str, str]:
     """Try to read AI provider and model from the current project config.
@@ -334,9 +337,7 @@ def track_command(
         }
 
         if parameters:
-            properties["parameters"] = json.dumps(
-                _sanitize_parameters(parameters)
-            )
+            properties["parameters"] = json.dumps(_sanitize_parameters(parameters))
 
         if error:
             properties["error"] = error[:1024]  # Cap at 1KB
@@ -364,10 +365,17 @@ def track_command(
 
 
 # Keys whose values must never be sent in telemetry.
-_SENSITIVE_PARAM_KEYS = frozenset({
-    "api_key", "token", "secret", "password", "key",
-    "subscription", "connection_string",
-})
+_SENSITIVE_PARAM_KEYS = frozenset(
+    {
+        "api_key",
+        "token",
+        "secret",
+        "password",
+        "key",
+        "subscription",
+        "connection_string",
+    }
+)
 
 
 def _sanitize_parameters(params: dict) -> dict:
@@ -443,9 +451,7 @@ def track_build_resources(
         }
 
         if parameters:
-            properties["parameters"] = json.dumps(
-                _sanitize_parameters(parameters)
-            )
+            properties["parameters"] = json.dumps(_sanitize_parameters(parameters))
 
         if error:
             properties["error"] = error[:1024]
@@ -484,6 +490,7 @@ def track_build_resources(
 # Public API — decorator
 # ---------------------------------------------------------------
 
+
 def track(command_name: str):
     """Decorator that records command-execution telemetry.
 
@@ -499,6 +506,7 @@ def track(command_name: str):
         def prototype_init(cmd, name=None, location="eastus", ...):
             ...
     """
+
     def decorator(func):
         @wraps(func)
         def wrapper(cmd, *args, **kwargs):
@@ -522,18 +530,9 @@ def track(command_name: str):
                     # Extract common dimensions from kwargs when present.
                     # ai_provider / model may be direct kwargs (e.g. init)
                     # or stored in prototype.yaml (all other commands).
-                    location = (
-                        overrides.get("location")
-                        or kwargs.get("location", "")
-                    )
-                    provider = (
-                        overrides.get("ai_provider")
-                        or kwargs.get("ai_provider", "")
-                    )
-                    model = (
-                        overrides.get("model")
-                        or kwargs.get("model", "")
-                    )
+                    location = overrides.get("location") or kwargs.get("location", "")
+                    provider = overrides.get("ai_provider") or kwargs.get("ai_provider", "")
+                    model = overrides.get("model") or kwargs.get("model", "")
                     if not provider or not model:
                         cfg_provider, cfg_model = _get_ai_config()
                         provider = provider or cfg_provider
@@ -561,5 +560,7 @@ def track(command_name: str):
                     )
                 except Exception:
                     pass  # Telemetry must never break the command
+
         return wrapper
+
     return decorator

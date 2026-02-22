@@ -177,9 +177,7 @@ class BacklogState:
         if 0 <= idx < len(self._state["push_status"]):
             self._state["push_status"][idx] = "pushed"
             self._state["push_results"][idx] = url
-            self._state["_metadata"]["last_pushed"] = (
-                datetime.now(timezone.utc).isoformat()
-            )
+            self._state["_metadata"]["last_pushed"] = datetime.now(timezone.utc).isoformat()
             self.save()
 
     def mark_item_failed(self, idx: int, error: str) -> None:
@@ -227,10 +225,9 @@ class BacklogState:
         content = design_context
         if scope:
             import json
+
             content += json.dumps(scope, sort_keys=True)
-        self._state["context_hash"] = hashlib.sha256(
-            content.encode("utf-8")
-        ).hexdigest()[:16]
+        self._state["context_hash"] = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
         self.save()
 
     def matches_context(self, design_context: str, scope: dict | None = None) -> bool:
@@ -238,6 +235,7 @@ class BacklogState:
         content = design_context
         if scope:
             import json
+
             content += json.dumps(scope, sort_keys=True)
         current_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
         return self._state.get("context_hash") == current_hash
@@ -253,12 +251,14 @@ class BacklogState:
         exchange_number: int,
     ) -> None:
         """Record a conversation exchange from the review loop."""
-        self._state["conversation_history"].append({
-            "exchange": exchange_number,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "user": user_input,
-            "assistant": agent_response,
-        })
+        self._state["conversation_history"].append(
+            {
+                "exchange": exchange_number,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "user": user_input,
+                "assistant": agent_response,
+            }
+        )
         self.save()
 
     # ------------------------------------------------------------------ #
@@ -299,9 +299,7 @@ class BacklogState:
                 children = item.get("children", [])
                 child_info = f" ({len(children)} stories)" if children else ""
 
-                lines.append(
-                    f"    {status} {idx + 1}. {title} [{effort}]{child_info}"
-                )
+                lines.append(f"    {status} {idx + 1}. {title} [{effort}]{child_info}")
 
             lines.append("")
 

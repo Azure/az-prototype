@@ -15,7 +15,12 @@ import logging
 import mimetypes
 from typing import Any
 
-from azext_prototype.agents.base import BaseAgent, AgentCapability, AgentContext, AgentContract
+from azext_prototype.agents.base import (
+    AgentCapability,
+    AgentContext,
+    AgentContract,
+    BaseAgent,
+)
 from azext_prototype.ai.provider import AIMessage, AIResponse
 
 logger = logging.getLogger(__name__)
@@ -30,9 +35,21 @@ class QAEngineerAgent(BaseAgent):
     _include_templates = False
     _include_standards = False
     _keywords = [
-        "error", "bug", "fail", "exception", "crash", "log",
-        "trace", "debug", "fix", "issue", "broken", "screenshot",
-        "analyze", "diagnose", "troubleshoot",
+        "error",
+        "bug",
+        "fail",
+        "exception",
+        "crash",
+        "log",
+        "trace",
+        "debug",
+        "fix",
+        "issue",
+        "broken",
+        "screenshot",
+        "analyze",
+        "diagnose",
+        "troubleshoot",
     ]
     _keyword_weight = 0.12
     _contract = AgentContract(
@@ -45,8 +62,7 @@ class QAEngineerAgent(BaseAgent):
         super().__init__(
             name="qa-engineer",
             description=(
-                "Analyze errors from logs, screenshots, or inline messages; "
-                "coordinate fixes and guide redeployment"
+                "Analyze errors from logs, screenshots, or inline messages; " "coordinate fixes and guide redeployment"
             ),
             capabilities=[AgentCapability.QA, AgentCapability.ANALYZE],
             constraints=[
@@ -62,22 +78,27 @@ class QAEngineerAgent(BaseAgent):
     def get_system_messages(self):
         messages = super().get_system_messages()
         from azext_prototype.requirements import get_dependency_version
+
         api_ver = get_dependency_version("azure_api")
         if api_ver:
-            messages.append(AIMessage(
-                role="system",
-                content=(
-                    f"AZURE API VERSION: {api_ver}\n\n"
-                    f"When reviewing Terraform code, all resources should be `azapi_resource` "
-                    f"with type property using @{api_ver}.\n"
-                    f"When reviewing Bicep code, all resource declarations should use @{api_ver}.\n\n"
-                    f"Reference docs URL pattern:\n"
-                    f"  https://learn.microsoft.com/en-us/azure/templates/<resource_provider>/{api_ver}/<resource_type>?pivots=deployment-language-<lang>\n"
-                    f"where <lang> is 'terraform' or 'bicep'.\n\n"
-                    f"If you need to verify a property exists, emit:\n"
-                    f"  [SEARCH: azure arm template <resource_type> {api_ver} properties]"
-                ),
-            ))
+            messages.append(
+                AIMessage(
+                    role="system",
+                    content=(
+                        f"AZURE API VERSION: {api_ver}\n\n"
+                        f"When reviewing Terraform code, all resources should be `azapi_resource` "
+                        f"with type property using @{api_ver}.\n"
+                        f"When reviewing Bicep code, all resource declarations should use @{api_ver}.\n\n"
+                        f"Reference docs URL pattern:\n"
+                        f"  https://learn.microsoft.com/en-us/azure/templates/"
+                        f"<resource_provider>/{api_ver}/<resource_type>"
+                        f"?pivots=deployment-language-<lang>\n"
+                        f"where <lang> is 'terraform' or 'bicep'.\n\n"
+                        f"If you need to verify a property exists, emit:\n"
+                        f"  [SEARCH: azure arm template <resource_type> {api_ver} properties]"
+                    ),
+                )
+            )
         return messages
 
     def execute_with_image(
@@ -143,9 +164,7 @@ class QAEngineerAgent(BaseAgent):
             if warnings:
                 for w in warnings:
                     logger.warning("Governance: %s", w)
-                block = "\n\n---\n⚠ **Governance warnings:**\n" + "\n".join(
-                    f"- {w}" for w in warnings
-                )
+                block = "\n\n---\n⚠ **Governance warnings:**\n" + "\n".join(f"- {w}" for w in warnings)
                 result = AIResponse(
                     content=result.content + block,
                     model=result.model,
@@ -155,10 +174,12 @@ class QAEngineerAgent(BaseAgent):
             return result
         except Exception as e:
             logger.warning("Vision-based analysis failed, falling back to text: %s", e)
-            messages.append(AIMessage(
-                role="user",
-                content=f"{task}\n\n[Image could not be processed: {image_path}]",
-            ))
+            messages.append(
+                AIMessage(
+                    role="user",
+                    content=f"{task}\n\n[Image could not be processed: {image_path}]",
+                )
+            )
             return context.ai_provider.chat(messages, temperature=0.2, max_tokens=8192)
 
     @staticmethod
@@ -166,7 +187,6 @@ class QAEngineerAgent(BaseAgent):
         """Read and base64-encode an image file."""
         with open(path, "rb") as f:
             return base64.b64encode(f.read()).decode("utf-8")
-
 
 
 QA_ENGINEER_PROMPT = """You are an expert QA engineer and diagnostics specialist for Azure prototypes.

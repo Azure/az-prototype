@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from azext_prototype.mcp.base import MCPToolDefinition, MCPToolResult
 from azext_prototype.mcp.registry import MCPRegistry
@@ -77,9 +77,10 @@ class MCPManager:
                     existing_handler = self._tool_map[tool.name]
                     if existing_handler != handler.name:
                         logger.warning(
-                            "Tool name collision: '%s' already registered by '%s', "
-                            "ignoring from '%s'",
-                            tool.name, existing_handler, handler.name,
+                            "Tool name collision: '%s' already registered by '%s', " "ignoring from '%s'",
+                            tool.name,
+                            existing_handler,
+                            handler.name,
                         )
                         continue
                 self._tool_map[tool.name] = handler.name
@@ -139,12 +140,12 @@ class MCPManager:
                     self._failed_handlers.add(handler_name)
                     logger.warning(
                         "Circuit breaker tripped for handler '%s' after %d errors",
-                        handler_name, count,
+                        handler_name,
+                        count,
                     )
                     if self._console:
                         self._console.print_warning(
-                            f"MCP handler '{handler_name}' disabled after "
-                            f"{count} consecutive failures"
+                            f"MCP handler '{handler_name}' disabled after " f"{count} consecutive failures"
                         )
             else:
                 self._error_counts[handler_name] = 0
@@ -164,7 +165,8 @@ class MCPManager:
                 except Exception as exc:
                     logger.warning(
                         "Error disconnecting handler '%s': %s",
-                        handler.name, exc,
+                        handler.name,
+                        exc,
                     )
         self._connected_handlers.clear()
         self._tool_map.clear()
@@ -199,10 +201,9 @@ class MCPManager:
             except Exception as exc:
                 logger.warning(
                     "Failed to connect MCP handler '%s': %s",
-                    handler.name, exc,
+                    handler.name,
+                    exc,
                 )
                 self._failed_handlers.add(handler.name)
                 if self._console:
-                    self._console.print_warning(
-                        f"MCP handler '{handler.name}' failed to connect: {exc}"
-                    )
+                    self._console.print_warning(f"MCP handler '{handler.name}' failed to connect: {exc}")

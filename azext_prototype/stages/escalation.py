@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 # Data structures
 # ======================================================================
 
+
 @dataclass
 class EscalationEntry:
     """A single tracked blocker with escalation history."""
@@ -78,10 +79,18 @@ class EscalationEntry:
 # Escalation Tracker
 # ======================================================================
 
-_SCOPE_KEYWORDS = frozenset({
-    "scope", "requirement", "backlog", "story", "feature",
-    "stakeholder", "priority", "sprint",
-})
+_SCOPE_KEYWORDS = frozenset(
+    {
+        "scope",
+        "requirement",
+        "backlog",
+        "story",
+        "feature",
+        "stakeholder",
+        "priority",
+        "sprint",
+    }
+)
 
 
 class EscalationTracker:
@@ -99,9 +108,7 @@ class EscalationTracker:
     def __init__(self, project_dir: str) -> None:
         self._project_dir = project_dir
         self._entries: list[EscalationEntry] = []
-        self._state_path = (
-            Path(project_dir) / ".prototype" / "state" / "escalation.yaml"
-        )
+        self._state_path = Path(project_dir) / ".prototype" / "state" / "escalation.yaml"
 
     # ------------------------------------------------------------------
     # State persistence
@@ -119,10 +126,7 @@ class EscalationTracker:
         if self._state_path.exists():
             with open(self._state_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f) or {}
-            self._entries = [
-                EscalationEntry.from_dict(e)
-                for e in data.get("entries", [])
-            ]
+            self._entries = [EscalationEntry.from_dict(e) for e in data.get("entries", [])]
 
     @property
     def exists(self) -> bool:
@@ -184,8 +188,6 @@ class EscalationTracker:
 
         Returns ``{"escalated": bool, "level": int, "content": str}``.
         """
-        from azext_prototype.agents.base import AgentCapability
-
         current = entry.escalation_level
         now = datetime.now(timezone.utc).isoformat()
 
@@ -201,13 +203,17 @@ class EscalationTracker:
         if next_level == 2:
             # Escalate to architect (technical) or PM (scope)
             result["content"] = self._escalate_to_agent(
-                entry, registry, agent_context, print_fn,
+                entry,
+                registry,
+                agent_context,
+                print_fn,
             )
 
         elif next_level == 3:
             # Expand to web search
             result["content"] = self._escalate_to_web_search(
-                entry, print_fn,
+                entry,
+                print_fn,
             )
 
         elif next_level == 4:
@@ -338,10 +344,7 @@ class EscalationTracker:
 
             results = search_and_fetch(query, max_results=3)
             if results:
-                content = "\n".join(
-                    f"- {r.get('title', 'No title')}: {r.get('snippet', '')}"
-                    for r in results
-                )
+                content = "\n".join(f"- {r.get('title', 'No title')}: {r.get('snippet', '')}" for r in results)
                 print_fn("  Web search results found.")
                 return content
             else:

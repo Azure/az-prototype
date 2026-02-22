@@ -32,10 +32,10 @@ from pathlib import Path
 
 import yaml
 
-
 # ------------------------------------------------------------------ #
 # Validation error
 # ------------------------------------------------------------------ #
+
 
 @dataclass
 class ValidationError:
@@ -165,6 +165,7 @@ def validate_anti_pattern_directory(directory: Path) -> list[ValidationError]:
 # CLI
 # ------------------------------------------------------------------ #
 
+
 def _get_staged_anti_pattern_files() -> list[Path]:
     """Return staged anti-pattern YAML files from the git index."""
     try:
@@ -186,9 +187,7 @@ def _get_staged_anti_pattern_files() -> list[Path]:
 
 def main(argv: list[str] | None = None) -> int:
     """Entry point for the anti-pattern validator."""
-    parser = argparse.ArgumentParser(
-        description="Validate anti-pattern YAML files against the expected schema."
-    )
+    parser = argparse.ArgumentParser(description="Validate anti-pattern YAML files against the expected schema.")
     parser.add_argument(
         "files",
         nargs="*",

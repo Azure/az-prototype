@@ -6,10 +6,10 @@ from pathlib import Path
 
 from knack.util import CLIError
 
-from azext_prototype.config import ProjectConfig
-from azext_prototype.stages.base import BaseStage, StageGuard, StageState
 from azext_prototype.agents.base import AgentContext
 from azext_prototype.agents.registry import AgentRegistry
+from azext_prototype.config import ProjectConfig
+from azext_prototype.stages.base import BaseStage, StageGuard, StageState
 from azext_prototype.templates.registry import TemplateRegistry
 
 logger = logging.getLogger(__name__)
@@ -104,18 +104,13 @@ class InitStage(BaseStage):
             template = tmpl_registry.get(_template)
             if template is None:
                 available = tmpl_registry.list_names()
-                raise CLIError(
-                    f"Unknown template '{_template}'. "
-                    f"Available templates: {', '.join(available)}"
-                )
+                raise CLIError(f"Unknown template '{_template}'. " f"Available templates: {', '.join(available)}")
 
         # --- Idempotency check ---
         project_dir = Path(output_dir).resolve() / name
         config_path = project_dir / ProjectConfig.CONFIG_FILENAME
         if config_path.exists():
-            console.print_warning(
-                f"Project already initialized at {project_dir}"
-            )
+            console.print_warning(f"Project already initialized at {project_dir}")
             answer = input("Reinitialize? This will reset configuration. [y/N] ").strip().lower()
             if answer != "y":
                 return {"status": "cancelled", "message": "Existing project preserved."}
@@ -134,8 +129,8 @@ class InitStage(BaseStage):
 
             console.print_header("Authenticating with GitHub")
 
-            from azext_prototype.auth.github_auth import GitHubAuthManager
             from azext_prototype.auth.copilot_license import CopilotLicenseValidator
+            from azext_prototype.auth.github_auth import GitHubAuthManager
 
             auth_manager = GitHubAuthManager()
             user_info = auth_manager.ensure_authenticated()
@@ -148,14 +143,10 @@ class InitStage(BaseStage):
             try:
                 license_info = license_validator.validate_license()
                 result["copilot_license"] = license_info
-                console.print_success(
-                    f"Copilot license: {license_info.get('plan', 'active')}"
-                )
+                console.print_success(f"Copilot license: {license_info.get('plan', 'active')}")
             except CLIError as e:
                 console.print_warning(str(e))
-                console.print_dim(
-                    "  Continuing — license will be validated on first AI call."
-                )
+                console.print_dim("  Continuing — license will be validated on first AI call.")
                 result["copilot_license"] = {"status": "unverified"}
 
             # Check for Copilot credentials
@@ -166,13 +157,10 @@ class InitStage(BaseStage):
                     console.print_success("Copilot API credentials found")
                 else:
                     console.print_warning(
-                        "No GitHub credentials found for Copilot API. "
-                        "Run 'copilot login' to authenticate."
+                        "No GitHub credentials found for Copilot API. " "Run 'copilot login' to authenticate."
                     )
         else:
-            console.print_dim(
-                f"\n  Skipping GitHub auth (not required for {ai_provider} provider)"
-            )
+            console.print_dim(f"\n  Skipping GitHub auth (not required for {ai_provider} provider)")
             result["github_user"] = None
 
         # --- Create project directory structure ---
@@ -186,26 +174,28 @@ class InitStage(BaseStage):
 
         resolved_model = model or _DEFAULT_MODELS.get(ai_provider, "gpt-4o")
 
-        config_data = config.create_default({
-            "project": {
-                "name": name,
-                "location": location,
-                "environment": environment,
-                "iac_tool": iac_tool,
-            },
-            "ai": {
-                "provider": ai_provider,
-                "model": resolved_model,
-            },
-        })
+        config_data = config.create_default(
+            {
+                "project": {
+                    "name": name,
+                    "location": location,
+                    "environment": environment,
+                    "iac_tool": iac_tool,
+                },
+                "ai": {
+                    "provider": ai_provider,
+                    "model": resolved_model,
+                },
+            }
+        )
 
         # Apply template to configuration
         if template:
             config.set("project.template", template.name)
-            config.set("project.services", [
-                {"name": s.name, "type": s.type, "tier": s.tier, "config": s.config}
-                for s in template.services
-            ])
+            config.set(
+                "project.services",
+                [{"name": s.name, "type": s.type, "tier": s.tier, "config": s.config} for s in template.services],
+            )
             if template.iac_defaults:
                 config.set("project.iac_defaults", template.iac_defaults)
             if template.requirements:
@@ -238,12 +228,8 @@ class InitStage(BaseStage):
             f"  IaC Tool:    {iac_tool}",
         ]
         if template:
-            summary_lines.append(
-                f"  Template:    {template.display_name} ({template.name})"
-            )
-            summary_lines.append(
-                f"  Services:    {', '.join(s.type for s in template.services)}"
-            )
+            summary_lines.append(f"  Template:    {template.display_name} ({template.name})")
+            summary_lines.append(f"  Services:    {', '.join(s.type for s in template.services)}")
         summary_lines.append("")
         summary_lines.append(f"  Next: cd {name} && az prototype design")
         console.panel("\n".join(summary_lines), title="Project Initialized")
@@ -553,10 +539,13 @@ Thumbs.db
     def _check_gh() -> bool:
         """Check if gh CLI is available."""
         import subprocess
+
         try:
             result = subprocess.run(
                 ["gh", "--version"],
-                capture_output=True, text=True, check=False,
+                capture_output=True,
+                text=True,
+                check=False,
             )
             return result.returncode == 0
         except FileNotFoundError:

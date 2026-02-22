@@ -9,9 +9,9 @@ import logging
 
 from knack.util import CLIError
 
-from azext_prototype.ai.provider import AIProvider
-from azext_prototype.ai.github_models import GitHubModelsProvider
 from azext_prototype.ai.azure_openai import AzureOpenAIProvider
+from azext_prototype.ai.github_models import GitHubModelsProvider
+from azext_prototype.ai.provider import AIProvider
 
 logger = logging.getLogger(__name__)
 
@@ -19,16 +19,18 @@ logger = logging.getLogger(__name__)
 ALLOWED_PROVIDERS = frozenset({"github-models", "azure-openai", "copilot"})
 
 # Provider names that are explicitly blocked (catch typos / social-engineering).
-BLOCKED_PROVIDERS = frozenset({
-    "openai",
-    "chatgpt",
-    "public-openai",
-    "anthropic",
-    "cohere",
-    "google",
-    "aws-bedrock",
-    "huggingface",
-})
+BLOCKED_PROVIDERS = frozenset(
+    {
+        "openai",
+        "chatgpt",
+        "public-openai",
+        "anthropic",
+        "cohere",
+        "google",
+        "aws-bedrock",
+        "huggingface",
+    }
+)
 
 # Models that require a specific provider.  Any model whose ID starts
 # with one of these prefixes will be rejected when paired with an
@@ -53,9 +55,7 @@ def _validate_model_provider(provider_name: str, model: str | None) -> str | Non
     model_lower = model.lower()
 
     # Claude models are only available via the Copilot API.
-    if provider_name != "copilot" and any(
-        model_lower.startswith(p) for p in _COPILOT_ONLY_PREFIXES
-    ):
+    if provider_name != "copilot" and any(model_lower.startswith(p) for p in _COPILOT_ONLY_PREFIXES):
         suggested = _PROVIDER_DEFAULT_MODELS.get(provider_name, "gpt-4o")
         raise CLIError(
             f"Model '{model}' is not available on the '{provider_name}' provider.\n"

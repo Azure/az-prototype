@@ -32,10 +32,10 @@ from pathlib import Path
 
 import yaml
 
-
 # ------------------------------------------------------------------ #
 # Validation error
 # ------------------------------------------------------------------ #
+
 
 @dataclass
 class ValidationError:
@@ -119,9 +119,7 @@ def validate_standards_file(path: Path) -> list[ValidationError]:
         return errors
 
     if len(principles) == 0:
-        errors.append(
-            ValidationError(filename, "'principles' is empty — file has no standards", severity="warning")
-        )
+        errors.append(ValidationError(filename, "'principles' is empty — file has no standards", severity="warning"))
 
     principle_ids: set[str] = set()
     for i, entry in enumerate(principles):
@@ -205,6 +203,7 @@ def validate_standards_directory(directory: Path) -> list[ValidationError]:
 # CLI
 # ------------------------------------------------------------------ #
 
+
 def _get_staged_standards_files() -> list[Path]:
     """Return staged standards YAML files from the git index."""
     try:
@@ -226,9 +225,7 @@ def _get_staged_standards_files() -> list[Path]:
 
 def main(argv: list[str] | None = None) -> int:
     """Entry point for the standards validator."""
-    parser = argparse.ArgumentParser(
-        description="Validate standards YAML files against the expected schema."
-    )
+    parser = argparse.ArgumentParser(description="Validate standards YAML files against the expected schema.")
     parser.add_argument(
         "files",
         nargs="*",

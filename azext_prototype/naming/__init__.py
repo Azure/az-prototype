@@ -6,8 +6,8 @@ resource naming across infrastructure and application code.
 """
 
 import re
-from knack.util import CLIError
 
+from knack.util import CLIError
 
 # Microsoft Cloud Adoption Framework abbreviations
 # https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/resource-abbreviations
@@ -298,7 +298,8 @@ class MicrosoftCAFStrategy(NamingStrategy):
 
     Pattern: {abbreviation}-{org}-{service}-{env}-{region_short}-{instance}
     Example: rg-contoso-api-dev-eus-001
-    Reference: https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/resource-naming
+    Reference: https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/
+    ready/azure-best-practices/resource-naming
     """
 
     def _build_name(self, resource_type: str, service_name: str) -> str:
@@ -365,9 +366,7 @@ class CustomStrategy(NamingStrategy):
 
     def __init__(self, config: dict):
         super().__init__(config)
-        self.pattern = config.get("naming", {}).get(
-            "pattern", "{type}-{org}-{service}-{env}-{region_short}"
-        )
+        self.pattern = config.get("naming", {}).get("pattern", "{type}-{org}-{service}-{env}-{region_short}")
 
     def _build_name(self, resource_type: str, service_name: str) -> str:
         return self._interpolate(self.pattern, resource_type, service_name)
@@ -402,8 +401,7 @@ def create_naming_strategy(config: dict) -> NamingStrategy:
     strategy_class = _STRATEGIES.get(strategy_name)
     if strategy_class is None:
         raise CLIError(
-            f"Unknown naming strategy '{strategy_name}'.\n"
-            f"Available strategies: {', '.join(_STRATEGIES.keys())}"
+            f"Unknown naming strategy '{strategy_name}'.\n" f"Available strategies: {', '.join(_STRATEGIES.keys())}"
         )
 
     return strategy_class(config)

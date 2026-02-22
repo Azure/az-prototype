@@ -38,9 +38,7 @@ Secrets example (prototype.secrets.yaml):
 from __future__ import annotations
 
 import json
-import logging
 import threading
-from typing import Any
 
 import requests
 
@@ -87,21 +85,26 @@ class LightpandaHandler(MCPHandler):
 
         # Create HTTP session with auth headers
         self._session = requests.Session()
-        self._session.headers.update({
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        })
+        self._session.headers.update(
+            {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            }
+        )
         if api_key:
             self._session.headers["Authorization"] = f"Bearer {api_key}"
 
         self._mcp_session_url = base_url
 
         # MCP initialize handshake over HTTP
-        init_result = self._send_jsonrpc("initialize", {
-            "protocolVersion": "2024-11-05",
-            "capabilities": {},
-            "clientInfo": self.client_info.to_dict(),
-        })
+        init_result = self._send_jsonrpc(
+            "initialize",
+            {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": self.client_info.to_dict(),
+            },
+        )
 
         if not init_result:
             self._bubble_warning("Lightpanda MCP initialization failed")
@@ -135,7 +138,8 @@ class LightpandaHandler(MCPHandler):
         """Invoke a Lightpanda tool via JSON-RPC over HTTP."""
         if not self._connected or not self._session:
             return MCPToolResult(
-                content="", is_error=True,
+                content="",
+                is_error=True,
                 error_message="Not connected to Lightpanda",
             )
 
@@ -143,30 +147,31 @@ class LightpandaHandler(MCPHandler):
 
         for attempt in range(self.config.max_retries + 1):
             try:
-                result = self._send_jsonrpc("tools/call", {
-                    "name": name,
-                    "arguments": arguments,
-                })
+                result = self._send_jsonrpc(
+                    "tools/call",
+                    {
+                        "name": name,
+                        "arguments": arguments,
+                    },
+                )
 
                 if result is None:
                     if attempt < self.config.max_retries:
                         continue
                     return MCPToolResult(
-                        content="", is_error=True,
+                        content="",
+                        is_error=True,
                         error_message="No response from Lightpanda",
                     )
 
                 # MCP tool results contain a content array
                 content_parts = result.get("content", [])
-                text_parts = [
-                    p.get("text", "") for p in content_parts
-                    if p.get("type") == "text"
-                ]
+                text_parts = [p.get("text", "") for p in content_parts if p.get("type") == "text"]
                 content = "\n".join(text_parts)
 
                 # Respect max_result_bytes
                 if len(content) > self.config.max_result_bytes:
-                    content = content[:self.config.max_result_bytes] + "\n...(truncated)"
+                    content = content[: self.config.max_result_bytes] + "\n...(truncated)"
 
                 return MCPToolResult(
                     content=content,
@@ -177,14 +182,16 @@ class LightpandaHandler(MCPHandler):
                 self.logger.warning("Tool call timed out (attempt %d)", attempt + 1)
                 if attempt == self.config.max_retries:
                     return MCPToolResult(
-                        content="", is_error=True,
+                        content="",
+                        is_error=True,
                         error_message=f"Timeout after {attempt + 1} attempts",
                     )
             except Exception as exc:
                 self.logger.warning("Tool call failed (attempt %d): %s", attempt + 1, exc)
                 if attempt == self.config.max_retries:
                     return MCPToolResult(
-                        content="", is_error=True,
+                        content="",
+                        is_error=True,
                         error_message=f"Failed after {attempt + 1} attempts: {exc}",
                     )
 

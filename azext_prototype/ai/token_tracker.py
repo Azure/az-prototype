@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-
 # Model context-window sizes (prompt token budget).
 # Used for budget-percentage display.  Values are the *input* context
 # window (not total output limit).

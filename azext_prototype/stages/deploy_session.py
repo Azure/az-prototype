@@ -50,7 +50,8 @@ from azext_prototype.stages.deploy_state import DeployState
 from azext_prototype.stages.escalation import EscalationTracker
 from azext_prototype.stages.qa_router import route_error_to_qa
 from azext_prototype.tracking import ChangeTracker
-from azext_prototype.ui.console import Console, DiscoveryPrompt, console as default_console
+from azext_prototype.ui.console import Console, DiscoveryPrompt
+from azext_prototype.ui.console import console as default_console
 
 logger = logging.getLogger(__name__)
 
@@ -86,22 +87,36 @@ def _lookup_deployer_object_id(client_id: str | None = None) -> str | None:
 
 _QUIT_WORDS = frozenset({"q", "quit", "exit"})
 _DONE_WORDS = frozenset({"done", "finish", "accept", "lgtm"})
-_SLASH_COMMANDS = frozenset({
-    "/status", "/stages", "/deploy", "/rollback", "/redeploy",
-    "/plan", "/outputs", "/preflight", "/login", "/help",
-})
+_SLASH_COMMANDS = frozenset(
+    {
+        "/status",
+        "/stages",
+        "/deploy",
+        "/rollback",
+        "/redeploy",
+        "/plan",
+        "/outputs",
+        "/preflight",
+        "/login",
+        "/help",
+    }
+)
 
 
 # -------------------------------------------------------------------- #
 # DeployResult — public interface consumed by DeployStage
 # -------------------------------------------------------------------- #
 
+
 class DeployResult:
     """Result of a deploy session."""
 
     __slots__ = (
-        "deployed_stages", "failed_stages", "rolled_back_stages",
-        "captured_outputs", "cancelled",
+        "deployed_stages",
+        "failed_stages",
+        "rolled_back_stages",
+        "captured_outputs",
+        "cancelled",
     )
 
     def __init__(
@@ -122,6 +137,7 @@ class DeployResult:
 # -------------------------------------------------------------------- #
 # DeploySession
 # -------------------------------------------------------------------- #
+
 
 class DeploySession:
     """Interactive, multi-phase deploy conversation.
@@ -201,11 +217,7 @@ class DeploySession:
         CLI-provided ``client_id`` / ``client_secret`` take priority over
         values stored in the project config (``deploy.service_principal.*``).
         """
-        self._subscription = (
-            subscription
-            or self._config.get("deploy.subscription")
-            or get_current_subscription()
-        )
+        self._subscription = subscription or self._config.get("deploy.subscription") or get_current_subscription()
         self._resource_group = self._config.get("deploy.resource_group") or ""
         self._tenant = tenant or self._config.get("deploy.tenant") or None
 
@@ -217,14 +229,8 @@ class DeploySession:
 
         # Resolve SP creds: CLI args > config
         sp_cfg = self._config.get("deploy.service_principal", {})
-        resolved_client_id = (
-            client_id
-            or (sp_cfg.get("client_id") if isinstance(sp_cfg, dict) else None)
-        )
-        resolved_client_secret = (
-            client_secret
-            or (sp_cfg.get("client_secret") if isinstance(sp_cfg, dict) else None)
-        )
+        resolved_client_id = client_id or (sp_cfg.get("client_id") if isinstance(sp_cfg, dict) else None)
+        resolved_client_secret = client_secret or (sp_cfg.get("client_secret") if isinstance(sp_cfg, dict) else None)
 
         # Build auth env for subprocesses
         self._deploy_env = build_deploy_env(
@@ -373,7 +379,11 @@ class DeploySession:
             # Slash commands
             if lower.startswith("/"):
                 self._handle_slash_command(
-                    user_input, force, use_styled, _print, _input,
+                    user_input,
+                    force,
+                    use_styled,
+                    _print,
+                    _input,
                 )
                 continue
 
@@ -558,7 +568,9 @@ class DeploySession:
             try:
                 result = subprocess.run(
                     ["terraform", "--version"],
-                    capture_output=True, text=True, check=False,
+                    capture_output=True,
+                    text=True,
+                    check=False,
                 )
                 if result.returncode == 0:
                     version = result.stdout.strip().split("\n")[0]
@@ -603,6 +615,7 @@ class DeploySession:
         for resource type declarations. Returns distinct Microsoft.* namespaces.
         """
         import re as _re
+
         namespaces: set[str] = set()
 
         # Patterns for extracting resource types
@@ -665,18 +678,22 @@ class DeploySession:
                 state = result.stdout.strip()
 
                 if state == "Registered":
-                    results.append({
-                        "name": f"Provider {ns}",
-                        "status": "pass",
-                        "message": "Registered.",
-                    })
+                    results.append(
+                        {
+                            "name": f"Provider {ns}",
+                            "status": "pass",
+                            "message": "Registered.",
+                        }
+                    )
                 else:
-                    results.append({
-                        "name": f"Provider {ns}",
-                        "status": "warn",
-                        "message": f"State: {state or 'unknown'}. May need registration.",
-                        "fix_command": f"az provider register -n {ns}",
-                    })
+                    results.append(
+                        {
+                            "name": f"Provider {ns}",
+                            "status": "warn",
+                            "message": f"State: {state or 'unknown'}. May need registration.",
+                            "fix_command": f"az provider register -n {ns}",
+                        }
+                    )
             except FileNotFoundError:
                 break  # az CLI not found, already caught above
 
@@ -697,32 +714,44 @@ class DeploySession:
             # Quick init + validate (no backend, no real provider download if cached)
             init = subprocess.run(
                 ["terraform", "init", "-backend=false", "-input=false", "-no-color"],
-                capture_output=True, text=True, cwd=str(stage_dir), check=False,
+                capture_output=True,
+                text=True,
+                cwd=str(stage_dir),
+                check=False,
             )
             if init.returncode != 0:
-                results.append({
-                    "name": f"Terraform Validate (Stage {stage['stage']})",
-                    "status": "fail",
-                    "message": f"Init failed: {(init.stderr or init.stdout).strip()[:200]}",
-                })
+                results.append(
+                    {
+                        "name": f"Terraform Validate (Stage {stage['stage']})",
+                        "status": "fail",
+                        "message": f"Init failed: {(init.stderr or init.stdout).strip()[:200]}",
+                    }
+                )
                 continue
             val = subprocess.run(
                 ["terraform", "validate", "-no-color"],
-                capture_output=True, text=True, cwd=str(stage_dir), check=False,
+                capture_output=True,
+                text=True,
+                cwd=str(stage_dir),
+                check=False,
             )
             if val.returncode != 0:
                 error = (val.stderr or val.stdout).strip()[:200]
-                results.append({
-                    "name": f"Terraform Validate (Stage {stage['stage']})",
-                    "status": "fail",
-                    "message": error,
-                })
+                results.append(
+                    {
+                        "name": f"Terraform Validate (Stage {stage['stage']})",
+                        "status": "fail",
+                        "message": error,
+                    }
+                )
             else:
-                results.append({
-                    "name": f"Terraform Validate (Stage {stage['stage']})",
-                    "status": "pass",
-                    "message": "Syntax valid.",
-                })
+                results.append(
+                    {
+                        "name": f"Terraform Validate (Stage {stage['stage']})",
+                        "status": "pass",
+                        "message": "Syntax valid.",
+                    }
+                )
         return results
 
     # ------------------------------------------------------------------ #
@@ -870,11 +899,16 @@ class DeploySession:
         svc_names = [s.get("name", "") for s in services if s.get("name")]
 
         qa_result = route_error_to_qa(
-            error_text, f"Deploy {stage_info}",
-            self._qa_agent, self._context, self._token_tracker, _print,
+            error_text,
+            f"Deploy {stage_info}",
+            self._qa_agent,
+            self._context,
+            self._token_tracker,
+            _print,
             services=svc_names,
             escalation_tracker=self._escalation_tracker,
-            source_agent="deploy-session", source_stage="deploy",
+            source_agent="deploy-session",
+            source_stage="deploy",
         )
 
         if not qa_result["diagnosed"]:
@@ -899,11 +933,14 @@ class DeploySession:
         """Roll back a single deployed stage. Returns True on success."""
         if not self._deploy_state.can_rollback(stage_num):
             higher = [
-                s["stage"] for s in self._deploy_state._state["deployment_stages"]
+                s["stage"]
+                for s in self._deploy_state._state["deployment_stages"]
                 if s["stage"] > stage_num and s.get("deploy_status") == "deployed"
             ]
-            _print(f"  Cannot roll back Stage {stage_num} — "
-                   f"Stage(s) {', '.join(str(s) for s in higher)} still deployed.")
+            _print(
+                f"  Cannot roll back Stage {stage_num} — "
+                f"Stage(s) {', '.join(str(s) for s in higher)} still deployed."
+            )
             _print("  Roll back those stages first.")
             return False
 
@@ -1086,7 +1123,12 @@ class DeploySession:
                                         plan_env.update(generated)
                                     result = plan_terraform(stage_dir, self._subscription, env=plan_env)
                                 else:
-                                    result = whatif_bicep(stage_dir, self._subscription, self._resource_group, env=self._deploy_env)
+                                    result = whatif_bicep(
+                                        stage_dir,
+                                        self._subscription,
+                                        self._resource_group,
+                                        env=self._deploy_env,
+                                    )
                             if result.get("output"):
                                 _print(result["output"])
                             if result.get("error"):
@@ -1115,7 +1157,10 @@ class DeploySession:
             _print("  Running az login...")
             try:
                 result = subprocess.run(
-                    [_az(), "login"], capture_output=True, text=True, check=False,
+                    [_az(), "login"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
                 )
                 if result.returncode == 0:
                     _print("  Login successful.")
@@ -1157,8 +1202,7 @@ class DeploySession:
             deployed_stages=self._deploy_state.get_deployed_stages(),
             failed_stages=self._deploy_state.get_failed_stages(),
             rolled_back_stages=[
-                s for s in self._deploy_state._state["deployment_stages"]
-                if s.get("deploy_status") == "rolled_back"
+                s for s in self._deploy_state._state["deployment_stages"] if s.get("deploy_status") == "rolled_back"
             ],
             captured_outputs=self._deploy_state._state.get("captured_outputs", {}),
         )

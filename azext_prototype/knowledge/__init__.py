@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import logging
 import re
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -279,10 +278,7 @@ class KnowledgeLoader:
         dirpath = self._dir / subdir
         if not dirpath.is_dir():
             return []
-        return sorted(
-            p.stem for p in dirpath.iterdir()
-            if p.suffix == ".md" and p.is_file()
-        )
+        return sorted(p.stem for p in dirpath.iterdir() if p.suffix == ".md" and p.is_file())
 
     def _assemble(self, sections: list[tuple[str, str]]) -> str:
         """Assemble sections into a single string, respecting token budget."""
@@ -303,7 +299,7 @@ class KnowledgeLoader:
                 remaining = budget_chars - used
                 if remaining > len(header) + 200:
                     # Include at least the header and some content
-                    truncated = section_text[:remaining - 50]
+                    truncated = section_text[: remaining - 50]
                     truncated += "\n\n[... truncated to fit token budget ...]\n"
                     parts.append(truncated)
                     used = budget_chars
@@ -335,7 +331,7 @@ def _filter_content(content: str, mode: str) -> str:
 
     start = match.start()
     # Find the next ## heading after this one (or end of file)
-    rest = content[match.end():]
+    rest = content[match.end() :]
     next_heading = re.search(r"^## ", rest, re.MULTILINE)
     if next_heading:
         end = match.end() + next_heading.start()
@@ -351,10 +347,10 @@ def _extract_production_section(content: str) -> list[str]:
     if not match:
         return []
 
-    rest = content[match.end():]
+    rest = content[match.end() :]
     # Stop at next heading or end of file
     next_heading = re.search(r"^## ", rest, re.MULTILINE)
-    section = rest[:next_heading.start()] if next_heading else rest
+    section = rest[: next_heading.start()] if next_heading else rest
 
     items: list[str] = []
     for line in section.splitlines():

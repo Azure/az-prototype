@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from azext_prototype.ai.provider import AIProvider, AIMessage, AIResponse, ToolCall
+from azext_prototype.ai.provider import AIMessage, AIProvider, AIResponse
 
 logger = logging.getLogger(__name__)
 
@@ -111,13 +111,13 @@ class BaseAgent:
     # -- Knowledge system: declare what knowledge this agent needs --
     # Subclasses set these to have knowledge automatically injected
     # into system messages alongside governance context.
-    _knowledge_role: str | None = None          # e.g. "architect", "infrastructure"
-    _knowledge_tools: list[str] | None = None   # e.g. ["terraform"]
+    _knowledge_role: str | None = None  # e.g. "architect", "infrastructure"
+    _knowledge_tools: list[str] | None = None  # e.g. ["terraform"]
     _knowledge_languages: list[str] | None = None  # e.g. ["python", "csharp"]
 
     # -- Web search: opt-in for runtime documentation access --
     _enable_web_search: bool = False
-    _SEARCH_PATTERN: re.Pattern = re.compile(r'\[SEARCH:\s*(.+?)\]')
+    _SEARCH_PATTERN: re.Pattern = re.compile(r"\[SEARCH:\s*(.+?)\]")
 
     # -- MCP tool calling: opt-in for MCP server tool access --
     _enable_mcp_tools: bool = True
@@ -192,11 +192,7 @@ class BaseAgent:
             for w in warnings:
                 logger.warning("Governance: %s", w)
             # Append warnings as a note in the response
-            warning_block = (
-                "\n\n---\n"
-                "**Governance warnings:**\n"
-                + "\n".join(f"- {w}" for w in warnings)
-            )
+            warning_block = "\n\n---\n" "**Governance warnings:**\n" + "\n".join(f"- {w}" for w in warnings)
             response = AIResponse(
                 content=response.content + warning_block,
                 model=response.model,
@@ -244,9 +240,7 @@ class BaseAgent:
             messages.append(AIMessage(role="system", content=self.system_prompt))
 
         if self.constraints:
-            constraint_text = "CONSTRAINTS:\n" + "\n".join(
-                f"- {c}" for c in self.constraints
-            )
+            constraint_text = "CONSTRAINTS:\n" + "\n".join(f"- {c}" for c in self.constraints)
             messages.append(AIMessage(role="system", content=constraint_text))
 
         # Inject governance context
@@ -280,6 +274,7 @@ class BaseAgent:
             return []
         try:
             from azext_prototype.agents.governance import GovernanceContext
+
             ctx = GovernanceContext()
             return ctx.check_response_for_violations(self.name, response_text)
         except Exception:  # pragma: no cover — never let validation break the agent
@@ -289,6 +284,7 @@ class BaseAgent:
         """Return formatted governance text for system messages."""
         try:
             from azext_prototype.agents.governance import GovernanceContext
+
             ctx = GovernanceContext()
             return ctx.format_all(
                 agent_name=self.name,
@@ -301,6 +297,7 @@ class BaseAgent:
         """Return formatted design standards for system messages."""
         try:
             from azext_prototype.governance import standards
+
             return standards.format_for_prompt(agent_name=self.name)
         except Exception:  # pragma: no cover — never let standards break the agent
             return ""
@@ -314,6 +311,7 @@ class BaseAgent:
         """
         try:
             from azext_prototype.knowledge import KnowledgeLoader
+
             loader = KnowledgeLoader()
 
             # Flatten tools list to a single tool (compose_context takes one)
@@ -323,11 +321,7 @@ class BaseAgent:
             return loader.compose_context(
                 role=self._knowledge_role,
                 tool=tool,
-                language=(
-                    self._knowledge_languages[0]
-                    if self._knowledge_languages
-                    else None
-                ),
+                language=(self._knowledge_languages[0] if self._knowledge_languages else None),
                 include_constraints=True,
             )
         except Exception:  # pragma: no cover — never let knowledge break the agent
@@ -335,10 +329,7 @@ class BaseAgent:
 
     def _get_mcp_tools(self, context: AgentContext) -> list[dict] | None:
         """Get MCP tools in OpenAI schema format if available."""
-        if (
-            not self._enable_mcp_tools
-            or context.mcp_manager is None
-        ):
+        if not self._enable_mcp_tools or context.mcp_manager is None:
             return None
 
         # Determine current stage from shared_state (set by session orchestrators)
@@ -370,11 +361,13 @@ class BaseAgent:
                 break
 
             # Append assistant message with tool calls to history
-            messages.append(AIMessage(
-                role="assistant",
-                content=response.content,
-                tool_calls=response.tool_calls,
-            ))
+            messages.append(
+                AIMessage(
+                    role="assistant",
+                    content=response.content,
+                    tool_calls=response.tool_calls,
+                )
+            )
 
             # Invoke each tool and append results
             for tc in response.tool_calls:
@@ -389,11 +382,13 @@ class BaseAgent:
                 if result.is_error:
                     tool_content = f"Error: {result.error_message}"
 
-                messages.append(AIMessage(
-                    role="tool",
-                    content=tool_content,
-                    tool_call_id=tc.id,
-                ))
+                messages.append(
+                    AIMessage(
+                        role="tool",
+                        content=tool_content,
+                        tool_call_id=tc.id,
+                    )
+                )
 
             # Re-call AI with tool results
             response = context.ai_provider.chat(
@@ -455,14 +450,16 @@ class BaseAgent:
         search_context = "DOCUMENTATION SEARCH RESULTS:\n\n" + "\n\n---\n\n".join(results)
         messages.append(AIMessage(role="assistant", content=response.content))
         messages.append(AIMessage(role="system", content=search_context))
-        messages.append(AIMessage(
-            role="user",
-            content=(
-                "Search results are now available above. Please continue "
-                "your response using the documentation provided. Do not "
-                "emit further [SEARCH:] markers."
-            ),
-        ))
+        messages.append(
+            AIMessage(
+                role="user",
+                content=(
+                    "Search results are now available above. Please continue "
+                    "your response using the documentation provided. Do not "
+                    "emit further [SEARCH:] markers."
+                ),
+            )
+        )
 
         final = context.ai_provider.chat(
             messages,

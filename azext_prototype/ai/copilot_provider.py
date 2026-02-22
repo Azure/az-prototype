@@ -28,7 +28,7 @@ from knack.util import CLIError
 from azext_prototype.ai.copilot_auth import (
     get_copilot_token,
 )
-from azext_prototype.ai.provider import AIProvider, AIMessage, AIResponse, ToolCall
+from azext_prototype.ai.provider import AIMessage, AIProvider, AIResponse, ToolCall
 
 logger = logging.getLogger(__name__)
 
@@ -66,12 +66,10 @@ class CopilotProvider(AIProvider):
     def __init__(
         self,
         model: str | None = None,
-        github_token: str | None = None,      # kept for API compat
+        github_token: str | None = None,  # kept for API compat
     ):
         self._model = model or self.DEFAULT_MODEL
-        self._timeout = int(
-            os.environ.get("COPILOT_TIMEOUT", str(_DEFAULT_TIMEOUT))
-        )
+        self._timeout = int(os.environ.get("COPILOT_TIMEOUT", str(_DEFAULT_TIMEOUT)))
 
     # ------------------------------------------------------------------
     # HTTP helpers
@@ -143,13 +141,18 @@ class CopilotProvider(AIProvider):
             payload["tools"] = tools
 
         prompt_chars = sum(
-            len(m.content) if isinstance(m.content, str)
-            else sum(len(p.get("text", "")) for p in m.content if isinstance(p, dict))
+            (
+                len(m.content)
+                if isinstance(m.content, str)
+                else sum(len(p.get("text", "")) for p in m.content if isinstance(p, dict))
+            )
             for m in messages
         )
         logger.debug(
             "Copilot request: model=%s, msgs=%d, chars=%d",
-            target_model, len(messages), prompt_chars,
+            target_model,
+            len(messages),
+            prompt_chars,
         )
 
         try:
@@ -166,9 +169,7 @@ class CopilotProvider(AIProvider):
                 "  set COPILOT_TIMEOUT=600"
             )
         except requests.RequestException as exc:
-            raise CLIError(
-                f"Failed to reach Copilot API: {exc}"
-            ) from exc
+            raise CLIError(f"Failed to reach Copilot API: {exc}") from exc
 
         # 401 → token may be invalid or revoked; retry once
         if resp.status_code == 401:
@@ -181,9 +182,7 @@ class CopilotProvider(AIProvider):
                     timeout=self._timeout,
                 )
             except requests.RequestException as exc:
-                raise CLIError(
-                    f"Copilot API retry failed: {exc}"
-                ) from exc
+                raise CLIError(f"Copilot API retry failed: {exc}") from exc
 
         if resp.status_code != 200:
             body = ""
@@ -265,13 +264,9 @@ class CopilotProvider(AIProvider):
             )
             resp.raise_for_status()
         except requests.Timeout:
-            raise CLIError(
-                f"Copilot streaming timed out after {self._timeout}s."
-            )
+            raise CLIError(f"Copilot streaming timed out after {self._timeout}s.")
         except requests.RequestException as exc:
-            raise CLIError(
-                f"Copilot streaming request failed: {exc}"
-            ) from exc
+            raise CLIError(f"Copilot streaming request failed: {exc}") from exc
 
         for line in resp.iter_lines(decode_unicode=True):
             if not line or not line.startswith("data: "):

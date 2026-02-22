@@ -13,7 +13,12 @@ and resource health rather than full production observability.
 
 import logging
 
-from azext_prototype.agents.base import BaseAgent, AgentCapability, AgentContext, AgentContract
+from azext_prototype.agents.base import (
+    AgentCapability,
+    AgentContext,
+    AgentContract,
+    BaseAgent,
+)
 from azext_prototype.ai.provider import AIMessage, AIResponse
 
 logger = logging.getLogger(__name__)
@@ -27,11 +32,25 @@ class MonitoringAgent(BaseAgent):
     _include_templates = False
     _knowledge_role = "monitoring"
     _keywords = [
-        "monitor", "monitoring", "alert", "alerts", "observability",
-        "diagnostic", "diagnostics", "log", "logging", "metrics",
-        "app insights", "application insights", "log analytics",
-        "dashboard", "health", "latency", "availability",
-        "telemetry", "tracing",
+        "monitor",
+        "monitoring",
+        "alert",
+        "alerts",
+        "observability",
+        "diagnostic",
+        "diagnostics",
+        "log",
+        "logging",
+        "metrics",
+        "app insights",
+        "application insights",
+        "log analytics",
+        "dashboard",
+        "health",
+        "latency",
+        "availability",
+        "telemetry",
+        "tracing",
     ]
     _keyword_weight = 0.12
     _contract = AgentContract(
@@ -72,32 +91,38 @@ class MonitoringAgent(BaseAgent):
         iac_tool = project_config.get("project", {}).get("iac_tool", "terraform")
         environment = project_config.get("project", {}).get("environment", "dev")
         location = project_config.get("project", {}).get("location", "eastus")
-        messages.append(AIMessage(
-            role="system",
-            content=(
-                f"PROJECT CONTEXT:\n"
-                f"- IaC Tool: {iac_tool}\n"
-                f"- Environment: {environment}\n"
-                f"- Region: {location}\n"
-                f"- Generate all monitoring IaC in {iac_tool} format\n"
-            ),
-        ))
+        messages.append(
+            AIMessage(
+                role="system",
+                content=(
+                    f"PROJECT CONTEXT:\n"
+                    f"- IaC Tool: {iac_tool}\n"
+                    f"- Environment: {environment}\n"
+                    f"- Region: {location}\n"
+                    f"- Generate all monitoring IaC in {iac_tool} format\n"
+                ),
+            )
+        )
 
         # Include architecture artifacts
         architecture = context.get_artifact("architecture")
         if architecture:
-            messages.append(AIMessage(
-                role="system",
-                content=f"ARCHITECTURE CONTEXT:\n{architecture}",
-            ))
+            messages.append(
+                AIMessage(
+                    role="system",
+                    content=f"ARCHITECTURE CONTEXT:\n{architecture}",
+                )
+            )
 
         # Include deployment plan if available
         deployment_plan = context.get_artifact("deployment_plan")
         if deployment_plan:
-            messages.append(AIMessage(
-                role="system",
-                content=f"DEPLOYMENT PLAN:\n{deployment_plan}",
-            ))
+            messages.append(
+                AIMessage(
+                    role="system",
+                    content=f"DEPLOYMENT PLAN:\n{deployment_plan}",
+                )
+            )
 
         messages.extend(context.conversation_history)
         messages.append(AIMessage(role="user", content=task))
@@ -113,11 +138,7 @@ class MonitoringAgent(BaseAgent):
         if warnings:
             for w in warnings:
                 logger.warning("Governance: %s", w)
-            warning_block = (
-                "\n\n---\n"
-                "**\u26a0 Governance warnings:**\n"
-                + "\n".join(f"- {w}" for w in warnings)
-            )
+            warning_block = "\n\n---\n" "**\u26a0 Governance warnings:**\n" + "\n".join(f"- {w}" for w in warnings)
             response = AIResponse(
                 content=response.content + warning_block,
                 model=response.model,
@@ -128,7 +149,9 @@ class MonitoringAgent(BaseAgent):
         return response
 
 
-MONITORING_AGENT_PROMPT = """You are an Azure monitoring specialist who generates observability infrastructure for prototypes.
+MONITORING_AGENT_PROMPT = """\
+You are an Azure monitoring specialist who generates \
+observability infrastructure for prototypes.
 
 Your role is to ensure every deployed Azure resource has appropriate monitoring,
 alerting, and diagnostic configuration. You generate IaC code (Terraform or Bicep)

@@ -165,9 +165,7 @@ def parse_version(s: str) -> tuple[int, ...]:
 # Constraint checking
 # ======================================================================
 
-_CONSTRAINT_RE = re.compile(
-    r"^(?P<op>>=|<=|!=|==|>|<|~|\^)\s*(?P<ver>v?\d+(?:\.\d+)*)$"
-)
+_CONSTRAINT_RE = re.compile(r"^(?P<op>>=|<=|!=|==|>|<|~|\^)\s*(?P<ver>v?\d+(?:\.\d+)*)$")
 
 
 def check_constraint(version: str, constraint: str) -> bool:

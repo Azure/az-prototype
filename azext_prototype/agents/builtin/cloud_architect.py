@@ -2,7 +2,12 @@
 
 import logging
 
-from azext_prototype.agents.base import BaseAgent, AgentCapability, AgentContext, AgentContract
+from azext_prototype.agents.base import (
+    AgentCapability,
+    AgentContext,
+    AgentContract,
+    BaseAgent,
+)
 from azext_prototype.ai.provider import AIMessage, AIResponse
 
 logger = logging.getLogger(__name__)
@@ -21,9 +26,18 @@ class CloudArchitectAgent(BaseAgent):
     _enable_web_search = True
     _knowledge_role = "architect"
     _keywords = [
-        "architect", "design", "service", "infrastructure",
-        "networking", "security", "identity", "managed identity",
-        "azure", "resource", "configuration", "integration",
+        "architect",
+        "design",
+        "service",
+        "infrastructure",
+        "networking",
+        "security",
+        "identity",
+        "managed identity",
+        "azure",
+        "resource",
+        "configuration",
+        "integration",
     ]
     _keyword_weight = 0.1
     _contract = AgentContract(
@@ -60,49 +74,60 @@ class CloudArchitectAgent(BaseAgent):
 
         # Add project context
         project_config = context.project_config
-        messages.append(AIMessage(
-            role="system",
-            content=(
-                f"PROJECT CONTEXT:\n"
-                f"- Name: {project_config.get('project', {}).get('name', 'unnamed')}\n"
-                f"- Region: {project_config.get('project', {}).get('location', 'eastus')}\n"
-                f"- IaC Tool: {project_config.get('project', {}).get('iac_tool', 'terraform')}\n"
-                f"- Environment: {project_config.get('project', {}).get('environment', 'dev')}\n"
-            ),
-        ))
+        messages.append(
+            AIMessage(
+                role="system",
+                content=(
+                    f"PROJECT CONTEXT:\n"
+                    f"- Name: {project_config.get('project', {}).get('name', 'unnamed')}\n"
+                    f"- Region: {project_config.get('project', {}).get('location', 'eastus')}\n"
+                    f"- IaC Tool: {project_config.get('project', {}).get('iac_tool', 'terraform')}\n"
+                    f"- Environment: {project_config.get('project', {}).get('environment', 'dev')}\n"
+                ),
+            )
+        )
 
         # Add Azure API version context for both Terraform and Bicep
         from azext_prototype.requirements import get_dependency_version
+
         api_ver = get_dependency_version("azure_api")
         if api_ver:
-            iac_tool = project_config.get('project', {}).get('iac_tool', 'terraform')
+            iac_tool = project_config.get("project", {}).get("iac_tool", "terraform")
             lang = "terraform" if iac_tool == "terraform" else "bicep"
-            messages.append(AIMessage(
-                role="system",
-                content=(
-                    f"AZURE API VERSION: {api_ver}\n"
-                    f"All resource type declarations must use API version {api_ver}.\n"
-                    f"Format: Microsoft.<Provider>/<ResourceType>@{api_ver}\n"
-                    f"Reference docs: "
-                    f"https://learn.microsoft.com/en-us/azure/templates/<resource_provider>/{api_ver}/<resource_type>?pivots=deployment-language-{lang}"
-                ),
-            ))
+            messages.append(
+                AIMessage(
+                    role="system",
+                    content=(
+                        f"AZURE API VERSION: {api_ver}\n"
+                        f"All resource type declarations must use API version {api_ver}.\n"
+                        f"Format: Microsoft.<Provider>/<ResourceType>@{api_ver}\n"
+                        f"Reference docs: "
+                        f"https://learn.microsoft.com/en-us/azure/templates/"
+                        f"<resource_provider>/{api_ver}/<resource_type>"
+                        f"?pivots=deployment-language-{lang}"
+                    ),
+                )
+            )
 
         # Add naming conventions
         naming_instructions = self._get_naming_instructions(project_config)
         if naming_instructions:
-            messages.append(AIMessage(
-                role="system",
-                content=naming_instructions,
-            ))
+            messages.append(
+                AIMessage(
+                    role="system",
+                    content=naming_instructions,
+                )
+            )
 
         # Add any artifacts
         requirements = context.get_artifact("requirements")
         if requirements:
-            messages.append(AIMessage(
-                role="system",
-                content=f"CUSTOMER REQUIREMENTS:\n{requirements}",
-            ))
+            messages.append(
+                AIMessage(
+                    role="system",
+                    content=f"CUSTOMER REQUIREMENTS:\n{requirements}",
+                )
+            )
 
         # Add conversation history
         messages.extend(context.conversation_history)
@@ -121,11 +146,7 @@ class CloudArchitectAgent(BaseAgent):
         if warnings:
             for w in warnings:
                 logger.warning("Governance: %s", w)
-            warning_block = (
-                "\n\n---\n"
-                "**\u26a0 Governance warnings:**\n"
-                + "\n".join(f"- {w}" for w in warnings)
-            )
+            warning_block = "\n\n---\n" "**\u26a0 Governance warnings:**\n" + "\n".join(f"- {w}" for w in warnings)
             response = AIResponse(
                 content=response.content + warning_block,
                 model=response.model,
@@ -139,11 +160,11 @@ class CloudArchitectAgent(BaseAgent):
         """Generate naming convention instructions from project config."""
         try:
             from azext_prototype.naming import create_naming_strategy
+
             strategy = create_naming_strategy(config)
             return strategy.to_prompt_instructions()
         except Exception:
             return ""
-
 
 
 CLOUD_ARCHITECT_PROMPT = """You are an expert Azure Cloud Architect specializing in rapid prototype design.

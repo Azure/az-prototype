@@ -117,8 +117,7 @@ def validate_policy_file(path: Path) -> list[ValidationError]:
         errors.append(
             ValidationError(
                 filename,
-                f"Unsupported apiVersion '{api_version}'. "
-                f"Supported: {', '.join(SUPPORTED_API_VERSIONS)}",
+                f"Unsupported apiVersion '{api_version}'. " f"Supported: {', '.join(SUPPORTED_API_VERSIONS)}",
             )
         )
 
@@ -144,26 +143,21 @@ def validate_policy_file(path: Path) -> list[ValidationError]:
 
     for key in _REQUIRED_METADATA_KEYS:
         if key not in metadata:
-            errors.append(
-                ValidationError(filename, f"metadata missing required key: '{key}'")
-            )
+            errors.append(ValidationError(filename, f"metadata missing required key: '{key}'"))
 
     category = metadata.get("category", "")
     if category and category not in VALID_CATEGORIES:
         errors.append(
             ValidationError(
                 filename,
-                f"metadata.category '{category}' is not valid. "
-                f"Allowed: {', '.join(VALID_CATEGORIES)}",
+                f"metadata.category '{category}' is not valid. " f"Allowed: {', '.join(VALID_CATEGORIES)}",
                 severity="warning",
             )
         )
 
     services = metadata.get("services")
     if services is not None and not isinstance(services, list):
-        errors.append(
-            ValidationError(filename, "metadata.services must be a list")
-        )
+        errors.append(ValidationError(filename, "metadata.services must be a list"))
 
     # ---- rules ----
     rules = data.get("rules", [])
@@ -180,16 +174,12 @@ def validate_policy_file(path: Path) -> list[ValidationError]:
 
         for key in _REQUIRED_RULE_KEYS:
             if key not in rule:
-                errors.append(
-                    ValidationError(filename, f"{prefix} missing required key: '{key}'")
-                )
+                errors.append(ValidationError(filename, f"{prefix} missing required key: '{key}'"))
 
         rid = rule.get("id", "")
         if rid:
             if rid in rule_ids:
-                errors.append(
-                    ValidationError(filename, f"{prefix}: duplicate rule id '{rid}'")
-                )
+                errors.append(ValidationError(filename, f"{prefix}: duplicate rule id '{rid}'"))
             rule_ids.add(rid)
 
         severity = rule.get("severity", "")
@@ -197,16 +187,13 @@ def validate_policy_file(path: Path) -> list[ValidationError]:
             errors.append(
                 ValidationError(
                     filename,
-                    f"{prefix}: invalid severity '{severity}'. "
-                    f"Allowed: {', '.join(VALID_SEVERITIES)}",
+                    f"{prefix}: invalid severity '{severity}'. " f"Allowed: {', '.join(VALID_SEVERITIES)}",
                 )
             )
 
         applies_to = rule.get("applies_to")
         if applies_to is not None and not isinstance(applies_to, list):
-            errors.append(
-                ValidationError(filename, f"{prefix}.applies_to must be a list")
-            )
+            errors.append(ValidationError(filename, f"{prefix}.applies_to must be a list"))
         elif isinstance(applies_to, list) and len(applies_to) == 0:
             errors.append(
                 ValidationError(
@@ -223,18 +210,12 @@ def validate_policy_file(path: Path) -> list[ValidationError]:
     elif isinstance(patterns, list):
         for i, pat in enumerate(patterns):
             if not isinstance(pat, dict):
-                errors.append(
-                    ValidationError(filename, f"patterns[{i}]: must be a mapping")
-                )
+                errors.append(ValidationError(filename, f"patterns[{i}]: must be a mapping"))
                 continue
             if "name" not in pat:
-                errors.append(
-                    ValidationError(filename, f"patterns[{i}] missing 'name'")
-                )
+                errors.append(ValidationError(filename, f"patterns[{i}] missing 'name'"))
             if "description" not in pat:
-                errors.append(
-                    ValidationError(filename, f"patterns[{i}] missing 'description'")
-                )
+                errors.append(ValidationError(filename, f"patterns[{i}] missing 'description'"))
 
     # ---- anti_patterns (optional) ----
     anti_patterns = data.get("anti_patterns", [])
@@ -243,18 +224,10 @@ def validate_policy_file(path: Path) -> list[ValidationError]:
     elif isinstance(anti_patterns, list):
         for i, ap in enumerate(anti_patterns):
             if not isinstance(ap, dict):
-                errors.append(
-                    ValidationError(
-                        filename, f"anti_patterns[{i}]: must be a mapping"
-                    )
-                )
+                errors.append(ValidationError(filename, f"anti_patterns[{i}]: must be a mapping"))
                 continue
             if "description" not in ap:
-                errors.append(
-                    ValidationError(
-                        filename, f"anti_patterns[{i}] missing 'description'"
-                    )
-                )
+                errors.append(ValidationError(filename, f"anti_patterns[{i}] missing 'description'"))
 
     # ---- references (optional) ----
     references = data.get("references", [])
@@ -263,18 +236,12 @@ def validate_policy_file(path: Path) -> list[ValidationError]:
     elif isinstance(references, list):
         for i, ref in enumerate(references):
             if not isinstance(ref, dict):
-                errors.append(
-                    ValidationError(filename, f"references[{i}]: must be a mapping")
-                )
+                errors.append(ValidationError(filename, f"references[{i}]: must be a mapping"))
                 continue
             if "title" not in ref:
-                errors.append(
-                    ValidationError(filename, f"references[{i}] missing 'title'")
-                )
+                errors.append(ValidationError(filename, f"references[{i}] missing 'title'"))
             if "url" not in ref:
-                errors.append(
-                    ValidationError(filename, f"references[{i}] missing 'url'")
-                )
+                errors.append(ValidationError(filename, f"references[{i}] missing 'url'"))
 
     return errors
 
@@ -413,9 +380,7 @@ class PolicyEngine:
                 for pattern in policy.patterns:
                     sections.append(f"- {pattern.name}: {pattern.description}")
                     if pattern.example:
-                        sections.append(
-                            f"  ```\n{pattern.example.strip()}\n  ```"
-                        )
+                        sections.append(f"  ```\n{pattern.example.strip()}\n  ```")
 
             if policy.anti_patterns:
                 sections.append("\n**Anti-patterns to avoid:**")
@@ -438,9 +403,7 @@ class PolicyEngine:
     def _parse_policy(self, path: Path) -> Policy | None:
         """Parse a single .policy.yaml file into a Policy object."""
         try:
-            data: dict[str, Any] = (
-                yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-            )
+            data: dict[str, Any] = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         except Exception:
             logger.warning("Failed to parse policy file: %s", path)
             return None

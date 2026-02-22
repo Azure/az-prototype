@@ -171,12 +171,14 @@ class BuildState:
                 stage["files"] = files
                 break
 
-        self._state["generation_log"].append({
-            "stage": stage_num,
-            "agent": agent_name,
-            "files": files,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        self._state["generation_log"].append(
+            {
+                "stage": stage_num,
+                "agent": agent_name,
+                "files": files,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
 
         # Add files to the global list
         for f in files:
@@ -195,17 +197,11 @@ class BuildState:
 
     def get_pending_stages(self) -> list[dict]:
         """Return stages that have not yet been generated."""
-        return [
-            s for s in self._state["deployment_stages"]
-            if s.get("status") == "pending"
-        ]
+        return [s for s in self._state["deployment_stages"] if s.get("status") == "pending"]
 
     def get_generated_stages(self) -> list[dict]:
         """Return stages that have been generated (but may not be accepted)."""
-        return [
-            s for s in self._state["deployment_stages"]
-            if s.get("status") in ("generated", "accepted")
-        ]
+        return [s for s in self._state["deployment_stages"] if s.get("status") in ("generated", "accepted")]
 
     def get_stage(self, stage_num: int) -> dict | None:
         """Return a specific stage by number."""
@@ -225,21 +221,25 @@ class BuildState:
         overrides: list[dict],
     ) -> None:
         """Record policy check results for a stage."""
-        self._state["policy_checks"].append({
-            "stage": stage_num,
-            "violations": violations,
-            "overrides": overrides,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        self._state["policy_checks"].append(
+            {
+                "stage": stage_num,
+                "violations": violations,
+                "overrides": overrides,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         self.save()
 
     def add_policy_override(self, rule_id: str, justification: str) -> None:
         """Record a user-approved policy override."""
-        self._state["policy_overrides"].append({
-            "rule_id": rule_id,
-            "justification": justification,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        self._state["policy_overrides"].append(
+            {
+                "rule_id": rule_id,
+                "justification": justification,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         self.save()
 
     # ------------------------------------------------------------------ #
@@ -248,11 +248,13 @@ class BuildState:
 
     def add_review_decision(self, feedback: str, iteration: int) -> None:
         """Record user feedback from the review loop."""
-        self._state["review_decisions"].append({
-            "feedback": feedback,
-            "iteration": iteration,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        self._state["review_decisions"].append(
+            {
+                "feedback": feedback,
+                "iteration": iteration,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         self._state["_metadata"]["iteration"] = iteration
         self.save()
 
@@ -267,12 +269,14 @@ class BuildState:
         exchange_number: int,
     ) -> None:
         """Record a conversation exchange from the review loop."""
-        self._state["conversation_history"].append({
-            "exchange": exchange_number,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "user": user_input,
-            "assistant": agent_response,
-        })
+        self._state["conversation_history"].append(
+            {
+                "exchange": exchange_number,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "user": user_input,
+                "assistant": agent_response,
+            }
+        )
         self.save()
 
     # ------------------------------------------------------------------ #
@@ -335,9 +339,7 @@ class BuildState:
 
         # Per-stage summary
         for stage in stages:
-            status_icon = {"pending": " ", "generated": "+", "accepted": "v"}.get(
-                stage.get("status", "pending"), " "
-            )
+            status_icon = {"pending": " ", "generated": "+", "accepted": "v"}.get(stage.get("status", "pending"), " ")
             lines.append(f"  [{status_icon}] Stage {stage['stage']}: {stage['name']}")
 
             services = stage.get("services", [])
@@ -356,10 +358,7 @@ class BuildState:
                 lines.append(f"      Files: {len(files)}{dir_label}")
 
             # Policy results for this stage
-            policy_checks = [
-                pc for pc in self._state.get("policy_checks", [])
-                if pc.get("stage") == stage["stage"]
-            ]
+            policy_checks = [pc for pc in self._state.get("policy_checks", []) if pc.get("stage") == stage["stage"]]
             if policy_checks:
                 latest = policy_checks[-1]
                 violations = len(latest.get("violations", []))

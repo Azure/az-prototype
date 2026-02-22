@@ -6,7 +6,7 @@ from typing import Any
 
 from knack.util import CLIError
 
-from azext_prototype.ai.provider import AIProvider, AIMessage, AIResponse, ToolCall
+from azext_prototype.ai.provider import AIMessage, AIProvider, AIResponse, ToolCall
 
 logger = logging.getLogger(__name__)
 
@@ -139,9 +139,7 @@ class GitHubModelsProvider(AIProvider):
     ) -> Iterator[str]:
         """Stream a chat completion response from GitHub Models."""
         target_model = model or self._model
-        api_messages: list[dict[str, Any]] = [
-            {"role": m.role, "content": m.content} for m in messages
-        ]
+        api_messages: list[dict[str, Any]] = [{"role": m.role, "content": m.content} for m in messages]
 
         try:
             stream = self._client.chat.completions.create(
@@ -174,7 +172,12 @@ class GitHubModelsProvider(AIProvider):
             {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini", "provider": "openai", "context_length": 128000},
             {"id": "openai/o3", "name": "o3", "provider": "openai", "context_length": 200000},
             {"id": "openai/o3-mini", "name": "o3 Mini", "provider": "openai", "context_length": 200000},
-            {"id": "meta/meta-llama-3.1-405b-instruct", "name": "Llama 3.1 405B", "provider": "meta", "context_length": 128000},
+            {
+                "id": "meta/meta-llama-3.1-405b-instruct",
+                "name": "Llama 3.1 405B",
+                "provider": "meta",
+                "context_length": 128000,
+            },
             {"id": "deepseek/deepseek-r1", "name": "DeepSeek R1", "provider": "deepseek", "context_length": 128000},
         ]
 

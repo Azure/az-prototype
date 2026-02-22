@@ -25,6 +25,7 @@ _HTTP_TIMEOUT = 10  # seconds
 # HTML → plain-text helper
 # ------------------------------------------------------------------
 
+
 class _HTMLTextExtractor(HTMLParser):
     """Minimal HTML-to-text converter using only stdlib."""
 
@@ -66,6 +67,7 @@ def _html_to_text(html: str) -> str:
 # ------------------------------------------------------------------
 # Public API
 # ------------------------------------------------------------------
+
 
 def search_learn(query: str, max_results: int = 3) -> list[dict]:
     """Search Microsoft Learn and return a list of ``{title, url, description}`` dicts.

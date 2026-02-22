@@ -119,9 +119,7 @@ class TemplateRegistry:
             lines.append(f"{tmpl.description.strip()}")
             lines.append(f"**Category:** {tmpl.category}  ")
             lines.append(f"**Tags:** {', '.join(tmpl.tags)}")
-            svc_list = ", ".join(
-                f"{s.name} ({s.type})" for s in tmpl.services
-            )
+            svc_list = ", ".join(f"{s.name} ({s.type})" for s in tmpl.services)
             lines.append(f"**Services:** {svc_list}")
             if tmpl.requirements:
                 lines.append(f"**Requirements match:** {tmpl.requirements.strip()}")
@@ -132,9 +130,7 @@ class TemplateRegistry:
     def _parse_template(self, path: Path) -> ProjectTemplate | None:
         """Parse a .template.yaml file."""
         try:
-            data: dict[str, Any] = (
-                yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-            )
+            data: dict[str, Any] = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         except Exception:
             logger.warning("Failed to parse template: %s", path)
             return None

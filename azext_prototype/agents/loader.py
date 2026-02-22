@@ -7,7 +7,7 @@ from pathlib import Path
 import yaml
 from knack.util import CLIError
 
-from azext_prototype.agents.base import BaseAgent, AgentCapability, AgentContext
+from azext_prototype.agents.base import AgentCapability, AgentContext, BaseAgent
 from azext_prototype.ai.provider import AIMessage, AIResponse
 
 logger = logging.getLogger(__name__)
@@ -149,9 +149,7 @@ def load_python_agent(file_path: str) -> BaseAgent:
         raise CLIError(f"Expected .py file, got: {path.suffix}")
 
     try:
-        spec = importlib.util.spec_from_file_location(
-            f"custom_agent_{path.stem}", str(path)
-        )
+        spec = importlib.util.spec_from_file_location(f"custom_agent_{path.stem}", str(path))
         if spec is None or spec.loader is None:
             raise CLIError(f"Cannot load module spec from {file_path}")
         module = importlib.util.module_from_spec(spec)
@@ -166,26 +164,17 @@ def load_python_agent(file_path: str) -> BaseAgent:
         agent_cls = module.AGENT_CLASS
         if isinstance(agent_cls, type) and issubclass(agent_cls, BaseAgent):
             return agent_cls()  # type: ignore[call-arg]  # concrete subclass provides defaults
-        raise CLIError(
-            f"AGENT_CLASS in {file_path} must be a BaseAgent subclass."
-        )
+        raise CLIError(f"AGENT_CLASS in {file_path} must be a BaseAgent subclass.")
 
     # Auto-discover BaseAgent subclass
     agent_classes = []
     for attr_name in dir(module):
         attr = getattr(module, attr_name)
-        if (
-            isinstance(attr, type)
-            and issubclass(attr, BaseAgent)
-            and attr is not BaseAgent
-        ):
+        if isinstance(attr, type) and issubclass(attr, BaseAgent) and attr is not BaseAgent:
             agent_classes.append(attr)
 
     if len(agent_classes) == 0:
-        raise CLIError(
-            f"No BaseAgent subclass found in {file_path}. "
-            "Define a class that extends BaseAgent."
-        )
+        raise CLIError(f"No BaseAgent subclass found in {file_path}. " "Define a class that extends BaseAgent.")
 
     if len(agent_classes) > 1:
         raise CLIError(

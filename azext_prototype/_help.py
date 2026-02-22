@@ -2,7 +2,6 @@
 
 from knack.help_files import helps
 
-
 helps["prototype"] = """
 type: group
 short-summary: Rapidly create Azure prototypes using AI-driven agent teams.

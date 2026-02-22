@@ -75,7 +75,7 @@ class DeployStage(BaseStage):
         - ``--stage N``  → ``DeploySession.run_single_stage(N)``
         - Default        → ``DeploySession.run()`` (interactive)
         """
-        target_stage = kwargs.get("stage")       # int | None
+        target_stage = kwargs.get("stage")  # int | None
         force = kwargs.get("force", False)
         dry_run = kwargs.get("dry_run", False)
         status = kwargs.get("status", False)
@@ -128,10 +128,7 @@ class DeployStage(BaseStage):
                 client_id=client_id,
                 client_secret=client_secret,
             )
-            self.state = (
-                StageState.COMPLETED if not result.failed_stages
-                else StageState.FAILED
-            )
+            self.state = StageState.COMPLETED if not result.failed_stages else StageState.FAILED
             return _result_to_dict(result, "single_stage")
 
         # Default: interactive session
@@ -147,10 +144,7 @@ class DeployStage(BaseStage):
             self.state = StageState.COMPLETED
             return {"status": "cancelled"}
 
-        self.state = (
-            StageState.COMPLETED if not result.failed_stages
-            else StageState.FAILED
-        )
+        self.state = StageState.COMPLETED if not result.failed_stages else StageState.FAILED
         return _result_to_dict(result, "interactive")
 
 

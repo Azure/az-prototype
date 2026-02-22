@@ -1,6 +1,6 @@
 """Documentation built-in agent — generates project documentation."""
 
-from azext_prototype.agents.base import BaseAgent, AgentCapability, AgentContract
+from azext_prototype.agents.base import AgentCapability, AgentContract, BaseAgent
 
 
 class DocumentationAgent(BaseAgent):

@@ -341,12 +341,14 @@ class DiscoveryState:
             persist_text = user_input
 
         # Add to conversation history - store FULL text content
-        self._state["conversation_history"].append({
-            "exchange": exchange_number,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "user": persist_text,
-            "assistant": agent_response,
-        })
+        self._state["conversation_history"].append(
+            {
+                "exchange": exchange_number,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "user": persist_text,
+                "assistant": agent_response,
+            }
+        )
 
         # Update exchange count
         self._state["_metadata"]["exchange_count"] = exchange_number

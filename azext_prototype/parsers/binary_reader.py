@@ -63,9 +63,18 @@ class ReadResult:
 # Extension → category mapping
 # ---------------------------------------------------------------------------
 
-_IMAGE_EXTENSIONS = frozenset({
-    ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".tif",
-})
+_IMAGE_EXTENSIONS = frozenset(
+    {
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".webp",
+        ".bmp",
+        ".tiff",
+        ".tif",
+    }
+)
 _DOCUMENT_EXTENSIONS = frozenset({".pdf", ".docx", ".pptx", ".xlsx"})
 _TEXT_EXTENSIONS_OVERRIDE = frozenset({".svg"})  # SVG is XML text
 
@@ -233,11 +242,13 @@ def _extract_pdf(path: Path, filename: str) -> tuple[str, list[EmbeddedImage]]:
                 if len(blob) > MAX_IMAGE_SIZE:
                     continue
                 mime = mimetypes.guess_type(img.name)[0] or "image/png"
-                images.append(EmbeddedImage(
-                    data=_encode_blob(blob),
-                    mime_type=mime,
-                    source=f"{filename}/page{i + 1}/{img.name}",
-                ))
+                images.append(
+                    EmbeddedImage(
+                        data=_encode_blob(blob),
+                        mime_type=mime,
+                        source=f"{filename}/page{i + 1}/{img.name}",
+                    )
+                )
         except Exception as e:
             logger.debug("Could not extract images from PDF page %d: %s", i + 1, e)
 
@@ -264,11 +275,13 @@ def _extract_docx(path: Path, filename: str) -> tuple[str, list[EmbeddedImage]]:
                         continue
                     mime = rel.target_part.content_type
                     name = rel.target_ref if hasattr(rel, "target_ref") else "image"
-                    images.append(EmbeddedImage(
-                        data=_encode_blob(blob),
-                        mime_type=mime,
-                        source=f"{filename}/{name}",
-                    ))
+                    images.append(
+                        EmbeddedImage(
+                            data=_encode_blob(blob),
+                            mime_type=mime,
+                            source=f"{filename}/{name}",
+                        )
+                    )
                 except Exception as e:
                     logger.debug("Could not extract image from DOCX rel: %s", e)
     except Exception as e:
@@ -303,11 +316,13 @@ def _extract_pptx(path: Path, filename: str) -> tuple[str, list[EmbeddedImage]]:
                         continue
                     mime = shape.image.content_type
                     ext = shape.image.ext
-                    images.append(EmbeddedImage(
-                        data=_encode_blob(blob),
-                        mime_type=mime,
-                        source=f"{filename}/slide{i + 1}.{ext}",
-                    ))
+                    images.append(
+                        EmbeddedImage(
+                            data=_encode_blob(blob),
+                            mime_type=mime,
+                            source=f"{filename}/slide{i + 1}.{ext}",
+                        )
+                    )
             except (AttributeError, Exception) as e:
                 # Known issue: JPEG extraction can fail on some files
                 logger.debug("Could not extract image from PPTX slide %d: %s", i + 1, e)

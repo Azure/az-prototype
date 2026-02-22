@@ -32,11 +32,11 @@ logger = logging.getLogger(__name__)
 # Captures an optional language prefix (e.g. "hcl:") and the path.
 # A valid path must contain a "." (extension) or a "/" (directory separator).
 _FENCE_RE = re.compile(
-    r"^(`{3,})"            # 1: opening backtick fence (3+)
+    r"^(`{3,})"  # 1: opening backtick fence (3+)
     r"\s*"
-    r"(?:[a-zA-Z0-9_+-]+:)?"   # optional language: prefix (non-capturing)
+    r"(?:[a-zA-Z0-9_+-]+:)?"  # optional language: prefix (non-capturing)
     r"\s*"
-    r"([\w./-]+)"          # 2: potential file path
+    r"([\w./-]+)"  # 2: potential file path
     r"\s*$"
 )
 

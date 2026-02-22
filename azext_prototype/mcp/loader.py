@@ -49,7 +49,8 @@ def load_mcp_handler(
 
     try:
         spec = importlib.util.spec_from_file_location(
-            f"mcp_handler_{path.stem}", str(path),
+            f"mcp_handler_{path.stem}",
+            str(path),
         )
         if spec is None or spec.loader is None:
             raise ValueError(f"Cannot load module spec from {file_path}")
@@ -65,26 +66,17 @@ def load_mcp_handler(
         handler_cls = module.MCP_HANDLER_CLASS
         if isinstance(handler_cls, type) and issubclass(handler_cls, MCPHandler):
             return handler_cls(config, **kwargs)
-        raise ValueError(
-            f"MCP_HANDLER_CLASS in {file_path} must be an MCPHandler subclass."
-        )
+        raise ValueError(f"MCP_HANDLER_CLASS in {file_path} must be an MCPHandler subclass.")
 
     # Auto-discover MCPHandler subclass
     handler_classes = []
     for attr_name in dir(module):
         attr = getattr(module, attr_name)
-        if (
-            isinstance(attr, type)
-            and issubclass(attr, MCPHandler)
-            and attr is not MCPHandler
-        ):
+        if isinstance(attr, type) and issubclass(attr, MCPHandler) and attr is not MCPHandler:
             handler_classes.append(attr)
 
     if len(handler_classes) == 0:
-        raise ValueError(
-            f"No MCPHandler subclass found in {file_path}. "
-            "Define a class that extends MCPHandler."
-        )
+        raise ValueError(f"No MCPHandler subclass found in {file_path}. " "Define a class that extends MCPHandler.")
 
     if len(handler_classes) > 1:
         raise ValueError(
@@ -134,7 +126,8 @@ def load_handlers_from_directory(
         if config is None:
             logger.debug(
                 "No config for MCP handler '%s' (from %s), skipping",
-                handler_name, file_path.name,
+                handler_name,
+                file_path.name,
             )
             continue
 

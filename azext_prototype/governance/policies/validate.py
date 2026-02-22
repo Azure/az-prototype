@@ -29,7 +29,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-from azext_prototype.governance.policies import validate_policy_directory, validate_policy_file
+from azext_prototype.governance.policies import (
+    validate_policy_directory,
+    validate_policy_file,
+)
 
 
 def _get_staged_policy_files() -> list[Path]:
@@ -44,18 +47,12 @@ def _get_staged_policy_files() -> list[Path]:
     except (subprocess.CalledProcessError, FileNotFoundError):
         return []
 
-    return [
-        Path(f)
-        for f in result.stdout.strip().splitlines()
-        if f.endswith(".policy.yaml")
-    ]
+    return [Path(f) for f in result.stdout.strip().splitlines() if f.endswith(".policy.yaml")]
 
 
 def main(argv: list[str] | None = None) -> int:
     """Entry point for the policy validator."""
-    parser = argparse.ArgumentParser(
-        description="Validate .policy.yaml files against the governance schema."
-    )
+    parser = argparse.ArgumentParser(description="Validate .policy.yaml files against the governance schema.")
     parser.add_argument(
         "files",
         nargs="*",

@@ -20,12 +20,15 @@ logger = logging.getLogger(__name__)
 # Auth Checks
 # ======================================================================
 
+
 def check_gh_auth() -> bool:
     """Verify gh CLI is installed and authenticated."""
     try:
         result = subprocess.run(
             ["gh", "auth", "status"],
-            capture_output=True, text=True, check=False,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         return result.returncode == 0
     except FileNotFoundError:
@@ -37,7 +40,9 @@ def check_devops_ext() -> bool:
     try:
         result = subprocess.run(
             ["az", "devops", "--help"],
-            capture_output=True, text=True, check=False,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         return result.returncode == 0
     except FileNotFoundError:
@@ -47,6 +52,7 @@ def check_devops_ext() -> bool:
 # ======================================================================
 # Formatters
 # ======================================================================
+
 
 def format_github_body(item: dict) -> str:
     """Format a backlog item as a GitHub issue body with task checklists.
@@ -108,7 +114,7 @@ def format_github_body(item: dict) -> str:
         label_parts.append(f"effort/{effort}")
 
     if label_parts:
-        lines.append(f"**Labels:** {', '.join(f'`{l}`' for l in label_parts)}")
+        lines.append(f"**Labels:** {', '.join(f'`{lbl}`' for lbl in label_parts)}")
 
     return "\n".join(lines)
 
@@ -146,6 +152,7 @@ def format_devops_description(item: dict) -> str:
 # GitHub Push
 # ======================================================================
 
+
 def push_github_issue(
     org: str,
     project: str,
@@ -166,10 +173,15 @@ def push_github_issue(
     body = format_github_body(item)
 
     cmd = [
-        "gh", "issue", "create",
-        "--title", full_title,
-        "--body", body,
-        "--repo", f"{org}/{project}",
+        "gh",
+        "issue",
+        "create",
+        "--title",
+        full_title,
+        "--body",
+        body,
+        "--repo",
+        f"{org}/{project}",
     ]
 
     # Add labels
@@ -186,7 +198,10 @@ def push_github_issue(
     logger.info("Creating GitHub issue: %s", full_title)
     try:
         result = subprocess.run(
-            cmd, capture_output=True, text=True, check=False,
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         if result.returncode != 0:
             error = result.stderr.strip() or result.stdout.strip()
@@ -205,6 +220,7 @@ def push_github_issue(
 # ======================================================================
 # Azure DevOps Push
 # ======================================================================
+
 
 def push_devops_feature(
     org: str,
@@ -229,7 +245,9 @@ def push_devops_story(
     Returns ``{url, id}`` on success or ``{error}`` on failure.
     """
     return _push_devops_work_item(
-        org, project, item,
+        org,
+        project,
+        item,
         work_item_type="User Story",
         parent_id=parent_id,
     )
@@ -246,7 +264,9 @@ def push_devops_task(
     Returns ``{url, id}`` on success or ``{error}`` on failure.
     """
     return _push_devops_work_item(
-        org, project, item,
+        org,
+        project,
+        item,
         work_item_type="Task",
         parent_id=parent_id,
     )
@@ -268,13 +288,22 @@ def _push_devops_work_item(
     description = format_devops_description(item)
 
     cmd = [
-        "az", "boards", "work-item", "create",
-        "--type", work_item_type,
-        "--title", title,
-        "--description", description,
-        "--org", f"https://dev.azure.com/{org}",
-        "--project", project,
-        "--output", "json",
+        "az",
+        "boards",
+        "work-item",
+        "create",
+        "--type",
+        work_item_type,
+        "--title",
+        title,
+        "--description",
+        description,
+        "--org",
+        f"https://dev.azure.com/{org}",
+        "--project",
+        project,
+        "--output",
+        "json",
     ]
 
     # Add area path for epic grouping
@@ -289,7 +318,10 @@ def _push_devops_work_item(
     logger.info("Creating DevOps %s: %s", work_item_type, title)
     try:
         result = subprocess.run(
-            cmd, capture_output=True, text=True, check=False,
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         if result.returncode != 0:
             error = result.stderr.strip() or result.stdout.strip()
@@ -320,13 +352,23 @@ def _link_parent(org: str, project: str, child_id: int, parent_id: int) -> None:
     try:
         subprocess.run(
             [
-                "az", "boards", "work-item", "relation", "add",
-                "--id", str(child_id),
-                "--relation-type", "parent",
-                "--target-id", str(parent_id),
-                "--org", f"https://dev.azure.com/{org}",
+                "az",
+                "boards",
+                "work-item",
+                "relation",
+                "add",
+                "--id",
+                str(child_id),
+                "--relation-type",
+                "parent",
+                "--target-id",
+                str(parent_id),
+                "--org",
+                f"https://dev.azure.com/{org}",
             ],
-            capture_output=True, text=True, check=False,
+            capture_output=True,
+            text=True,
+            check=False,
         )
     except (FileNotFoundError, subprocess.SubprocessError):
         logger.warning("Could not link work item %s to parent %s", child_id, parent_id)

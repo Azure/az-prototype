@@ -129,8 +129,13 @@ class CopilotLicenseValidator:
             for org in orgs:
                 try:
                     seat_result = subprocess.run(
-                        ["gh", "api", f"/orgs/{org}/copilot/billing/seats",
-                         "--jq", ".seats[] | select(.assignee.login == env.USER)"],
+                        [
+                            "gh",
+                            "api",
+                            f"/orgs/{org}/copilot/billing/seats",
+                            "--jq",
+                            ".seats[] | select(.assignee.login == env.USER)",
+                        ],
                         capture_output=True,
                         text=True,
                         check=False,

@@ -13,7 +13,12 @@ from typing import Any
 
 import requests
 
-from azext_prototype.agents.base import BaseAgent, AgentCapability, AgentContext, AgentContract
+from azext_prototype.agents.base import (
+    AgentCapability,
+    AgentContext,
+    AgentContract,
+    BaseAgent,
+)
 from azext_prototype.ai.provider import AIMessage, AIResponse
 
 logger = logging.getLogger(__name__)
@@ -30,9 +35,19 @@ class CostAnalystAgent(BaseAgent):
     _include_templates = False
     _include_standards = False
     _keywords = [
-        "cost", "price", "pricing", "budget", "estimate",
-        "spend", "expense", "sku", "t-shirt", "tshirt",
-        "consumption", "billing", "retail",
+        "cost",
+        "price",
+        "pricing",
+        "budget",
+        "estimate",
+        "spend",
+        "expense",
+        "sku",
+        "t-shirt",
+        "tshirt",
+        "consumption",
+        "billing",
+        "retail",
     ]
     _keyword_weight = 0.12
     _contract = AgentContract(
@@ -84,7 +99,9 @@ class CostAnalystAgent(BaseAgent):
         messages.append(AIMessage(role="user", content=extraction_task))
 
         extraction_response = context.ai_provider.chat(
-            messages, temperature=0.0, max_tokens=4096,
+            messages,
+            temperature=0.0,
+            max_tokens=4096,
         )
 
         # Step 2: Parse components and query pricing
@@ -94,21 +111,25 @@ class CostAnalystAgent(BaseAgent):
         # Step 3: Generate the cost report
         report_messages = self.get_system_messages()
         report_messages.extend(context.conversation_history)
-        report_messages.append(AIMessage(
-            role="user",
-            content=(
-                "Generate a detailed cost estimation report using this pricing data.\n\n"
-                f"## Architecture\n{task}\n\n"
-                f"## Azure Retail Prices Data\n```json\n{json.dumps(pricing_data, indent=2)}\n```\n\n"
-                "Create a table with columns: Service | Small | Medium | Large\n"
-                "Show monthly costs. Include a total row.\n"
-                "Define what Small/Medium/Large means for each service.\n"
-                "Add notes about consumption-based services where exact costs depend on usage."
-            ),
-        ))
+        report_messages.append(
+            AIMessage(
+                role="user",
+                content=(
+                    "Generate a detailed cost estimation report using this pricing data.\n\n"
+                    f"## Architecture\n{task}\n\n"
+                    f"## Azure Retail Prices Data\n```json\n{json.dumps(pricing_data, indent=2)}\n```\n\n"
+                    "Create a table with columns: Service | Small | Medium | Large\n"
+                    "Show monthly costs. Include a total row.\n"
+                    "Define what Small/Medium/Large means for each service.\n"
+                    "Add notes about consumption-based services where exact costs depend on usage."
+                ),
+            )
+        )
 
         response = context.ai_provider.chat(
-            report_messages, temperature=0.0, max_tokens=8192,
+            report_messages,
+            temperature=0.0,
+            max_tokens=8192,
         )
 
         # Post-response governance check
@@ -116,9 +137,7 @@ class CostAnalystAgent(BaseAgent):
         if warnings:
             for w in warnings:
                 logger.warning("Governance: %s", w)
-            block = "\n\n---\n⚠ **Governance warnings:**\n" + "\n".join(
-                f"- {w}" for w in warnings
-            )
+            block = "\n\n---\n⚠ **Governance warnings:**\n" + "\n".join(f"- {w}" for w in warnings)
             response = AIResponse(
                 content=response.content + block,
                 model=response.model,
@@ -172,16 +191,18 @@ class CostAnalystAgent(BaseAgent):
                     region=region,
                 )
 
-                pricing_results.append({
-                    "service": service_name,
-                    "size": size_label,
-                    "sku": sku,
-                    "region": region,
-                    "retailPrice": price.get("retailPrice"),
-                    "unitOfMeasure": price.get("unitOfMeasure", ""),
-                    "meterName": price.get("meterName", ""),
-                    "currencyCode": price.get("currencyCode", "USD"),
-                })
+                pricing_results.append(
+                    {
+                        "service": service_name,
+                        "size": size_label,
+                        "sku": sku,
+                        "region": region,
+                        "retailPrice": price.get("retailPrice"),
+                        "unitOfMeasure": price.get("unitOfMeasure", ""),
+                        "meterName": price.get("meterName", ""),
+                        "currencyCode": price.get("currencyCode", "USD"),
+                    }
+                )
 
         return pricing_results
 
@@ -249,7 +270,6 @@ class CostAnalystAgent(BaseAgent):
         }
         provider = arm_type.split("/")[0] if "/" in arm_type else arm_type
         return mapping.get(provider, "Compute")
-
 
 
 COST_ANALYST_PROMPT = """You are an expert Azure cost analyst.

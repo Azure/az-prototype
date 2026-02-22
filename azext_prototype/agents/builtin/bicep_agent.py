@@ -1,6 +1,6 @@
 """Bicep built-in agent — infrastructure-as-code generation."""
 
-from azext_prototype.agents.base import BaseAgent, AgentCapability, AgentContract
+from azext_prototype.agents.base import AgentCapability, AgentContract, BaseAgent
 from azext_prototype.ai.provider import AIMessage
 
 
@@ -45,30 +45,37 @@ class BicepAgent(BaseAgent):
     def get_system_messages(self):
         messages = super().get_system_messages()
         from azext_prototype.requirements import get_dependency_version
+
         api_ver = get_dependency_version("azure_api")
         if api_ver:
-            messages.append(AIMessage(
-                role="system",
-                content=(
-                    f"AZURE API VERSION: {api_ver}\n\n"
-                    f"You MUST use API version {api_ver} for ALL resource type declarations.\n"
-                    f"Format: 'Microsoft.<Provider>/<ResourceType>@{api_ver}'\n\n"
-                    f"Example:\n"
-                    f"  resource storageAccount 'Microsoft.Storage/storageAccounts@{api_ver}' = {{\n"
-                    f"    name: storageAccountName\n"
-                    f"    location: location\n"
-                    f"    kind: 'StorageV2'\n"
-                    f"    sku: {{ name: 'Standard_LRS' }}\n"
-                    f"    properties: {{ ... }}\n"
-                    f"  }}\n\n"
-                    f"Reference documentation URL pattern:\n"
-                    f"  https://learn.microsoft.com/en-us/azure/templates/<resource_provider>/{api_ver}/<resource_type>?pivots=deployment-language-bicep\n"
-                    f"Example: Microsoft.Storage/storageAccounts →\n"
-                    f"  https://learn.microsoft.com/en-us/azure/templates/microsoft.storage/{api_ver}/storageaccounts?pivots=deployment-language-bicep\n\n"
-                    f"If uncertain about any property, emit:\n"
-                    f"  [SEARCH: azure arm template <resource_type> {api_ver} properties]"
-                ),
-            ))
+            messages.append(
+                AIMessage(
+                    role="system",
+                    content=(
+                        f"AZURE API VERSION: {api_ver}\n\n"
+                        f"You MUST use API version {api_ver} for ALL resource type declarations.\n"
+                        f"Format: 'Microsoft.<Provider>/<ResourceType>@{api_ver}'\n\n"
+                        f"Example:\n"
+                        f"  resource storageAccount 'Microsoft.Storage/storageAccounts@{api_ver}' = {{\n"
+                        f"    name: storageAccountName\n"
+                        f"    location: location\n"
+                        f"    kind: 'StorageV2'\n"
+                        f"    sku: {{ name: 'Standard_LRS' }}\n"
+                        f"    properties: {{ ... }}\n"
+                        f"  }}\n\n"
+                        f"Reference documentation URL pattern:\n"
+                        f"  https://learn.microsoft.com/en-us/azure/templates/"
+                        f"<resource_provider>/{api_ver}/<resource_type>"
+                        f"?pivots=deployment-language-bicep\n"
+                        f"Example: Microsoft.Storage/storageAccounts →\n"
+                        f"  https://learn.microsoft.com/en-us/azure/templates/"
+                        f"microsoft.storage/{api_ver}/storageaccounts"
+                        f"?pivots=deployment-language-bicep\n\n"
+                        f"If uncertain about any property, emit:\n"
+                        f"  [SEARCH: azure arm template <resource_type> {api_ver} properties]"
+                    ),
+                )
+            )
         return messages
 
 

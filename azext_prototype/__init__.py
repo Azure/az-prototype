@@ -1,6 +1,7 @@
 """Azure CLI Extension: az prototype — Innovation Factory rapid prototyping."""
 
 from azure.cli.core import AzCommandsLoader
+
 from azext_prototype._help import helps  # noqa: F401
 
 
@@ -10,9 +11,7 @@ class PrototypeCommandsLoader(AzCommandsLoader):
     def __init__(self, cli_ctx=None):
         from azure.cli.core.commands import CliCommandType
 
-        prototype_custom = CliCommandType(
-            operations_tmpl="azext_prototype.custom#{}"
-        )
+        prototype_custom = CliCommandType(operations_tmpl="azext_prototype.custom#{}")
         super().__init__(cli_ctx=cli_ctx, custom_command_type=prototype_custom)
 
     def load_command_table(self, args):

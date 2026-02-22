@@ -13,12 +13,13 @@ through an interactive resolution flow:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable
 
 from azext_prototype.agents.governance import GovernanceContext
 from azext_prototype.stages.build_state import BuildState
-from azext_prototype.ui.console import Console, DiscoveryPrompt, console as default_console
+from azext_prototype.ui.console import Console, DiscoveryPrompt
+from azext_prototype.ui.console import console as default_console
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +100,8 @@ class PolicyResolver:
 
         # Run the governance check
         violations = self._governance.check_response_for_violations(
-            agent_name, generated_content,
+            agent_name,
+            generated_content,
         )
 
         if not violations:
@@ -118,11 +120,13 @@ class PolicyResolver:
                 safe = violation.replace("[", "\\[")
                 _print(f"\\[{i}] {safe}")
                 _print("    Auto-accepted compliant recommendation.")
-                resolutions.append(PolicyResolution(
-                    rule_id=self._extract_rule_id(violation),
-                    action="accept",
-                    violation_text=violation,
-                ))
+                resolutions.append(
+                    PolicyResolution(
+                        rule_id=self._extract_rule_id(violation),
+                        action="accept",
+                        violation_text=violation,
+                    )
+                )
             _print("")
         else:
             for i, violation in enumerate(violations, 1):
@@ -174,8 +178,7 @@ class PolicyResolver:
 
         # Record the policy check in build state
         override_dicts = [
-            {"rule_id": r.rule_id, "justification": r.justification}
-            for r in resolutions if r.action == "override"
+            {"rule_id": r.rule_id, "justification": r.justification} for r in resolutions if r.action == "override"
         ]
         build_state.add_policy_check(
             stage_num,

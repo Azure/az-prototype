@@ -25,6 +25,7 @@ _DEFAULT_REPO = "Azure/az-prototype"
 # Gap Detection
 # ======================================================================
 
+
 def check_knowledge_gap(finding: dict, knowledge_loader: Any) -> bool:
     """Check whether a finding represents a gap in the knowledge base.
 
@@ -64,6 +65,7 @@ def check_knowledge_gap(finding: dict, knowledge_loader: Any) -> bool:
 # ======================================================================
 # Formatters
 # ======================================================================
+
 
 def format_contribution_title(finding: dict) -> str:
     """Format a finding as a GitHub Issue title.
@@ -128,6 +130,7 @@ def format_contribution_body(finding: dict) -> str:
 # Submission
 # ======================================================================
 
+
 def submit_contribution(
     finding: dict,
     repo: str = _DEFAULT_REPO,
@@ -163,10 +166,15 @@ def submit_contribution(
     labels.append(type_label)
 
     cmd = [
-        "gh", "issue", "create",
-        "--title", title,
-        "--body", body,
-        "--repo", repo,
+        "gh",
+        "issue",
+        "create",
+        "--title",
+        title,
+        "--body",
+        body,
+        "--repo",
+        repo,
     ]
     for label in labels:
         cmd.extend(["--label", label])
@@ -174,7 +182,10 @@ def submit_contribution(
     logger.info("Creating knowledge contribution issue: %s", title)
     try:
         result = subprocess.run(
-            cmd, capture_output=True, text=True, check=False,
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         if result.returncode != 0:
             error = result.stderr.strip() or result.stdout.strip()
@@ -192,6 +203,7 @@ def submit_contribution(
 # ======================================================================
 # QA Integration
 # ======================================================================
+
 
 def build_finding_from_qa(
     qa_content: str,
@@ -222,6 +234,7 @@ def build_finding_from_qa(
 # ======================================================================
 # Fire-and-Forget Wrapper
 # ======================================================================
+
 
 def submit_if_gap(
     finding: dict,

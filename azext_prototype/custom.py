@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 # Helpers
 # ======================================================================
 
+
 def _quiet_output(fn):
     """Suppress Azure CLI's automatic JSON serialization of return values.
 
@@ -74,9 +75,9 @@ def _load_config(project_dir: str | None = None):
 
 def _build_registry(config=None, project_dir: str | None = None):
     """Build the agent registry with built-in and custom agents."""
-    from azext_prototype.agents.registry import AgentRegistry
     from azext_prototype.agents.builtin import register_all_builtin
     from azext_prototype.agents.loader import load_agents_from_directory
+    from azext_prototype.agents.registry import AgentRegistry
 
     registry = AgentRegistry()
 
@@ -95,7 +96,11 @@ def _build_registry(config=None, project_dir: str | None = None):
         overrides = config.get("agents.overrides", {})
         if overrides:
             for name, override_path in overrides.items():
-                from azext_prototype.agents.loader import load_yaml_agent, load_python_agent
+                from azext_prototype.agents.loader import (
+                    load_python_agent,
+                    load_yaml_agent,
+                )
+
                 full_path = str(Path(project_dir) / override_path)
                 if override_path.endswith((".yaml", ".yml")):
                     agent = load_yaml_agent(full_path)
@@ -115,10 +120,10 @@ def _build_mcp_manager(config, project_dir: str):
     Returns None if no MCP servers are configured.
     """
     from azext_prototype.mcp.base import MCPHandlerConfig
-    from azext_prototype.mcp.registry import MCPRegistry
-    from azext_prototype.mcp.manager import MCPManager
     from azext_prototype.mcp.builtin import register_all_builtin_mcp
     from azext_prototype.mcp.loader import load_handlers_from_directory
+    from azext_prototype.mcp.manager import MCPManager
+    from azext_prototype.mcp.registry import MCPRegistry
 
     mcp_config = config.get("mcp", {})
     server_configs = mcp_config.get("servers", [])
@@ -246,6 +251,7 @@ def _prepare_deploy_command(project_dir: str | None = None):
     ai_provider = None
     try:
         from azext_prototype.ai.factory import create_ai_provider
+
         ai_provider = create_ai_provider(config.to_dict())
     except Exception:
         pass
@@ -271,9 +277,7 @@ def _check_guards(stage):
     """Check stage guards and raise CLIError on failure."""
     can_run, failures = stage.can_run()
     if not can_run:
-        raise CLIError(
-            "Prerequisites not met:\n" + "\n".join(f"  - {f}" for f in failures)
-        )
+        raise CLIError("Prerequisites not met:\n" + "\n".join(f"  - {f}" for f in failures))
 
 
 def _get_registry_with_fallback(project_dir: str | None = None):
@@ -283,8 +287,9 @@ def _get_registry_with_fallback(project_dir: str | None = None):
         config = _load_config(project_dir)
         return _build_registry(config, project_dir)
     except CLIError:
-        from azext_prototype.agents.registry import AgentRegistry
         from azext_prototype.agents.builtin import register_all_builtin
+        from azext_prototype.agents.registry import AgentRegistry
+
         registry = AgentRegistry()
         register_all_builtin(registry)
         return registry
@@ -293,6 +298,7 @@ def _get_registry_with_fallback(project_dir: str | None = None):
 # ======================================================================
 # Stage Commands
 # ======================================================================
+
 
 @_quiet_output
 @track("prototype init")
@@ -308,10 +314,10 @@ def prototype_init(
     model=None,
 ):
     """Initialize a new prototype project."""
-    from azext_prototype.stages.init_stage import InitStage
     from azext_prototype.agents.base import AgentContext
-    from azext_prototype.agents.registry import AgentRegistry
     from azext_prototype.agents.builtin import register_all_builtin
+    from azext_prototype.agents.registry import AgentRegistry
+    from azext_prototype.stages.init_stage import InitStage
 
     # Validate external tool versions before proceeding
     _check_requirements(iac_tool)
@@ -362,7 +368,15 @@ def prototype_init(
 
 @_quiet_output
 @track("prototype design")
-def prototype_design(cmd, artifacts=None, context=None, reset=False, interactive=False, status=False, skip_discovery=False):
+def prototype_design(
+    cmd,
+    artifacts=None,
+    context=None,
+    reset=False,
+    interactive=False,
+    status=False,
+    skip_discovery=False,
+):
     """Run the design stage.
 
     The design stage ALWAYS engages in an iterative discovery
@@ -721,12 +735,13 @@ def prototype_status(cmd, verbose=False, json_output=False):
         if json_output:
             return {"status": "not_initialized", "message": "No prototype project found. Run 'az prototype init'."}
         from azext_prototype.ui.console import console
+
         console.print_warning("No prototype project found. Run 'az prototype init'.")
         return {"status": "not_initialized", "message": "No prototype project found. Run 'az prototype init'."}
 
-    from azext_prototype.stages.discovery_state import DiscoveryState
     from azext_prototype.stages.build_state import BuildState
     from azext_prototype.stages.deploy_state import DeployState
+    from azext_prototype.stages.discovery_state import DiscoveryState
     from azext_prototype.tracking import ChangeTracker
 
     stages_cfg = config.get("stages", {})
@@ -939,6 +954,7 @@ def prototype_status(cmd, verbose=False, json_output=False):
 # Config Commands
 # ======================================================================
 
+
 @_quiet_output
 @track("prototype config show")
 def prototype_config_show(cmd):
@@ -947,7 +963,7 @@ def prototype_config_show(cmd):
     Secret values (API keys, subscription IDs, tokens) stored in
     ``prototype.secrets.yaml`` are masked as ``***`` in the output.
     """
-    from azext_prototype.config import ProjectConfig, SECRET_KEY_PREFIXES
+    from azext_prototype.config import SECRET_KEY_PREFIXES
     from azext_prototype.ui.console import console
 
     config = _load_config()
@@ -1048,7 +1064,11 @@ def _prompt_project_basics(console) -> tuple[str, str, str, str]:
 
 def _prompt_naming_config(console, name: str, location: str, environment: str) -> dict:
     """Prompt for resource naming strategy and return the naming config dict."""
-    from azext_prototype.naming import get_available_strategies, ALZ_ZONE_IDS, create_naming_strategy
+    from azext_prototype.naming import (
+        ALZ_ZONE_IDS,
+        create_naming_strategy,
+        get_available_strategies,
+    )
 
     console.print_header("Resource Naming Strategy")
     console.print_info("Available strategies:")
@@ -1128,10 +1148,7 @@ def _prompt_ai_config(console) -> dict:
     ai_provider = ""
     valid_providers = ("copilot", "github-models", "azure-openai")
     while ai_provider not in valid_providers:
-        ai_provider = (
-            input("AI provider (copilot/github-models/azure-openai) [copilot]: ").strip().lower()
-            or "copilot"
-        )
+        ai_provider = input("AI provider (copilot/github-models/azure-openai) [copilot]: ").strip().lower() or "copilot"
         if ai_provider not in valid_providers:
             console.print_warning("Please choose 'copilot', 'github-models', or 'azure-openai'.")
 
@@ -1232,6 +1249,7 @@ def prototype_config_init(cmd):
     one here, subsequent commands can read defaults from it.
     """
     from datetime import datetime, timezone
+
     from azext_prototype.config import ProjectConfig
     from azext_prototype.ui.console import console
 
@@ -1245,8 +1263,7 @@ def prototype_config_init(cmd):
             return {"status": "cancelled", "message": "Existing configuration preserved."}
 
     console.panel(
-        "Answer the following questions to create your\n"
-        "prototype.yaml. Press Enter to accept defaults.",
+        "Answer the following questions to create your\n" "prototype.yaml. Press Enter to accept defaults.",
         title="Prototype Configuration Setup",
     )
 
@@ -1304,6 +1321,7 @@ def prototype_config_init(cmd):
 # Agent Commands
 # ======================================================================
 
+
 @_quiet_output
 @track("prototype agent list")
 def prototype_agent_list(cmd, show_builtin=True, verbose=False, json_output=False):
@@ -1350,7 +1368,6 @@ def prototype_agent_list(cmd, show_builtin=True, verbose=False, json_output=Fals
         console.print()
 
     total = len(agents)
-    builtin_count = len(groups.get("builtin", []))
     custom_count = len(groups.get("custom", []))
     override_count = len(groups.get("override", []))
     parts = [f"{total} agent(s)"]
@@ -1388,7 +1405,8 @@ def prototype_agent_add(cmd, name=None, file=None, definition=None):
 
     import shutil
     from datetime import datetime, timezone
-    from azext_prototype.agents.loader import load_yaml_agent, load_python_agent
+
+    from azext_prototype.agents.loader import load_python_agent, load_yaml_agent
     from azext_prototype.ui.console import console
 
     project_dir = _get_project_dir()
@@ -1424,6 +1442,7 @@ def prototype_agent_add(cmd, name=None, file=None, definition=None):
             )
 
         import yaml as _yaml
+
         dest.write_text(_yaml.dump(agent_def, default_flow_style=False, sort_keys=False), encoding="utf-8")
 
         agent = load_yaml_agent(str(dest))
@@ -1528,7 +1547,9 @@ def _prompt_agent_definition(console, name: str, existing: dict | None = None) -
     valid_caps = [c.value for c in AgentCapability]
     console.print_info(f"Valid capabilities: {', '.join(valid_caps)}")
     default_caps = ", ".join(defaults.get("capabilities", []))
-    caps_prompt = f"Capabilities (comma-separated) [{default_caps}]: " if default_caps else "Capabilities (comma-separated): "
+    caps_prompt = (
+        f"Capabilities (comma-separated) [{default_caps}]: " if default_caps else "Capabilities (comma-separated): "
+    )
     caps_input = input(caps_prompt).strip() or default_caps
     capabilities = []
     if caps_input:
@@ -1618,12 +1639,9 @@ def _resolve_definition(definitions_dir: Path, definition: str) -> Path:
         if candidate.exists():
             return candidate
 
-    available = sorted(
-        p.stem for p in definitions_dir.glob("*.yaml") if p.stem != "example_custom_agent"
-    )
+    available = sorted(p.stem for p in definitions_dir.glob("*.yaml") if p.stem != "example_custom_agent")
     raise CLIError(
-        f"Unknown definition '{definition}'. Available definitions:\n"
-        + "\n".join(f"  - {d}" for d in available)
+        f"Unknown definition '{definition}'. Available definitions:\n" + "\n".join(f"  - {d}" for d in available)
     )
 
 
@@ -1661,6 +1679,7 @@ def prototype_agent_override(cmd, name=None, file=None):
     # Validate YAML parse and name field
     if str(file_path).endswith((".yaml", ".yml")):
         import yaml as _yaml
+
         try:
             content = _yaml.safe_load(file_path.read_text(encoding="utf-8"))
         except _yaml.YAMLError as e:
@@ -1672,10 +1691,7 @@ def prototype_agent_override(cmd, name=None, file=None):
     registry = _get_registry_with_fallback(project_dir)
     builtin_names = [a.name for a in registry.list_all() if a.is_builtin]
     if name not in builtin_names:
-        console.print_warning(
-            f"'{name}' is not a known built-in agent. "
-            f"Available: {', '.join(builtin_names)}"
-        )
+        console.print_warning(f"'{name}' is not a known built-in agent. " f"Available: {', '.join(builtin_names)}")
 
     # Store override in config
     overrides = config.get("agents.overrides", {}) or {}
@@ -1684,7 +1700,7 @@ def prototype_agent_override(cmd, name=None, file=None):
 
     console.print_success(f"Override registered for '{name}'")
     console.print_dim(f"  File: {file}")
-    console.print_dim(f"  Takes effect on next command run.")
+    console.print_dim("  Takes effect on next command run.")
 
     return {
         "name": name,
@@ -1726,7 +1742,7 @@ def prototype_agent_show(cmd, name=None, verbose=False, json_output=False):
         console.print(f"  Capabilities: {caps}")
     constraints = info.get("constraints", [])
     if constraints:
-        console.print(f"  Constraints:")
+        console.print("  Constraints:")
         for c in constraints:
             console.print_dim(f"    - {c}")
 
@@ -1801,6 +1817,7 @@ def prototype_agent_update(cmd, name=None, description=None, capabilities=None, 
         raise CLIError("--name is required.")
 
     import yaml as _yaml
+
     from azext_prototype.agents.loader import load_yaml_agent
     from azext_prototype.ui.console import console
 
@@ -1817,10 +1834,7 @@ def prototype_agent_update(cmd, name=None, description=None, capabilities=None, 
             break
 
     if agent_file is None:
-        raise CLIError(
-            f"Custom agent '{name}' not found in {custom_dir}.\n"
-            "Only custom YAML agents can be updated."
-        )
+        raise CLIError(f"Custom agent '{name}' not found in {custom_dir}.\n" "Only custom YAML agents can be updated.")
 
     # Load current definition
     current = _yaml.safe_load(agent_file.read_text(encoding="utf-8"))
@@ -1836,6 +1850,7 @@ def prototype_agent_update(cmd, name=None, description=None, capabilities=None, 
             current["description"] = description
         if capabilities is not None:
             from azext_prototype.agents.base import AgentCapability
+
             valid_caps = {c.value for c in AgentCapability}
             parsed_caps = [c.strip() for c in capabilities.split(",") if c.strip()]
             for cap in parsed_caps:
@@ -1921,6 +1936,7 @@ def prototype_agent_export(cmd, name=None, output=None):
         raise CLIError("--name is required.")
 
     import yaml as _yaml
+
     from azext_prototype.ui.console import console
 
     registry = _get_registry_with_fallback()
@@ -1961,6 +1977,7 @@ def prototype_agent_export(cmd, name=None, output=None):
 # ======================================================================
 # Analyze Commands — input-type handlers
 # ======================================================================
+
 
 def _analyze_image_input(qa_agent, agent_context, project_dir: str, image_path: Path):
     """Analyze an error from a screenshot/image using vision."""
@@ -2014,6 +2031,7 @@ def _analyze_inline_input(qa_agent, agent_context, project_dir: str, error_text:
 # ======================================================================
 # Analyze Commands
 # ======================================================================
+
 
 @_quiet_output
 @track("prototype analyze error")
@@ -2114,8 +2132,7 @@ def prototype_analyze_costs(cmd, output_format="markdown", refresh=False):
     console.print_info("Querying Azure Retail Prices API...")
 
     task = (
-        "Analyze the costs for this Azure architecture at three t-shirt sizes.\n\n"
-        f"## Architecture\n{design_context}"
+        "Analyze the costs for this Azure architecture at three t-shirt sizes.\n\n" f"## Architecture\n{design_context}"
     )
 
     response = cost_agent.execute(agent_context, task)
@@ -2216,6 +2233,7 @@ def _load_discovery_scope(project_dir: str) -> dict | None:
 # Knowledge Commands
 # ======================================================================
 
+
 @_quiet_output
 @track("prototype knowledge contribute")
 def prototype_knowledge_contribute(
@@ -2284,8 +2302,7 @@ def prototype_knowledge_contribute(
         finding = _prompt_knowledge_contribution(contribution_type, section)
     else:
         raise CLIError(
-            "Provide --service and --description together, or --file, "
-            "or run without arguments for interactive mode."
+            "Provide --service and --description together, or --file, " "or run without arguments for interactive mode."
         )
 
     title = format_contribution_title(finding)
@@ -2302,17 +2319,14 @@ def prototype_knowledge_contribute(
     from azext_prototype.stages.backlog_push import check_gh_auth
 
     if not check_gh_auth():
-        raise CLIError(
-            "gh CLI not authenticated. Run: gh auth login\n"
-            "Use --draft to preview without submitting."
-        )
+        raise CLIError("gh CLI not authenticated. Run: gh auth login\n" "Use --draft to preview without submitting.")
 
     result = submit_contribution(finding)
 
     if result.get("error"):
         raise CLIError(f"Failed to submit: {result['error']}")
 
-    console.print_success(f"Knowledge contribution submitted")
+    console.print_success("Knowledge contribution submitted")
     console.print_dim(f"  {result.get('url', '')}")
 
     return {
@@ -2331,11 +2345,14 @@ def _prompt_knowledge_contribution(
     from azext_prototype.ui.console import console
 
     valid_types = [
-        "Service pattern update", "New service",
-        "Tool pattern", "Language pattern", "Pitfall",
+        "Service pattern update",
+        "New service",
+        "Tool pattern",
+        "Language pattern",
+        "Pitfall",
     ]
     console.print_info("Types: " + ", ".join(f"{i+1}. {t}" for i, t in enumerate(valid_types)))
-    type_choice = input(f"  Type [5]: ").strip() or "5"
+    type_choice = input("  Type [5]: ").strip() or "5"
     try:
         contribution_type = valid_types[int(type_choice) - 1]
     except (ValueError, IndexError):
@@ -2440,6 +2457,7 @@ def _generate_templates(
     doc_agent = None
     if ai_provider and design_context and registry:
         from azext_prototype.agents.base import AgentCapability
+
         doc_agents = registry.find_by_capability(AgentCapability.DOCUMENT)
         if doc_agents:
             doc_agent = doc_agents[0]
@@ -2457,7 +2475,6 @@ def _generate_templates(
         if doc_agent and "[PLACEHOLDER]" in rendered or (doc_agent and "[" in rendered):
             try:
                 from azext_prototype.agents.base import AgentContext
-                from azext_prototype.ai.provider import AIMessage
 
                 with console.spinner(f"Populating {template_name}..."):
                     task = (
@@ -2557,10 +2574,7 @@ def prototype_generate_backlog(
             config.set("backlog.project", project_name)
 
     if provider not in ("github", "devops"):
-        raise CLIError(
-            f"Unsupported backlog provider '{provider}'. "
-            "Supported values: github, devops"
-        )
+        raise CLIError(f"Unsupported backlog provider '{provider}'. " "Supported values: github, devops")
 
     # Load architecture
     design_context = _load_design_context(project_dir)
@@ -2644,6 +2658,7 @@ def prototype_generate_docs(cmd, path=None):
     if design_context:
         try:
             from azext_prototype.ai.factory import create_ai_provider
+
             ai_provider = create_ai_provider(project_config)
             registry = _build_registry(config, project_dir)
             console.print_info("Design context available — populating templates with AI.")
@@ -2653,7 +2668,10 @@ def prototype_generate_docs(cmd, path=None):
         console.print_dim("  No design context — using static templates.")
 
     generated = _generate_templates(
-        output_dir, project_dir, project_config, "docs",
+        output_dir,
+        project_dir,
+        project_config,
+        "docs",
         ai_provider=ai_provider,
         design_context=design_context,
         registry=registry,
@@ -2688,6 +2706,7 @@ def prototype_generate_speckit(cmd, path=None):
     if design_context:
         try:
             from azext_prototype.ai.factory import create_ai_provider
+
             ai_provider = create_ai_provider(project_config)
             registry = _build_registry(config, project_dir)
             console.print_info("Design context available — populating templates with AI.")
@@ -2697,7 +2716,10 @@ def prototype_generate_speckit(cmd, path=None):
         console.print_dim("  No design context — using static templates.")
 
     generated = _generate_templates(
-        output_dir, project_dir, project_config, "speckit",
+        output_dir,
+        project_dir,
+        project_config,
+        "speckit",
         include_manifest=True,
         ai_provider=ai_provider,
         design_context=design_context,
