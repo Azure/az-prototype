@@ -208,9 +208,21 @@ jobs:
           echo "version=${{ needs.build.outputs.version }}" >> "$GITHUB_OUTPUT"
           echo "download_url=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$FILENAME" >> "$GITHUB_OUTPUT"
 
-      - name: Clone azure-cli-extensions
+      - name: Clone azure-cli-extensions fork
         run: |
-          gh repo fork Azure/azure-cli-extensions --clone --remote
+          # Get the authenticated user's login
+          GH_USER=$(gh api user --jq .login)
+          echo "Authenticated as: $GH_USER"
+
+          # Ensure fork exists (no-op if already forked)
+          gh repo fork Azure/azure-cli-extensions --clone=false 2>/dev/null || true
+
+          # Shallow clone the fork (the repo is huge)
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${GH_USER}/azure-cli-extensions.git" azure-cli-extensions
+
+          # Add upstream for PR targeting
+          cd azure-cli-extensions
+          git remote add upstream https://github.com/Azure/azure-cli-extensions.git
         env:
           GH_TOKEN: ${{ secrets.EXTENSIONS_INDEX_PAT }}
 
@@ -248,6 +260,8 @@ jobs:
       - name: Create PR against Azure/azure-cli-extensions
         working-directory: azure-cli-extensions
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           VERSION="${{ steps.meta.outputs.version }}"
           BRANCH="prototype/v${VERSION}"
           git checkout -b "$BRANCH"
