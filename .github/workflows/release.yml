@@ -210,15 +210,13 @@ jobs:
 
       - name: Clone azure-cli-extensions fork
         run: |
-          # Get the authenticated user's login
-          GH_USER=$(gh api user --jq .login)
-          echo "Authenticated as: $GH_USER"
-
           # Ensure fork exists (no-op if already forked)
-          gh repo fork Azure/azure-cli-extensions --clone=false 2>/dev/null || true
+          gh repo fork Azure/azure-cli-extensions --clone=false || true
 
-          # Shallow clone the fork (the repo is huge)
-          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${GH_USER}/azure-cli-extensions.git" azure-cli-extensions
+          # Clone the fork via gh (handles auth automatically)
+          GH_USER=$(gh api user -q .login)
+          echo "Fork owner: $GH_USER"
+          gh repo clone "${GH_USER}/azure-cli-extensions" azure-cli-extensions -- --depth 1
 
           # Add upstream for PR targeting
           cd azure-cli-extensions
@@ -267,19 +265,34 @@ jobs:
           git checkout -b "$BRANCH"
           git add src/index.json
           git commit -m "Update prototype extension to ${VERSION}"
-          git push origin "$BRANCH"
-          gh pr create \
-            --repo Azure/azure-cli-extensions \
-            --title "Update \`prototype\` extension to ${VERSION}" \
-            --body "$(cat <<'EOF'
+          git push --force origin "$BRANCH"
+
+          PR_BODY="$(cat <<EOF
           ## Summary
-          Automated index update for the `az prototype` extension.
+          Automated index update for the \`az prototype\` extension.
 
           - **Version**: ${{ steps.meta.outputs.version }}
-          - **SHA-256**: `${{ steps.meta.outputs.sha256 }}`
+          - **SHA-256**: \`${{ steps.meta.outputs.sha256 }}\`
           - **Download**: ${{ steps.meta.outputs.download_url }}
           - **Source release**: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
           EOF
           )"
+
+          # Check if a PR already exists for this branch
+          GH_USER=$(gh api user -q .login)
+          EXISTING_PR=$(gh pr list --repo Azure/azure-cli-extensions --head "${GH_USER}:${BRANCH}" --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING_PR" ]; then
+            echo "Updating existing PR #${EXISTING_PR}"
+            gh pr edit "$EXISTING_PR" \
+              --repo Azure/azure-cli-extensions \
+              --title "Update \`prototype\` extension to ${VERSION}" \
+              --body "$PR_BODY"
+          else
+            echo "Creating new PR"
+            gh pr create \
+              --repo Azure/azure-cli-extensions \
+              --title "Update \`prototype\` extension to ${VERSION}" \
+              --body "$PR_BODY"
+          fi
         env:
           GH_TOKEN: ${{ secrets.EXTENSIONS_INDEX_PAT }}
