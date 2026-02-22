@@ -1,3 +1,7 @@
+[tool.pyright]
+pythonVersion = "3.10"
+reportMissingImports = "warning"  # azure-cli-core / knack have no type stubs
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"

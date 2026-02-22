@@ -402,6 +402,8 @@ class BacklogSession:
         """Call the project-manager agent to generate structured items."""
         from azext_prototype.ai.provider import AIMessage
 
+        assert self._pm_agent is not None
+        assert self._context.ai_provider is not None
         messages = self._pm_agent.get_system_messages()
         messages.extend(self._context.conversation_history)
 
@@ -470,6 +472,7 @@ class BacklogSession:
 
         messages.append(AIMessage(role="user", content=task))
 
+        assert self._context.ai_provider is not None
         response = self._context.ai_provider.chat(
             messages,
             temperature=0.3,

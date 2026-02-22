@@ -344,9 +344,8 @@ class EscalationTracker:
 
             results = search_and_fetch(query, max_results=3)
             if results:
-                content = "\n".join(f"- {r.get('title', 'No title')}: {r.get('snippet', '')}" for r in results)
                 print_fn("  Web search results found.")
-                return content
+                return results
             else:
                 print_fn("  No relevant web results found.")
                 return "No web results found"

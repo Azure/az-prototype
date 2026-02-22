@@ -115,6 +115,7 @@ class AgentOrchestrator:
             "2. [app-developer] Build the API service\n"
         )
 
+        assert self.context.ai_provider is not None
         response = self.context.ai_provider.chat(
             [AIMessage(role="user", content=planning_prompt)],
             temperature=0.2,

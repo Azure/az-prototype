@@ -136,6 +136,7 @@ class QAEngineerAgent(BaseAgent):
 
         # Use the provider's client directly for multi-modal
         try:
+            assert context.ai_provider is not None
             client = getattr(context.ai_provider, "_client", None)
             if client is None:
                 raise ValueError("AI provider does not expose a chat client for vision requests")
@@ -180,6 +181,7 @@ class QAEngineerAgent(BaseAgent):
                     content=f"{task}\n\n[Image could not be processed: {image_path}]",
                 )
             )
+            assert context.ai_provider is not None
             return context.ai_provider.chat(messages, temperature=0.2, max_tokens=8192)
 
     @staticmethod

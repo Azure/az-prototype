@@ -2,7 +2,7 @@
 
 from azure.cli.core import AzCommandsLoader
 
-from azext_prototype._help import helps  # noqa: F401
+from azext_prototype._help import helps  # type: ignore[attr-defined]  # noqa: F401
 
 
 class PrototypeCommandsLoader(AzCommandsLoader):

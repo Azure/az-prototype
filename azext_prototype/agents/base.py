@@ -171,6 +171,7 @@ class BaseAgent:
         # Gather MCP tools if available
         tools = self._get_mcp_tools(context)
 
+        assert context.ai_provider is not None
         response = context.ai_provider.chat(
             messages,
             temperature=self._temperature,
@@ -391,6 +392,7 @@ class BaseAgent:
                 )
 
             # Re-call AI with tool results
+            assert context.ai_provider is not None
             response = context.ai_provider.chat(
                 messages,
                 temperature=self._temperature,
@@ -461,6 +463,7 @@ class BaseAgent:
             )
         )
 
+        assert context.ai_provider is not None
         final = context.ai_provider.chat(
             messages,
             temperature=self._temperature,

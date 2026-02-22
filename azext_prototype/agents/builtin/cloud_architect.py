@@ -135,6 +135,7 @@ class CloudArchitectAgent(BaseAgent):
         # Add the task
         messages.append(AIMessage(role="user", content=task))
 
+        assert context.ai_provider is not None
         response = context.ai_provider.chat(
             messages,
             temperature=self._temperature,

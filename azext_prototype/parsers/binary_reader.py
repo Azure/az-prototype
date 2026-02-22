@@ -304,18 +304,18 @@ def _extract_pptx(path: Path, filename: str) -> tuple[str, list[EmbeddedImage]]:
         for shape in slide.shapes:
             # Extract text from text frames
             if shape.has_text_frame:
-                frame_text = shape.text_frame.text
+                frame_text = shape.text_frame.text  # type: ignore[attr-defined]
                 if frame_text.strip():
                     texts.append(frame_text)
 
             # Extract images from picture shapes
             try:
                 if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
-                    blob = shape.image.blob
+                    blob = shape.image.blob  # type: ignore[attr-defined]
                     if len(blob) > MAX_IMAGE_SIZE:
                         continue
-                    mime = shape.image.content_type
-                    ext = shape.image.ext
+                    mime = shape.image.content_type  # type: ignore[attr-defined]
+                    ext = shape.image.ext  # type: ignore[attr-defined]
                     images.append(
                         EmbeddedImage(
                             data=_encode_blob(blob),

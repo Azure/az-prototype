@@ -321,8 +321,8 @@ def _register_shift_enter():
     SHIFT_ENTER_SEQUENCE = "\x1b[13;2u"
 
     # Register the sequence if not already known
-    if SHIFT_ENTER_SEQUENCE not in vt100_parser.ANSI_SEQUENCES:
-        vt100_parser.ANSI_SEQUENCES[SHIFT_ENTER_SEQUENCE] = Keys.Vt100MouseEvent
+    if SHIFT_ENTER_SEQUENCE not in vt100_parser.ANSI_SEQUENCES:  # type: ignore[attr-defined]
+        vt100_parser.ANSI_SEQUENCES[SHIFT_ENTER_SEQUENCE] = Keys.Vt100MouseEvent  # type: ignore[attr-defined]
         # Use a custom key name we can bind to
         Keys.ShiftEnter = "<shift-enter>"  # type: ignore[attr-defined]
         vt100_parser.ANSI_SEQUENCES[SHIFT_ENTER_SEQUENCE] = Keys.ShiftEnter  # type: ignore[attr-defined]

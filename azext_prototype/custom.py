@@ -563,6 +563,8 @@ def prototype_deploy(
         return {"status": "displayed"}
 
     # Service principal login (before guards — so az_logged_in guard passes)
+    sp_client_id = None
+    sp_secret = None
     if service_principal:
         from azext_prototype.stages.deploy_helpers import login_service_principal
 
@@ -1952,10 +1954,12 @@ def prototype_agent_export(cmd, name=None, output=None):
     if agent.constraints:
         export_data["constraints"] = agent.constraints
     export_data["system_prompt"] = agent.system_prompt
-    if hasattr(agent, "examples") and agent.examples:
-        export_data["examples"] = agent.examples
-    if hasattr(agent, "tools") and agent.tools:
-        export_data["tools"] = agent.tools
+    examples = getattr(agent, "examples", None)
+    if examples:
+        export_data["examples"] = examples
+    tools = getattr(agent, "tools", None)
+    if tools:
+        export_data["tools"] = tools
 
     output_path = Path(output) if output else Path(f"./{name}.yaml")
     output_path.write_text(

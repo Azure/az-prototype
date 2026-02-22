@@ -98,6 +98,7 @@ class CostAnalystAgent(BaseAgent):
         )
         messages.append(AIMessage(role="user", content=extraction_task))
 
+        assert context.ai_provider is not None
         extraction_response = context.ai_provider.chat(
             messages,
             temperature=0.0,
@@ -126,6 +127,7 @@ class CostAnalystAgent(BaseAgent):
             )
         )
 
+        assert context.ai_provider is not None
         response = context.ai_provider.chat(
             report_messages,
             temperature=0.0,

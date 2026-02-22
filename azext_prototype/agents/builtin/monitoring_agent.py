@@ -127,6 +127,7 @@ class MonitoringAgent(BaseAgent):
         messages.extend(context.conversation_history)
         messages.append(AIMessage(role="user", content=task))
 
+        assert context.ai_provider is not None
         response = context.ai_provider.chat(
             messages,
             temperature=self._temperature,

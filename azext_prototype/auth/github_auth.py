@@ -57,8 +57,9 @@ class GitHubAuthManager:
             return self._token
 
         result = self._run_gh(["auth", "token"])
-        self._token = result.stdout.strip()
-        return self._token
+        token: str = result.stdout.strip()
+        self._token = token
+        return token
 
     def get_user_info(self) -> dict:
         """Return cached user info or fetch it."""

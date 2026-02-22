@@ -72,6 +72,7 @@ class YAMLAgent(BaseAgent):
         # Add the current task
         messages.append(AIMessage(role="user", content=task))
 
+        assert context.ai_provider is not None
         return context.ai_provider.chat(messages)
 
     def can_handle(self, task_description: str) -> float:
