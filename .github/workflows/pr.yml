@@ -1,0 +1,173 @@
+# ---------------------------------------------------------------
+# PR — Validate pull requests to main
+# Runs the full release build pipeline (minus publish) to ensure
+# the PR is release-ready before merging.
+# ---------------------------------------------------------------
+name: PR
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black isort pyright
+          pip install -e .
+
+      - name: Run flake8
+        run: flake8 azext_prototype/ --max-line-length=120 --extend-ignore=E203,W503
+
+      - name: Check formatting (black)
+        run: black --check --line-length 120 azext_prototype/
+
+      - name: Check imports (isort)
+        run: isort --check-only --profile black azext_prototype/
+
+      - name: Run pyright (type checking)
+        run: pyright azext_prototype/
+
+  validate-policies:
+    name: Validate governance policies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+
+      - name: Validate policy files (strict)
+        run: python -m azext_prototype.governance.policies.validate --dir azext_prototype/governance/policies/ --strict
+
+      - name: Validate workload templates against policies (strict)
+        run: python -m azext_prototype.templates.validate --dir azext_prototype/templates/workloads/ --strict
+
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    env:
+      APPINSIGHTS_CONNECTION_STRING: ${{ secrets.APPINSIGHTS_CONNECTION_STRING }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Inject App Insights connection string
+        if: env.APPINSIGHTS_CONNECTION_STRING != ''
+        run: |
+          sed -i "s|^_BUILTIN_CONNECTION_STRING = \"\".*|_BUILTIN_CONNECTION_STRING = \"$APPINSIGHTS_CONNECTION_STRING\"|" azext_prototype/telemetry/__init__.py
+          grep -qF "$APPINSIGHTS_CONNECTION_STRING" azext_prototype/telemetry/__init__.py && echo "App Insights connection string injected" || { echo "::error::Failed to inject connection string"; exit 1; }
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pytest pytest-cov opencensus-ext-azure
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short --cov=azext_prototype --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage
+        if: matrix.python-version == '3.11'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  security:
+    name: Security scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit safety
+
+      - name: Run bandit (security linter)
+        run: bandit -r azext_prototype/ -ll --skip B101
+
+      - name: Check dependencies for known vulnerabilities
+        run: pip install -e . && safety check --output text
+        continue-on-error: true  # Advisory — don't fail the build
+
+  build:
+    name: Build wheel
+    needs: [lint, validate-policies, test, security]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify version consistency
+        run: |
+          SETUP_VERSION=$(python -c "import re, pathlib; m=re.search(r'VERSION\s*=\s*\"(.+?)\"', pathlib.Path('setup.py').read_text()); print(m.group(1))")
+          META_VERSION=$(python -c "import json, pathlib; print(json.loads(pathlib.Path('azext_prototype/azext_metadata.json').read_text())['version'])")
+          if [ "$SETUP_VERSION" != "$META_VERSION" ]; then
+            echo "::error::Version mismatch: setup.py has '$SETUP_VERSION' but azext_metadata.json has '$META_VERSION'. These must match."
+            exit 1
+          fi
+          echo "Versions match: $SETUP_VERSION"
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel setuptools
+
+      - name: Inject App Insights connection string and build wheel
+        run: |
+          WHEEL_SRC="azext_prototype/telemetry/__init__.py"
+          if [ -n "$APPINSIGHTS_CONNECTION_STRING" ]; then
+            sed -i "s|^_BUILTIN_CONNECTION_STRING = \"\".*|_BUILTIN_CONNECTION_STRING = \"$APPINSIGHTS_CONNECTION_STRING\"|" "$WHEEL_SRC"
+            grep -qF "$APPINSIGHTS_CONNECTION_STRING" "$WHEEL_SRC" && echo "App Insights connection string injected" || { echo "::error::Failed to inject connection string"; exit 1; }
+          else
+            echo "::warning::APPINSIGHTS_CONNECTION_STRING secret not set — telemetry will be disabled in this build"
+          fi
+          python -m build --wheel --outdir dist/
+        env:
+          APPINSIGHTS_CONNECTION_STRING: ${{ secrets.APPINSIGHTS_CONNECTION_STRING }}
+
+      - name: Verify wheel contents
+        run: |
+          pip install dist/*.whl
+          python -c "import azext_prototype; print('Extension package OK')"
