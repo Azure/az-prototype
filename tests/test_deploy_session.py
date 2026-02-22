@@ -688,11 +688,12 @@ class TestDeploySession:
         joined = "\n".join(output)
         assert "Foundation" in joined or "Stage" in joined
 
+    @patch("azext_prototype.stages.deploy_session.subprocess.run", return_value=MagicMock(returncode=0, stdout="Terraform v1.7.0\n", stderr=""))
     @patch("azext_prototype.stages.deploy_session.check_az_login", return_value=True)
     @patch("azext_prototype.stages.deploy_session.get_current_subscription", return_value="sub-123")
     @patch("azext_prototype.stages.deploy_session.deploy_terraform", return_value={"status": "deployed"})
     @patch("azext_prototype.stages.deploy_session.deploy_app_stage", return_value={"status": "deployed"})
-    def test_full_deploy_flow(self, mock_app, mock_tf, mock_sub, mock_login, tmp_project):
+    def test_full_deploy_flow(self, mock_app, mock_tf, mock_sub, mock_login, mock_subprocess, tmp_project):
         """Test full interactive deploy: confirm → preflight → deploy → done."""
         stages = [
             {
@@ -716,10 +717,11 @@ class TestDeploySession:
         assert not result.cancelled
         assert len(result.deployed_stages) == 1
 
+    @patch("azext_prototype.stages.deploy_session.subprocess.run", return_value=MagicMock(returncode=0, stdout="Terraform v1.7.0\n", stderr=""))
     @patch("azext_prototype.stages.deploy_session.check_az_login", return_value=True)
     @patch("azext_prototype.stages.deploy_session.get_current_subscription", return_value="sub-123")
     @patch("azext_prototype.stages.deploy_session.deploy_terraform", return_value={"status": "failed", "error": "auth error"})
-    def test_deploy_failure_qa_routing(self, mock_tf, mock_sub, mock_login, tmp_project):
+    def test_deploy_failure_qa_routing(self, mock_tf, mock_sub, mock_login, mock_subprocess, tmp_project):
         """Test that deploy failure routes to QA agent."""
         stages = [
             {
@@ -1307,10 +1309,11 @@ class TestDeployNoAI:
         )
         assert result.cancelled is True
 
+    @patch("azext_prototype.stages.deploy_session.subprocess.run", return_value=MagicMock(returncode=0, stdout="Terraform v1.7.0\n", stderr=""))
     @patch("azext_prototype.stages.deploy_session.check_az_login", return_value=True)
     @patch("azext_prototype.stages.deploy_session.get_current_subscription", return_value="sub-123")
     @patch("azext_prototype.stages.deploy_session.deploy_terraform", return_value={"status": "deployed"})
-    def test_deploy_succeeds_without_ai(self, mock_tf, mock_sub, mock_login, tmp_project):
+    def test_deploy_succeeds_without_ai(self, mock_tf, mock_sub, mock_login, mock_subprocess, tmp_project):
         """Full deploy succeeds with ai_provider=None."""
         stages = [
             {
@@ -1332,10 +1335,11 @@ class TestDeployNoAI:
         assert not result.cancelled
         assert len(result.deployed_stages) == 1
 
+    @patch("azext_prototype.stages.deploy_session.subprocess.run", return_value=MagicMock(returncode=0, stdout="Terraform v1.7.0\n", stderr=""))
     @patch("azext_prototype.stages.deploy_session.check_az_login", return_value=True)
     @patch("azext_prototype.stages.deploy_session.get_current_subscription", return_value="sub-123")
     @patch("azext_prototype.stages.deploy_session.deploy_terraform", return_value={"status": "failed", "error": "auth error"})
-    def test_deploy_failure_without_ai_shows_raw_error(self, mock_tf, mock_sub, mock_login, tmp_project):
+    def test_deploy_failure_without_ai_shows_raw_error(self, mock_tf, mock_sub, mock_login, mock_subprocess, tmp_project):
         """Deploy failure with ai_provider=None falls back to raw error display."""
         stages = [
             {
@@ -1511,8 +1515,9 @@ class TestTenantPreflight:
 class TestDeploySPValidation:
     """Tests for --service-principal validation in prototype_deploy."""
 
+    @patch("azext_prototype.custom._check_requirements")
     @patch("azext_prototype.custom._get_project_dir")
-    def test_sp_missing_params_raises(self, mock_dir, project_with_config):
+    def test_sp_missing_params_raises(self, mock_dir, mock_check_req, project_with_config):
         from knack.util import CLIError
         from azext_prototype.custom import prototype_deploy
 
@@ -1526,9 +1531,10 @@ class TestDeploySPValidation:
                 # Missing client_secret and tenant_id
             )
 
+    @patch("azext_prototype.custom._check_requirements")
     @patch("azext_prototype.custom._get_project_dir")
     @patch("azext_prototype.stages.deploy_helpers.login_service_principal")
-    def test_sp_login_failure_raises(self, mock_login, mock_dir, project_with_config):
+    def test_sp_login_failure_raises(self, mock_login, mock_dir, mock_check_req, project_with_config):
         from knack.util import CLIError
         from azext_prototype.custom import prototype_deploy
 
@@ -1544,10 +1550,11 @@ class TestDeploySPValidation:
                 tenant_id="ghi",
             )
 
+    @patch("azext_prototype.custom._check_requirements")
     @patch("azext_prototype.custom._get_project_dir")
     @patch("azext_prototype.stages.deploy_helpers.login_service_principal")
     @patch("azext_prototype.custom._check_guards")
-    def test_sp_login_success_proceeds(self, mock_guards, mock_login, mock_dir, project_with_config):
+    def test_sp_login_success_proceeds(self, mock_guards, mock_login, mock_dir, mock_check_req, project_with_config):
         from azext_prototype.custom import prototype_deploy
 
         mock_dir.return_value = str(project_with_config)
@@ -1706,8 +1713,9 @@ class TestLoginSlashCommand:
 class TestPrepareDeployCommand:
     """Tests for _prepare_deploy_command in custom.py."""
 
+    @patch("azext_prototype.custom._check_requirements")
     @patch("azext_prototype.custom._get_project_dir")
-    def test_returns_none_ai_provider_when_factory_fails(self, mock_dir, project_with_config):
+    def test_returns_none_ai_provider_when_factory_fails(self, mock_dir, mock_check_req, project_with_config):
         from azext_prototype.custom import _prepare_deploy_command
 
         mock_dir.return_value = str(project_with_config)
@@ -1718,8 +1726,9 @@ class TestPrepareDeployCommand:
         assert agent_context.ai_provider is None
         assert project_dir == str(project_with_config)
 
+    @patch("azext_prototype.custom._check_requirements")
     @patch("azext_prototype.custom._get_project_dir")
-    def test_returns_ai_provider_when_factory_succeeds(self, mock_dir, project_with_config):
+    def test_returns_ai_provider_when_factory_succeeds(self, mock_dir, mock_check_req, project_with_config):
         from azext_prototype.custom import _prepare_deploy_command
 
         mock_dir.return_value = str(project_with_config)

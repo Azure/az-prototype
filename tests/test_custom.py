@@ -413,8 +413,9 @@ class TestPrototypeGenerateSpeckit:
 class TestPrototypeGenerateBacklog:
     """Test az prototype generate backlog command."""
 
+    @patch(f"{_CUSTOM_MODULE}._check_requirements")
     @patch(f"{_CUSTOM_MODULE}._get_project_dir")
-    def test_generate_backlog_github(self, mock_dir, project_with_design, mock_ai_provider):
+    def test_generate_backlog_github(self, mock_dir, mock_check_req, project_with_design, mock_ai_provider):
         """Backlog session runs and returns result for github provider."""
         from azext_prototype.custom import prototype_generate_backlog
         from azext_prototype.stages.backlog_session import BacklogResult
@@ -442,8 +443,9 @@ class TestPrototypeGenerateBacklog:
         assert result["provider"] == "github"
         assert result["items_generated"] == 3
 
+    @patch(f"{_CUSTOM_MODULE}._check_requirements")
     @patch(f"{_CUSTOM_MODULE}._get_project_dir")
-    def test_generate_backlog_devops(self, mock_dir, project_with_design, mock_ai_provider):
+    def test_generate_backlog_devops(self, mock_dir, mock_check_req, project_with_design, mock_ai_provider):
         """Backlog session runs for devops provider."""
         from azext_prototype.custom import prototype_generate_backlog
         from azext_prototype.stages.backlog_session import BacklogResult
@@ -470,8 +472,9 @@ class TestPrototypeGenerateBacklog:
         assert result["status"] == "generated"
         assert result["provider"] == "devops"
 
+    @patch(f"{_CUSTOM_MODULE}._check_requirements")
     @patch(f"{_CUSTOM_MODULE}._get_project_dir")
-    def test_generate_backlog_invalid_provider_raises(self, mock_dir, project_with_design, mock_ai_provider):
+    def test_generate_backlog_invalid_provider_raises(self, mock_dir, mock_check_req, project_with_design, mock_ai_provider):
         from azext_prototype.custom import prototype_generate_backlog
 
         mock_dir.return_value = str(project_with_design)
@@ -490,8 +493,9 @@ class TestPrototypeGenerateBacklog:
             with pytest.raises(CLIError, match="Unsupported backlog provider"):
                 prototype_generate_backlog(cmd, provider="jira", org="x", project="y")
 
+    @patch(f"{_CUSTOM_MODULE}._check_requirements")
     @patch(f"{_CUSTOM_MODULE}._get_project_dir")
-    def test_generate_backlog_no_design_raises(self, mock_dir, project_with_config, mock_ai_provider):
+    def test_generate_backlog_no_design_raises(self, mock_dir, mock_check_req, project_with_config, mock_ai_provider):
         from azext_prototype.custom import prototype_generate_backlog
 
         mock_dir.return_value = str(project_with_config)
@@ -510,8 +514,9 @@ class TestPrototypeGenerateBacklog:
             with pytest.raises(CLIError, match="No architecture design found"):
                 prototype_generate_backlog(cmd, provider="github", org="x", project="y")
 
+    @patch(f"{_CUSTOM_MODULE}._check_requirements")
     @patch(f"{_CUSTOM_MODULE}._get_project_dir")
-    def test_generate_backlog_defaults_from_config(self, mock_dir, project_with_design, mock_ai_provider):
+    def test_generate_backlog_defaults_from_config(self, mock_dir, mock_check_req, project_with_design, mock_ai_provider):
         """Backlog provider/org/project fall back to prototype.yaml values."""
         from azext_prototype.custom import prototype_generate_backlog
         from azext_prototype.stages.backlog_session import BacklogResult
@@ -546,8 +551,9 @@ class TestPrototypeGenerateBacklog:
 
         assert result["provider"] == "devops"
 
+    @patch(f"{_CUSTOM_MODULE}._check_requirements")
     @patch(f"{_CUSTOM_MODULE}._get_project_dir")
-    def test_generate_backlog_json_format(self, mock_dir, project_with_design, mock_ai_provider):
+    def test_generate_backlog_json_format(self, mock_dir, mock_check_req, project_with_design, mock_ai_provider):
         """Format field in result reflects output_format parameter."""
         from azext_prototype.custom import prototype_generate_backlog
         from azext_prototype.stages.backlog_session import BacklogResult
@@ -573,8 +579,9 @@ class TestPrototypeGenerateBacklog:
 
         assert result["format"] == "json"
 
+    @patch(f"{_CUSTOM_MODULE}._check_requirements")
     @patch(f"{_CUSTOM_MODULE}._get_project_dir")
-    def test_generate_backlog_prompts_when_unconfigured(self, mock_dir, project_with_design, mock_ai_provider):
+    def test_generate_backlog_prompts_when_unconfigured(self, mock_dir, mock_check_req, project_with_design, mock_ai_provider):
         """When provider/org/project are missing, prompt interactively and save."""
         from azext_prototype.custom import prototype_generate_backlog
         from azext_prototype.stages.backlog_session import BacklogResult
@@ -617,8 +624,9 @@ class TestPrototypeGenerateBacklog:
         assert saved["backlog"]["org"] == "prompted-org"
         assert saved["backlog"]["project"] == "prompted-repo"
 
+    @patch(f"{_CUSTOM_MODULE}._check_requirements")
     @patch(f"{_CUSTOM_MODULE}._get_project_dir")
-    def test_generate_backlog_no_prompt_when_fully_configured(self, mock_dir, project_with_design, mock_ai_provider):
+    def test_generate_backlog_no_prompt_when_fully_configured(self, mock_dir, mock_check_req, project_with_design, mock_ai_provider):
         """No prompt when all three values are supplied via CLI args."""
         from azext_prototype.custom import prototype_generate_backlog
         from azext_prototype.stages.backlog_session import BacklogResult

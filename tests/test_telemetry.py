@@ -1,11 +1,41 @@
 """Tests for azext_prototype.telemetry — App Insights telemetry collection."""
 
 import logging
+import sys
+from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 TELEMETRY_MODULE = "azext_prototype.telemetry"
+
+
+@contextmanager
+def _fake_azure_cli_modules():
+    """Inject fake azure.cli.core.* modules into sys.modules so that
+    ``from azure.cli.core._environment import get_config_dir`` succeeds
+    even when azure-cli-core is not installed (e.g. CI)."""
+    fakes: dict[str, MagicMock] = {}
+    keys = [
+        "azure",
+        "azure.cli",
+        "azure.cli.core",
+        "azure.cli.core._environment",
+        "azure.cli.core._profile",
+    ]
+    originals = {k: sys.modules.get(k) for k in keys}
+    try:
+        for k in keys:
+            if k not in sys.modules:
+                fakes[k] = MagicMock()
+                sys.modules[k] = fakes[k]
+        yield
+    finally:
+        for k, orig in originals.items():
+            if orig is None and k in fakes:
+                sys.modules.pop(k, None)
+            elif orig is not None:
+                sys.modules[k] = orig
 
 
 # ======================================================================
@@ -94,7 +124,7 @@ class TestIsCliTelemetryEnabled:
         config_file = tmp_path / "config"
         config_file.write_text("[core]\ncollect_telemetry = no\n")
 
-        with patch(
+        with _fake_azure_cli_modules(), patch(
             "azure.cli.core._environment.get_config_dir",
             return_value=str(tmp_path),
         ):
@@ -110,7 +140,7 @@ class TestIsCliTelemetryEnabled:
         config_file = tmp_path / "config"
         config_file.write_text("[core]\ndisable_telemetry = true\n")
 
-        with patch(
+        with _fake_azure_cli_modules(), patch(
             "azure.cli.core._environment.get_config_dir",
             return_value=str(tmp_path),
         ):
@@ -126,7 +156,7 @@ class TestIsCliTelemetryEnabled:
         config_file = tmp_path / "config"
         config_file.write_text("[core]\ndisable_telemetry = false\n")
 
-        with patch(
+        with _fake_azure_cli_modules(), patch(
             "azure.cli.core._environment.get_config_dir",
             return_value=str(tmp_path),
         ):
@@ -142,7 +172,7 @@ class TestIsCliTelemetryEnabled:
         config_file = tmp_path / "config"
         config_file.write_text("[core]\nname = test\n")
 
-        with patch(
+        with _fake_azure_cli_modules(), patch(
             "azure.cli.core._environment.get_config_dir",
             return_value=str(tmp_path),
         ):
@@ -156,7 +186,7 @@ class TestIsCliTelemetryEnabled:
 
         monkeypatch.delenv("AZURE_CORE_COLLECT_TELEMETRY", raising=False)
 
-        with patch(
+        with _fake_azure_cli_modules(), patch(
             "azure.cli.core._environment.get_config_dir",
             side_effect=ImportError("no CLI"),
         ):
@@ -294,7 +324,7 @@ class TestGetExtensionVersion:
         from azext_prototype.telemetry import _get_extension_version
 
         version = _get_extension_version()
-        assert version == "0.2.0"
+        assert version == "0.2.1"
 
     def test_returns_unknown_on_error(self):
         from azext_prototype.telemetry import _get_extension_version
@@ -324,7 +354,7 @@ class TestGetTenantId:
             "tenantId": "aaaabbbb-1111-2222-3333-ccccddddeeee"
         }
 
-        with patch(
+        with _fake_azure_cli_modules(), patch(
             "azure.cli.core._profile.Profile",
             return_value=mock_profile,
         ):
@@ -335,7 +365,7 @@ class TestGetTenantId:
         from azext_prototype.telemetry import _get_tenant_id
 
         cmd = MagicMock()
-        with patch(
+        with _fake_azure_cli_modules(), patch(
             "azure.cli.core._profile.Profile",
             side_effect=Exception("no auth"),
         ):
@@ -348,7 +378,7 @@ class TestGetTenantId:
         mock_profile = MagicMock()
         mock_profile.get_subscription.return_value = {}
 
-        with patch(
+        with _fake_azure_cli_modules(), patch(
             "azure.cli.core._profile.Profile",
             return_value=mock_profile,
         ):

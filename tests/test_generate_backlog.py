@@ -747,8 +747,9 @@ class TestBacklogCommandIntegration:
         result = prototype_generate_backlog(cmd, status=True, json_output=True)
         assert result["status"] == "displayed"
 
+    @patch(f"{_CUSTOM_MODULE}._check_requirements")
     @patch(f"{_CUSTOM_MODULE}._get_project_dir")
-    def test_backlog_invalid_provider_raises(self, mock_dir, project_with_design, mock_ai_provider):
+    def test_backlog_invalid_provider_raises(self, mock_dir, mock_check_req, project_with_design, mock_ai_provider):
         from azext_prototype.custom import prototype_generate_backlog
 
         mock_dir.return_value = str(project_with_design)
@@ -766,8 +767,9 @@ class TestBacklogCommandIntegration:
             with pytest.raises(CLIError, match="Unsupported backlog provider"):
                 prototype_generate_backlog(cmd, provider="jira", org="x", project="y")
 
+    @patch(f"{_CUSTOM_MODULE}._check_requirements")
     @patch(f"{_CUSTOM_MODULE}._get_project_dir")
-    def test_backlog_no_design_raises(self, mock_dir, project_with_config, mock_ai_provider):
+    def test_backlog_no_design_raises(self, mock_dir, mock_check_req, project_with_config, mock_ai_provider):
         from azext_prototype.custom import prototype_generate_backlog
 
         mock_dir.return_value = str(project_with_config)
@@ -785,8 +787,9 @@ class TestBacklogCommandIntegration:
             with pytest.raises(CLIError, match="No architecture design found"):
                 prototype_generate_backlog(cmd, provider="github", org="x", project="y")
 
+    @patch(f"{_CUSTOM_MODULE}._check_requirements")
     @patch(f"{_CUSTOM_MODULE}._get_project_dir")
-    def test_backlog_delegates_to_session(self, mock_dir, project_with_design, mock_ai_provider):
+    def test_backlog_delegates_to_session(self, mock_dir, mock_check_req, project_with_design, mock_ai_provider):
         """The command delegates to BacklogSession.run()."""
         from azext_prototype.custom import prototype_generate_backlog
         from azext_prototype.ai.provider import AIResponse
@@ -819,8 +822,9 @@ class TestBacklogCommandIntegration:
         assert result["status"] == "generated"
         assert result["items_generated"] == 1
 
+    @patch(f"{_CUSTOM_MODULE}._check_requirements")
     @patch(f"{_CUSTOM_MODULE}._get_project_dir")
-    def test_backlog_cancelled_returns_cancelled(self, mock_dir, project_with_design, mock_ai_provider):
+    def test_backlog_cancelled_returns_cancelled(self, mock_dir, mock_check_req, project_with_design, mock_ai_provider):
         from azext_prototype.custom import prototype_generate_backlog
         from azext_prototype.ai.provider import AIResponse
 

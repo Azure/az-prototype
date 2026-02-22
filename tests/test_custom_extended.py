@@ -79,8 +79,9 @@ class TestBuildContext:
 class TestPrepareCommand:
     """Test _prepare_command helper."""
 
+    @patch(f"{_MOD}._check_requirements")
     @patch("azext_prototype.ai.factory.create_ai_provider")
-    def test_prepare_command(self, mock_factory, project_with_config):
+    def test_prepare_command(self, mock_factory, mock_check_req, project_with_config):
         from azext_prototype.custom import _prepare_command
 
         mock_factory.return_value = MagicMock()
@@ -211,11 +212,12 @@ class TestGetRegistryWithFallback:
 class TestPrototypeInit:
     """Test the init command."""
 
+    @patch(f"{_MOD}._check_requirements")
     @patch(f"{_MOD}._check_guards")
     @patch("azext_prototype.auth.copilot_license.CopilotLicenseValidator")
     @patch("azext_prototype.auth.github_auth.GitHubAuthManager")
     @patch("azext_prototype.stages.init_stage.InitStage._check_gh", return_value=True)
-    def test_init_success(self, mock_gh, mock_auth_cls, mock_lic_cls, mock_guards, tmp_path):
+    def test_init_success(self, mock_gh, mock_auth_cls, mock_lic_cls, mock_guards, mock_check_req, tmp_path):
         from azext_prototype.custom import prototype_init
 
         mock_auth = MagicMock()
@@ -243,8 +245,9 @@ class TestPrototypeInit:
         assert (project_dir / "prototype.yaml").exists()
         assert (project_dir / ".gitignore").exists()
 
+    @patch(f"{_MOD}._check_requirements")
     @patch(f"{_MOD}._check_guards")
-    def test_init_azure_openai_skips_license(self, mock_guards, tmp_path):
+    def test_init_azure_openai_skips_license(self, mock_guards, mock_check_req, tmp_path):
         from azext_prototype.custom import prototype_init
 
         cmd = MagicMock()
@@ -261,7 +264,8 @@ class TestPrototypeInit:
         assert "copilot_license" not in result
         assert result["github_user"] is None
 
-    def test_init_missing_name_raises(self, tmp_path):
+    @patch(f"{_MOD}._check_requirements")
+    def test_init_missing_name_raises(self, mock_check_req, tmp_path):
         from azext_prototype.custom import prototype_init
         from azext_prototype.stages.init_stage import InitStage
 
@@ -271,7 +275,8 @@ class TestPrototypeInit:
             with pytest.raises(CLIError, match="Project name"):
                 prototype_init(cmd, name=None, location="eastus", output_dir=str(tmp_path))
 
-    def test_init_missing_location_raises(self, tmp_path):
+    @patch(f"{_MOD}._check_requirements")
+    def test_init_missing_location_raises(self, mock_check_req, tmp_path):
         from azext_prototype.custom import prototype_init
         from azext_prototype.stages.init_stage import InitStage
 
@@ -280,8 +285,9 @@ class TestPrototypeInit:
             with pytest.raises(CLIError, match="region is required"):
                 prototype_init(cmd, name="test-proj", location=None, output_dir=str(tmp_path))
 
+    @patch(f"{_MOD}._check_requirements")
     @patch(f"{_MOD}._check_guards")
-    def test_init_idempotency_cancel(self, mock_guards, tmp_path):
+    def test_init_idempotency_cancel(self, mock_guards, mock_check_req, tmp_path):
         """If project exists and user declines, init should cancel."""
         from azext_prototype.custom import prototype_init
 
@@ -299,8 +305,9 @@ class TestPrototypeInit:
             )
         assert result["status"] == "cancelled"
 
+    @patch(f"{_MOD}._check_requirements")
     @patch(f"{_MOD}._check_guards")
-    def test_init_idempotency_reinitialize(self, mock_guards, tmp_path):
+    def test_init_idempotency_reinitialize(self, mock_guards, mock_check_req, tmp_path):
         """If project exists and user confirms, init should proceed."""
         from azext_prototype.custom import prototype_init
 
@@ -317,8 +324,9 @@ class TestPrototypeInit:
             )
         assert result["status"] == "success"
 
+    @patch(f"{_MOD}._check_requirements")
     @patch(f"{_MOD}._check_guards")
-    def test_init_environment_parameter(self, mock_guards, tmp_path):
+    def test_init_environment_parameter(self, mock_guards, mock_check_req, tmp_path):
         """--environment should be stored in config."""
         from azext_prototype.custom import prototype_init
         from azext_prototype.config import ProjectConfig
@@ -334,8 +342,9 @@ class TestPrototypeInit:
         config.load()
         assert config.get("project.environment") == "staging"
 
+    @patch(f"{_MOD}._check_requirements")
     @patch(f"{_MOD}._check_guards")
-    def test_init_model_parameter(self, mock_guards, tmp_path):
+    def test_init_model_parameter(self, mock_guards, mock_check_req, tmp_path):
         """--model should override the provider default."""
         from azext_prototype.custom import prototype_init
         from azext_prototype.config import ProjectConfig
@@ -351,8 +360,9 @@ class TestPrototypeInit:
         config.load()
         assert config.get("ai.model") == "gpt-4o-mini"
 
+    @patch(f"{_MOD}._check_requirements")
     @patch(f"{_MOD}._check_guards")
-    def test_init_default_model_per_provider(self, mock_guards, tmp_path):
+    def test_init_default_model_per_provider(self, mock_guards, mock_check_req, tmp_path):
         """Without --model, the default should be provider-specific."""
         from azext_prototype.custom import prototype_init
         from azext_prototype.config import ProjectConfig
@@ -368,8 +378,9 @@ class TestPrototypeInit:
         config.load()
         assert config.get("ai.model") == "gpt-4o"
 
+    @patch(f"{_MOD}._check_requirements")
     @patch(f"{_MOD}._check_guards")
-    def test_init_sends_telemetry_overrides(self, mock_guards, tmp_path):
+    def test_init_sends_telemetry_overrides(self, mock_guards, mock_check_req, tmp_path):
         """Init should set _telemetry_overrides with resolved values."""
         from azext_prototype.custom import prototype_init
 
@@ -388,8 +399,9 @@ class TestPrototypeInit:
         assert overrides["iac_tool"] == "bicep"
         assert overrides["environment"] == "staging"
 
+    @patch(f"{_MOD}._check_requirements")
     @patch(f"{_MOD}._check_guards")
-    def test_init_telemetry_overrides_explicit_model(self, mock_guards, tmp_path):
+    def test_init_telemetry_overrides_explicit_model(self, mock_guards, mock_check_req, tmp_path):
         """When --model is explicit, overrides should use that value."""
         from azext_prototype.custom import prototype_init
 
@@ -549,10 +561,11 @@ class TestPrototypeConfigInit:
 class TestPrototypeBuild:
     """Test the build command."""
 
+    @patch(f"{_MOD}._check_requirements")
     @patch(f"{_MOD}._get_project_dir")
     @patch("azext_prototype.ai.factory.create_ai_provider")
     @patch(f"{_MOD}._check_guards")
-    def test_build_calls_stage(self, mock_guards, mock_factory, mock_dir, project_with_design, mock_ai_provider):
+    def test_build_calls_stage(self, mock_guards, mock_factory, mock_dir, mock_check_req, project_with_design, mock_ai_provider):
         from azext_prototype.custom import prototype_build
         from azext_prototype.ai.provider import AIResponse
 
@@ -571,9 +584,10 @@ class TestPrototypeBuild:
 class TestPrototypeDeploy:
     """Test the deploy command."""
 
+    @patch(f"{_MOD}._check_requirements")
     @patch(f"{_MOD}._get_project_dir")
     @patch("azext_prototype.ai.factory.create_ai_provider")
-    def test_deploy_status(self, mock_factory, mock_dir, project_with_build, mock_ai_provider):
+    def test_deploy_status(self, mock_factory, mock_dir, mock_check_req, project_with_build, mock_ai_provider):
         from azext_prototype.custom import prototype_deploy
 
         mock_dir.return_value = str(project_with_build)
