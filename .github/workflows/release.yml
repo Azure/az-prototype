@@ -220,7 +220,7 @@ jobs:
 
           # Add upstream for PR targeting
           cd azure-cli-extensions
-          git remote add upstream https://github.com/Azure/azure-cli-extensions.git
+          git remote add upstream https://github.com/Azure/azure-cli-extensions.git || true
         env:
           GH_TOKEN: ${{ secrets.EXTENSIONS_INDEX_PAT }}
 
