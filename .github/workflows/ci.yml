@@ -216,5 +216,5 @@ jobs:
       - name: Upload wheel
         uses: actions/upload-artifact@v4
         with:
-          name: prototype-${{ needs.version.outputs.version }}
+          name: az-prototype-${{ needs.version.outputs.version }}
           path: dist/*.whl
