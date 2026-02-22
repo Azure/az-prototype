@@ -51,11 +51,15 @@ jobs:
       - name: Verify tag matches source version
         run: |
           TAG_VERSION="${{ steps.ver.outputs.version }}"
+          # Strip semver pre-release suffix (-rc.1, -preview, etc.) for comparison
+          # because setup.py carries the base version only.
+          TAG_BASE="${TAG_VERSION%%-*}"
           SRC_VERSION=$(python -c "import re, pathlib; m=re.search(r'VERSION\s*=\s*\"(.+?)\"', pathlib.Path('setup.py').read_text()); print(m.group(1))")
           echo "Tag version:    $TAG_VERSION"
+          echo "Tag base:       $TAG_BASE"
           echo "Source version: $SRC_VERSION"
-          if [ "$TAG_VERSION" != "$SRC_VERSION" ]; then
-            echo "::error::Tag version ($TAG_VERSION) does not match source version ($SRC_VERSION). Update setup.py and azext_metadata.json before tagging."
+          if [ "$TAG_BASE" != "$SRC_VERSION" ]; then
+            echo "::error::Tag base version ($TAG_BASE) does not match source version ($SRC_VERSION). Update setup.py and azext_metadata.json before tagging."
             exit 1
           fi
           echo "Version check passed"
@@ -73,11 +77,10 @@ jobs:
       - name: Validate workload templates against policies
         run: python -m azext_prototype.templates.validate --dir azext_prototype/templates/workloads/ --strict
 
-      - name: Stamp version into source
+      - name: Stamp version into metadata
         run: |
           TAG_VERSION="${{ steps.ver.outputs.version }}"
           TAG_NAME="${{ github.ref_name }}"
-          sed -i "s/^VERSION = \".*\"/VERSION = \"$TAG_VERSION\"/" setup.py
           python -c "
           import json, pathlib
           p = pathlib.Path('azext_prototype/azext_metadata.json')
@@ -101,6 +104,17 @@ jobs:
           python -m build --wheel --outdir dist/
         env:
           APPINSIGHTS_CONNECTION_STRING: ${{ secrets.APPINSIGHTS_CONNECTION_STRING }}
+
+      - name: Rename wheel with tag version
+        run: |
+          TAG_VERSION="${{ steps.ver.outputs.version }}"
+          BASE_VERSION=$(python -c "import re, pathlib; m=re.search(r'VERSION\s*=\s*\"(.+?)\"', pathlib.Path('setup.py').read_text()); print(m.group(1))")
+          if [ "$TAG_VERSION" != "$BASE_VERSION" ]; then
+            for f in dist/*.whl; do
+              mv "$f" "${f/$BASE_VERSION/$TAG_VERSION}"
+            done
+          fi
+          ls dist/
 
       - name: Verify wheel contents
         run: |

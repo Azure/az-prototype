@@ -89,7 +89,7 @@ def _safe_load_yaml(stream: Any) -> dict | None:
         if hasattr(stream, "seek"):
             stream.seek(0)
 
-        data = yaml.load(stream, Loader=_RepairLoader)  # noqa: S506
+        data = yaml.load(stream, Loader=_RepairLoader)  # noqa: S506  # nosec B506
         logger.warning("Repaired legacy config — re-saving without Python type tags.")
         return _sanitize_for_yaml(data) if data else data
 

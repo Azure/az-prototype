@@ -109,10 +109,9 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Stamp version into source
+      - name: Stamp version into metadata
         run: |
           CI_VERSION="${{ needs.version.outputs.version }}"
-          sed -i "s/^VERSION = \".*\"/VERSION = \"$CI_VERSION\"/" setup.py
           python -c "
           import json, pathlib
           p = pathlib.Path('azext_prototype/azext_metadata.json')
@@ -179,10 +178,9 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Stamp version into source
+      - name: Stamp version into metadata
         run: |
           CI_VERSION="${{ needs.version.outputs.version }}"
-          sed -i "s/^VERSION = \".*\"/VERSION = \"$CI_VERSION\"/" setup.py
           python -c "
           import json, pathlib
           p = pathlib.Path('azext_prototype/azext_metadata.json')
@@ -196,6 +194,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip build
           python -m build --wheel --outdir dist/
+
+      - name: Rename wheel with CI version
+        run: |
+          CI_VERSION="${{ needs.version.outputs.version }}"
+          BASE_VERSION=$(python -c "import re, pathlib; m=re.search(r'VERSION\s*=\s*\"(.+?)\"', pathlib.Path('setup.py').read_text()); print(m.group(1))")
+          for f in dist/*.whl; do
+            mv "$f" "${f/$BASE_VERSION/$CI_VERSION}"
+          done
+          ls dist/
 
       - name: Upload wheel
         uses: actions/upload-artifact@v4

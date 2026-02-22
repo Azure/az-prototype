@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Azure CLI Extension: az prototype — Innovation Factory rapid prototyping."""
 
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 VERSION = "0.2.1"
 CLASSIFIERS = [
