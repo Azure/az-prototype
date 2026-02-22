@@ -687,8 +687,14 @@ class TestAIPopulatedTemplates:
         project_dir = str(project_with_config)
         project_config = {"project": {"name": "test"}}
 
-        # console is imported locally inside _generate_templates
-        with patch("azext_prototype.ui.console.console") as mock_console:
+        # Patch the module-level console singleton. We must use importlib
+        # because `import azext_prototype.ui.console` can resolve to the
+        # `console` variable re-exported in azext_prototype.ui.__init__
+        # instead of the submodule (name collision on Python 3.10).
+        import importlib
+        _console_mod = importlib.import_module("azext_prototype.ui.console")
+
+        with patch.object(_console_mod, "console") as mock_console:
             generated = _generate_templates(output_dir, project_dir, project_config, "docs")
 
         # Should use console.print_file_list instead of bare print()

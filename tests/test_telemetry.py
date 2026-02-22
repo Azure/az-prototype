@@ -14,28 +14,43 @@ TELEMETRY_MODULE = "azext_prototype.telemetry"
 def _fake_azure_cli_modules():
     """Inject fake azure.cli.core.* modules into sys.modules so that
     ``from azure.cli.core._environment import get_config_dir`` succeeds
-    even when azure-cli-core is not installed (e.g. CI)."""
-    fakes: dict[str, MagicMock] = {}
-    keys = [
-        "azure",
+    even when azure-cli-core is not installed (e.g. CI).
+
+    The ``azure`` namespace package may already be in sys.modules (from
+    opencensus-ext-azure or azure-core) without having an ``azure.cli``
+    submodule.  We must always inject the ``azure.cli.*`` hierarchy and
+    wire it into whatever ``azure`` module is present.
+    """
+    cli_keys = [
         "azure.cli",
         "azure.cli.core",
         "azure.cli.core._environment",
         "azure.cli.core._profile",
     ]
-    originals = {k: sys.modules.get(k) for k in keys}
+    originals = {k: sys.modules.get(k) for k in cli_keys}
+    fakes: dict[str, MagicMock] = {}
     try:
-        for k in keys:
-            if k not in sys.modules:
-                fakes[k] = MagicMock()
-                sys.modules[k] = fakes[k]
+        for k in cli_keys:
+            fakes[k] = MagicMock()
+            sys.modules[k] = fakes[k]
+        # Wire azure.cli into the existing azure namespace package
+        azure_mod = sys.modules.get("azure")
+        if azure_mod is not None:
+            azure_mod.cli = fakes["azure.cli"]  # type: ignore[attr-defined]
         yield
     finally:
         for k, orig in originals.items():
-            if orig is None and k in fakes:
+            if orig is None:
                 sys.modules.pop(k, None)
-            elif orig is not None:
+            else:
                 sys.modules[k] = orig
+        # Remove the injected .cli attribute from the real azure package
+        azure_mod = sys.modules.get("azure")
+        if azure_mod is not None and hasattr(azure_mod, "cli"):
+            try:
+                delattr(azure_mod, "cli")
+            except (AttributeError, TypeError):
+                pass
 
 
 # ======================================================================

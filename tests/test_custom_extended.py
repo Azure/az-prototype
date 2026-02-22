@@ -1444,8 +1444,14 @@ class TestAnalyzeConsoleOutput:
 
         cmd = MagicMock()
 
-        # Patch the console inside the function's lazy import
-        with patch("azext_prototype.ui.console.console") as mock_console:
+        # Patch the module-level console singleton. We must use importlib
+        # because `import azext_prototype.ui.console` can resolve to the
+        # `console` variable re-exported in azext_prototype.ui.__init__
+        # instead of the submodule (name collision on Python 3.10).
+        import importlib
+        _console_mod = importlib.import_module("azext_prototype.ui.console")
+
+        with patch.object(_console_mod, "console") as mock_console:
             result = prototype_analyze_error(cmd, input="some error", json_output=True)
 
         assert result["status"] == "analyzed"
