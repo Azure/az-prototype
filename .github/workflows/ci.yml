@@ -1,15 +1,13 @@
 # ---------------------------------------------------------------
-# CI — Run on feature / dev branches (not main)
+# CI — Run on all branches
 # Stamps the patch version with the build number for traceability.
 # ---------------------------------------------------------------
 name: CI
 
 on:
-  workflow_dispatch:  # Manual only — automatic triggers disabled
-  # push:
-  #   branches-ignore: [main]
-  # pull_request:
-  #   branches-ignore: [main]
+  workflow_dispatch:
+  push:
+  pull_request:
 
 permissions:
   contents: read
@@ -23,14 +21,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify version consistency
+        run: |
+          SETUP_VERSION=$(python -c "import re, pathlib; m=re.search(r'VERSION\s*=\s*\"(.+?)\"', pathlib.Path('setup.py').read_text()); print(m.group(1))")
+          META_VERSION=$(python -c "import json, pathlib; print(json.loads(pathlib.Path('azext_prototype/azext_metadata.json').read_text())['version'])")
+          if [ "$SETUP_VERSION" != "$META_VERSION" ]; then
+            echo "::error::Version mismatch: setup.py has '$SETUP_VERSION' but azext_metadata.json has '$META_VERSION'. These must match."
+            exit 1
+          fi
+          echo "Versions match: $SETUP_VERSION"
+
       - name: Compute CI version
         id: ver
         run: |
-          # Read base version from setup.py (e.g. 0.1.0)
           BASE=$(python -c "import re, pathlib; m=re.search(r'VERSION\s*=\s*\"(.+?)\"', pathlib.Path('setup.py').read_text()); print(m.group(1))")
-          # Replace patch with the GitHub run number → 0.1.<run>
-          MAJOR_MINOR=$(echo "$BASE" | sed -E 's/([0-9]+\.[0-9]+)\..*/\1/')
-          CI_VERSION="${MAJOR_MINOR}.${{ github.run_number }}"
+          CI_VERSION="${BASE}-ci.${{ github.run_number }}"
           echo "version=$CI_VERSION" >> "$GITHUB_OUTPUT"
           echo "CI version: $CI_VERSION"
 
@@ -48,7 +53,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 black isort
+          pip install flake8 black isort pyright
+          pip install -e .
 
       - name: Run flake8
         run: flake8 azext_prototype/ --max-line-length=120 --extend-ignore=E203,W503
@@ -58,6 +64,9 @@ jobs:
 
       - name: Check imports (isort)
         run: isort --check-only --profile black azext_prototype/
+
+      - name: Run pyright (type checking)
+        run: pyright azext_prototype/
 
   validate-policies:
     name: Validate governance policies
@@ -157,3 +166,39 @@ jobs:
       - name: Check dependencies for known vulnerabilities
         run: pip install -e . && safety check --output text
         continue-on-error: true  # Advisory — don't fail the build
+
+  package:
+    name: Build wheel
+    needs: [version, lint, validate-policies, test, security]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Stamp version into source
+        run: |
+          CI_VERSION="${{ needs.version.outputs.version }}"
+          sed -i "s/^VERSION = \".*\"/VERSION = \"$CI_VERSION\"/" setup.py
+          python -c "
+          import json, pathlib
+          p = pathlib.Path('azext_prototype/azext_metadata.json')
+          d = json.loads(p.read_text())
+          d['version'] = '$CI_VERSION'
+          p.write_text(json.dumps(d, indent=2) + '\n')
+          "
+          echo "Stamped version: $CI_VERSION"
+
+      - name: Build wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel --outdir dist/
+
+      - name: Upload wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: prototype-${{ needs.version.outputs.version }}
+          path: dist/*.whl

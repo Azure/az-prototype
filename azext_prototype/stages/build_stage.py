@@ -129,6 +129,7 @@ class BuildStage(BaseStage):
         build_state = BuildState(agent_context.project_dir)
         if reset:
             build_state.reset()
+            self._clean_output_dirs(agent_context.project_dir)
         elif build_state.exists:
             build_state.load()
 
@@ -176,6 +177,26 @@ class BuildStage(BaseStage):
             "deployment_stages": result.deployment_stages,
             "resources": result.resources,
         }
+
+    # ------------------------------------------------------------------
+    # Output directory cleanup
+    # ------------------------------------------------------------------
+
+    _OUTPUT_DIRS = ("concept/infra", "concept/apps", "concept/db", "concept/docs")
+
+    def _clean_output_dirs(self, project_dir: str) -> None:
+        """Remove generated output directories so ``--reset`` starts clean.
+
+        Without this, stale files from a previous build can leak into the
+        next Terraform/Bicep run and cause deployment failures.
+        """
+        import shutil
+
+        for rel in self._OUTPUT_DIRS:
+            target = Path(project_dir) / rel
+            if target.is_dir():
+                shutil.rmtree(target)
+                logger.info("Cleaned %s", rel)
 
     # ------------------------------------------------------------------
     # Template matching

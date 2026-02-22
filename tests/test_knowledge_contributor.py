@@ -449,6 +449,7 @@ class TestKnowledgeContributeCommand:
                 service="cosmos-db",
                 description="RU throughput must be >= 400",
                 draft=True,
+                json_output=True,
             )
 
         assert result["status"] == "draft"
@@ -471,6 +472,7 @@ class TestKnowledgeContributeCommand:
                 cmd,
                 service="cosmos-db",
                 description="RU throughput must be >= 400",
+                json_output=True,
             )
 
         assert result["status"] == "submitted"
@@ -508,6 +510,7 @@ class TestKnowledgeContributeCommand:
                 cmd,
                 file=str(finding_file),
                 draft=True,
+                json_output=True,
             )
 
         assert result["status"] == "draft"
@@ -537,6 +540,7 @@ class TestKnowledgeContributeCommand:
                 contribution_type="Service pattern update",
                 section="Pitfalls",
                 draft=True,
+                json_output=True,
             )
 
         assert result["status"] == "draft"

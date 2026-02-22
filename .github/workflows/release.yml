@@ -6,11 +6,11 @@
 name: Release
 
 on:
-  workflow_dispatch:  # Manual only — automatic triggers disabled
-  # push:
-  #   tags:
-  #     - "v*"
-  #   branches: [main]
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+    branches: [main]
 
 permissions:
   contents: write
@@ -30,6 +30,36 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Verify version consistency
+        run: |
+          SETUP_VERSION=$(python -c "import re, pathlib; m=re.search(r'VERSION\s*=\s*\"(.+?)\"', pathlib.Path('setup.py').read_text()); print(m.group(1))")
+          META_VERSION=$(python -c "import json, pathlib; print(json.loads(pathlib.Path('azext_prototype/azext_metadata.json').read_text())['version'])")
+          if [ "$SETUP_VERSION" != "$META_VERSION" ]; then
+            echo "::error::Version mismatch: setup.py has '$SETUP_VERSION' but azext_metadata.json has '$META_VERSION'. These must match."
+            exit 1
+          fi
+          echo "Versions match: $SETUP_VERSION"
+
+      - name: Extract version from tag
+        id: ver
+        run: |
+          # Strip leading "v" from tag (v0.2.0 → 0.2.0)
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$TAG_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Release version: $TAG_VERSION"
+
+      - name: Verify tag matches source version
+        run: |
+          TAG_VERSION="${{ steps.ver.outputs.version }}"
+          SRC_VERSION=$(python -c "import re, pathlib; m=re.search(r'VERSION\s*=\s*\"(.+?)\"', pathlib.Path('setup.py').read_text()); print(m.group(1))")
+          echo "Tag version:    $TAG_VERSION"
+          echo "Source version: $SRC_VERSION"
+          if [ "$TAG_VERSION" != "$SRC_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) does not match source version ($SRC_VERSION). Update setup.py and azext_metadata.json before tagging."
+            exit 1
+          fi
+          echo "Version check passed"
+
       - name: Install build tools
         run: |
           python -m pip install --upgrade pip
@@ -43,40 +73,21 @@ jobs:
       - name: Validate workload templates against policies
         run: python -m azext_prototype.templates.validate --dir azext_prototype/templates/workloads/ --strict
 
-      - name: Extract version from tag
-        id: ver
-        run: |
-          # Strip leading "v" from tag (v0.2.0 → 0.2.0)
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          echo "version=$TAG_VERSION" >> "$GITHUB_OUTPUT"
-          echo "Release version: $TAG_VERSION"
-
-      - name: Verify tag matches metadata major.minor
-        run: |
-          TAG_VERSION="${{ steps.ver.outputs.version }}"
-          TAG_MAJOR_MINOR="${TAG_VERSION%.*}"
-          META_VERSION=$(python -c "import json; print(json.load(open('azext_prototype/azext_metadata.json'))['version'])")
-          META_MAJOR_MINOR="${META_VERSION%.*}"
-          echo "Tag major.minor:  $TAG_MAJOR_MINOR"
-          echo "Meta major.minor: $META_MAJOR_MINOR"
-          if [ "$TAG_MAJOR_MINOR" != "$META_MAJOR_MINOR" ]; then
-            echo "::error::Tag version ($TAG_VERSION) major.minor does not match azext_metadata.json ($META_VERSION)"
-            exit 1
-          fi
-          echo "Version check passed"
-
       - name: Stamp version into source
         run: |
           TAG_VERSION="${{ steps.ver.outputs.version }}"
+          TAG_NAME="${{ github.ref_name }}"
           sed -i "s/^VERSION = \".*\"/VERSION = \"$TAG_VERSION\"/" setup.py
           python -c "
           import json, pathlib
           p = pathlib.Path('azext_prototype/azext_metadata.json')
           d = json.loads(p.read_text())
           d['version'] = '$TAG_VERSION'
+          d['azext.isPreview'] = 'rc' in '$TAG_NAME' or 'preview' in '$TAG_NAME'
           p.write_text(json.dumps(d, indent=2) + '\n')
           "
           echo "Stamped version: $TAG_VERSION"
+          echo "Preview: $(python -c "print('rc' in '$TAG_NAME' or 'preview' in '$TAG_NAME')")"
 
       - name: Inject App Insights connection string and build wheel
         run: |
@@ -116,28 +127,55 @@ jobs:
           name: az-prototype-wheel
           path: dist/
 
+      - name: Extract release notes from HISTORY.rst
+        id: notes
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          python3 -c "
+          import re, sys
+
+          version = '$TAG_VERSION'
+          text = open('HISTORY.rst').read()
+
+          # Match version header (e.g. '0.2.0-preview' or '0.2.0')
+          # Each section starts with a version line followed by a +++ underline
+          sections = re.split(r'\n(?=\d+\.\d+\.\d+\S*\n\+)', text)
+          for section in sections:
+              if section.lstrip().startswith(version):
+                  # Strip the version header and underline, keep the body
+                  lines = section.strip().splitlines()
+                  # Skip version line and underline
+                  body = '\n'.join(lines[2:]).strip()
+                  print(body)
+                  sys.exit(0)
+
+          print(f'::warning::No HISTORY.rst section found for {version}')
+          " > release_notes.md
+          echo "has_notes=$([ -s release_notes.md ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.whl
-          generate_release_notes: true
+          body_path: ${{ steps.notes.outputs.has_notes == 'true' && 'release_notes.md' || '' }}
+          generate_release_notes: ${{ steps.notes.outputs.has_notes != 'true' }}
           draft: false
-          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') || contains(github.ref, 'preview') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # -------------------------------------------------------------------
-  # Optional: Publish to an Azure CLI extension index
+  # Publish to the official Azure CLI extension index
+  # Requires EXTENSIONS_INDEX_PAT secret with repo scope on
+  # Azure/azure-cli-extensions.
   # -------------------------------------------------------------------
   publish-index:
     name: Update extension index
-    needs: release
+    needs: [build, release]
     runs-on: ubuntu-latest
     if: "!contains(github.ref, 'alpha') && !contains(github.ref, 'beta')"
 
     steps:
-      - uses: actions/checkout@v4
-
       - name: Download wheel artifact
         uses: actions/download-artifact@v4
         with:
@@ -150,31 +188,70 @@ jobs:
           WHEEL=$(ls dist/*.whl)
           FILENAME=$(basename "$WHEEL")
           SHA256=$(sha256sum "$WHEEL" | cut -d ' ' -f1)
-          VERSION=$(echo "$FILENAME" | sed -E 's/az_prototype-([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
 
           echo "filename=$FILENAME" >> "$GITHUB_OUTPUT"
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version=${{ needs.build.outputs.version }}" >> "$GITHUB_OUTPUT"
+          echo "download_url=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$FILENAME" >> "$GITHUB_OUTPUT"
 
-      - name: Generate index entry
+      - name: Clone azure-cli-extensions
         run: |
-          cat <<EOF > index-entry.json
-          {
-            "name": "prototype",
-            "version": "${{ steps.meta.outputs.version }}",
-            "filename": "${{ steps.meta.outputs.filename }}",
-            "sha256Digest": "${{ steps.meta.outputs.sha256 }}",
-            "downloadUrl": "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.meta.outputs.filename }}",
-            "metadata": {
-              "azext.minCliCoreVersion": "2.50.0",
-              "classifiers": ["Development Status :: 3 - Alpha"]
-            }
-          }
-          EOF
-          cat index-entry.json
+          gh repo fork Azure/azure-cli-extensions --clone --remote
+        env:
+          GH_TOKEN: ${{ secrets.EXTENSIONS_INDEX_PAT }}
 
-      - name: Upload index entry as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: extension-index-entry
-          path: index-entry.json
+      - name: Update index.json
+        working-directory: azure-cli-extensions
+        run: |
+          python3 -c "
+          import json, pathlib
+
+          index_path = pathlib.Path('src/index.json')
+          index = json.loads(index_path.read_text())
+
+          entry = {
+              'filename': '${{ steps.meta.outputs.filename }}',
+              'sha256Digest': '${{ steps.meta.outputs.sha256 }}',
+              'downloadUrl': '${{ steps.meta.outputs.download_url }}',
+              'metadata': {
+                  'azext.isPreview': True,
+                  'azext.minCliCoreVersion': '2.50.0',
+                  'azext.summary': 'Azure CLI extension for building rapid prototypes.',
+                  'classifiers': ['Development Status :: 3 - Alpha'],
+                  'name': 'prototype',
+                  'version': '${{ steps.meta.outputs.version }}'
+              }
+          }
+
+          # Replace existing entry or append
+          extensions = index.get('extensions', {})
+          extensions['prototype'] = [entry]
+          index['extensions'] = extensions
+
+          index_path.write_text(json.dumps(index, indent=4, sort_keys=True) + '\n')
+          "
+
+      - name: Create PR against Azure/azure-cli-extensions
+        working-directory: azure-cli-extensions
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          BRANCH="prototype/v${VERSION}"
+          git checkout -b "$BRANCH"
+          git add src/index.json
+          git commit -m "Update prototype extension to ${VERSION}"
+          git push origin "$BRANCH"
+          gh pr create \
+            --repo Azure/azure-cli-extensions \
+            --title "Update \`prototype\` extension to ${VERSION}" \
+            --body "$(cat <<'EOF'
+          ## Summary
+          Automated index update for the `az prototype` extension.
+
+          - **Version**: ${{ steps.meta.outputs.version }}
+          - **SHA-256**: `${{ steps.meta.outputs.sha256 }}`
+          - **Download**: ${{ steps.meta.outputs.download_url }}
+          - **Source release**: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
+          EOF
+          )"
+        env:
+          GH_TOKEN: ${{ secrets.EXTENSIONS_INDEX_PAT }}

@@ -6,6 +6,16 @@ from azure.cli.core.commands.parameters import get_enum_type
 def load_arguments(self, _):
     """Register CLI parameters for all commands."""
 
+    # --- global: --json on every prototype command ---
+    with self.argument_context("prototype") as c:
+        c.argument(
+            "json_output",
+            options_list=["--json", "-j"],
+            help="Output machine-readable JSON instead of formatted display.",
+            action="store_true",
+            default=False,
+        )
+
     # --- az prototype init ---
     with self.argument_context("prototype init") as c:
         c.argument("name", help="Name of the prototype project.")
@@ -165,13 +175,6 @@ def load_arguments(self, _):
             action="store_true",
             default=False,
         )
-        c.argument(
-            "json_output",
-            options_list=["--json", "-j"],
-            help="Output machine-readable JSON instead of formatted display.",
-            action="store_true",
-            default=False,
-        )
 
     # --- az prototype deploy generate-scripts ---
     with self.argument_context("prototype deploy generate-scripts") as c:
@@ -327,13 +330,6 @@ def load_arguments(self, _):
             action="store_true",
             default=False,
         )
-        c.argument(
-            "json_output",
-            options_list=["--json", "-j"],
-            help="Output machine-readable JSON instead of formatted display.",
-            action="store_true",
-            default=False,
-        )
 
     with self.argument_context("prototype agent show") as c:
         c.argument("name", help="Name of the agent to show details for.")
@@ -341,13 +337,6 @@ def load_arguments(self, _):
             "verbose",
             options_list=["--verbose", "-v"],
             help="Show full system prompt instead of 200-char preview.",
-            action="store_true",
-            default=False,
-        )
-        c.argument(
-            "json_output",
-            options_list=["--json", "-j"],
-            help="Output machine-readable JSON instead of formatted display.",
             action="store_true",
             default=False,
         )

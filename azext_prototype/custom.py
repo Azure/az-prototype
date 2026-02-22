@@ -4,6 +4,7 @@ These functions are the entry points called by the Azure CLI framework.
 Each one maps to a registered command in commands.py.
 """
 
+import functools
 import hashlib
 import json
 import logging
@@ -21,6 +22,40 @@ logger = logging.getLogger(__name__)
 # ======================================================================
 # Helpers
 # ======================================================================
+
+def _quiet_output(fn):
+    """Suppress Azure CLI's automatic JSON serialization of return values.
+
+    Most commands print formatted output via the console module.  The dict
+    they return is then *also* serialised by Azure CLI as JSON, which is
+    extremely noisy for interactive workflows.
+
+    This decorator swallows the return value (returning ``None`` so Azure
+    CLI prints nothing extra) **unless** the command was invoked with an
+    explicit ``--json`` / ``-j`` flag (``json_output=True``).
+
+    For commands whose function signature does not include a ``json_output``
+    parameter, the decorator transparently strips it from *kwargs* before
+    forwarding so that callers (including tests) can still opt-in to the
+    raw return value.
+    """
+    import inspect
+
+    _accepts_json = "json_output" in inspect.signature(fn).parameters
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        json_flag = kwargs.get("json_output", False)
+        if not _accepts_json and "json_output" in kwargs:
+            kwargs.pop("json_output")
+
+        result = fn(*args, **kwargs)
+        if json_flag:
+            return result
+        return None
+
+    return wrapper
+
 
 def _get_project_dir() -> str:
     """Resolve the current project directory."""
@@ -259,6 +294,7 @@ def _get_registry_with_fallback(project_dir: str | None = None):
 # Stage Commands
 # ======================================================================
 
+@_quiet_output
 @track("prototype init")
 def prototype_init(
     cmd,
@@ -324,6 +360,7 @@ def prototype_init(
     return result
 
 
+@_quiet_output
 @track("prototype design")
 def prototype_design(cmd, artifacts=None, context=None, reset=False, interactive=False, status=False, skip_discovery=False):
     """Run the design stage.
@@ -398,6 +435,7 @@ def prototype_design(cmd, artifacts=None, context=None, reset=False, interactive
         _shutdown_mcp(agent_context)
 
 
+@_quiet_output
 @track("prototype build")
 def prototype_build(cmd, scope="all", dry_run=False, status=False, reset=False, auto_accept=False):
     """Run the build stage.
@@ -455,6 +493,7 @@ def prototype_build(cmd, scope="all", dry_run=False, status=False, reset=False, 
         _shutdown_mcp(agent_context)
 
 
+@_quiet_output
 @track("prototype deploy")
 def prototype_deploy(
     cmd,
@@ -553,6 +592,7 @@ def prototype_deploy(
         _shutdown_mcp(agent_context)
 
 
+@_quiet_output
 @track("prototype deploy outputs")
 def prototype_deploy_outputs(cmd):
     """Show captured deployment outputs.
@@ -573,9 +613,19 @@ def prototype_deploy_outputs(cmd):
         console.print_dim("Run 'az prototype deploy' first.")
         return {"status": "empty", "message": "No deployment outputs captured yet. Run 'az prototype deploy' first."}
 
+    for stage_name, stage_outputs in outputs.items():
+        console.print(f"  [accent]{stage_name}[/accent]")
+        if isinstance(stage_outputs, dict):
+            for key, val in stage_outputs.items():
+                console.print(f"    {key}: {val}")
+        else:
+            console.print(f"    {stage_outputs}")
+        console.print()
+
     return outputs
 
 
+@_quiet_output
 @track("prototype deploy rollback-info")
 def prototype_deploy_rollback_info(cmd):
     """Show rollback instructions based on deployment history."""
@@ -591,6 +641,16 @@ def prototype_deploy_rollback_info(cmd):
     if not snapshot and not instructions:
         console.print_warning("No deployment history found.")
         console.print_dim("Run 'az prototype deploy' first.")
+    else:
+        if snapshot:
+            console.print_info("Last Deployment:")
+            for key, val in snapshot.items():
+                console.print(f"    {key}: {val}")
+            console.print()
+        if instructions:
+            console.print_info("Rollback Instructions:")
+            for instr in instructions if isinstance(instructions, list) else [instructions]:
+                console.print(f"    {instr}")
 
     return {
         "last_deployment": snapshot,
@@ -598,6 +658,7 @@ def prototype_deploy_rollback_info(cmd):
     }
 
 
+@_quiet_output
 @track("prototype deploy generate-scripts")
 def prototype_deploy_generate_scripts(
     cmd,
@@ -648,6 +709,7 @@ def prototype_deploy_generate_scripts(
     return {"status": "generated", "scripts": generated, "deploy_type": deploy_type}
 
 
+@_quiet_output
 @track("prototype status")
 def prototype_status(cmd, verbose=False, json_output=False):
     """Show current project status across all stages."""
@@ -877,6 +939,7 @@ def prototype_status(cmd, verbose=False, json_output=False):
 # Config Commands
 # ======================================================================
 
+@_quiet_output
 @track("prototype config show")
 def prototype_config_show(cmd):
     """Display current configuration.
@@ -885,6 +948,7 @@ def prototype_config_show(cmd):
     ``prototype.secrets.yaml`` are masked as ``***`` in the output.
     """
     from azext_prototype.config import ProjectConfig, SECRET_KEY_PREFIXES
+    from azext_prototype.ui.console import console
 
     config = _load_config()
     result = config.to_dict()
@@ -903,13 +967,20 @@ def prototype_config_show(cmd):
             if isinstance(node, dict) and leaf in node and node[leaf]:
                 node[leaf] = "***"
 
+    import yaml as _yaml
+
+    console.print_header("Configuration")
+    console.print(_yaml.dump(result, default_flow_style=False, sort_keys=False).rstrip())
+
     return result
 
 
+@_quiet_output
 @track("prototype config get")
 def prototype_config_get(cmd, key=None):
     """Get a single configuration value by dot-separated key."""
     from azext_prototype.config import ProjectConfig
+    from azext_prototype.ui.console import console
 
     if not key:
         raise CLIError("--key is required.")
@@ -920,15 +991,21 @@ def prototype_config_get(cmd, key=None):
         raise CLIError(f"Key '{key}' not found in configuration.")
 
     # Mask secret values
+    display_value = "***" if ProjectConfig._is_secret_key(key) and value else value
+    console.print(f"{key}: {display_value}")
+
     if ProjectConfig._is_secret_key(key) and value:
         return {"key": key, "value": "***"}
 
     return {"key": key, "value": value}
 
 
+@_quiet_output
 @track("prototype config set")
 def prototype_config_set(cmd, key=None, value=None):
     """Set a configuration value."""
+    from azext_prototype.ui.console import console
+
     if not key:
         raise CLIError("--key is required.")
     if value is None:
@@ -942,6 +1019,8 @@ def prototype_config_set(cmd, key=None, value=None):
         config.set(key, parsed)
     except (json.JSONDecodeError, TypeError):
         config.set(key, value)
+
+    console.print_success(f"{key} = {config.get(key)}")
 
     return {"key": key, "value": config.get(key), "status": "updated"}
 
@@ -1143,6 +1222,7 @@ def _prompt_backlog_config(current_provider: str = "", current_org: str = "", cu
     return result
 
 
+@_quiet_output
 @track("prototype config init")
 def prototype_config_init(cmd):
     """Interactive questionnaire to create prototype.yaml.
@@ -1224,6 +1304,7 @@ def prototype_config_init(cmd):
 # Agent Commands
 # ======================================================================
 
+@_quiet_output
 @track("prototype agent list")
 def prototype_agent_list(cmd, show_builtin=True, verbose=False, json_output=False):
     """List all available agents."""
@@ -1282,6 +1363,7 @@ def prototype_agent_list(cmd, show_builtin=True, verbose=False, json_output=Fals
     return agents
 
 
+@_quiet_output
 @track("prototype agent add")
 def prototype_agent_add(cmd, name=None, file=None, definition=None):
     """Add a custom agent.
@@ -1555,6 +1637,7 @@ def _copy_yaml_with_name(source: Path, dest: Path, new_name: str) -> None:
     dest.write_text(content, encoding="utf-8")
 
 
+@_quiet_output
 @track("prototype agent override")
 def prototype_agent_override(cmd, name=None, file=None):
     """Override a built-in agent with validation."""
@@ -1610,6 +1693,7 @@ def prototype_agent_override(cmd, name=None, file=None):
     }
 
 
+@_quiet_output
 @track("prototype agent show")
 def prototype_agent_show(cmd, name=None, verbose=False, json_output=False):
     """Show agent details."""
@@ -1659,6 +1743,7 @@ def prototype_agent_show(cmd, name=None, verbose=False, json_output=False):
     return info
 
 
+@_quiet_output
 @track("prototype agent remove")
 def prototype_agent_remove(cmd, name=None):
     """Remove a custom agent."""
@@ -1702,6 +1787,7 @@ def prototype_agent_remove(cmd, name=None):
     raise CLIError(f"Agent '{name}' is not a custom or override agent. Built-in agents cannot be removed.")
 
 
+@_quiet_output
 @track("prototype agent update")
 def prototype_agent_update(cmd, name=None, description=None, capabilities=None, system_prompt_file=None):
     """Update an existing custom agent.
@@ -1788,6 +1874,7 @@ def prototype_agent_update(cmd, name=None, description=None, capabilities=None, 
     }
 
 
+@_quiet_output
 @track("prototype agent test")
 def prototype_agent_test(cmd, name=None, prompt=None):
     """Send a test prompt to an agent and display the response.
@@ -1826,6 +1913,7 @@ def prototype_agent_test(cmd, name=None, prompt=None):
     }
 
 
+@_quiet_output
 @track("prototype agent export")
 def prototype_agent_export(cmd, name=None, output=None):
     """Export any agent (including built-in) as a YAML file."""
@@ -1927,6 +2015,7 @@ def _analyze_inline_input(qa_agent, agent_context, project_dir: str, error_text:
 # Analyze Commands
 # ======================================================================
 
+@_quiet_output
 @track("prototype analyze error")
 def prototype_analyze_error(cmd, input=None):
     """Analyze an error and propose a fix.
@@ -1978,6 +2067,7 @@ def prototype_analyze_error(cmd, input=None):
     return {"status": "analyzed", "agent": qa_agent.name}
 
 
+@_quiet_output
 @track("prototype analyze costs")
 def prototype_analyze_costs(cmd, output_format="markdown", refresh=False):
     """Analyze architecture costs at Small/Medium/Large t-shirt sizes.
@@ -2126,6 +2216,7 @@ def _load_discovery_scope(project_dir: str) -> dict | None:
 # Knowledge Commands
 # ======================================================================
 
+@_quiet_output
 @track("prototype knowledge contribute")
 def prototype_knowledge_contribute(
     cmd,
@@ -2410,6 +2501,7 @@ def _generate_templates(
     return generated
 
 
+@_quiet_output
 @track("prototype generate backlog")
 def prototype_generate_backlog(
     cmd,
@@ -2526,6 +2618,7 @@ def prototype_generate_backlog(
     }
 
 
+@_quiet_output
 @track("prototype generate docs")
 def prototype_generate_docs(cmd, path=None):
     """Generate documentation from templates.
@@ -2569,6 +2662,7 @@ def prototype_generate_docs(cmd, path=None):
     return {"status": "generated", "documents": generated, "output_dir": str(output_dir)}
 
 
+@_quiet_output
 @track("prototype generate speckit")
 def prototype_generate_speckit(cmd, path=None):
     """Generate the spec-kit documentation bundle.

@@ -233,6 +233,7 @@ class TestPrototypeInit:
             location="eastus",
             output_dir=str(tmp_path),
             ai_provider="github-models",
+            json_output=True,
         )
 
         assert result["status"] == "success"
@@ -253,6 +254,7 @@ class TestPrototypeInit:
             location="eastus",
             output_dir=str(tmp_path),
             ai_provider="azure-openai",
+            json_output=True,
         )
 
         assert result["status"] == "success"
@@ -293,6 +295,7 @@ class TestPrototypeInit:
             result = prototype_init(
                 cmd, name="existing-proj", location="eastus",
                 output_dir=str(tmp_path), ai_provider="azure-openai",
+                json_output=True,
             )
         assert result["status"] == "cancelled"
 
@@ -310,6 +313,7 @@ class TestPrototypeInit:
             result = prototype_init(
                 cmd, name="reinit-proj", location="eastus",
                 output_dir=str(tmp_path), ai_provider="azure-openai",
+                json_output=True,
             )
         assert result["status"] == "success"
 
@@ -323,7 +327,7 @@ class TestPrototypeInit:
         result = prototype_init(
             cmd, name="env-proj", location="westus2",
             output_dir=str(tmp_path), ai_provider="azure-openai",
-            environment="staging",
+            environment="staging", json_output=True,
         )
         assert result["status"] == "success"
         config = ProjectConfig(str(tmp_path / "env-proj"))
@@ -340,7 +344,7 @@ class TestPrototypeInit:
         result = prototype_init(
             cmd, name="model-proj", location="eastus",
             output_dir=str(tmp_path), ai_provider="azure-openai",
-            model="gpt-4o-mini",
+            model="gpt-4o-mini", json_output=True,
         )
         assert result["status"] == "success"
         config = ProjectConfig(str(tmp_path / "model-proj"))
@@ -357,6 +361,7 @@ class TestPrototypeInit:
         result = prototype_init(
             cmd, name="defmodel-proj", location="eastus",
             output_dir=str(tmp_path), ai_provider="azure-openai",
+            json_output=True,
         )
         assert result["status"] == "success"
         config = ProjectConfig(str(tmp_path / "defmodel-proj"))
@@ -408,7 +413,7 @@ class TestPrototypeConfigGet:
 
         cmd = MagicMock()
         with patch(f"{_MOD}._get_project_dir", return_value=str(project_with_config)):
-            result = prototype_config_get(cmd, key="ai.provider")
+            result = prototype_config_get(cmd, key="ai.provider", json_output=True)
         assert result == {"key": "ai.provider", "value": "github-models"}
 
     def test_config_get_missing_key(self, project_with_config):
@@ -433,7 +438,7 @@ class TestPrototypeConfigGet:
 
         cmd = MagicMock()
         with patch(f"{_MOD}._get_project_dir", return_value=str(project_with_config)):
-            result = prototype_config_get(cmd, key="deploy.subscription")
+            result = prototype_config_get(cmd, key="deploy.subscription", json_output=True)
         assert result == {"key": "deploy.subscription", "value": "***"}
 
 
@@ -454,7 +459,7 @@ class TestPrototypeConfigShowMasking:
 
         cmd = MagicMock()
         with patch(f"{_MOD}._get_project_dir", return_value=str(project_with_config)):
-            result = prototype_config_show(cmd)
+            result = prototype_config_show(cmd, json_output=True)
         assert result["deploy"]["subscription"] == "***"
 
     def test_config_show_preserves_non_secrets(self, project_with_config):
@@ -462,7 +467,7 @@ class TestPrototypeConfigShowMasking:
 
         cmd = MagicMock()
         with patch(f"{_MOD}._get_project_dir", return_value=str(project_with_config)):
-            result = prototype_config_show(cmd)
+            result = prototype_config_show(cmd, json_output=True)
         # Non-secret value should not be masked
         assert result["ai"]["provider"] == "github-models"
 
@@ -536,7 +541,7 @@ class TestPrototypeConfigInit:
         cmd = MagicMock(spec=[])  # strict spec — no auto-attributes
         with patch(f"{_MOD}._get_project_dir", return_value=str(project_with_config)):
             with patch("builtins.input", return_value="n"):
-                result = prototype_config_init(cmd)
+                result = prototype_config_init(cmd, json_output=True)
         assert result["status"] == "cancelled"
         assert not hasattr(cmd, "_telemetry_overrides")
 
@@ -559,7 +564,7 @@ class TestPrototypeBuild:
         )
 
         cmd = MagicMock()
-        result = prototype_build(cmd, scope="docs", dry_run=True)
+        result = prototype_build(cmd, scope="docs", dry_run=True, json_output=True)
         assert result["status"] == "dry-run"
 
 
@@ -575,7 +580,7 @@ class TestPrototypeDeploy:
         mock_factory.return_value = mock_ai_provider
 
         cmd = MagicMock()
-        result = prototype_deploy(cmd, status=True)
+        result = prototype_deploy(cmd, status=True, json_output=True)
         assert result["status"] == "displayed"
 
 
@@ -588,7 +593,7 @@ class TestPrototypeDeployOutputs:
 
         mock_dir.return_value = str(project_with_build)
         cmd = MagicMock()
-        result = prototype_deploy_outputs(cmd)
+        result = prototype_deploy_outputs(cmd, json_output=True)
         assert result["status"] == "empty"
 
     @patch(f"{_MOD}._get_project_dir")
@@ -603,7 +608,7 @@ class TestPrototypeDeployOutputs:
             json.dumps({"rg_name": "test-rg"}), encoding="utf-8"
         )
         cmd = MagicMock()
-        result = prototype_deploy_outputs(cmd)
+        result = prototype_deploy_outputs(cmd, json_output=True)
         # May return empty or dict depending on DeploymentOutputCapture impl
         assert isinstance(result, dict)
 
@@ -617,7 +622,7 @@ class TestPrototypeDeployRollbackInfo:
 
         mock_dir.return_value = str(project_with_build)
         cmd = MagicMock()
-        result = prototype_deploy_rollback_info(cmd)
+        result = prototype_deploy_rollback_info(cmd, json_output=True)
         assert "last_deployment" in result
         assert "rollback_instructions" in result
 
@@ -632,7 +637,7 @@ class TestPrototypeDeployGenerateScripts:
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
         # concept/apps exists but empty
-        result = prototype_deploy_generate_scripts(cmd)
+        result = prototype_deploy_generate_scripts(cmd, json_output=True)
         assert result["status"] == "generated"
         assert len(result["scripts"]) == 0
 
@@ -647,7 +652,7 @@ class TestPrototypeDeployGenerateScripts:
         (apps_dir / "frontend").mkdir(parents=True, exist_ok=True)
 
         cmd = MagicMock()
-        result = prototype_deploy_generate_scripts(cmd, deploy_type="webapp")
+        result = prototype_deploy_generate_scripts(cmd, deploy_type="webapp", json_output=True)
         assert result["status"] == "generated"
         assert len(result["scripts"]) == 2
 
@@ -685,7 +690,7 @@ class TestPrototypeAgentOverride:
             encoding="utf-8",
         )
 
-        result = prototype_agent_override(cmd, name="cloud-architect", file="my_arch.yaml")
+        result = prototype_agent_override(cmd, name="cloud-architect", file="my_arch.yaml", json_output=True)
         assert result["status"] == "override_registered"
         assert result["name"] == "cloud-architect"
 
@@ -715,7 +720,7 @@ class TestPrototypeAgentRemove:
         cmd = MagicMock()
         # Add then remove
         prototype_agent_add(cmd, name="to-remove", definition="cloud_architect")
-        result = prototype_agent_remove(cmd, name="to-remove")
+        result = prototype_agent_remove(cmd, name="to-remove", json_output=True)
         assert result["status"] == "removed"
 
     @patch(f"{_MOD}._get_project_dir")
@@ -734,7 +739,7 @@ class TestPrototypeAgentRemove:
 
         cmd = MagicMock()
         prototype_agent_override(cmd, name="cloud-architect", file="my_arch.yaml")
-        result = prototype_agent_remove(cmd, name="cloud-architect")
+        result = prototype_agent_remove(cmd, name="cloud-architect", json_output=True)
         assert result["status"] == "override_removed"
 
     @patch(f"{_MOD}._get_project_dir")
@@ -782,7 +787,7 @@ class TestPrototypeAnalyzeError:
         mock_prep.return_value = (str(project_with_design), MagicMock(), mock_registry, mock_ctx)
 
         cmd = MagicMock()
-        result = prototype_analyze_error(cmd, input="ResourceNotFound error")
+        result = prototype_analyze_error(cmd, input="ResourceNotFound error", json_output=True)
         assert result["status"] == "analyzed"
 
     @patch(f"{_MOD}._prepare_command")
@@ -804,7 +809,7 @@ class TestPrototypeAnalyzeError:
         log_file.write_text("ERROR: Connection refused", encoding="utf-8")
 
         cmd = MagicMock()
-        result = prototype_analyze_error(cmd, input=str(log_file))
+        result = prototype_analyze_error(cmd, input=str(log_file), json_output=True)
         assert result["status"] == "analyzed"
 
     @patch(f"{_MOD}._prepare_command")
@@ -826,7 +831,7 @@ class TestPrototypeAnalyzeError:
         img.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
 
         cmd = MagicMock()
-        result = prototype_analyze_error(cmd, input=str(img))
+        result = prototype_analyze_error(cmd, input=str(img), json_output=True)
         assert result["status"] == "analyzed"
 
 
@@ -849,7 +854,7 @@ class TestPrototypeAnalyzeCosts:
         mock_prep.return_value = (str(project_with_design), MagicMock(), mock_registry, mock_ctx)
 
         cmd = MagicMock()
-        result = prototype_analyze_costs(cmd)
+        result = prototype_analyze_costs(cmd, json_output=True)
         assert result["status"] == "analyzed"
 
     @patch(f"{_MOD}._prepare_command")
@@ -881,7 +886,7 @@ class TestPrototypeConfigSet:
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
-        result = prototype_config_set(cmd, key="deploy.tags", value='{"env":"dev"}')
+        result = prototype_config_set(cmd, key="deploy.tags", value='{"env":"dev"}', json_output=True)
         assert result["status"] == "updated"
 
 
@@ -904,7 +909,7 @@ class TestPrototypeStatusExtended:
 
     @patch(f"{_MOD}._get_project_dir")
     def test_status_default_uses_console(self, mock_dir, project_with_config):
-        """Default mode (no flags) uses console output and returns displayed."""
+        """Default mode (no flags) uses console output and returns None (suppressed)."""
         from azext_prototype.custom import prototype_status
 
         mock_dir.return_value = str(project_with_config)
@@ -913,7 +918,7 @@ class TestPrototypeStatusExtended:
         with patch("azext_prototype.custom.console", create=True):
             result = prototype_status(cmd)
 
-        assert result == {"status": "displayed"}
+        assert result is None
 
     @patch(f"{_MOD}._get_project_dir")
     def test_status_json_returns_enriched_dict(self, mock_dir, project_with_config):
@@ -937,7 +942,7 @@ class TestPrototypeStatusExtended:
 
     @patch(f"{_MOD}._get_project_dir")
     def test_status_verbose_prints_detail(self, mock_dir, project_with_config):
-        """--verbose prints expanded output and returns displayed."""
+        """--verbose prints expanded output and returns None (suppressed)."""
         from azext_prototype.custom import prototype_status
 
         mock_dir.return_value = str(project_with_config)
@@ -946,7 +951,7 @@ class TestPrototypeStatusExtended:
         with patch("azext_prototype.custom.console", create=True):
             result = prototype_status(cmd, verbose=True)
 
-        assert result == {"status": "displayed"}
+        assert result is None
 
     @patch(f"{_MOD}._get_project_dir")
     def test_status_with_discovery_state(self, mock_dir, project_with_config):
@@ -1255,7 +1260,7 @@ class TestAnalyzeCostsCache:
         mock_prep.return_value = self._make_mock_prep(project_with_design, registry, mock_ctx)
 
         cmd = MagicMock()
-        result = prototype_analyze_costs(cmd, output_format="json", refresh=False)
+        result = prototype_analyze_costs(cmd, output_format="json", refresh=False, json_output=True)
 
         assert result["status"] == "analyzed"
         agent.execute.assert_called_once()
@@ -1292,7 +1297,7 @@ class TestAnalyzeCostsCache:
         cache_path.write_text(_yaml.dump(cache_data, default_flow_style=False), encoding="utf-8")
 
         cmd = MagicMock()
-        result = prototype_analyze_costs(cmd, output_format="markdown", refresh=False)
+        result = prototype_analyze_costs(cmd, output_format="markdown", refresh=False, json_output=True)
 
         assert result["status"] == "analyzed"
         agent.execute.assert_not_called()  # Should NOT have called the agent
@@ -1324,7 +1329,7 @@ class TestAnalyzeCostsCache:
         cache_path.write_text(_yaml.dump(cache_data, default_flow_style=False), encoding="utf-8")
 
         cmd = MagicMock()
-        result = prototype_analyze_costs(cmd, output_format="json", refresh=True)
+        result = prototype_analyze_costs(cmd, output_format="json", refresh=True, json_output=True)
 
         assert result["status"] == "analyzed"
         agent.execute.assert_called_once()  # Should HAVE called the agent
@@ -1350,7 +1355,7 @@ class TestAnalyzeCostsCache:
         cache_path.write_text(_yaml.dump(cache_data, default_flow_style=False), encoding="utf-8")
 
         cmd = MagicMock()
-        result = prototype_analyze_costs(cmd, output_format="json", refresh=False)
+        result = prototype_analyze_costs(cmd, output_format="json", refresh=False, json_output=True)
 
         assert result["status"] == "analyzed"
         agent.execute.assert_called_once()  # Stale cache — must re-run
@@ -1403,7 +1408,7 @@ class TestAnalyzeConsoleOutput:
         mock_prep.return_value = (str(project_with_design), config, registry, MagicMock())
 
         cmd = MagicMock()
-        result = prototype_analyze_error(cmd, input="some error text")
+        result = prototype_analyze_error(cmd, input="some error text", json_output=True)
 
         assert result["status"] == "analyzed"
 
@@ -1427,7 +1432,7 @@ class TestAnalyzeConsoleOutput:
 
         # Patch the console inside the function's lazy import
         with patch("azext_prototype.ui.console.console") as mock_console:
-            result = prototype_analyze_error(cmd, input="some error")
+            result = prototype_analyze_error(cmd, input="some error", json_output=True)
 
         assert result["status"] == "analyzed"
 
@@ -1452,7 +1457,7 @@ class TestAnalyzeConsoleOutput:
         mock_prep.return_value = (str(project_with_design), config, registry, mock_ctx)
 
         cmd = MagicMock()
-        result = prototype_analyze_costs(cmd, output_format="json", refresh=True)
+        result = prototype_analyze_costs(cmd, output_format="json", refresh=True, json_output=True)
 
         assert result["status"] == "analyzed"
 
@@ -1474,7 +1479,7 @@ class TestDeploySubcommandConsole:
 
         with patch("azext_prototype.stages.deploy_helpers.DeploymentOutputCapture") as MockCapture:
             MockCapture.return_value.get_all.return_value = {}
-            result = prototype_deploy_outputs(cmd)
+            result = prototype_deploy_outputs(cmd, json_output=True)
 
         assert result["status"] == "empty"
 
@@ -1488,7 +1493,7 @@ class TestDeploySubcommandConsole:
         with patch("azext_prototype.stages.deploy_helpers.RollbackManager") as MockMgr:
             MockMgr.return_value.get_last_snapshot.return_value = None
             MockMgr.return_value.get_rollback_instructions.return_value = None
-            result = prototype_deploy_rollback_info(cmd)
+            result = prototype_deploy_rollback_info(cmd, json_output=True)
 
         assert result["last_deployment"] is None
         assert result["rollback_instructions"] is None
@@ -1510,7 +1515,7 @@ class TestDeploySubcommandConsole:
         cmd = MagicMock()
 
         with patch("azext_prototype.stages.deploy_helpers.DeployScriptGenerator") as MockGen:
-            result = prototype_deploy_generate_scripts(cmd)
+            result = prototype_deploy_generate_scripts(cmd, json_output=True)
 
         assert result["status"] == "generated"
         assert "my-app/deploy.sh" in result["scripts"]
@@ -1545,7 +1550,7 @@ class TestPrototypeAgentListRichUI:
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
 
-        result = prototype_agent_list(cmd, json_output=False)
+        result = prototype_agent_list(cmd, json_output=True)
         assert isinstance(result, list)
 
     @patch(f"{_MOD}._get_project_dir")
@@ -1555,7 +1560,7 @@ class TestPrototypeAgentListRichUI:
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
 
-        result = prototype_agent_list(cmd, verbose=True, json_output=False)
+        result = prototype_agent_list(cmd, verbose=True, json_output=True)
         assert isinstance(result, list)
 
     @patch(f"{_MOD}._get_project_dir")
@@ -1604,7 +1609,7 @@ class TestPrototypeAgentShowRichUI:
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
 
-        result = prototype_agent_show(cmd, name="cloud-architect", json_output=False)
+        result = prototype_agent_show(cmd, name="cloud-architect", json_output=True)
         assert isinstance(result, dict)
 
 
@@ -1620,7 +1625,7 @@ class TestPrototypeAgentUpdate:
         cmd = MagicMock()
 
         prototype_agent_add(cmd, name="updatable", definition="cloud_architect")
-        result = prototype_agent_update(cmd, name="updatable", description="New desc")
+        result = prototype_agent_update(cmd, name="updatable", description="New desc", json_output=True)
         assert result["status"] == "updated"
         assert result["description"] == "New desc"
 
@@ -1632,7 +1637,7 @@ class TestPrototypeAgentUpdate:
         cmd = MagicMock()
 
         prototype_agent_add(cmd, name="cap-update", definition="cloud_architect")
-        result = prototype_agent_update(cmd, name="cap-update", capabilities="architect,deploy")
+        result = prototype_agent_update(cmd, name="cap-update", capabilities="architect,deploy", json_output=True)
         assert result["status"] == "updated"
         assert "architect" in result["capabilities"]
         assert "deploy" in result["capabilities"]
@@ -1649,7 +1654,7 @@ class TestPrototypeAgentUpdate:
         prompt_file = project_with_config / "new_prompt.txt"
         prompt_file.write_text("You are an updated agent.", encoding="utf-8")
 
-        result = prototype_agent_update(cmd, name="prompt-update", system_prompt_file=str(prompt_file))
+        result = prototype_agent_update(cmd, name="prompt-update", system_prompt_file=str(prompt_file), json_output=True)
         assert result["status"] == "updated"
 
         import yaml as _yaml
@@ -1677,7 +1682,7 @@ class TestPrototypeAgentUpdate:
             "",                    # examples (skip)
         ]
         with patch("builtins.input", side_effect=inputs):
-            result = prototype_agent_update(cmd, name="interactive-up")
+            result = prototype_agent_update(cmd, name="interactive-up", json_output=True)
 
         assert result["status"] == "updated"
         assert result["description"] == "Updated description"
@@ -1758,7 +1763,7 @@ class TestPrototypeAgentTest:
         mock_prep.return_value = (str(project_with_config), MagicMock(), mock_registry, MagicMock())
 
         cmd = MagicMock()
-        result = prototype_agent_test(cmd, name="cloud-architect")
+        result = prototype_agent_test(cmd, name="cloud-architect", json_output=True)
 
         assert result["status"] == "tested"
         assert result["name"] == "cloud-architect"
@@ -1784,7 +1789,7 @@ class TestPrototypeAgentTest:
         mock_prep.return_value = (str(project_with_config), MagicMock(), mock_registry, MagicMock())
 
         cmd = MagicMock()
-        result = prototype_agent_test(cmd, name="cloud-architect", prompt="Design a web app")
+        result = prototype_agent_test(cmd, name="cloud-architect", prompt="Design a web app", json_output=True)
 
         assert result["status"] == "tested"
         # Verify custom prompt was passed
@@ -1810,7 +1815,7 @@ class TestPrototypeAgentExport:
         cmd = MagicMock()
 
         output_path = str(project_with_config / "exported.yaml")
-        result = prototype_agent_export(cmd, name="cloud-architect", output=output_path)
+        result = prototype_agent_export(cmd, name="cloud-architect", output=output_path, json_output=True)
 
         assert result["status"] == "exported"
         assert result["name"] == "cloud-architect"
@@ -1832,7 +1837,7 @@ class TestPrototypeAgentExport:
 
         prototype_agent_add(cmd, name="export-test", definition="bicep_agent")
         output_path = str(project_with_config / "custom_export.yaml")
-        result = prototype_agent_export(cmd, name="export-test", output=output_path)
+        result = prototype_agent_export(cmd, name="export-test", output=output_path, json_output=True)
 
         assert result["status"] == "exported"
         assert (project_with_config / "custom_export.yaml").exists()
@@ -1850,7 +1855,7 @@ class TestPrototypeAgentExport:
         original_cwd = os.getcwd()
         try:
             os.chdir(str(project_with_config))
-            result = prototype_agent_export(cmd, name="cloud-architect")
+            result = prototype_agent_export(cmd, name="cloud-architect", json_output=True)
             assert result["status"] == "exported"
             assert (project_with_config / "cloud-architect.yaml").exists()
         finally:
@@ -1933,7 +1938,7 @@ class TestPrototypeAgentOverrideValidation:
             encoding="utf-8",
         )
 
-        result = prototype_agent_override(cmd, name="nonexistent-agent", file="valid.yaml")
+        result = prototype_agent_override(cmd, name="nonexistent-agent", file="valid.yaml", json_output=True)
         assert result["status"] == "override_registered"
 
     @patch(f"{_MOD}._get_project_dir")
@@ -1951,7 +1956,7 @@ class TestPrototypeAgentOverrideValidation:
             encoding="utf-8",
         )
 
-        result = prototype_agent_override(cmd, name="cloud-architect", file="arch_override.yaml")
+        result = prototype_agent_override(cmd, name="cloud-architect", file="arch_override.yaml", json_output=True)
         assert result["status"] == "override_registered"
 
 

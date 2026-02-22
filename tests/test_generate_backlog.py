@@ -637,7 +637,7 @@ class TestAIPopulatedTemplates:
         cmd = MagicMock()
 
         out_dir = str(project_with_config / "docs")
-        result = prototype_generate_docs(cmd, path=out_dir)
+        result = prototype_generate_docs(cmd, path=out_dir, json_output=True)
         assert result["status"] == "generated"
 
         docs_path = project_with_config / "docs"
@@ -674,7 +674,7 @@ class TestAIPopulatedTemplates:
             mock_factory.return_value = mock_ai_provider
 
             out_dir = str(project_with_design / "docs")
-            result = prototype_generate_docs(cmd, path=out_dir)
+            result = prototype_generate_docs(cmd, path=out_dir, json_output=True)
 
         assert result["status"] == "generated"
 
@@ -720,7 +720,7 @@ class TestBacklogCommandIntegration:
         mock_prepare.return_value = (str(project_with_config), config, AgentRegistry(), ctx)
         cmd = MagicMock()
 
-        result = prototype_generate_backlog(cmd, status=True)
+        result = prototype_generate_backlog(cmd, status=True, json_output=True)
         assert result["status"] == "displayed"
 
     @patch(f"{_CUSTOM_MODULE}._prepare_command")
@@ -744,7 +744,7 @@ class TestBacklogCommandIntegration:
         state = BacklogState(str(project_with_design))
         state.set_items([{"epic": "Infra", "title": "VNet", "effort": "M"}])
 
-        result = prototype_generate_backlog(cmd, status=True)
+        result = prototype_generate_backlog(cmd, status=True, json_output=True)
         assert result["status"] == "displayed"
 
     @patch(f"{_CUSTOM_MODULE}._get_project_dir")
@@ -813,7 +813,7 @@ class TestBacklogCommandIntegration:
                 )
 
                 result = prototype_generate_backlog(
-                    cmd, provider="github", org="o", project="p",
+                    cmd, provider="github", org="o", project="p", json_output=True,
                 )
 
         assert result["status"] == "generated"
@@ -843,7 +843,7 @@ class TestBacklogCommandIntegration:
                 mock_run.return_value = BacklogResult(cancelled=True)
 
                 result = prototype_generate_backlog(
-                    cmd, provider="github", org="o", project="p",
+                    cmd, provider="github", org="o", project="p", json_output=True,
                 )
 
         assert result["status"] == "cancelled"

@@ -84,7 +84,7 @@ class TestPrototypeConfigShow:
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
 
-        result = prototype_config_show(cmd)
+        result = prototype_config_show(cmd, json_output=True)
         assert result["project"]["name"] == "test-project"
 
 
@@ -98,7 +98,7 @@ class TestPrototypeConfigSet:
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
 
-        result = prototype_config_set(cmd, key="project.location", value="westus2")
+        result = prototype_config_set(cmd, key="project.location", value="westus2", json_output=True)
         assert result is not None
         assert result["status"] == "updated"
 
@@ -172,7 +172,7 @@ class TestPrototypeAgentAdd:
         # Interactive mode: description, role, capabilities, constraints(end), prompt, END, examples(skip)
         inputs = ["My data agent", "analyst", "analyze", "", "You analyze data.", "END", ""]
         with patch("builtins.input", side_effect=inputs):
-            result = prototype_agent_add(cmd, name="my-data-agent")
+            result = prototype_agent_add(cmd, name="my-data-agent", json_output=True)
         assert result["status"] == "added"
         assert result["name"] == "my-data-agent"
         assert "my-data-agent.yaml" in result["file"]
@@ -193,7 +193,7 @@ class TestPrototypeAgentAdd:
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
 
-        result = prototype_agent_add(cmd, name="my-architect", definition="cloud_architect")
+        result = prototype_agent_add(cmd, name="my-architect", definition="cloud_architect", json_output=True)
         assert result["status"] == "added"
         assert result["name"] == "my-architect"
         assert result["based_on"] == "cloud_architect"
@@ -222,7 +222,7 @@ class TestPrototypeAgentAdd:
             encoding="utf-8",
         )
 
-        result = prototype_agent_add(cmd, name="my-custom", file=str(custom_yaml))
+        result = prototype_agent_add(cmd, name="my-custom", file=str(custom_yaml), json_output=True)
         assert result["status"] == "added"
         assert result["name"] == "my-custom"
 
@@ -353,7 +353,7 @@ class TestPrototypeGenerateDocs:
         cmd = MagicMock()
 
         out_dir = str(project_with_config / "docs")
-        result = prototype_generate_docs(cmd, path=out_dir)
+        result = prototype_generate_docs(cmd, path=out_dir, json_output=True)
         assert result is not None
         assert result["status"] == "generated"
 
@@ -369,7 +369,7 @@ class TestPrototypeGenerateDocs:
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
 
-        result = prototype_generate_docs(cmd)
+        result = prototype_generate_docs(cmd, json_output=True)
         assert result is not None
         assert result["status"] == "generated"
 
@@ -385,7 +385,7 @@ class TestPrototypeGenerateSpeckit:
         cmd = MagicMock()
 
         out_dir = str(project_with_config / "concept" / ".specify")
-        result = prototype_generate_speckit(cmd, path=out_dir)
+        result = prototype_generate_speckit(cmd, path=out_dir, json_output=True)
         assert result is not None
         assert result["status"] == "generated"
 
@@ -436,7 +436,7 @@ class TestPrototypeGenerateBacklog:
             mock_ctx.return_value = ctx
             MockSession.return_value.run.return_value = mock_result
 
-            result = prototype_generate_backlog(cmd, provider="github", org="myorg", project="myrepo")
+            result = prototype_generate_backlog(cmd, provider="github", org="myorg", project="myrepo", json_output=True)
 
         assert result["status"] == "generated"
         assert result["provider"] == "github"
@@ -465,7 +465,7 @@ class TestPrototypeGenerateBacklog:
             mock_ctx.return_value = ctx
             MockSession.return_value.run.return_value = mock_result
 
-            result = prototype_generate_backlog(cmd, provider="devops", org="myorg", project="myproj")
+            result = prototype_generate_backlog(cmd, provider="devops", org="myorg", project="myproj", json_output=True)
 
         assert result["status"] == "generated"
         assert result["provider"] == "devops"
@@ -542,7 +542,7 @@ class TestPrototypeGenerateBacklog:
             mock_ctx.return_value = ctx
             MockSession.return_value.run.return_value = mock_result
 
-            result = prototype_generate_backlog(cmd)
+            result = prototype_generate_backlog(cmd, json_output=True)
 
         assert result["provider"] == "devops"
 
@@ -569,7 +569,7 @@ class TestPrototypeGenerateBacklog:
             mock_ctx.return_value = ctx
             MockSession.return_value.run.return_value = mock_result
 
-            result = prototype_generate_backlog(cmd, provider="github", org="o", project="p", output_format="json")
+            result = prototype_generate_backlog(cmd, provider="github", org="o", project="p", output_format="json", json_output=True)
 
         assert result["format"] == "json"
 
@@ -603,7 +603,7 @@ class TestPrototypeGenerateBacklog:
             mock_ctx.return_value = ctx
             MockSession.return_value.run.return_value = mock_result
 
-            result = prototype_generate_backlog(cmd)
+            result = prototype_generate_backlog(cmd, json_output=True)
 
         assert result["provider"] == "github"
         mock_prompt.assert_called_once()

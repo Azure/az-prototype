@@ -202,7 +202,7 @@ class TestCopilotProvider:
         from azext_prototype.ai.copilot_provider import CopilotProvider
 
         provider = CopilotProvider()
-        assert provider._model == "claude-sonnet-4.5"  # Copilot default
+        assert provider._model == "claude-sonnet-4"  # Copilot default
 
     def test_custom_model(self):
         from azext_prototype.ai.copilot_provider import CopilotProvider
@@ -222,7 +222,7 @@ class TestCopilotProvider:
         provider = CopilotProvider()
         models = provider.list_models()
         assert len(models) >= 2
-        assert any(m["id"] == "gpt-4o" for m in models)
+        assert any(m["id"] == "claude-sonnet-4" for m in models)
 
     def test_messages_to_dicts(self):
         from azext_prototype.ai.copilot_provider import CopilotProvider
@@ -271,7 +271,7 @@ class TestDefaultModel:
     def test_copilot_default(self):
         from azext_prototype.ai.copilot_provider import CopilotProvider
 
-        assert CopilotProvider.DEFAULT_MODEL == "claude-sonnet-4.5"
+        assert CopilotProvider.DEFAULT_MODEL == "claude-sonnet-4"
 
     def test_github_models_default(self):
         assert GitHubModelsProvider.DEFAULT_MODEL == "gpt-4o"

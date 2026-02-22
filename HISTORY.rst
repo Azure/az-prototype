@@ -3,8 +3,43 @@
 Release History
 ===============
 
-0.2.0
-++++++
+0.2.1-preview
+++++++++++++++
+
+Quiet output by default
+~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Suppressed JSON output** — all ``az prototype`` commands now return
+  ``None`` by default, eliminating the verbose JSON dump that Azure CLI
+  auto-serializes after every command.  Pass ``--json`` / ``-j`` to any
+  command to restore machine-readable JSON output.
+* **Global ``--json`` flag** — registered on the ``prototype`` parent
+  command group so it is inherited by every subcommand without per-command
+  boilerplate.
+* **Console output for data commands** — ``config show`` prints
+  YAML-formatted config, ``config get`` prints key/value pairs,
+  ``config set`` confirms the new value, ``deploy outputs`` and
+  ``deploy rollback-info`` print human-readable summaries when ``--json``
+  is not supplied.
+
+Build ``--reset`` directory cleanup
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Clean generated output on reset** — ``az prototype build --reset``
+  now removes the ``concept/infra``, ``concept/apps``, ``concept/db``,
+  and ``concept/docs`` directories before regenerating.  Previously only
+  the build state metadata was cleared, leaving stale files that could
+  cause Terraform/Bicep deployment failures when merged with new output.
+
+Test fixes
+~~~~~~~~~~~
+* **Updated model defaults** — test expectations aligned with the
+  ``claude-sonnet-4`` default (was ``claude-sonnet-4.5``) and version
+  ``0.2.0`` (was ``0.1.1``).
+* **75+ test call-sites updated** — all tests that assert on command
+  return values now pass ``json_output=True`` to work with the new
+  quiet-output decorator.
+
+0.2.0-preview
+++++++++++++++
 
 Azapi provider for Terraform
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -118,8 +153,8 @@ Tool-calling support across all providers
 * **``_messages_to_dicts()``** — each provider now has a dedicated helper
   for serializing tool call fields into OpenAI-compatible message dicts.
 
-0.1.1
-++++++
+0.1.1-preview
+++++++++++++++
 
 v0.1.1 polish pass
 ~~~~~~~~~~~~~~~~~~~
@@ -514,8 +549,8 @@ Deploy subcommand hardening
 * Empty-state warnings for ``deploy outputs`` and
   ``deploy rollback-info`` when no deployment data exists.
 
-0.1.0
-++++++
+0.1.0-preview
+++++++++++++++
 
 **Initial release** of the ``az prototype`` Azure CLI extension — an
 AI-driven prototyping engine that takes you from idea to deployed Azure

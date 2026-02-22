@@ -54,6 +54,7 @@ dmypy.json
 Thumbs.db
 Desktop.ini
 .claude/
+CLAUDE.md
 
 # --- Misc ---
 ISSUES.md

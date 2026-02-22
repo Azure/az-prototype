@@ -395,7 +395,7 @@ class TestCopilotProviderExtended:
 
         assert len(models) >= 2
         ids = [m["id"] for m in models]
-        assert "gpt-4o" in ids
+        assert "claude-sonnet-4" in ids
 
     def test_properties(self):
         provider = self._make_provider(model="gpt-4o-mini")

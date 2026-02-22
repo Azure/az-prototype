@@ -1564,6 +1564,7 @@ class TestDeploySPValidation:
                 client_id="abc",
                 client_secret="def",
                 tenant_id="ghi",
+                json_output=True,
             )
             assert result["status"] == "success"
             # Verify tenant and subscription were passed through

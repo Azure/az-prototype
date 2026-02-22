@@ -908,6 +908,40 @@ class TestBuildStageIntegration:
         assert bs.state["deployment_stages"] == []
         assert bs.state["files_generated"] == []
 
+    def test_build_stage_reset_cleans_output_dirs(self, project_with_design):
+        """--reset removes concept/infra, concept/apps, concept/db, concept/docs."""
+        from azext_prototype.stages.build_stage import BuildStage
+
+        project_dir = str(project_with_design)
+        base = project_with_design / "concept"
+
+        # Create output dirs with stale files
+        for sub in ("infra/terraform/stage-1-foundation", "apps/stage-2-api", "db/sql", "docs"):
+            d = base / sub
+            d.mkdir(parents=True, exist_ok=True)
+            (d / "stale.tf").write_text("# stale", encoding="utf-8")
+
+        assert (base / "infra").is_dir()
+        assert (base / "apps").is_dir()
+        assert (base / "db").is_dir()
+        assert (base / "docs").is_dir()
+
+        stage = BuildStage()
+        stage._clean_output_dirs(project_dir)
+
+        assert not (base / "infra").exists()
+        assert not (base / "apps").exists()
+        assert not (base / "db").exists()
+        assert not (base / "docs").exists()
+
+    def test_build_stage_reset_ignores_missing_dirs(self, project_with_design):
+        """_clean_output_dirs is a no-op when dirs don't exist."""
+        from azext_prototype.stages.build_stage import BuildStage
+
+        stage = BuildStage()
+        # Should not raise
+        stage._clean_output_dirs(str(project_with_design))
+
 
 # ======================================================================
 # BuildResult tests

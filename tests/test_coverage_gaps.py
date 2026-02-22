@@ -344,7 +344,7 @@ class TestPrototypeDesign:
                 policy_overrides=[],
                 exchange_count=2,
             )
-            result = prototype_design(cmd)
+            result = prototype_design(cmd, json_output=True)
         # Design stage calls execute which returns a dict
         assert isinstance(result, dict)
 
@@ -373,7 +373,7 @@ class TestPrototypeDesign:
                 policy_overrides=[],
                 exchange_count=2,
             )
-            result = prototype_design(cmd, context="Build an API with Cosmos DB")
+            result = prototype_design(cmd, context="Build an API with Cosmos DB", json_output=True)
         assert isinstance(result, dict)
 
 
@@ -386,7 +386,7 @@ class TestPrototypeGenerateDocs:
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
-        result = prototype_generate_docs(cmd)
+        result = prototype_generate_docs(cmd, json_output=True)
         assert result["status"] == "generated"
         assert len(result["documents"]) >= 1
         docs_dir = project_with_config / "docs"
@@ -399,7 +399,7 @@ class TestPrototypeGenerateDocs:
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
         custom_dir = project_with_config / "custom_docs"
-        result = prototype_generate_docs(cmd, path=str(custom_dir))
+        result = prototype_generate_docs(cmd, path=str(custom_dir), json_output=True)
         assert result["output_dir"] == str(custom_dir)
         assert custom_dir.is_dir()
 
@@ -409,7 +409,7 @@ class TestPrototypeGenerateDocs:
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
-        result = prototype_generate_speckit(cmd)
+        result = prototype_generate_speckit(cmd, json_output=True)
         assert result["status"] == "generated"
         # Speckit should include manifest
         speckit_dir = project_with_config / "concept" / ".specify"
@@ -425,7 +425,7 @@ class TestPrototypeAgentList:
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
-        result = prototype_agent_list(cmd)
+        result = prototype_agent_list(cmd, json_output=True)
         assert len(result) >= 8
 
     @patch(f"{_MOD}._get_project_dir")
@@ -434,7 +434,7 @@ class TestPrototypeAgentList:
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
-        result = prototype_agent_list(cmd, show_builtin=False)
+        result = prototype_agent_list(cmd, show_builtin=False, json_output=True)
         # Should filter out built-in agents
         assert isinstance(result, list)
 
@@ -448,7 +448,7 @@ class TestPrototypeAgentShow:
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
-        result = prototype_agent_show(cmd, name="cloud-architect")
+        result = prototype_agent_show(cmd, name="cloud-architect", json_output=True)
         assert result["name"] == "cloud-architect"
 
     @patch(f"{_MOD}._get_project_dir")
@@ -480,7 +480,7 @@ class TestPrototypeAgentAddExtended:
         # Interactive mode: provide input for all prompts
         inputs = ["My agent", "general", "develop", "", "You are a test agent.", "END", ""]
         with patch("builtins.input", side_effect=inputs):
-            result = prototype_agent_add(cmd, name="my-agent")
+            result = prototype_agent_add(cmd, name="my-agent", json_output=True)
         assert result["status"] == "added"
         assert result["name"] == "my-agent"
 
@@ -490,7 +490,7 @@ class TestPrototypeAgentAddExtended:
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
-        result = prototype_agent_add(cmd, name="custom-arch", definition="example_custom_agent")
+        result = prototype_agent_add(cmd, name="custom-arch", definition="example_custom_agent", json_output=True)
         assert result["status"] == "added"
 
     @patch(f"{_MOD}._get_project_dir")
@@ -567,5 +567,5 @@ class TestPrototypeDeployOutputsExtended:
             json.dumps({"rg_name": {"value": "test-rg"}}), encoding="utf-8"
         )
         cmd = MagicMock()
-        result = prototype_deploy_outputs(cmd)
+        result = prototype_deploy_outputs(cmd, json_output=True)
         assert isinstance(result, dict)
