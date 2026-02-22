@@ -16,6 +16,7 @@ CLASSIFIERS = [
 ]
 
 DEPENDENCIES = [
+    "knack>=0.11.0",
     "pyyaml>=6.0",
     "requests>=2.28.0",
     "rich>=13.0.0",
