@@ -18,7 +18,7 @@ Rapid Azure prototype generation powered by AI agent teams.
 Currently, AZ Prototype is in _private preview_ and is, therefore, not available in the Azure CLI library. To use, you must currently download the wheel to you local machine from our [releases](https://github.com/Azure/az-prototype/releases) and manually install it.
 
 ```bash
-az extension add --source path/to/az_prototype-0.2.0-py3-none-any.whl
+az extension add --source path/to/az_prototype-<version>-py3-none-any.whl
 ```
 
 ## Quick Start
