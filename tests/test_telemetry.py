@@ -20,6 +20,10 @@ def _fake_azure_cli_modules():
     opencensus-ext-azure or azure-core) without having an ``azure.cli``
     submodule.  We must always inject the ``azure.cli.*`` hierarchy and
     wire it into whatever ``azure`` module is present.
+
+    The fake modules are wired together via attributes so that
+    ``patch("azure.cli.core._environment.get_config_dir", ...)``
+    traverses the same objects that sit in sys.modules.
     """
     cli_keys = [
         "azure.cli",
@@ -28,15 +32,26 @@ def _fake_azure_cli_modules():
         "azure.cli.core._profile",
     ]
     originals = {k: sys.modules.get(k) for k in cli_keys}
-    fakes: dict[str, MagicMock] = {}
+    # Build fake modules
+    fake_env = MagicMock()
+    fake_profile = MagicMock()
+    fake_core = MagicMock(_environment=fake_env, _profile=fake_profile)
+    fake_cli = MagicMock(core=fake_core)
+    fakes = {
+        "azure.cli": fake_cli,
+        "azure.cli.core": fake_core,
+        "azure.cli.core._environment": fake_env,
+        "azure.cli.core._profile": fake_profile,
+    }
+    had_cli_attr = False
     try:
-        for k in cli_keys:
-            fakes[k] = MagicMock()
-            sys.modules[k] = fakes[k]
+        for k, mod in fakes.items():
+            sys.modules[k] = mod
         # Wire azure.cli into the existing azure namespace package
         azure_mod = sys.modules.get("azure")
         if azure_mod is not None:
-            azure_mod.cli = fakes["azure.cli"]  # type: ignore[attr-defined]
+            had_cli_attr = hasattr(azure_mod, "cli")
+            azure_mod.cli = fake_cli  # type: ignore[attr-defined]
         yield
     finally:
         for k, orig in originals.items():
@@ -46,7 +61,7 @@ def _fake_azure_cli_modules():
                 sys.modules[k] = orig
         # Remove the injected .cli attribute from the real azure package
         azure_mod = sys.modules.get("azure")
-        if azure_mod is not None and hasattr(azure_mod, "cli"):
+        if azure_mod is not None and not had_cli_attr:
             try:
                 delattr(azure_mod, "cli")
             except (AttributeError, TypeError):
