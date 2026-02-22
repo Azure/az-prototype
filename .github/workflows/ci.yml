@@ -195,8 +195,8 @@ jobs:
           python -m pip install --upgrade pip build
           WHEEL_SRC="azext_prototype/telemetry/__init__.py"
           if [ -n "$APPINSIGHTS_CONNECTION_STRING" ]; then
-            sed -i "s|^_BUILTIN_CONNECTION_STRING = \"\"$|_BUILTIN_CONNECTION_STRING = \"$APPINSIGHTS_CONNECTION_STRING\"|" "$WHEEL_SRC"
-            grep -q "$APPINSIGHTS_CONNECTION_STRING" "$WHEEL_SRC" && echo "App Insights connection string injected" || { echo "::error::Failed to inject connection string"; exit 1; }
+            sed -i "s|^_BUILTIN_CONNECTION_STRING = \"\".*|_BUILTIN_CONNECTION_STRING = \"$APPINSIGHTS_CONNECTION_STRING\"|" "$WHEEL_SRC"
+            grep -qF "$APPINSIGHTS_CONNECTION_STRING" "$WHEEL_SRC" && echo "App Insights connection string injected" || { echo "::error::Failed to inject connection string"; exit 1; }
           else
             echo "::warning::APPINSIGHTS_CONNECTION_STRING secret not set — telemetry will be disabled in this build"
           fi
