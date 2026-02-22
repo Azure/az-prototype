@@ -3,5 +3,32 @@
   "azext.minCliCoreVersion": "2.50.0",
   "name": "prototype",
   "version": "0.2.1",
-  "azext.summary": "Azure CLI extension for building rapid prototypes with GitHub Copilot."
+  "azext.summary": "Azure CLI extension for building rapid prototypes with GitHub Copilot.",
+  "license": "MIT",
+  "classifiers": [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License"
+  ],
+  "extensions": {
+      "python.details": {
+          "contacts": [
+              {
+                  "email": "joshuadavis@microsoft.com",
+                  "name": "Microsoft Corporation",
+                  "role": "author"
+              }
+          ],
+          "document_names": {
+              "history": "HISTORY.rst"
+          },
+          "project_urls": {
+              "Home": "https://github.com/Azure/az-prototype"
+          }
+      }
+  }
 }

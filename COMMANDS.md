@@ -71,6 +71,7 @@ az prototype init --name
                   [--model]
                   [--output-dir]
                   [--template]
+                  [--json]
 ```
 
 ### Examples
@@ -190,6 +191,7 @@ az prototype design [--artifacts]
                     [--reset]
                     [--skip-discovery]
                     [--status]
+                    [--json]
 ```
 
 ### Examples
@@ -297,6 +299,7 @@ az prototype build [--scope {all, apps, db, docs, infra}]
                    [--status]
                    [--reset]
                    [--auto-accept]
+                   [--json]
 ```
 
 ### Examples
@@ -404,6 +407,7 @@ az prototype deploy [--stage]
                     [--client-id]
                     [--client-secret]
                     [--tenant-id]
+                    [--json]
 ```
 
 ### Examples
@@ -608,7 +612,7 @@ Show captured deployment outputs.
 After infrastructure is deployed (Terraform / Bicep), the outputs are captured so that app deploy scripts can reference them. Displays all captured outputs from the most recent deployment.
 
 ```
-az prototype deploy outputs
+az prototype deploy outputs [--json]
 ```
 
 ### Examples
@@ -628,7 +632,7 @@ Show rollback instructions based on deployment history.
 Displays the last deployment snapshot and generated rollback instructions. Use this to understand what would happen if you roll back.
 
 ```
-az prototype deploy rollback-info
+az prototype deploy rollback-info [--json]
 ```
 
 ### Examples
@@ -652,6 +656,7 @@ az prototype deploy generate-scripts [--scope {apps}]
                                       [--deploy-type {container_app, function, webapp}]
                                       [--resource-group]
                                       [--registry]
+                                      [--json]
 ```
 
 ### Examples
@@ -760,14 +765,6 @@ Show expanded per-stage details: discovery open/confirmed items, build stage bre
 |---|---|
 | Default value: | `False` |
 
-`--json` `-j`
-
-Output machine-readable JSON instead of formatted display. Returns an enriched dict with all stage details, deployment history, and project metadata.
-
-| | |
-|---|---|
-| Default value: | `False` |
-
 ---
 
 ## az prototype analyze
@@ -795,6 +792,7 @@ When a screenshot (`.png`, `.jpg`, `.gif`) is provided, the agent uses vision/mu
 
 ```
 az prototype analyze error [--input]
+                            [--json]
 ```
 
 ### Examples
@@ -836,6 +834,7 @@ Results are cached in `.prototype/state/cost_analysis.yaml`. Re-running the comm
 ```
 az prototype analyze costs [--output-format {json, markdown, table}]
                             [--refresh]
+                            [--json]
 ```
 
 ### Examples
@@ -931,7 +930,7 @@ Walks through standard project questions and generates a `prototype.yaml` file. 
 The configuration file is optional — all settings can also be provided via command-line parameters.
 
 ```
-az prototype config init
+az prototype config init [--json]
 ```
 
 ### Examples
@@ -961,7 +960,7 @@ az prototype config set --key naming.zone_id --value zp
 Display current project configuration. Secret values (API keys, subscription IDs, tokens) stored in `prototype.secrets.yaml` are masked as `***` in the output.
 
 ```
-az prototype config show
+az prototype config show [--json]
 ```
 
 ---
@@ -972,6 +971,7 @@ Get a single configuration value by its dot-separated key path. Secret values ar
 
 ```
 az prototype config get --key
+                        [--json]
 ```
 
 ### Examples
@@ -1009,6 +1009,7 @@ Set a configuration value.
 ```
 az prototype config set --key
                         --value
+                        [--json]
 ```
 
 ### Examples
@@ -1085,6 +1086,7 @@ Reads each documentation template, applies project configuration values (project
 
 ```
 az prototype generate docs [--path]
+                            [--json]
 ```
 
 ### Examples
@@ -1121,6 +1123,7 @@ Creates a self-contained package of documentation templates that define the proj
 
 ```
 az prototype generate speckit [--path]
+                               [--json]
 ```
 
 ### Examples
@@ -1179,6 +1182,7 @@ az prototype generate backlog [--provider {devops, github}]
                               [--refresh]
                               [--status]
                               [--push]
+                              [--json]
 ```
 
 ### Examples
@@ -1339,6 +1343,7 @@ az prototype knowledge contribute [--service]
                                    [--draft]
                                    [--type]
                                    [--section]
+                                   [--json]
 ```
 
 ### Examples
@@ -1491,14 +1496,6 @@ Show expanded capability details for each agent.
 |---|---|
 | Default value: | `False` |
 
-`--json` `-j`
-
-Output machine-readable JSON instead of formatted display.
-
-| | |
-|---|---|
-| Default value: | `False` |
-
 ---
 
 ## az prototype agent add
@@ -1513,6 +1510,7 @@ Creates a new custom agent definition in `.prototype/agents/` and registers it i
 az prototype agent add --name
                        [--file]
                        [--definition]
+                       [--json]
 ```
 
 ### Examples
@@ -1563,6 +1561,7 @@ Replaces the behavior of a built-in agent with a custom implementation. The over
 ```
 az prototype agent override --name
                             --file
+                            [--json]
 ```
 
 ### Examples
@@ -1633,14 +1632,6 @@ Show full system prompt instead of 200-char preview.
 |---|---|
 | Default value: | `False` |
 
-`--json` `-j`
-
-Output machine-readable JSON instead of formatted display.
-
-| | |
-|---|---|
-| Default value: | `False` |
-
 ---
 
 ## az prototype agent remove
@@ -1651,6 +1642,7 @@ Removes the agent definition from the project's `.prototype/agents/` directory a
 
 ```
 az prototype agent remove --name
+                          [--json]
 ```
 
 ### Examples
@@ -1686,6 +1678,7 @@ az prototype agent update --name
                           [--description]
                           [--capabilities]
                           [--system-prompt-file]
+                          [--json]
 ```
 
 ### Examples
@@ -1745,6 +1738,7 @@ Sends a prompt to the specified agent using the configured AI provider and displ
 ```
 az prototype agent test --name
                         [--prompt]
+                        [--json]
 ```
 
 ### Examples
@@ -1784,6 +1778,7 @@ Exports the agent's metadata, system prompt, capabilities, constraints, and exam
 ```
 az prototype agent export --name
                           [--output]
+                          [--json]
 ```
 
 ### Examples
@@ -1817,6 +1812,14 @@ Output file path for the exported YAML. Defaults to `./<name>.yaml`.
 ## Global Parameters
 
 The following global parameters are available for all `az prototype` commands:
+
+`--json` `-j`
+
+Output machine-readable JSON instead of formatted display. Available on all `az prototype` commands.
+
+| | |
+|---|---|
+| Default value: | `False` |
 
 `--debug`
 
