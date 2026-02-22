@@ -294,6 +294,7 @@ jobs:
             echo "Creating new PR"
             gh pr create \
               --repo Azure/azure-cli-extensions \
+              --head "${GH_USER}:${BRANCH}" \
               --title "Update \`prototype\` extension to ${VERSION}" \
               --body "$PR_BODY"
           fi
