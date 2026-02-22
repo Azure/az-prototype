@@ -124,7 +124,7 @@ jobs:
       - name: Inject App Insights connection string
         if: env.APPINSIGHTS_CONNECTION_STRING != ''
         run: |
-          sed -i "s|^_BUILTIN_CONNECTION_STRING = \"\"$|_BUILTIN_CONNECTION_STRING = \"$APPINSIGHTS_CONNECTION_STRING\"|" azext_prototype/telemetry/__init__.py
+          sed -i "s|^_BUILTIN_CONNECTION_STRING = \"\".*|_BUILTIN_CONNECTION_STRING = \"$APPINSIGHTS_CONNECTION_STRING\"|" azext_prototype/telemetry/__init__.py
           grep -qF "$APPINSIGHTS_CONNECTION_STRING" azext_prototype/telemetry/__init__.py && echo "App Insights connection string injected" || { echo "::error::Failed to inject connection string"; exit 1; }
 
       - name: Install dependencies
