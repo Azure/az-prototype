@@ -105,6 +105,11 @@ jobs:
         env:
           APPINSIGHTS_CONNECTION_STRING: ${{ secrets.APPINSIGHTS_CONNECTION_STRING }}
 
+      - name: Verify wheel contents
+        run: |
+          pip install dist/*.whl
+          python -c "import azext_prototype; print('Extension package OK')"
+
       - name: Rename wheel with tag version
         run: |
           TAG_VERSION="${{ steps.ver.outputs.version }}"
@@ -115,11 +120,6 @@ jobs:
             done
           fi
           ls dist/
-
-      - name: Verify wheel contents
-        run: |
-          pip install dist/*.whl
-          python -c "import azext_prototype; print('Extension package OK')"
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v4
