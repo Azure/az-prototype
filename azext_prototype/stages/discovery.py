@@ -596,9 +596,7 @@ class DiscoverySession:
         """
         if self._exchange_count == 0:
             user_msgs = [
-                m.content if isinstance(m.content, str) else str(m.content)
-                for m in self._messages
-                if m.role == "user"
+                m.content if isinstance(m.content, str) else str(m.content) for m in self._messages if m.role == "user"
             ]
             return "\n\n".join(user_msgs).strip()
 
