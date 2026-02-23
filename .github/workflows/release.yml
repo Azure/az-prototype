@@ -254,7 +254,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           VERSION="${{ steps.meta.outputs.version }}"
           BRANCH="prototype/v${VERSION}"
-          git checkout -b "$BRANCH"
+          git fetch origin "$BRANCH" 2>/dev/null && git checkout "$BRANCH" || git checkout -b "$BRANCH"
           git add src/index.json
           git commit -m "Update prototype extension to ${VERSION}"
           git push --force origin "$BRANCH"
