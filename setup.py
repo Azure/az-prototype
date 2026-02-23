@@ -48,13 +48,18 @@ setup(
     classifiers=CLASSIFIERS,
     packages=find_packages(exclude=["tests", "tests.*"]),
     install_requires=DEPENDENCIES,
+    include_package_data=True,
     package_data={
         "azext_prototype": [
+            "azext_metadata.json",
             "agents/builtin/definitions/*.yaml",
-            "policies/**/*.yaml",
-            "policies/*.json",
+            "governance/policies/**/*.yaml",
+            "governance/policies/*.json",
+            "governance/anti_patterns/*.yaml",
+            "governance/standards/**/*.yaml",
             "templates/**/*",
-            "templates/workloads/*.yaml",
+            "knowledge/**/*.md",
+            "knowledge/**/*.yaml",
         ]
     },
     entry_points={
