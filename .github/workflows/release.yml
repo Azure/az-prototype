@@ -270,22 +270,24 @@ jobs:
           EOF
           )"
 
-          # Check if a PR already exists for this branch
+          # Try to create PR; if one already exists, update it instead
           GH_USER=$(gh api user -q .login)
-          EXISTING_PR=$(gh pr list --repo Azure/azure-cli-extensions --head "${GH_USER}:${BRANCH}" --json number --jq '.[0].number // empty')
-          if [ -n "$EXISTING_PR" ]; then
-            echo "Updating existing PR #${EXISTING_PR}"
-            gh pr edit "$EXISTING_PR" \
-              --repo Azure/azure-cli-extensions \
-              --title "Update \`prototype\` extension to ${VERSION}" \
-              --body "$PR_BODY"
-          else
-            echo "Creating new PR"
-            gh pr create \
-              --repo Azure/azure-cli-extensions \
-              --head "${GH_USER}:${BRANCH}" \
-              --title "Update \`prototype\` extension to ${VERSION}" \
-              --body "$PR_BODY"
-          fi
+          CREATE_OUTPUT=$(gh pr create \
+            --repo Azure/azure-cli-extensions \
+            --head "${GH_USER}:${BRANCH}" \
+            --title "Update \`prototype\` extension to ${VERSION}" \
+            --body "$PR_BODY" 2>&1) && echo "Created PR: $CREATE_OUTPUT" || {
+            EXISTING_PR=$(echo "$CREATE_OUTPUT" | grep -oP '/pull/\K\d+' || true)
+            if [ -n "$EXISTING_PR" ]; then
+              echo "Updating existing PR #${EXISTING_PR}"
+              gh pr edit "$EXISTING_PR" \
+                --repo Azure/azure-cli-extensions \
+                --title "Update \`prototype\` extension to ${VERSION}" \
+                --body "$PR_BODY"
+            else
+              echo "::error::Failed to create PR: $CREATE_OUTPUT"
+              exit 1
+            fi
+          }
         env:
           GH_TOKEN: ${{ secrets.EXTENSIONS_INDEX_PAT }}
