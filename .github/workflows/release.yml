@@ -280,10 +280,9 @@ jobs:
             EXISTING_PR=$(echo "$CREATE_OUTPUT" | grep -oP '/pull/\K\d+' || true)
             if [ -n "$EXISTING_PR" ]; then
               echo "Updating existing PR #${EXISTING_PR}"
-              gh pr edit "$EXISTING_PR" \
-                --repo Azure/azure-cli-extensions \
-                --title "Update \`prototype\` extension to ${VERSION}" \
-                --body "$PR_BODY"
+              gh api -X PATCH "repos/Azure/azure-cli-extensions/pulls/${EXISTING_PR}" \
+                -f title="Update \`prototype\` extension to ${VERSION}" \
+                -f body="$PR_BODY" --silent
             else
               echo "::error::Failed to create PR: $CREATE_OUTPUT"
               exit 1
