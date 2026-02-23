@@ -189,7 +189,7 @@ def _get_extension_version() -> str:
     try:
         from importlib.metadata import version as pkg_version
 
-        return pkg_version("az-prototype")
+        return pkg_version("prototype")
     except Exception:
         pass
 

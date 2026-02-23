@@ -218,22 +218,50 @@ jobs:
       - name: Extract metadata from wheel
         id: whl_meta
         run: |
+          pip install wheel==0.30.0
           WHEEL=$(ls dist/*.whl)
+          # Replicate the exact logic from Azure/azure-cli-extensions util.py get_ext_metadata()
           python3 -c "
-          import json, zipfile, sys
+          import json, os, re, sys, tempfile, zipfile
+
+          WHEEL_INFO_RE = re.compile(
+              r'^(?P<namever>(?P<name>.+?)(-(?P<ver>\d.+?))?)'
+              r'((-(?P<build>\d.*?))?-(?P<pyver>.+?)-(?P<abi>.+?)-(?P<plat>.+?)'
+              r'\.whl|\.dist-info)$',
+              re.VERBOSE).match
 
           whl = sys.argv[1]
-          with zipfile.ZipFile(whl) as zf:
-              matches = [n for n in zf.namelist() if n.endswith('azext_metadata.json')]
-              if not matches:
-                  print('Available files:', sorted(zf.namelist())[:20], file=sys.stderr)
-                  sys.exit('azext_metadata.json not found in wheel')
-              meta = json.loads(zf.read(matches[0]))
-          print(json.dumps(meta))
-          " "$WHEEL" > /tmp/azext_metadata.json
-          cat /tmp/azext_metadata.json
+          ext_name = 'prototype'
 
-      - name: Update index.json
+          ext_dir = tempfile.mkdtemp()
+          with zipfile.ZipFile(whl, 'r') as zf:
+              zf.extractall(ext_dir)
+
+          metadata = {}
+
+          # Step 1: azext_metadata.json
+          pos_mods = [n for n in os.listdir(ext_dir) if n.startswith('azext_') and os.path.isdir(os.path.join(ext_dir, n))]
+          if pos_mods:
+              p = os.path.join(ext_dir, pos_mods[0], 'azext_metadata.json')
+              if os.path.isfile(p):
+                  with open(p) as f:
+                      metadata.update(json.load(f))
+
+          # Step 2: dist-info/metadata.json (contains generator field)
+          for d in os.listdir(ext_dir):
+              if d.endswith('.dist-info'):
+                  parsed = WHEEL_INFO_RE(d)
+                  if parsed and parsed.groupdict().get('name') == ext_name.replace('-', '_'):
+                      p = os.path.join(ext_dir, d, 'metadata.json')
+                      if os.path.isfile(p):
+                          with open(p) as f:
+                              metadata.update(json.load(f))
+
+          print(json.dumps(metadata, indent=2, sort_keys=True))
+          " "$WHEEL" > /tmp/wheel_metadata.json
+          cat /tmp/wheel_metadata.json
+
+      - name: Update index.json and service_name.json
         working-directory: azure-cli-extensions
         run: |
           python3 -c "
@@ -242,20 +270,14 @@ jobs:
           index_path = pathlib.Path('src/index.json')
           index = json.loads(index_path.read_text())
 
-          meta = json.loads(pathlib.Path('/tmp/azext_metadata.json').read_text())
+          # Use the full merged metadata from the wheel (matches what test_index.py expects)
+          metadata = json.loads(pathlib.Path('/tmp/wheel_metadata.json').read_text())
 
           entry = {
               'filename': '${{ steps.meta.outputs.filename }}',
               'sha256Digest': '${{ steps.meta.outputs.sha256 }}',
               'downloadUrl': '${{ steps.meta.outputs.download_url }}',
-              'metadata': {
-                  'azext.isPreview': meta.get('azext.isPreview', True),
-                  'azext.minCliCoreVersion': meta.get('azext.minCliCoreVersion', '2.50.0'),
-                  'azext.summary': meta.get('azext.summary', ''),
-                  'classifiers': meta.get('classifiers', []),
-                  'name': meta.get('name', 'prototype'),
-                  'version': '${{ steps.meta.outputs.version }}'
-              }
+              'metadata': metadata
           }
 
           # Replace existing entry or append
@@ -264,6 +286,23 @@ jobs:
           index['extensions'] = extensions
 
           index_path.write_text(json.dumps(index, indent=4, sort_keys=True) + '\n')
+
+          # Add service name mapping for azdev linter/style checks
+          sn_path = pathlib.Path('src/service_name.json')
+          sn = json.loads(sn_path.read_text())
+          # service_name.json is an array of {Command, AzureServiceName, URL} objects
+          existing = [e for e in sn if e.get('Command') == 'az prototype']
+          if not existing:
+              sn.append({
+                  'Command': 'az prototype',
+                  'AzureServiceName': 'Azure Prototype',
+                  'URL': ''
+              })
+              sn.sort(key=lambda e: e.get('Command', ''))
+              sn_path.write_text(json.dumps(sn, indent=2) + '\n')
+              print('Added prototype to service_name.json')
+          else:
+              print('prototype already in service_name.json')
           "
 
       - name: Create PR against Azure/azure-cli-extensions
@@ -275,7 +314,7 @@ jobs:
           VERSION="${{ steps.meta.outputs.version }}"
           BRANCH="prototype/v${VERSION}"
           git fetch origin "$BRANCH" 2>/dev/null && git checkout "$BRANCH" || git checkout -b "$BRANCH"
-          git add src/index.json
+          git add src/index.json src/service_name.json
           git commit -m "Update prototype extension to ${VERSION}"
           git push --force origin "$BRANCH"
 

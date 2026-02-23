@@ -195,7 +195,7 @@ long-summary: |
     and tells you which commands to run to redeploy.
 examples:
     - name: Analyze an inline error message
-      text: az prototype analyze error --input "ResourceNotFound: The Resource ... was not found"
+      text: az prototype analyze error --input "ResourceNotFound - The Resource was not found"
     - name: Analyze a log file
       text: az prototype analyze error --input ./deploy.log
     - name: Analyze a screenshot

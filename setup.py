@@ -37,7 +37,7 @@ DEPENDENCIES = [
 ]
 
 setup(
-    name="az-prototype",
+    name="prototype",
     version=VERSION,
     description="Azure CLI extension for rapid prototype generation using AI agents and GitHub Copilot",
     long_description="Empowers customers to rapidly create Azure prototypes using AI-driven agent teams.",

@@ -759,7 +759,7 @@ az prototype analyze error [--input]
 Analyze an inline error message.
 
 ```
-az prototype analyze error --input "ResourceNotFound: The Resource ... was not found"
+az prototype analyze error --input "ResourceNotFound - The Resource was not found"
 ```
 
 Analyze a log file.
