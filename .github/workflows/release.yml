@@ -224,8 +224,11 @@ jobs:
 
           whl = sys.argv[1]
           with zipfile.ZipFile(whl) as zf:
-              meta_path = [n for n in zf.namelist() if n.endswith('/azext_metadata.json')][0]
-              meta = json.loads(zf.read(meta_path))
+              matches = [n for n in zf.namelist() if n.endswith('azext_metadata.json')]
+              if not matches:
+                  print('Available files:', sorted(zf.namelist())[:20], file=sys.stderr)
+                  sys.exit('azext_metadata.json not found in wheel')
+              meta = json.loads(zf.read(matches[0]))
           print(json.dumps(meta))
           " "$WHEEL" > /tmp/azext_metadata.json
           cat /tmp/azext_metadata.json
