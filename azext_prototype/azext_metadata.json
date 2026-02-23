@@ -2,7 +2,7 @@
   "azext.isPreview": true,
   "azext.minCliCoreVersion": "2.50.0",
   "name": "prototype",
-  "version": "0.2.1b1",
+  "version": "0.2.1b2",
   "azext.summary": "Azure CLI extension for building rapid prototypes with GitHub Copilot.",
   "license": "MIT",
   "classifiers": [

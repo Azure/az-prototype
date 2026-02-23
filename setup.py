@@ -3,7 +3,7 @@
 
 from setuptools import find_packages, setup
 
-VERSION = "0.2.1b1"
+VERSION = "0.2.1b2"
 CLASSIFIERS = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
