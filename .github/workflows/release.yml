@@ -215,6 +215,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.EXTENSIONS_INDEX_PAT }}
 
+      - name: Extract metadata from wheel
+        id: whl_meta
+        run: |
+          WHEEL=$(ls dist/*.whl)
+          python3 -c "
+          import json, zipfile, sys
+
+          whl = sys.argv[1]
+          with zipfile.ZipFile(whl) as zf:
+              meta_path = [n for n in zf.namelist() if n.endswith('/azext_metadata.json')][0]
+              meta = json.loads(zf.read(meta_path))
+          print(json.dumps(meta))
+          " "$WHEEL" > /tmp/azext_metadata.json
+          cat /tmp/azext_metadata.json
+
       - name: Update index.json
         working-directory: azure-cli-extensions
         run: |
@@ -224,16 +239,18 @@ jobs:
           index_path = pathlib.Path('src/index.json')
           index = json.loads(index_path.read_text())
 
+          meta = json.loads(pathlib.Path('/tmp/azext_metadata.json').read_text())
+
           entry = {
               'filename': '${{ steps.meta.outputs.filename }}',
               'sha256Digest': '${{ steps.meta.outputs.sha256 }}',
               'downloadUrl': '${{ steps.meta.outputs.download_url }}',
               'metadata': {
-                  'azext.isPreview': True,
-                  'azext.minCliCoreVersion': '2.50.0',
-                  'azext.summary': 'Azure CLI extension for building rapid prototypes.',
-                  'classifiers': ['Development Status :: 3 - Alpha'],
-                  'name': 'prototype',
+                  'azext.isPreview': meta.get('azext.isPreview', True),
+                  'azext.minCliCoreVersion': meta.get('azext.minCliCoreVersion', '2.50.0'),
+                  'azext.summary': meta.get('azext.summary', ''),
+                  'classifiers': meta.get('classifiers', []),
+                  'name': meta.get('name', 'prototype'),
                   'version': '${{ steps.meta.outputs.version }}'
               }
           }
