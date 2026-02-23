@@ -112,17 +112,6 @@ jobs:
           pip install dist/*.whl
           python -c "import azext_prototype; print('Extension package OK')"
 
-      - name: Rename wheel with tag version
-        run: |
-          TAG_VERSION="${{ steps.ver.outputs.version }}"
-          BASE_VERSION=$(python -c "import re, pathlib; m=re.search(r'VERSION\s*=\s*\"(.+?)\"', pathlib.Path('setup.py').read_text()); print(m.group(1))")
-          if [ "$TAG_VERSION" != "$BASE_VERSION" ]; then
-            for f in dist/*.whl; do
-              mv "$f" "${f/$BASE_VERSION/$TAG_VERSION}"
-            done
-          fi
-          ls dist/
-
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v4
         with:

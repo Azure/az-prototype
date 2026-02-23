@@ -205,15 +205,6 @@ jobs:
         env:
           APPINSIGHTS_CONNECTION_STRING: ${{ secrets.APPINSIGHTS_CONNECTION_STRING }}
 
-      - name: Rename wheel with CI version
-        run: |
-          CI_VERSION="${{ needs.version.outputs.version }}"
-          BASE_VERSION=$(python -c "import re, pathlib; m=re.search(r'VERSION\s*=\s*\"(.+?)\"', pathlib.Path('setup.py').read_text()); print(m.group(1))")
-          for f in dist/*.whl; do
-            mv "$f" "${f/$BASE_VERSION/$CI_VERSION}"
-          done
-          ls dist/
-
       - name: Upload wheel
         uses: actions/upload-artifact@v4
         with:
