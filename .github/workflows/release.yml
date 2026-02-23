@@ -88,11 +88,12 @@ jobs:
           p = pathlib.Path('azext_prototype/azext_metadata.json')
           d = json.loads(p.read_text())
           d['version'] = '$TAG_VERSION'
-          d['azext.isPreview'] = 'rc' in '$TAG_NAME' or 'preview' in '$TAG_NAME'
+          import re
+          d['azext.isPreview'] = bool(re.search(r'(a|b|rc|alpha|beta|preview|dev)\d*', '$TAG_NAME'))
           p.write_text(json.dumps(d, indent=2) + '\n')
           "
           echo "Stamped version: $TAG_VERSION"
-          echo "Preview: $(python -c "print('rc' in '$TAG_NAME' or 'preview' in '$TAG_NAME')")"
+          echo "Preview: $(python -c "import re; print(bool(re.search(r'(a|b|rc|alpha|beta|preview|dev)\d*', '$TAG_NAME')))")"
 
       - name: Inject App Insights connection string and build wheel
         run: |
