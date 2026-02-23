@@ -152,7 +152,7 @@ jobs:
       - name: Install build tools
         run: |
           python -m pip install --upgrade pip
-          pip install build wheel==0.30.0 setuptools
+          pip install "setuptools<70" wheel==0.30.0
 
       - name: Inject App Insights connection string and build wheel
         run: |
@@ -163,7 +163,7 @@ jobs:
           else
             echo "::warning::APPINSIGHTS_CONNECTION_STRING secret not set — telemetry will be disabled in this build"
           fi
-          python -m build --wheel --outdir dist/
+          python setup.py bdist_wheel --dist-dir dist/
         env:
           APPINSIGHTS_CONNECTION_STRING: ${{ secrets.APPINSIGHTS_CONNECTION_STRING }}
 
