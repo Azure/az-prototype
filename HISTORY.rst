@@ -3,6 +3,26 @@
 Release History
 ===============
 
+0.2.1b1
++++++++
+
+Azure CLI extension index compatibility
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Renamed ``--verbose`` to ``--detailed``** — ``--verbose`` / ``-v`` is a
+  reserved Azure CLI global argument.  The ``prototype status``,
+  ``agent list``, and ``agent show`` commands now use ``--detailed`` / ``-d``
+  instead.
+* **Dropped non-PEP 440 version suffixes from wheel filenames** — release
+  and CI pipelines no longer rename wheels with ``-preview`` or ``-ci.N``
+  suffixes, which broke ``azdev linter`` filename validation.
+* **Fixed ``publish-index`` idempotency** — the release pipeline now checks
+  out an existing PR branch instead of failing on ``git checkout -b`` when
+  the branch already exists.  PR creation falls back to ``gh api`` REST
+  update when a PR already exists (avoids ``read:org`` scope requirement
+  of ``gh pr edit`` GraphQL).
+* **Excluded ``tests`` from wheel** — ``find_packages()`` now uses
+  ``exclude=["tests", "tests.*"]`` to avoid packaging the test suite.
+
 0.2.1-preview
 ++++++++++++++
 
@@ -387,7 +407,7 @@ Agent commands hardening
   ``agent add``, ``agent override``, and ``agent remove`` now use
   ``console.*`` styled output (header, success, info, dim, file_list).
 * ``--json`` / ``-j`` flag on ``agent list`` and ``agent show`` returns
-  raw dicts for scripting.  ``--verbose`` / ``-v`` expands capability
+  raw dicts for scripting.  ``--detailed`` / ``-d`` expands capability
   details (list) or shows full system prompt (show).
 * **Interactive agent creation** — ``agent add`` defaults to an
   interactive walkthrough (description, role, capabilities, constraints,
@@ -491,7 +511,7 @@ Enriched status command
   per-stage progress with counts (exchanges, confirmed items, stages
   accepted, files generated, stages deployed/failed/rolled back), and
   pending file changes.
-* ``--verbose`` / ``-v`` — expanded per-stage detail using existing
+* ``--detailed`` / ``-d`` — expanded per-stage detail using existing
   state formatters (open/confirmed items, build stage breakdown,
   deploy stage status, deployment history).
 * ``--json`` / ``-j`` — enriched machine-readable dict (superset of

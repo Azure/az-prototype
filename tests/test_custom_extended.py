@@ -955,15 +955,15 @@ class TestPrototypeStatusExtended:
             assert "completed" in result["stages"][stage]
 
     @patch(f"{_MOD}._get_project_dir")
-    def test_status_verbose_prints_detail(self, mock_dir, project_with_config):
-        """--verbose prints expanded output and returns None (suppressed)."""
+    def test_status_detailed_prints_detail(self, mock_dir, project_with_config):
+        """--detailed prints expanded output and returns None (suppressed)."""
         from azext_prototype.custom import prototype_status
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
 
         with patch("azext_prototype.custom.console", create=True):
-            result = prototype_status(cmd, verbose=True)
+            result = prototype_status(cmd, detailed=True)
 
         assert result is None
 
@@ -1085,13 +1085,13 @@ class TestPrototypeStatusExtended:
         assert result["deployment_history"][0]["scope"] == "all"
 
     @patch(f"{_MOD}._get_project_dir")
-    def test_status_verbose_json_returns_dict(self, mock_dir, project_with_config):
-        """When both verbose and json_output are True, json wins — returns dict."""
+    def test_status_detailed_json_returns_dict(self, mock_dir, project_with_config):
+        """When both detailed and json_output are True, json wins — returns dict."""
         from azext_prototype.custom import prototype_status
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
-        result = prototype_status(cmd, verbose=True, json_output=True)
+        result = prototype_status(cmd, detailed=True, json_output=True)
 
         # json_output takes precedence — returns the enriched dict, not displayed
         assert isinstance(result, dict)
@@ -1549,7 +1549,7 @@ _MOD = "azext_prototype.custom"
 
 
 class TestPrototypeAgentListRichUI:
-    """Test agent list Rich UI, json, and verbose modes."""
+    """Test agent list Rich UI, json, and detailed modes."""
 
     @patch(f"{_MOD}._get_project_dir")
     def test_list_json_returns_list(self, mock_dir, project_with_config):
@@ -1574,13 +1574,13 @@ class TestPrototypeAgentListRichUI:
         assert isinstance(result, list)
 
     @patch(f"{_MOD}._get_project_dir")
-    def test_list_verbose_mode(self, mock_dir, project_with_config):
+    def test_list_detailed_mode(self, mock_dir, project_with_config):
         from azext_prototype.custom import prototype_agent_list
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
 
-        result = prototype_agent_list(cmd, verbose=True, json_output=True)
+        result = prototype_agent_list(cmd, detailed=True, json_output=True)
         assert isinstance(result, list)
 
     @patch(f"{_MOD}._get_project_dir")
@@ -1596,7 +1596,7 @@ class TestPrototypeAgentListRichUI:
 
 
 class TestPrototypeAgentShowRichUI:
-    """Test agent show Rich UI, json, and verbose modes."""
+    """Test agent show Rich UI, json, and detailed modes."""
 
     @patch(f"{_MOD}._get_project_dir")
     def test_show_json_returns_dict(self, mock_dir, project_with_config):
@@ -1611,15 +1611,15 @@ class TestPrototypeAgentShowRichUI:
         assert "system_prompt_preview" in result
 
     @patch(f"{_MOD}._get_project_dir")
-    def test_show_verbose_includes_full_prompt(self, mock_dir, project_with_config):
+    def test_show_detailed_includes_full_prompt(self, mock_dir, project_with_config):
         from azext_prototype.custom import prototype_agent_show
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
 
-        result = prototype_agent_show(cmd, name="cloud-architect", verbose=True, json_output=True)
+        result = prototype_agent_show(cmd, name="cloud-architect", detailed=True, json_output=True)
         assert "system_prompt" in result
-        # verbose should not have preview
+        # detailed should not have preview
         assert "system_prompt_preview" not in result
 
     @patch(f"{_MOD}._get_project_dir")

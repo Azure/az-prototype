@@ -727,7 +727,7 @@ def prototype_deploy_generate_scripts(
 
 @_quiet_output
 @track("prototype status")
-def prototype_status(cmd, verbose=False, json_output=False):
+def prototype_status(cmd, detailed=False, json_output=False):
     """Show current project status across all stages."""
     project_dir = _get_project_dir()
 
@@ -911,8 +911,8 @@ def prototype_status(cmd, verbose=False, json_output=False):
         else:
             console.print_dim("  No pending changes")
 
-    # -- Verbose mode: expanded per-stage detail --
-    if verbose:
+    # -- Detailed mode: expanded per-stage detail --
+    if detailed:
         console.print()
 
         if discovery_state.exists:
@@ -1326,7 +1326,7 @@ def prototype_config_init(cmd):
 
 @_quiet_output
 @track("prototype agent list")
-def prototype_agent_list(cmd, show_builtin=True, verbose=False, json_output=False):
+def prototype_agent_list(cmd, show_builtin=True, detailed=False, json_output=False):
     """List all available agents."""
     registry = _get_registry_with_fallback()
 
@@ -1355,7 +1355,7 @@ def prototype_agent_list(cmd, show_builtin=True, verbose=False, json_output=Fals
         for a in group:
             caps = ", ".join(a.get("capabilities", []))
             desc = a.get("description", "")
-            if verbose:
+            if detailed:
                 console.print(f"    {a['name']}")
                 if desc:
                     console.print_dim(f"      {desc}")
@@ -1713,7 +1713,7 @@ def prototype_agent_override(cmd, name=None, file=None):
 
 @_quiet_output
 @track("prototype agent show")
-def prototype_agent_show(cmd, name=None, verbose=False, json_output=False):
+def prototype_agent_show(cmd, name=None, detailed=False, json_output=False):
     """Show agent details."""
     if not name:
         raise CLIError("--name is required.")
@@ -1723,7 +1723,7 @@ def prototype_agent_show(cmd, name=None, verbose=False, json_output=False):
     agent = registry.get(name)
     info = agent.to_dict()
 
-    if verbose:
+    if detailed:
         info["system_prompt"] = agent.system_prompt
     else:
         info["system_prompt_preview"] = (
@@ -1748,7 +1748,7 @@ def prototype_agent_show(cmd, name=None, verbose=False, json_output=False):
         for c in constraints:
             console.print_dim(f"    - {c}")
 
-    if verbose:
+    if detailed:
         console.print()
         console.print_info("System Prompt:")
         console.print(agent.system_prompt)

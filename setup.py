@@ -3,7 +3,7 @@
 
 from setuptools import find_packages, setup
 
-VERSION = "0.2.1"
+VERSION = "0.2.1b1"
 CLASSIFIERS = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -46,7 +46,7 @@ setup(
     author_email="",
     url="https://github.com/microsoft/az-prototype",
     classifiers=CLASSIFIERS,
-    packages=find_packages(),
+    packages=find_packages(exclude=["tests", "tests.*"]),
     install_requires=DEPENDENCIES,
     package_data={
         "azext_prototype": [

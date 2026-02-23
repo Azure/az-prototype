@@ -203,12 +203,12 @@ long-summary: |
     stage progress (design, build, deploy), and pending changes.
 
     By default shows a human-readable summary. Use --json for machine-readable
-    output suitable for scripting. Use --verbose for expanded per-stage details.
+    output suitable for scripting. Use --detailed for expanded per-stage details.
 examples:
     - name: Show project status
       text: az prototype status
     - name: Show detailed status with per-stage breakdown
-      text: az prototype status --verbose
+      text: az prototype status --detailed
     - name: Get machine-readable JSON output
       text: az prototype status --json
 """
@@ -497,14 +497,14 @@ long-summary: |
     name, description, and capabilities.
 
     By default shows a formatted console display. Use --json for
-    machine-readable output. Use --verbose for expanded capability details.
+    machine-readable output. Use --detailed for expanded capability details.
 examples:
     - name: List all agents with formatted output
       text: az prototype agent list
     - name: Get machine-readable JSON output
       text: az prototype agent list --json
     - name: Show expanded details
-      text: az prototype agent list --verbose
+      text: az prototype agent list --detailed
     - name: List only custom agents
       text: az prototype agent list --show-builtin false
 """
@@ -559,13 +559,13 @@ long-summary: |
     Displays agent metadata including description, source, capabilities,
     constraints, and a preview of the system prompt.
 
-    Use --verbose to show the full system prompt instead of a 200-character
+    Use --detailed to show the full system prompt instead of a 200-character
     preview. Use --json for machine-readable output.
 examples:
     - name: Show agent details
       text: az prototype agent show --name cloud-architect
     - name: Show full system prompt
-      text: az prototype agent show --name cloud-architect --verbose
+      text: az prototype agent show --name cloud-architect --detailed
     - name: Get JSON output
       text: az prototype agent show --name cloud-architect --json
 """

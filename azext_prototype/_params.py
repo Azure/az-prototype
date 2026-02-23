@@ -169,8 +169,8 @@ def load_arguments(self, _):
     # --- az prototype status ---
     with self.argument_context("prototype status") as c:
         c.argument(
-            "verbose",
-            options_list=["--verbose", "-v"],
+            "detailed",
+            options_list=["--detailed", "-d"],
             help="Show expanded per-stage details.",
             action="store_true",
             default=False,
@@ -329,8 +329,8 @@ def load_arguments(self, _):
             default=True,
         )
         c.argument(
-            "verbose",
-            options_list=["--verbose", "-v"],
+            "detailed",
+            options_list=["--detailed", "-d"],
             help="Show expanded capability details for each agent.",
             action="store_true",
             default=False,
@@ -339,8 +339,8 @@ def load_arguments(self, _):
     with self.argument_context("prototype agent show") as c:
         c.argument("name", help="Name of the agent to show details for.")
         c.argument(
-            "verbose",
-            options_list=["--verbose", "-v"],
+            "detailed",
+            options_list=["--detailed", "-d"],
             help="Show full system prompt instead of 200-char preview.",
             action="store_true",
             default=False,
