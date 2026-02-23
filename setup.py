@@ -5,13 +5,13 @@ from setuptools import find_packages, setup
 
 VERSION = "0.2.1b2"
 CLASSIFIERS = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: System Administrators",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: MIT License",
 ]
 
@@ -42,9 +42,9 @@ setup(
     description="Azure CLI extension for rapid prototype generation using AI agents and GitHub Copilot",
     long_description="Empowers customers to rapidly create Azure prototypes using AI-driven agent teams.",
     license="MIT",
-    author="Microsoft Innovation Factory",
-    author_email="",
-    url="https://github.com/microsoft/az-prototype",
+    author="Joshua Davis",
+    author_email="joshuadavis@microsoft.com",
+    url="https://github.com/Azure/az-prototype",
     classifiers=CLASSIFIERS,
     packages=find_packages(exclude=["tests", "tests.*"]),
     install_requires=DEPENDENCIES,
