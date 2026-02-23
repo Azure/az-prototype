@@ -69,7 +69,7 @@ jobs:
       - name: Install build tools
         run: |
           python -m pip install --upgrade pip
-          pip install build wheel setuptools
+          pip install "setuptools<70" wheel==0.30.0
 
       - name: Validate governance policies
         run: |
@@ -88,11 +88,12 @@ jobs:
           p = pathlib.Path('azext_prototype/azext_metadata.json')
           d = json.loads(p.read_text())
           d['version'] = '$TAG_VERSION'
-          d['azext.isPreview'] = 'rc' in '$TAG_NAME' or 'preview' in '$TAG_NAME'
+          import re
+          d['azext.isPreview'] = bool(re.search(r'(a|b|rc|alpha|beta|preview|dev)\d*', '$TAG_NAME'))
           p.write_text(json.dumps(d, indent=2) + '\n')
           "
           echo "Stamped version: $TAG_VERSION"
-          echo "Preview: $(python -c "print('rc' in '$TAG_NAME' or 'preview' in '$TAG_NAME')")"
+          echo "Preview: $(python -c "import re; print(bool(re.search(r'(a|b|rc|alpha|beta|preview|dev)\d*', '$TAG_NAME')))")"
 
       - name: Inject App Insights connection string and build wheel
         run: |
@@ -103,7 +104,7 @@ jobs:
           else
             echo "::warning::APPINSIGHTS_CONNECTION_STRING secret not set — telemetry will be disabled in this build"
           fi
-          python -m build --wheel --outdir dist/
+          python setup.py bdist_wheel --dist-dir dist/
         env:
           APPINSIGHTS_CONNECTION_STRING: ${{ secrets.APPINSIGHTS_CONNECTION_STRING }}
 
@@ -111,17 +112,6 @@ jobs:
         run: |
           pip install dist/*.whl
           python -c "import azext_prototype; print('Extension package OK')"
-
-      - name: Rename wheel with tag version
-        run: |
-          TAG_VERSION="${{ steps.ver.outputs.version }}"
-          BASE_VERSION=$(python -c "import re, pathlib; m=re.search(r'VERSION\s*=\s*\"(.+?)\"', pathlib.Path('setup.py').read_text()); print(m.group(1))")
-          if [ "$TAG_VERSION" != "$BASE_VERSION" ]; then
-            for f in dist/*.whl; do
-              mv "$f" "${f/$BASE_VERSION/$TAG_VERSION}"
-            done
-          fi
-          ls dist/
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v4
@@ -226,7 +216,53 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.EXTENSIONS_INDEX_PAT }}
 
-      - name: Update index.json
+      - name: Extract metadata from wheel
+        id: whl_meta
+        run: |
+          pip install wheel==0.30.0
+          WHEEL=$(ls dist/*.whl)
+          # Replicate the exact logic from Azure/azure-cli-extensions util.py get_ext_metadata()
+          python3 -c "
+          import json, os, re, sys, tempfile, zipfile
+
+          WHEEL_INFO_RE = re.compile(
+              r'^(?P<namever>(?P<name>.+?)(-(?P<ver>\d.+?))?)'
+              r'((-(?P<build>\d.*?))?-(?P<pyver>.+?)-(?P<abi>.+?)-(?P<plat>.+?)'
+              r'\.whl|\.dist-info)$',
+              re.VERBOSE).match
+
+          whl = sys.argv[1]
+          ext_name = 'prototype'
+
+          ext_dir = tempfile.mkdtemp()
+          with zipfile.ZipFile(whl, 'r') as zf:
+              zf.extractall(ext_dir)
+
+          metadata = {}
+
+          # Step 1: azext_metadata.json
+          pos_mods = [n for n in os.listdir(ext_dir) if n.startswith('azext_') and os.path.isdir(os.path.join(ext_dir, n))]
+          if pos_mods:
+              p = os.path.join(ext_dir, pos_mods[0], 'azext_metadata.json')
+              if os.path.isfile(p):
+                  with open(p) as f:
+                      metadata.update(json.load(f))
+
+          # Step 2: dist-info/metadata.json (contains generator field)
+          for d in os.listdir(ext_dir):
+              if d.endswith('.dist-info'):
+                  parsed = WHEEL_INFO_RE(d)
+                  if parsed and parsed.groupdict().get('name') == ext_name.replace('-', '_'):
+                      p = os.path.join(ext_dir, d, 'metadata.json')
+                      if os.path.isfile(p):
+                          with open(p) as f:
+                              metadata.update(json.load(f))
+
+          print(json.dumps(metadata, indent=2, sort_keys=True))
+          " "$WHEEL" > /tmp/wheel_metadata.json
+          cat /tmp/wheel_metadata.json
+
+      - name: Update index.json and service_name.json
         working-directory: azure-cli-extensions
         run: |
           python3 -c "
@@ -235,18 +271,14 @@ jobs:
           index_path = pathlib.Path('src/index.json')
           index = json.loads(index_path.read_text())
 
+          # Use the full merged metadata from the wheel (matches what test_index.py expects)
+          metadata = json.loads(pathlib.Path('/tmp/wheel_metadata.json').read_text())
+
           entry = {
               'filename': '${{ steps.meta.outputs.filename }}',
               'sha256Digest': '${{ steps.meta.outputs.sha256 }}',
               'downloadUrl': '${{ steps.meta.outputs.download_url }}',
-              'metadata': {
-                  'azext.isPreview': True,
-                  'azext.minCliCoreVersion': '2.50.0',
-                  'azext.summary': 'Azure CLI extension for building rapid prototypes.',
-                  'classifiers': ['Development Status :: 3 - Alpha'],
-                  'name': 'prototype',
-                  'version': '${{ steps.meta.outputs.version }}'
-              }
+              'metadata': metadata
           }
 
           # Replace existing entry or append
@@ -255,6 +287,23 @@ jobs:
           index['extensions'] = extensions
 
           index_path.write_text(json.dumps(index, indent=4, sort_keys=True) + '\n')
+
+          # Add service name mapping for azdev linter/style checks
+          sn_path = pathlib.Path('src/service_name.json')
+          sn = json.loads(sn_path.read_text())
+          # service_name.json is an array of {Command, AzureServiceName, URL} objects
+          existing = [e for e in sn if e.get('Command') == 'az prototype']
+          if not existing:
+              sn.append({
+                  'Command': 'az prototype',
+                  'AzureServiceName': 'Azure Prototype',
+                  'URL': ''
+              })
+              sn.sort(key=lambda e: e.get('Command', ''))
+              sn_path.write_text(json.dumps(sn, indent=2) + '\n')
+              print('Added prototype to service_name.json')
+          else:
+              print('prototype already in service_name.json')
           "
 
       - name: Create PR against Azure/azure-cli-extensions
@@ -265,8 +314,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           VERSION="${{ steps.meta.outputs.version }}"
           BRANCH="prototype/v${VERSION}"
-          git checkout -b "$BRANCH"
-          git add src/index.json
+          git fetch origin "$BRANCH" 2>/dev/null && git checkout "$BRANCH" || git checkout -b "$BRANCH"
+          git add src/index.json src/service_name.json
           git commit -m "Update prototype extension to ${VERSION}"
           git push --force origin "$BRANCH"
 
@@ -281,22 +330,23 @@ jobs:
           EOF
           )"
 
-          # Check if a PR already exists for this branch
+          # Try to create PR; if one already exists, update it instead
           GH_USER=$(gh api user -q .login)
-          EXISTING_PR=$(gh pr list --repo Azure/azure-cli-extensions --head "${GH_USER}:${BRANCH}" --json number --jq '.[0].number // empty')
-          if [ -n "$EXISTING_PR" ]; then
-            echo "Updating existing PR #${EXISTING_PR}"
-            gh pr edit "$EXISTING_PR" \
-              --repo Azure/azure-cli-extensions \
-              --title "Update \`prototype\` extension to ${VERSION}" \
-              --body "$PR_BODY"
-          else
-            echo "Creating new PR"
-            gh pr create \
-              --repo Azure/azure-cli-extensions \
-              --head "${GH_USER}:${BRANCH}" \
-              --title "Update \`prototype\` extension to ${VERSION}" \
-              --body "$PR_BODY"
-          fi
+          CREATE_OUTPUT=$(gh pr create \
+            --repo Azure/azure-cli-extensions \
+            --head "${GH_USER}:${BRANCH}" \
+            --title "Update \`prototype\` extension to ${VERSION}" \
+            --body "$PR_BODY" 2>&1) && echo "Created PR: $CREATE_OUTPUT" || {
+            EXISTING_PR=$(echo "$CREATE_OUTPUT" | grep -oP '/pull/\K\d+' || true)
+            if [ -n "$EXISTING_PR" ]; then
+              echo "Updating existing PR #${EXISTING_PR}"
+              gh api -X PATCH "repos/Azure/azure-cli-extensions/pulls/${EXISTING_PR}" \
+                -f title="Update \`prototype\` extension to ${VERSION}" \
+                -f body="$PR_BODY" --silent
+            else
+              echo "::error::Failed to create PR: $CREATE_OUTPUT"
+              exit 1
+            fi
+          }
         env:
           GH_TOKEN: ${{ secrets.EXTENSIONS_INDEX_PAT }}

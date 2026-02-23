@@ -137,6 +137,9 @@ long-summary: |
     Use --dry-run for non-interactive what-if / terraform plan preview.
     Use --stage N for non-interactive single-stage deploy.
     Use --stage N --dry-run for what-if preview of a single stage.
+    Use --outputs to show captured deployment outputs.
+    Use --rollback-info to show rollback instructions.
+    Use --generate-scripts to generate deploy.sh for application directories.
 examples:
     - name: Interactive deploy session (default)
       text: az prototype deploy
@@ -144,55 +147,16 @@ examples:
       text: az prototype deploy --status
     - name: Preview all stages (what-if / terraform plan)
       text: az prototype deploy --dry-run
-    - name: Preview a single stage
-      text: az prototype deploy --stage 1 --dry-run
     - name: Deploy only stage 2
       text: az prototype deploy --stage 2
     - name: Force full redeployment
       text: az prototype deploy --force
-    - name: Clear deploy state and start fresh
-      text: az prototype deploy --reset
-    - name: Deploy with explicit subscription
-      text: az prototype deploy --subscription 00000000-0000-0000-0000-000000000000
-"""
-
-helps["prototype deploy outputs"] = """
-type: command
-short-summary: Show captured deployment outputs from Terraform / Bicep.
-long-summary: |
-    After infrastructure is deployed, outputs (resource names, endpoints,
-    connection strings) are captured so application deploy scripts can
-    reference them without hard-coding values.
-examples:
-    - name: Show all captured outputs
-      text: az prototype deploy outputs
-"""
-
-helps["prototype deploy rollback-info"] = """
-type: command
-short-summary: Show rollback instructions for the most recent deployment.
-long-summary: |
-    Displays rollback commands and guidance based on the deployment history.
-    Includes Terraform state revert and Bicep re-deployment options.
-examples:
-    - name: Get rollback instructions
-      text: az prototype deploy rollback-info
-"""
-
-helps["prototype deploy generate-scripts"] = """
-type: command
-short-summary: Generate deploy.sh scripts for application directories.
-long-summary: |
-    Scans ./concept/apps/ for sub-directories and generates a deployment
-    script in each one, tailored to the chosen Azure deployment target
-    (App Service, Container Apps, or Azure Functions).
-examples:
+    - name: Show captured deployment outputs
+      text: az prototype deploy --outputs
+    - name: Show rollback instructions
+      text: az prototype deploy --rollback-info
     - name: Generate App Service deployment scripts
-      text: az prototype deploy generate-scripts --deploy-type webapp
-    - name: Generate Container Apps deployment scripts
-      text: az prototype deploy generate-scripts --deploy-type container_app --registry myregistry.azurecr.io
-    - name: Generate Azure Functions deployment scripts
-      text: az prototype deploy generate-scripts --deploy-type function
+      text: az prototype deploy --generate-scripts --script-type webapp
 """
 
 helps["prototype status"] = """
@@ -203,12 +167,12 @@ long-summary: |
     stage progress (design, build, deploy), and pending changes.
 
     By default shows a human-readable summary. Use --json for machine-readable
-    output suitable for scripting. Use --verbose for expanded per-stage details.
+    output suitable for scripting. Use --detailed for expanded per-stage details.
 examples:
     - name: Show project status
       text: az prototype status
     - name: Show detailed status with per-stage breakdown
-      text: az prototype status --verbose
+      text: az prototype status --detailed
     - name: Get machine-readable JSON output
       text: az prototype status --json
 """
@@ -231,7 +195,7 @@ long-summary: |
     and tells you which commands to run to redeploy.
 examples:
     - name: Analyze an inline error message
-      text: az prototype analyze error --input "ResourceNotFound: The Resource ... was not found"
+      text: az prototype analyze error --input "ResourceNotFound - The Resource was not found"
     - name: Analyze a log file
       text: az prototype analyze error --input ./deploy.log
     - name: Analyze a screenshot
@@ -497,14 +461,14 @@ long-summary: |
     name, description, and capabilities.
 
     By default shows a formatted console display. Use --json for
-    machine-readable output. Use --verbose for expanded capability details.
+    machine-readable output. Use --detailed for expanded capability details.
 examples:
     - name: List all agents with formatted output
       text: az prototype agent list
     - name: Get machine-readable JSON output
       text: az prototype agent list --json
     - name: Show expanded details
-      text: az prototype agent list --verbose
+      text: az prototype agent list --detailed
     - name: List only custom agents
       text: az prototype agent list --show-builtin false
 """
@@ -559,13 +523,13 @@ long-summary: |
     Displays agent metadata including description, source, capabilities,
     constraints, and a preview of the system prompt.
 
-    Use --verbose to show the full system prompt instead of a 200-character
+    Use --detailed to show the full system prompt instead of a 200-character
     preview. Use --json for machine-readable output.
 examples:
     - name: Show agent details
       text: az prototype agent show --name cloud-architect
     - name: Show full system prompt
-      text: az prototype agent show --name cloud-architect --verbose
+      text: az prototype agent show --name cloud-architect --detailed
     - name: Get JSON output
       text: az prototype agent show --name cloud-architect --json
 """
@@ -639,5 +603,5 @@ examples:
     - name: Export a built-in agent
       text: az prototype agent export --name cloud-architect
     - name: Export to a specific path
-      text: az prototype agent export --name qa-engineer --output ./agents/qa.yaml
+      text: az prototype agent export --name qa-engineer --output-file ./agents/qa.yaml
 """

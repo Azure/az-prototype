@@ -11,11 +11,6 @@ def load_command_table(self, _):
         g.custom_command("deploy", "prototype_deploy")
         g.custom_command("status", "prototype_status")
 
-    with self.command_group("prototype deploy", is_preview=True) as g:
-        g.custom_command("outputs", "prototype_deploy_outputs")
-        g.custom_command("rollback-info", "prototype_deploy_rollback_info")
-        g.custom_command("generate-scripts", "prototype_deploy_generate_scripts")
-
     with self.command_group("prototype analyze", is_preview=True) as g:
         g.custom_command("error", "prototype_analyze_error")
         g.custom_command("costs", "prototype_analyze_costs")

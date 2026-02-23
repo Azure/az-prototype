@@ -599,20 +599,20 @@ class TestPrototypeDeploy:
 
 
 class TestPrototypeDeployOutputs:
-    """Test deploy outputs command."""
+    """Test deploy --outputs flag."""
 
     @patch(f"{_MOD}._get_project_dir")
     def test_no_outputs(self, mock_dir, project_with_build):
-        from azext_prototype.custom import prototype_deploy_outputs
+        from azext_prototype.custom import prototype_deploy
 
         mock_dir.return_value = str(project_with_build)
         cmd = MagicMock()
-        result = prototype_deploy_outputs(cmd, json_output=True)
+        result = prototype_deploy(cmd, outputs=True, json_output=True)
         assert result["status"] == "empty"
 
     @patch(f"{_MOD}._get_project_dir")
     def test_with_outputs(self, mock_dir, project_with_build):
-        from azext_prototype.custom import prototype_deploy_outputs
+        from azext_prototype.custom import prototype_deploy
 
         mock_dir.return_value = str(project_with_build)
         # Write outputs file
@@ -622,42 +622,42 @@ class TestPrototypeDeployOutputs:
             json.dumps({"rg_name": "test-rg"}), encoding="utf-8"
         )
         cmd = MagicMock()
-        result = prototype_deploy_outputs(cmd, json_output=True)
+        result = prototype_deploy(cmd, outputs=True, json_output=True)
         # May return empty or dict depending on DeploymentOutputCapture impl
         assert isinstance(result, dict)
 
 
 class TestPrototypeDeployRollbackInfo:
-    """Test deploy rollback-info command."""
+    """Test deploy --rollback-info flag."""
 
     @patch(f"{_MOD}._get_project_dir")
     def test_rollback_info(self, mock_dir, project_with_build):
-        from azext_prototype.custom import prototype_deploy_rollback_info
+        from azext_prototype.custom import prototype_deploy
 
         mock_dir.return_value = str(project_with_build)
         cmd = MagicMock()
-        result = prototype_deploy_rollback_info(cmd, json_output=True)
+        result = prototype_deploy(cmd, rollback_info=True, json_output=True)
         assert "last_deployment" in result
         assert "rollback_instructions" in result
 
 
 class TestPrototypeDeployGenerateScripts:
-    """Test deploy generate-scripts command."""
+    """Test deploy --generate-scripts flag."""
 
     @patch(f"{_MOD}._get_project_dir")
     def test_generate_scripts_no_apps(self, mock_dir, project_with_config):
-        from azext_prototype.custom import prototype_deploy_generate_scripts
+        from azext_prototype.custom import prototype_deploy
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
         # concept/apps exists but empty
-        result = prototype_deploy_generate_scripts(cmd, json_output=True)
+        result = prototype_deploy(cmd, generate_scripts=True, json_output=True)
         assert result["status"] == "generated"
         assert len(result["scripts"]) == 0
 
     @patch(f"{_MOD}._get_project_dir")
     def test_generate_scripts_with_apps(self, mock_dir, project_with_config):
-        from azext_prototype.custom import prototype_deploy_generate_scripts
+        from azext_prototype.custom import prototype_deploy
 
         mock_dir.return_value = str(project_with_config)
         # Create app directories
@@ -666,13 +666,13 @@ class TestPrototypeDeployGenerateScripts:
         (apps_dir / "frontend").mkdir(parents=True, exist_ok=True)
 
         cmd = MagicMock()
-        result = prototype_deploy_generate_scripts(cmd, deploy_type="webapp", json_output=True)
+        result = prototype_deploy(cmd, generate_scripts=True, script_deploy_type="webapp", json_output=True)
         assert result["status"] == "generated"
         assert len(result["scripts"]) == 2
 
     @patch(f"{_MOD}._get_project_dir")
     def test_generate_scripts_no_apps_dir_raises(self, mock_dir, project_with_config):
-        from azext_prototype.custom import prototype_deploy_generate_scripts
+        from azext_prototype.custom import prototype_deploy
 
         # Remove apps dir if present
         import shutil
@@ -683,7 +683,7 @@ class TestPrototypeDeployGenerateScripts:
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
         with pytest.raises(CLIError, match="No apps directory"):
-            prototype_deploy_generate_scripts(cmd)
+            prototype_deploy(cmd, generate_scripts=True)
 
 
 class TestPrototypeAgentOverride:
@@ -955,15 +955,15 @@ class TestPrototypeStatusExtended:
             assert "completed" in result["stages"][stage]
 
     @patch(f"{_MOD}._get_project_dir")
-    def test_status_verbose_prints_detail(self, mock_dir, project_with_config):
-        """--verbose prints expanded output and returns None (suppressed)."""
+    def test_status_detailed_prints_detail(self, mock_dir, project_with_config):
+        """--detailed prints expanded output and returns None (suppressed)."""
         from azext_prototype.custom import prototype_status
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
 
         with patch("azext_prototype.custom.console", create=True):
-            result = prototype_status(cmd, verbose=True)
+            result = prototype_status(cmd, detailed=True)
 
         assert result is None
 
@@ -1085,13 +1085,13 @@ class TestPrototypeStatusExtended:
         assert result["deployment_history"][0]["scope"] == "all"
 
     @patch(f"{_MOD}._get_project_dir")
-    def test_status_verbose_json_returns_dict(self, mock_dir, project_with_config):
-        """When both verbose and json_output are True, json wins — returns dict."""
+    def test_status_detailed_json_returns_dict(self, mock_dir, project_with_config):
+        """When both detailed and json_output are True, json wins — returns dict."""
         from azext_prototype.custom import prototype_status
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
-        result = prototype_status(cmd, verbose=True, json_output=True)
+        result = prototype_status(cmd, detailed=True, json_output=True)
 
         # json_output takes precedence — returns the enriched dict, not displayed
         assert isinstance(result, dict)
@@ -1488,24 +1488,24 @@ class TestAnalyzeConsoleOutput:
 
 
 class TestDeploySubcommandConsole:
-    """Verify deploy subcommands use console.* methods."""
+    """Verify deploy flag sub-actions use console.* methods."""
 
     @patch(f"{_MOD}._get_project_dir")
     def test_deploy_outputs_empty_warns(self, mock_dir, project_with_config):
-        from azext_prototype.custom import prototype_deploy_outputs
+        from azext_prototype.custom import prototype_deploy
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
 
         with patch("azext_prototype.stages.deploy_helpers.DeploymentOutputCapture") as MockCapture:
             MockCapture.return_value.get_all.return_value = {}
-            result = prototype_deploy_outputs(cmd, json_output=True)
+            result = prototype_deploy(cmd, outputs=True, json_output=True)
 
         assert result["status"] == "empty"
 
     @patch(f"{_MOD}._get_project_dir")
     def test_deploy_rollback_info_empty_warns(self, mock_dir, project_with_config):
-        from azext_prototype.custom import prototype_deploy_rollback_info
+        from azext_prototype.custom import prototype_deploy
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
@@ -1513,7 +1513,7 @@ class TestDeploySubcommandConsole:
         with patch("azext_prototype.stages.deploy_helpers.RollbackManager") as MockMgr:
             MockMgr.return_value.get_last_snapshot.return_value = None
             MockMgr.return_value.get_rollback_instructions.return_value = None
-            result = prototype_deploy_rollback_info(cmd, json_output=True)
+            result = prototype_deploy(cmd, rollback_info=True, json_output=True)
 
         assert result["last_deployment"] is None
         assert result["rollback_instructions"] is None
@@ -1521,7 +1521,7 @@ class TestDeploySubcommandConsole:
     @patch(f"{_MOD}._get_project_dir")
     @patch(f"{_MOD}._load_config")
     def test_generate_scripts_uses_console(self, mock_config, mock_dir, project_with_config):
-        from azext_prototype.custom import prototype_deploy_generate_scripts
+        from azext_prototype.custom import prototype_deploy
 
         mock_dir.return_value = str(project_with_config)
         mock_config.return_value = MagicMock()
@@ -1535,7 +1535,7 @@ class TestDeploySubcommandConsole:
         cmd = MagicMock()
 
         with patch("azext_prototype.stages.deploy_helpers.DeployScriptGenerator") as MockGen:
-            result = prototype_deploy_generate_scripts(cmd, json_output=True)
+            result = prototype_deploy(cmd, generate_scripts=True, json_output=True)
 
         assert result["status"] == "generated"
         assert "my-app/deploy.sh" in result["scripts"]
@@ -1549,7 +1549,7 @@ _MOD = "azext_prototype.custom"
 
 
 class TestPrototypeAgentListRichUI:
-    """Test agent list Rich UI, json, and verbose modes."""
+    """Test agent list Rich UI, json, and detailed modes."""
 
     @patch(f"{_MOD}._get_project_dir")
     def test_list_json_returns_list(self, mock_dir, project_with_config):
@@ -1574,13 +1574,13 @@ class TestPrototypeAgentListRichUI:
         assert isinstance(result, list)
 
     @patch(f"{_MOD}._get_project_dir")
-    def test_list_verbose_mode(self, mock_dir, project_with_config):
+    def test_list_detailed_mode(self, mock_dir, project_with_config):
         from azext_prototype.custom import prototype_agent_list
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
 
-        result = prototype_agent_list(cmd, verbose=True, json_output=True)
+        result = prototype_agent_list(cmd, detailed=True, json_output=True)
         assert isinstance(result, list)
 
     @patch(f"{_MOD}._get_project_dir")
@@ -1596,7 +1596,7 @@ class TestPrototypeAgentListRichUI:
 
 
 class TestPrototypeAgentShowRichUI:
-    """Test agent show Rich UI, json, and verbose modes."""
+    """Test agent show Rich UI, json, and detailed modes."""
 
     @patch(f"{_MOD}._get_project_dir")
     def test_show_json_returns_dict(self, mock_dir, project_with_config):
@@ -1611,15 +1611,15 @@ class TestPrototypeAgentShowRichUI:
         assert "system_prompt_preview" in result
 
     @patch(f"{_MOD}._get_project_dir")
-    def test_show_verbose_includes_full_prompt(self, mock_dir, project_with_config):
+    def test_show_detailed_includes_full_prompt(self, mock_dir, project_with_config):
         from azext_prototype.custom import prototype_agent_show
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
 
-        result = prototype_agent_show(cmd, name="cloud-architect", verbose=True, json_output=True)
+        result = prototype_agent_show(cmd, name="cloud-architect", detailed=True, json_output=True)
         assert "system_prompt" in result
-        # verbose should not have preview
+        # detailed should not have preview
         assert "system_prompt_preview" not in result
 
     @patch(f"{_MOD}._get_project_dir")
@@ -1835,7 +1835,7 @@ class TestPrototypeAgentExport:
         cmd = MagicMock()
 
         output_path = str(project_with_config / "exported.yaml")
-        result = prototype_agent_export(cmd, name="cloud-architect", output=output_path, json_output=True)
+        result = prototype_agent_export(cmd, name="cloud-architect", output_file=output_path, json_output=True)
 
         assert result["status"] == "exported"
         assert result["name"] == "cloud-architect"
@@ -1857,7 +1857,7 @@ class TestPrototypeAgentExport:
 
         prototype_agent_add(cmd, name="export-test", definition="bicep_agent")
         output_path = str(project_with_config / "custom_export.yaml")
-        result = prototype_agent_export(cmd, name="export-test", output=output_path, json_output=True)
+        result = prototype_agent_export(cmd, name="export-test", output_file=output_path, json_output=True)
 
         assert result["status"] == "exported"
         assert (project_with_config / "custom_export.yaml").exists()
@@ -1891,7 +1891,7 @@ class TestPrototypeAgentExport:
         cmd = MagicMock()
 
         output_path = str(project_with_config / "loadable.yaml")
-        prototype_agent_export(cmd, name="cloud-architect", output=output_path)
+        prototype_agent_export(cmd, name="cloud-architect", output_file=output_path)
 
         agent = load_yaml_agent(output_path)
         assert agent.name == "cloud-architect"

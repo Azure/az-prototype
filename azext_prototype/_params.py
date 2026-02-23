@@ -165,33 +165,55 @@ def load_arguments(self, _):
         c.argument("client_id", help="Service principal application/client ID (or set via config).")
         c.argument("client_secret", help="Service principal client secret (or set via config).")
         c.argument("tenant_id", help="Tenant ID for service principal authentication (or set via config).")
+        # Flags that replace former subcommands
+        c.argument(
+            "outputs",
+            options_list=["--outputs"],
+            help="Show captured deployment outputs from Terraform / Bicep.",
+            action="store_true",
+            default=False,
+        )
+        c.argument(
+            "rollback_info",
+            options_list=["--rollback-info"],
+            help="Show rollback instructions based on deployment history.",
+            action="store_true",
+            default=False,
+        )
+        c.argument(
+            "generate_scripts",
+            options_list=["--generate-scripts"],
+            help="Generate deploy.sh scripts for application directories.",
+            action="store_true",
+            default=False,
+        )
+        c.argument(
+            "script_deploy_type",
+            options_list=["--script-type"],
+            arg_type=get_enum_type(["webapp", "container_app", "function"]),
+            help="Azure deployment target type for --generate-scripts.",
+            default="webapp",
+        )
+        c.argument(
+            "script_resource_group",
+            options_list=["--script-resource-group"],
+            help="Default resource group name for --generate-scripts.",
+        )
+        c.argument(
+            "script_registry",
+            options_list=["--script-registry"],
+            help="Container registry URL for --generate-scripts (container_app type).",
+        )
 
     # --- az prototype status ---
     with self.argument_context("prototype status") as c:
         c.argument(
-            "verbose",
-            options_list=["--verbose", "-v"],
+            "detailed",
+            options_list=["--detailed", "-d"],
             help="Show expanded per-stage details.",
             action="store_true",
             default=False,
         )
-
-    # --- az prototype deploy generate-scripts ---
-    with self.argument_context("prototype deploy generate-scripts") as c:
-        c.argument(
-            "scope",
-            arg_type=get_enum_type(["apps"]),
-            help="Scope for script generation.",
-            default="apps",
-        )
-        c.argument(
-            "deploy_type",
-            arg_type=get_enum_type(["webapp", "container_app", "function"]),
-            help="Azure deployment target type.",
-            default="webapp",
-        )
-        c.argument("resource_group", help="Default resource group name for generated scripts.")
-        c.argument("registry", help="Container registry URL (for container_app type).")
 
     # --- az prototype analyze ---
     with self.argument_context("prototype analyze error") as c:
@@ -329,8 +351,8 @@ def load_arguments(self, _):
             default=True,
         )
         c.argument(
-            "verbose",
-            options_list=["--verbose", "-v"],
+            "detailed",
+            options_list=["--detailed", "-d"],
             help="Show expanded capability details for each agent.",
             action="store_true",
             default=False,
@@ -339,8 +361,8 @@ def load_arguments(self, _):
     with self.argument_context("prototype agent show") as c:
         c.argument("name", help="Name of the agent to show details for.")
         c.argument(
-            "verbose",
-            options_list=["--verbose", "-v"],
+            "detailed",
+            options_list=["--detailed", "-d"],
             help="Show full system prompt instead of 200-char preview.",
             action="store_true",
             default=False,
@@ -371,7 +393,8 @@ def load_arguments(self, _):
     with self.argument_context("prototype agent export") as c:
         c.argument("name", help="Name of the agent to export.")
         c.argument(
-            "output",
+            "output_file",
+            options_list=["--output-file", "-f"],
             help="Output file path for the exported YAML.",
             default=None,
         )
