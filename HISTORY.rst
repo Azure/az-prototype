@@ -12,6 +12,16 @@ Azure CLI extension index compatibility
   reserved Azure CLI global argument.  The ``prototype status``,
   ``agent list``, and ``agent show`` commands now use ``--detailed`` / ``-d``
   instead.
+* **Renamed ``--output`` to ``--output-file``** — ``--output`` / ``-o`` is a
+  reserved Azure CLI global argument.  The ``agent export`` command now uses
+  ``--output-file`` / ``-f`` instead.
+* **Consolidated deploy subcommands into flags** — ``deploy outputs``,
+  ``deploy rollback-info``, and ``deploy generate-scripts`` were subcommands
+  that made ``deploy`` both a command and a command group, causing an
+  argparse conflict on Python 3.13.  They are now flags on the single
+  ``az prototype deploy`` command: ``--outputs``, ``--rollback-info``,
+  ``--generate-scripts`` (with ``--script-type``, ``--script-resource-group``,
+  ``--script-registry``).
 * **Dropped non-PEP 440 version suffixes from wheel filenames** — release
   and CI pipelines no longer rename wheels with ``-preview`` or ``-ci.N``
   suffixes, which broke ``azdev linter`` filename validation.
@@ -294,7 +304,7 @@ Cross-tenant and service principal deploy
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * **Service principal authentication** — ``--service-principal``,
   ``--client-id``, ``--client-secret``, ``--tenant-id`` parameters on
-  ``az prototype deploy run``.  SP credentials route to
+  ``az prototype deploy``.  SP credentials route to
   ``prototype.secrets.yaml`` via ``deploy.service_principal`` prefix.
 * **Cross-tenant targeting** — ``--tenant`` parameter sets the
   deployment subscription context.  Preflight ``_check_tenant()`` warns

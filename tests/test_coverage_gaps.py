@@ -558,7 +558,7 @@ class TestPrototypeDeployOutputsExtended:
 
     @patch(f"{_MOD}._get_project_dir")
     def test_outputs_with_stored_data(self, mock_dir, project_with_build):
-        from azext_prototype.custom import prototype_deploy_outputs
+        from azext_prototype.custom import prototype_deploy
 
         mock_dir.return_value = str(project_with_build)
         state_dir = project_with_build / ".prototype" / "state"
@@ -567,5 +567,5 @@ class TestPrototypeDeployOutputsExtended:
             json.dumps({"rg_name": {"value": "test-rg"}}), encoding="utf-8"
         )
         cmd = MagicMock()
-        result = prototype_deploy_outputs(cmd, json_output=True)
+        result = prototype_deploy(cmd, outputs=True, json_output=True)
         assert isinstance(result, dict)

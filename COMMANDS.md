@@ -24,9 +24,6 @@ Analysis commands let you diagnose errors and estimate costs at any point.
 | [az prototype design](#az-prototype-design) | Analyze requirements and generate architecture design. | Preview |
 | [az prototype build](#az-prototype-build) | Generate infrastructure and application code in staged output. | Preview |
 | [az prototype deploy](#az-prototype-deploy) | Deploy prototype to Azure with staged, incremental deployments. | Preview |
-| [az prototype deploy outputs](#az-prototype-deploy-outputs) | Show captured deployment outputs. | Preview |
-| [az prototype deploy rollback-info](#az-prototype-deploy-rollback-info) | Show rollback instructions based on deployment history. | Preview |
-| [az prototype deploy generate-scripts](#az-prototype-deploy-generate-scripts) | Generate deploy scripts for application directories. | Preview |
 | [az prototype status](#az-prototype-status) | Show current project status across all stages. | Preview |
 | [az prototype analyze](#az-prototype-analyze) | Analyze errors, costs, and diagnostics for the prototype. | Preview |
 | [az prototype analyze error](#az-prototype-analyze-error) | Analyze an error and get a fix with redeployment instructions. | Preview |
@@ -404,6 +401,12 @@ az prototype deploy [--stage]
                     [--client-id]
                     [--client-secret]
                     [--tenant-id]
+                    [--outputs]
+                    [--rollback-info]
+                    [--generate-scripts]
+                    [--script-type {container_app, function, webapp}]
+                    [--script-resource-group]
+                    [--script-registry]
 ```
 
 ### Examples
@@ -475,6 +478,30 @@ az prototype config set --key deploy.service_principal.client_id --value abc123
 az prototype config set --key deploy.service_principal.client_secret --value mysecret
 az prototype config set --key deploy.service_principal.tenant_id --value def456
 az prototype deploy --service-principal
+```
+
+Show captured deployment outputs.
+
+```
+az prototype deploy --outputs
+```
+
+Show rollback instructions.
+
+```
+az prototype deploy --rollback-info
+```
+
+Generate webapp deploy scripts (default).
+
+```
+az prototype deploy --generate-scripts
+```
+
+Generate container app deploy scripts with registry.
+
+```
+az prototype deploy --generate-scripts --script-type container_app --script-registry myregistry.azurecr.io
 ```
 
 ### Interactive Session
@@ -591,116 +618,46 @@ Service principal client secret. Can also be set via `az prototype config set --
 
 Tenant ID for service principal authentication. Can also be set via `az prototype config set --key deploy.service_principal.tenant_id --value <tenant>`. Stored in `prototype.secrets.yaml`.
 
-### Subcommands
+`--outputs`
 
-| Command | Description |
-|---|---|
-| [az prototype deploy outputs](#az-prototype-deploy-outputs) | Show captured deployment outputs. |
-| [az prototype deploy rollback-info](#az-prototype-deploy-rollback-info) | Show rollback instructions based on deployment history. |
-| [az prototype deploy generate-scripts](#az-prototype-deploy-generate-scripts) | Generate deploy scripts for application directories. |
-
----
-
-## az prototype deploy outputs
-
-Show captured deployment outputs.
-
-After infrastructure is deployed (Terraform / Bicep), the outputs are captured so that app deploy scripts can reference them. Displays all captured outputs from the most recent deployment.
-
-```
-az prototype deploy outputs
-```
-
-### Examples
-
-Show deployment outputs.
-
-```
-az prototype deploy outputs
-```
-
----
-
-## az prototype deploy rollback-info
-
-Show rollback instructions based on deployment history.
-
-Displays the last deployment snapshot and generated rollback instructions. Use this to understand what would happen if you roll back.
-
-```
-az prototype deploy rollback-info
-```
-
-### Examples
-
-View rollback instructions.
-
-```
-az prototype deploy rollback-info
-```
-
----
-
-## az prototype deploy generate-scripts
-
-Generate deploy scripts for application directories.
-
-Scans `./concept/apps/` for sub-directories and generates a `deploy.sh` in each one, tailored to the chosen deployment target (webapp, container app, or function).
-
-```
-az prototype deploy generate-scripts [--scope {apps}]
-                                      [--deploy-type {container_app, function, webapp}]
-                                      [--resource-group]
-                                      [--registry]
-```
-
-### Examples
-
-Generate webapp deploy scripts (default).
-
-```
-az prototype deploy generate-scripts
-```
-
-Generate container app deploy scripts with registry.
-
-```
-az prototype deploy generate-scripts --deploy-type container_app --registry myregistry.azurecr.io
-```
-
-Generate function deploy scripts for a specific resource group.
-
-```
-az prototype deploy generate-scripts --deploy-type function --resource-group my-rg
-```
-
-### Optional Parameters
-
-`--scope`
-
-Scope for script generation.
+Show captured deployment outputs from Terraform / Bicep. Displays all captured outputs from the most recent deployment.
 
 | | |
 |---|---|
-| Default value: | `apps` |
-| Accepted values: | `apps` |
+| Default value: | `False` |
 
-`--deploy-type`
+`--rollback-info`
 
-Azure deployment target type.
+Show rollback instructions based on deployment history. Displays the last deployment snapshot and generated rollback instructions.
+
+| | |
+|---|---|
+| Default value: | `False` |
+
+`--generate-scripts`
+
+Generate deploy scripts for application directories. Scans `./concept/apps/` for sub-directories and generates a `deploy.sh` in each one, tailored to the chosen deployment target.
+
+| | |
+|---|---|
+| Default value: | `False` |
+
+`--script-type`
+
+Azure deployment target type for `--generate-scripts`.
 
 | | |
 |---|---|
 | Default value: | `webapp` |
 | Accepted values: | `container_app`, `function`, `webapp` |
 
-`--resource-group`
+`--script-resource-group`
 
-Default resource group name for generated scripts.
+Default resource group name for `--generate-scripts`.
 
-`--registry`
+`--script-registry`
 
-Container registry URL (for `container_app` type).
+Container registry URL for `--generate-scripts` (`container_app` type).
 
 ---
 
@@ -708,12 +665,12 @@ Container registry URL (for `container_app` type).
 
 Show current project status across all stages.
 
-Displays a layered summary of the prototype project including configuration, stage progress (design, build, deploy), and pending file changes. By default shows a human-readable Rich console summary. Use `--json` for machine-readable output suitable for scripting. Use `--verbose` for expanded per-stage details.
+Displays a layered summary of the prototype project including configuration, stage progress (design, build, deploy), and pending file changes. By default shows a human-readable Rich console summary. Use `--json` for machine-readable output suitable for scripting. Use `--detailed` for expanded per-stage details.
 
 The command reads state from all three stage files (`discovery.yaml`, `build.yaml`, `deploy.yaml`) to show real progress — not just boolean completion flags.
 
 ```
-az prototype status [--verbose]
+az prototype status [--detailed]
                     [--json]
 ```
 
@@ -728,7 +685,7 @@ az prototype status
 Show detailed status with per-stage breakdown.
 
 ```
-az prototype status --verbose
+az prototype status --detailed
 ```
 
 Get machine-readable JSON output.
@@ -752,7 +709,7 @@ IaC: terraform | AI: copilot | Naming: microsoft-caf
 
 ### Optional Parameters
 
-`--verbose` `-v`
+`--detailed` `-d`
 
 Show expanded per-stage details: discovery open/confirmed items, build stage breakdown, deploy stage status, and deployment history.
 
@@ -1445,11 +1402,11 @@ Agent resolution order: **custom** → **override** → **built-in**.
 
 List all available agents (built-in and custom).
 
-Displays agents grouped by source (built-in, custom, override) with name, description, and capabilities. Use `--json` for machine-readable output. Use `--verbose` for expanded capability details.
+Displays agents grouped by source (built-in, custom, override) with name, description, and capabilities. Use `--json` for machine-readable output. Use `--detailed` for expanded capability details.
 
 ```
 az prototype agent list [--show-builtin]
-                        [--verbose]
+                        [--detailed]
                         [--json]
 ```
 
@@ -1470,7 +1427,7 @@ az prototype agent list --json
 Show expanded details.
 
 ```
-az prototype agent list --verbose
+az prototype agent list --detailed
 ```
 
 ### Optional Parameters
@@ -1483,7 +1440,7 @@ Include built-in agents in the listing.
 |---|---|
 | Default value: | `True` |
 
-`--verbose` `-v`
+`--detailed` `-d`
 
 Show expanded capability details for each agent.
 
@@ -1589,11 +1546,11 @@ Path to YAML or Python agent definition file.
 
 Show details of a specific agent.
 
-Displays agent metadata including description, source, capabilities, constraints, and a preview of the system prompt. Use `--verbose` to show the full system prompt. Use `--json` for machine-readable output.
+Displays agent metadata including description, source, capabilities, constraints, and a preview of the system prompt. Use `--detailed` to show the full system prompt. Use `--json` for machine-readable output.
 
 ```
 az prototype agent show --name
-                        [--verbose]
+                        [--detailed]
                         [--json]
 ```
 
@@ -1608,7 +1565,7 @@ az prototype agent show --name cloud-architect
 Show full system prompt.
 
 ```
-az prototype agent show --name cloud-architect --verbose
+az prototype agent show --name cloud-architect --detailed
 ```
 
 Get JSON output.
@@ -1625,7 +1582,7 @@ Name of the agent to show details for.
 
 ### Optional Parameters
 
-`--verbose` `-v`
+`--detailed` `-d`
 
 Show full system prompt instead of 200-char preview.
 
@@ -1783,7 +1740,7 @@ Exports the agent's metadata, system prompt, capabilities, constraints, and exam
 
 ```
 az prototype agent export --name
-                          [--output]
+                          [--output-file]
 ```
 
 ### Examples
@@ -1797,7 +1754,7 @@ az prototype agent export --name cloud-architect
 Export to a specific path.
 
 ```
-az prototype agent export --name qa-engineer --output ./agents/qa.yaml
+az prototype agent export --name qa-engineer --output-file ./agents/qa.yaml
 ```
 
 ### Required Parameters
@@ -1808,7 +1765,7 @@ Name of the agent to export.
 
 ### Optional Parameters
 
-`--output`
+`--output-file` `-f`
 
 Output file path for the exported YAML. Defaults to `./<name>.yaml`.
 

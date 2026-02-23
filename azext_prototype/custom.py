@@ -521,6 +521,12 @@ def prototype_deploy(
     client_id=None,
     client_secret=None,
     tenant_id=None,
+    outputs=False,
+    rollback_info=False,
+    generate_scripts=False,
+    script_deploy_type="webapp",
+    script_resource_group=None,
+    script_registry=None,
 ):
     """Run the deploy stage.
 
@@ -534,7 +540,23 @@ def prototype_deploy(
     Use ``--stage N --dry-run`` for what-if of a single stage.
     Use ``--service-principal`` with ``--client-id``, ``--client-secret``,
     and ``--tenant-id`` for cross-tenant service principal deployment.
+    Use ``--outputs`` to show captured deployment outputs.
+    Use ``--rollback-info`` to show rollback instructions.
+    Use ``--generate-scripts`` to generate deploy.sh scripts for apps.
     """
+    # Dispatch to sub-actions if a flag is set
+    if outputs:
+        return _deploy_outputs(cmd)
+    if rollback_info:
+        return _deploy_rollback_info(cmd)
+    if generate_scripts:
+        return _deploy_generate_scripts(
+            cmd,
+            deploy_type=script_deploy_type,
+            resource_group=script_resource_group,
+            registry=script_registry,
+        )
+
     from azext_prototype.stages.deploy_stage import DeployStage
     from azext_prototype.stages.deploy_state import DeployState
     from azext_prototype.ui.console import console
@@ -608,9 +630,7 @@ def prototype_deploy(
         _shutdown_mcp(agent_context)
 
 
-@_quiet_output
-@track("prototype deploy outputs")
-def prototype_deploy_outputs(cmd):
+def _deploy_outputs(cmd):
     """Show captured deployment outputs.
 
     After infrastructure is deployed (Terraform / Bicep), the outputs
@@ -641,9 +661,7 @@ def prototype_deploy_outputs(cmd):
     return outputs
 
 
-@_quiet_output
-@track("prototype deploy rollback-info")
-def prototype_deploy_rollback_info(cmd):
+def _deploy_rollback_info(cmd):
     """Show rollback instructions based on deployment history."""
     from azext_prototype.stages.deploy_helpers import RollbackManager
     from azext_prototype.ui.console import console
@@ -674,11 +692,8 @@ def prototype_deploy_rollback_info(cmd):
     }
 
 
-@_quiet_output
-@track("prototype deploy generate-scripts")
-def prototype_deploy_generate_scripts(
+def _deploy_generate_scripts(
     cmd,
-    scope="apps",
     deploy_type="webapp",
     resource_group=None,
     registry=None,
@@ -1932,7 +1947,7 @@ def prototype_agent_test(cmd, name=None, prompt=None):
 
 @_quiet_output
 @track("prototype agent export")
-def prototype_agent_export(cmd, name=None, output=None):
+def prototype_agent_export(cmd, name=None, output_file=None):
     """Export any agent (including built-in) as a YAML file."""
     if not name:
         raise CLIError("--name is required.")
@@ -1961,7 +1976,7 @@ def prototype_agent_export(cmd, name=None, output=None):
     if tools:
         export_data["tools"] = tools
 
-    output_path = Path(output) if output else Path(f"./{name}.yaml")
+    output_path = Path(output_file) if output_file else Path(f"./{name}.yaml")
     output_path.write_text(
         _yaml.dump(export_data, default_flow_style=False, sort_keys=False),
         encoding="utf-8",
