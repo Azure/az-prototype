@@ -299,7 +299,6 @@ jobs:
                   'AzureServiceName': 'Azure Prototype',
                   'URL': ''
               })
-              sn.sort(key=lambda e: e.get('Command', ''))
               sn_path.write_text(json.dumps(sn, indent=2) + '\n')
               print('Added prototype to service_name.json')
           else:
