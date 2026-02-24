@@ -22,7 +22,6 @@ from __future__ import annotations
 import json
 import logging
 import re
-import subprocess
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Iterator
@@ -1397,47 +1396,6 @@ class BuildSession:
 
         return "\n\n".join(parts)
 
-    def _validate_terraform_stage(self, stage: dict) -> str | None:
-        """Run terraform init -backend=false + validate for one stage.
-
-        Returns error string or None if valid.
-        """
-        if self._iac_tool != "terraform":
-            return None
-        if stage.get("category") not in ("infra", "data", "integration"):
-            return None
-
-        stage_dir = Path(self._context.project_dir) / stage.get("dir", "")
-        if not stage_dir.is_dir() or not list(stage_dir.glob("*.tf")):
-            return None
-
-        try:
-            init = subprocess.run(
-                ["terraform", "init", "-backend=false", "-input=false", "-no-color"],
-                capture_output=True,
-                text=True,
-                cwd=str(stage_dir),
-                check=False,
-            )
-        except FileNotFoundError:
-            logger.debug("terraform not found on PATH — skipping stage validation")
-            return None
-
-        if init.returncode != 0:
-            return f"Init failed: {(init.stderr or init.stdout).strip()[:300]}"
-
-        val = subprocess.run(
-            ["terraform", "validate", "-no-color"],
-            capture_output=True,
-            text=True,
-            cwd=str(stage_dir),
-            check=False,
-        )
-        if val.returncode != 0:
-            return (val.stderr or val.stdout).strip()[:300]
-
-        return None
-
     def _run_stage_qa(
         self,
         stage: dict,
@@ -1451,7 +1409,6 @@ class BuildSession:
             return
 
         stage_num = stage["stage"]
-        category = stage.get("category", "infra")
         orchestrator = AgentOrchestrator(self._registry, self._context)
 
         for attempt in range(_MAX_STAGE_REMEDIATION_ATTEMPTS + 1):
@@ -1460,12 +1417,7 @@ class BuildSession:
             if not file_content:
                 return
 
-            # 2. Run terraform validate (inline) for infra stages
-            tf_error = None
-            if self._iac_tool == "terraform" and category in ("infra", "data", "integration"):
-                tf_error = self._validate_terraform_stage(stage)
-
-            # 3. Build QA task
+            # 2. Build QA task
             if attempt == 0:
                 qa_task = (
                     f"Review the generated code for Stage {stage_num}: {stage['name']} "
@@ -1482,10 +1434,7 @@ class BuildSession:
                     f"## Stage {stage_num} Files\n\n{file_content}"
                 )
 
-            if tf_error:
-                qa_task += f"\n\n## Terraform Validation Error (MUST FIX)\n```\n{tf_error}\n```"
-
-            # 4. Run QA
+            # 3. Run QA
             with self._maybe_spinner(f"QA reviewing Stage {stage_num}...", use_styled):
                 qa_result = orchestrator.delegate(
                     from_agent="build-session",
@@ -1497,39 +1446,34 @@ class BuildSession:
 
             qa_content = qa_result.content if qa_result else ""
 
-            # 5. Check if issues found
-            has_issues = tf_error or (
-                qa_content
-                and any(kw in qa_content.lower() for kw in ["critical", "error", "missing", "fix", "issue", "broken"])
+            # 4. Check if issues found
+            has_issues = qa_content and any(
+                kw in qa_content.lower() for kw in ["critical", "error", "missing", "fix", "issue", "broken"]
             )
 
             if not has_issues:
                 _print(f"       Stage {stage_num} passed QA.")
                 return
 
-            # 6. If at max attempts, report and move on
+            # 5. If at max attempts, report and move on
             if attempt >= _MAX_STAGE_REMEDIATION_ATTEMPTS:
                 _print(f"       Stage {stage_num}: QA issues remain after {attempt} remediation(s). Proceeding.")
                 if qa_content:
                     _print(f"       Remaining: {qa_content[:200]}")
                 return
 
-            # 7. Remediate — re-invoke IaC agent with QA findings
+            # 6. Remediate — re-invoke IaC agent with QA findings
             _print(f"       Stage {stage_num}: QA found issues — remediating (attempt {attempt + 1})...")
 
             agent, task = self._build_stage_task(stage, architecture, templates)
             if not agent:
                 return
 
-            combined_issues = qa_content or ""
-            if tf_error:
-                combined_issues += f"\n\nTerraform Validation Error:\n{tf_error}"
-
             task += (
                 "\n\n## QA Review Findings (MUST FIX)\n"
                 "The QA engineer found the following issues. "
                 "You MUST address ALL of them:\n\n"
-                f"{combined_issues}\n"
+                f"{qa_content}\n"
             )
 
             with self._maybe_spinner(f"Remediating Stage {stage_num}...", use_styled):
@@ -1587,47 +1531,6 @@ class BuildSession:
                 parts.append(block)
 
         return "\n\n".join(parts)
-
-    def _validate_terraform_stages(self) -> dict[int, str]:
-        """Run ``terraform init -backend=false`` + ``terraform validate`` on each infra stage.
-
-        Returns a dict mapping stage numbers to error messages.  Skips
-        stages that are not infra/data/integration, have no ``.tf`` files,
-        or when the IaC tool is not Terraform.
-        """
-        if self._iac_tool != "terraform":
-            return {}
-        errors: dict[int, str] = {}
-        for stage in self._build_state._state.get("deployment_stages", []):
-            if stage.get("category") not in ("infra", "data", "integration"):
-                continue
-            stage_dir = Path(self._context.project_dir) / stage.get("dir", "")
-            if not stage_dir.is_dir() or not list(stage_dir.glob("*.tf")):
-                continue
-            try:
-                init = subprocess.run(
-                    ["terraform", "init", "-backend=false", "-input=false", "-no-color"],
-                    capture_output=True,
-                    text=True,
-                    cwd=str(stage_dir),
-                    check=False,
-                )
-            except FileNotFoundError:
-                logger.debug("terraform not found on PATH — skipping build-time validation")
-                return {}
-            if init.returncode != 0:
-                errors[stage["stage"]] = f"Init failed: {(init.stderr or init.stdout).strip()[:300]}"
-                continue
-            val = subprocess.run(
-                ["terraform", "validate", "-no-color"],
-                capture_output=True,
-                text=True,
-                cwd=str(stage_dir),
-                check=False,
-            )
-            if val.returncode != 0:
-                errors[stage["stage"]] = (val.stderr or val.stdout).strip()[:300]
-        return errors
 
     @contextmanager
     def _maybe_spinner(self, message: str, use_styled: bool) -> Iterator[None]:

@@ -297,9 +297,8 @@ jobs:
               sn.append({
                   'Command': 'az prototype',
                   'AzureServiceName': 'Azure Prototype',
-                  'URL': ''
+                  'URL': 'https://github.com/Azure/az-prototype'
               })
-              sn.sort(key=lambda e: e.get('Command', ''))
               sn_path.write_text(json.dumps(sn, indent=2) + '\n')
               print('Added prototype to service_name.json')
           else:
