@@ -9,13 +9,13 @@ Rapid Azure prototype generation powered by AI agent teams.
 ## Prerequisites
 
 - Azure CLI 2.50+
-- GitHub CLI (`gh`) installed and authenticated
-- GitHub Copilot license (Business or Enterprise)
 - Azure subscription with appropriate permissions
+- GitHub CLI (`gh`) installed and authenticated (required for `copilot` and `github-models` providers)
+- GitHub Copilot license, Business or Enterprise (required for `copilot` provider only)
 
 ## Installation
 
-> NOTE: Currently, AZ Prototype is in _preview_. We are aggressively working to produce our first stable version in March 2025. Please log all bugs in [Issues](https://github.com/Azure/az-prototype/issues), and we will address them as soon as possible.
+> NOTE: Currently, AZ Prototype is in _preview_. We are aggressively working to produce our first stable version in March 2026. Please log all bugs in [Issues](https://github.com/Azure/az-prototype/issues), and we will address them as soon as possible.
 
 ### Install
 
@@ -53,11 +53,11 @@ az prototype build
 # Deploy to Azure (incremental — only deploys changes)
 az prototype deploy
 
-# Deploy only infrastructure changes
-az prototype deploy --scope infra
+# Build only infrastructure code
+az prototype build --scope infra
 
-# Deploy only application changes
-az prototype deploy --scope apps
+# Build only application code
+az prototype build --scope apps
 ```
 
 To receive help for any specific command, run `az prototype --help` or `az prototype <command> --help`.
@@ -67,18 +67,21 @@ View the [command reference](./COMMANDS.md) to see the full list of commands and
 ## Agent System
 
 ### Built-in Agents
-Ships with 8 pre-defined agents:
+Ships with 11 pre-defined agents:
 
 | Agent | Capability | Description |
 |-------|-----------|-------------|
 | `cloud-architect` | Architecture | Cross-service coordination and architecture design |
-| `terraform` | Terraform | Terraform IaC generation |
-| `bicep` | Bicep | Bicep template generation |
+| `terraform-agent` | Terraform | Terraform IaC generation |
+| `bicep-agent` | Bicep | Bicep template generation |
 | `app-developer` | Development | Application code generation (APIs, Functions, containers) |
-| `documentation` | Documentation | Project and deployment documentation |
+| `doc-agent` | Documentation | Project and deployment documentation |
 | `qa-engineer` | QA / Analysis | Error diagnosis from logs, strings, or screenshots; fix coordination |
 | `biz-analyst` | Business Analysis | Requirements gap analysis and interactive design dialogue |
-| `cost-analyst` | Cost Analysis | Azure cost estimation at S/M/L t-shirt sizes via Retail Prices API |
+| `cost-analyst` | Cost Analysis | Azure cost estimation at S/M/L t-shirt sizes |
+| `project-manager` | Coordination | Scope management, task assignment, escalation |
+| `security-reviewer` | Security | Pre-deployment IaC security scanning |
+| `monitoring-agent` | Monitoring | Observability configuration generation |
 
 ### Custom Agents
 Add your own agents via YAML or Python:
@@ -127,8 +130,8 @@ naming:
   zone_id: zd              # ALZ zone ID (see table below)
 
 ai:
-  provider: github-models  # or azure-openai
-  model: gpt-4o
+  provider: copilot  # copilot | github-models | azure-openai
+  model: claude-sonnet-4
 
 agents:
   custom_dir: ./.prototype/agents/
