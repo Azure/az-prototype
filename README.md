@@ -23,7 +23,7 @@ Rapid Azure prototype generation powered by AI agent teams.
 az extension add --name prototype
 ```
 
-### Updgrade
+### Upgrade
 
 Only Stable Versions:
 ```bash
@@ -176,3 +176,4 @@ When using `microsoft-alz`, resources are assigned to a landing zone:
 ## Development
 
 The Azure CLI prototype extension is architected and developed by [Joshua Davis](https://github.com/a11smiles/), and it is based on a solution engineering program he launched within Microsoft enterprise field sales, the Innovation Factory, that delivers rapid prototypes for Microsoft enterprise customers.
+
