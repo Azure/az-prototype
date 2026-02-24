@@ -1409,7 +1409,6 @@ class BuildSession:
             return
 
         stage_num = stage["stage"]
-        category = stage.get("category", "infra")
         orchestrator = AgentOrchestrator(self._registry, self._context)
 
         for attempt in range(_MAX_STAGE_REMEDIATION_ATTEMPTS + 1):
