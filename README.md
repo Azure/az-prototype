@@ -15,7 +15,7 @@ Rapid Azure prototype generation powered by AI agent teams.
 
 ## Installation
 
-Currently, AZ Prototype is in _private preview_ and is, therefore, not available in the Azure CLI library. To use, you must currently download the wheel to you local machine from our [releases](https://github.com/Azure/az-prototype/releases) and manually install it.
+> NOTE: Currently, AZ Prototype is in _preview_. We are aggressively working to produce our first stable version in March 2025. Please log all bugs in [Issues](https://github.com/Azure/az-prototype/issues), and we will address them as soon as possible.
 
 ### Install
 
@@ -173,7 +173,6 @@ When using `microsoft-alz`, resources are assigned to a landing zone:
 | `az prototype build` | Generate IaC and app code | Yes |
 | `az prototype deploy` | Deploy with change tracking | Yes |
 
-## License
+## Development
 
-MIT
-
+The Azure CLI prototype extension is architected and developed by [Joshua Davis](https://github.com/a11smiles/), and it is based on a solution engineering program he launched within Microsoft enterprise field sales, the Innovation Factory, that delivers rapid prototypes for Microsoft enterprise customers.
