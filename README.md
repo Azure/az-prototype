@@ -4,7 +4,7 @@ Rapid Azure prototype generation powered by AI agent teams.
 
 ## Overview
 
-`az prototype` is an Azure CLI extension that empowers customers to rapidly create functional Azure prototypes using AI-driven agent teams. It leverages GitHub Copilot (via GitHub Models API) or Azure OpenAI for intelligent code and infrastructure generation.
+`az prototype` is an Azure CLI extension that empowers customers to rapidly create functional Azure prototypes using AI-driven agent teams. It supports three AI providers — GitHub Copilot, GitHub Models, and Azure OpenAI — for intelligent code and infrastructure generation.
 
 ## Prerequisites
 
@@ -176,4 +176,5 @@ When using `microsoft-alz`, resources are assigned to a landing zone:
 ## Development
 
 The Azure CLI prototype extension is architected and developed by [Joshua Davis](https://github.com/a11smiles/), and it is based on a solution engineering program he launched within Microsoft enterprise field sales, the Innovation Factory, that delivers rapid prototypes for Microsoft enterprise customers.
+
 
