@@ -3,6 +3,22 @@
 Release History
 ===============
 
+0.2.1b3
++++++++
+
+Build stage
+~~~~~~~~~~~~
+* **Removed terraform validation from build** — ``terraform init`` and
+  ``terraform validate`` no longer run during the build stage.  Build
+  only generates code; the deploy stage is the correct place to validate
+  and execute IaC tooling.  This removes the requirement for terraform
+  to be installed at build time.
+
+0.2.1b2
++++++++
+
+_No changes._ Utility version bump for Azure CLI library deployment.
+
 0.2.1b1
 +++++++
 

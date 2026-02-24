@@ -1247,184 +1247,6 @@ class TestTerraformPromptReinforcement:
 # Terraform validation during build QA
 # ======================================================================
 
-class TestBuildTerraformValidation:
-    """Verify _validate_terraform_stages() in BuildSession."""
-
-    def _make_session(self, project_dir, iac_tool="terraform", stages=None):
-        from azext_prototype.stages.build_session import BuildSession
-        from azext_prototype.stages.build_state import BuildState
-
-        ctx = AgentContext(
-            project_config={"project": {"iac_tool": iac_tool}},
-            project_dir=str(project_dir),
-            ai_provider=MagicMock(),
-        )
-        registry = MagicMock()
-        registry.find_by_capability.return_value = []
-
-        build_state = BuildState(str(project_dir))
-        if stages:
-            build_state._state["deployment_stages"] = stages
-
-        with patch("azext_prototype.stages.build_session.ProjectConfig") as mock_config:
-            mock_config.return_value.load.return_value = None
-            mock_config.return_value.get.side_effect = lambda k, d=None: {
-                "project.iac_tool": iac_tool,
-                "project.name": "test",
-            }.get(k, d)
-            mock_config.return_value.to_dict.return_value = {"naming": {"strategy": "simple"}, "project": {"name": "test"}}
-            session = BuildSession(ctx, registry, build_state=build_state)
-
-        return session
-
-    def test_returns_empty_for_bicep(self, tmp_project):
-        session = self._make_session(tmp_project, iac_tool="bicep")
-        assert session._validate_terraform_stages() == {}
-
-    def test_returns_empty_when_no_tf_files(self, tmp_project):
-        stages = [
-            {"stage": 1, "name": "Infra", "category": "infra",
-             "dir": "concept/infra/terraform/stage-1", "services": [],
-             "status": "generated", "files": []},
-        ]
-        stage_dir = tmp_project / "concept" / "infra" / "terraform" / "stage-1"
-        stage_dir.mkdir(parents=True, exist_ok=True)
-        # No .tf files
-
-        session = self._make_session(tmp_project, stages=stages)
-        assert session._validate_terraform_stages() == {}
-
-    def test_skips_app_category(self, tmp_project):
-        stages = [
-            {"stage": 1, "name": "App", "category": "app",
-             "dir": "concept/apps/stage-1", "services": [],
-             "status": "generated", "files": []},
-        ]
-        stage_dir = tmp_project / "concept" / "apps" / "stage-1"
-        stage_dir.mkdir(parents=True, exist_ok=True)
-        (stage_dir / "main.tf").write_text('resource "null" "x" {}')
-
-        session = self._make_session(tmp_project, stages=stages)
-        assert session._validate_terraform_stages() == {}
-
-    @patch("azext_prototype.stages.build_session.subprocess.run")
-    def test_returns_errors_on_init_failure(self, mock_run, tmp_project):
-        stages = [
-            {"stage": 1, "name": "Foundation", "category": "infra",
-             "dir": "concept/infra/terraform/stage-1", "services": [],
-             "status": "generated", "files": []},
-        ]
-        stage_dir = tmp_project / "concept" / "infra" / "terraform" / "stage-1"
-        stage_dir.mkdir(parents=True, exist_ok=True)
-        (stage_dir / "main.tf").write_text('resource "null" "x" {}')
-
-        mock_run.return_value = MagicMock(returncode=1, stderr="Error: init failed", stdout="")
-        session = self._make_session(tmp_project, stages=stages)
-        errors = session._validate_terraform_stages()
-
-        assert 1 in errors
-        assert "Init failed" in errors[1]
-
-    @patch("azext_prototype.stages.build_session.subprocess.run")
-    def test_returns_errors_on_validate_failure(self, mock_run, tmp_project):
-        stages = [
-            {"stage": 1, "name": "Foundation", "category": "infra",
-             "dir": "concept/infra/terraform/stage-1", "services": [],
-             "status": "generated", "files": []},
-        ]
-        stage_dir = tmp_project / "concept" / "infra" / "terraform" / "stage-1"
-        stage_dir.mkdir(parents=True, exist_ok=True)
-        (stage_dir / "main.tf").write_text('resource "null" "x" {}')
-
-        # Init succeeds, validate fails
-        def run_side_effect(cmd, **kwargs):
-            if "init" in cmd:
-                return MagicMock(returncode=0, stderr="", stdout="")
-            return MagicMock(returncode=1, stderr="Error: Invalid argument", stdout="")
-
-        mock_run.side_effect = run_side_effect
-        session = self._make_session(tmp_project, stages=stages)
-        errors = session._validate_terraform_stages()
-
-        assert 1 in errors
-        assert "Invalid argument" in errors[1]
-
-    @patch("azext_prototype.stages.build_session.subprocess.run", side_effect=FileNotFoundError)
-    def test_returns_empty_when_terraform_not_installed(self, mock_run, tmp_project):
-        stages = [
-            {"stage": 1, "name": "Foundation", "category": "infra",
-             "dir": "concept/infra/terraform/stage-1", "services": [],
-             "status": "generated", "files": []},
-        ]
-        stage_dir = tmp_project / "concept" / "infra" / "terraform" / "stage-1"
-        stage_dir.mkdir(parents=True, exist_ok=True)
-        (stage_dir / "main.tf").write_text('resource "null" "x" {}')
-
-        session = self._make_session(tmp_project, stages=stages)
-        assert session._validate_terraform_stages() == {}
-
-    @patch("azext_prototype.stages.build_session.subprocess.run")
-    def test_returns_empty_on_success(self, mock_run, tmp_project):
-        stages = [
-            {"stage": 1, "name": "Foundation", "category": "infra",
-             "dir": "concept/infra/terraform/stage-1", "services": [],
-             "status": "generated", "files": []},
-        ]
-        stage_dir = tmp_project / "concept" / "infra" / "terraform" / "stage-1"
-        stage_dir.mkdir(parents=True, exist_ok=True)
-        (stage_dir / "main.tf").write_text('resource "null" "x" {}')
-
-        mock_run.return_value = MagicMock(returncode=0, stderr="", stdout="")
-        session = self._make_session(tmp_project, stages=stages)
-        errors = session._validate_terraform_stages()
-
-        assert errors == {}
-
-    @patch("azext_prototype.stages.build_session.subprocess.run")
-    def test_tf_errors_merge_into_qa_content(self, mock_run, tmp_project):
-        """Verify terraform validation errors are appended to qa_content."""
-        stages = [
-            {"stage": 1, "name": "Foundation", "category": "infra",
-             "dir": "concept/infra/terraform/stage-1", "services": [],
-             "status": "generated", "files": []},
-        ]
-        stage_dir = tmp_project / "concept" / "infra" / "terraform" / "stage-1"
-        stage_dir.mkdir(parents=True, exist_ok=True)
-        (stage_dir / "main.tf").write_text('resource "null" "x" {}')
-
-        # Simulate init ok, validate fails
-        def run_side_effect(cmd, **kwargs):
-            if "init" in cmd:
-                return MagicMock(returncode=0, stderr="", stdout="")
-            return MagicMock(returncode=1, stderr="Error: default_tags not valid", stdout="")
-
-        mock_run.side_effect = run_side_effect
-
-        session = self._make_session(tmp_project, stages=stages)
-        # Simulate QA returning no issues initially
-        session._build_state._state["deployment_stages"] = stages
-
-        errors = session._validate_terraform_stages()
-        assert 1 in errors
-
-        # Simulate the merge logic from the session
-        qa_content = "All looks good."
-        has_issues = False
-        if errors:
-            tf_section = "\n\n## Terraform Validation Errors (MUST FIX)\n"
-            for stage_num, err in sorted(errors.items()):
-                stage = session._build_state.get_stage(stage_num)
-                name = stage["name"] if stage else f"Stage {stage_num}"
-                tf_section += f"\n### Stage {stage_num}: {name}\n```\n{err}\n```\n"
-            qa_content = (qa_content or "") + tf_section
-            has_issues = True
-
-        assert has_issues is True
-        assert "Terraform Validation Errors" in qa_content
-        assert "default_tags" in qa_content
-        assert "Foundation" in qa_content
-
-
 # ======================================================================
 # QA Engineer prompt tests
 # ======================================================================
@@ -1447,7 +1269,7 @@ class TestQAPromptTerraformChecklist:
 
 
 class TestPerStageQA:
-    """Test _run_stage_qa(), _collect_stage_file_content(), _validate_terraform_stage()."""
+    """Test _run_stage_qa() and _collect_stage_file_content()."""
 
     def _make_session(self, project_dir, qa_response="No issues found.", iac_tool="terraform"):
         from azext_prototype.stages.build_session import BuildSession
@@ -1508,9 +1330,7 @@ class TestPerStageQA:
 
         printed = []
 
-        with patch("azext_prototype.stages.build_session.AgentOrchestrator") as mock_orch, \
-             patch("azext_prototype.stages.build_session.subprocess.run",
-                   return_value=MagicMock(returncode=0, stderr="", stdout="")):
+        with patch("azext_prototype.stages.build_session.AgentOrchestrator") as mock_orch:
             mock_orch.return_value.delegate.return_value = _make_response("All looks good. Code is clean and well-structured.")
             session._run_stage_qa(stage, "arch", [], False, lambda m: printed.append(m))
 
@@ -1541,9 +1361,7 @@ class TestPerStageQA:
                 return _make_response("CRITICAL: Missing managed identity config. Must fix.")
             return _make_response("All resolved, no remaining issues.")
 
-        with patch("azext_prototype.stages.build_session.AgentOrchestrator") as mock_orch, \
-             patch("azext_prototype.stages.build_session.subprocess.run",
-                   return_value=MagicMock(returncode=0, stderr="", stdout="")):
+        with patch("azext_prototype.stages.build_session.AgentOrchestrator") as mock_orch:
             mock_orch.return_value.delegate.side_effect = mock_delegate
             session._run_stage_qa(stage, "arch", [], False, lambda m: printed.append(m))
 
@@ -1571,9 +1389,7 @@ class TestPerStageQA:
 
         printed = []
 
-        with patch("azext_prototype.stages.build_session.AgentOrchestrator") as mock_orch, \
-             patch("azext_prototype.stages.build_session.subprocess.run",
-                   return_value=MagicMock(returncode=0, stderr="", stdout="")):
+        with patch("azext_prototype.stages.build_session.AgentOrchestrator") as mock_orch:
             # Always return issues
             mock_orch.return_value.delegate.return_value = _make_response(
                 "CRITICAL: This will never be fixed."
@@ -1592,47 +1408,6 @@ class TestPerStageQA:
         }
         # docs category is not in ("infra", "data", "integration", "app")
         assert stage["category"] not in ("infra", "data", "integration", "app")
-
-    @patch("azext_prototype.stages.build_session.subprocess.run")
-    def test_validate_terraform_stage_returns_error(self, mock_run, tmp_project):
-        session, _, _ = self._make_session(tmp_project)
-
-        stage_dir = tmp_project / "concept" / "infra" / "terraform" / "stage-1"
-        stage_dir.mkdir(parents=True, exist_ok=True)
-        (stage_dir / "main.tf").write_text('resource "azapi_resource" "rg" {\n  type = "Microsoft.Resources/resourceGroups@2025-06-01"\n}')
-
-        stage = {
-            "stage": 1, "name": "Foundation", "category": "infra",
-            "dir": "concept/infra/terraform/stage-1",
-        }
-
-        def run_side_effect(cmd, **kwargs):
-            if "init" in cmd:
-                return MagicMock(returncode=0, stderr="", stdout="")
-            return MagicMock(returncode=1, stderr="Error: Invalid argument", stdout="")
-
-        mock_run.side_effect = run_side_effect
-
-        error = session._validate_terraform_stage(stage)
-        assert error is not None
-        assert "Invalid argument" in error
-
-    def test_validate_terraform_stage_returns_none_on_success(self, tmp_project):
-        session, _, _ = self._make_session(tmp_project)
-
-        stage = {
-            "stage": 1, "name": "Foundation", "category": "infra",
-            "dir": "concept/infra/terraform/stage-1",
-        }
-
-        with patch("azext_prototype.stages.build_session.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stderr="", stdout="")
-            stage_dir = tmp_project / "concept" / "infra" / "terraform" / "stage-1"
-            stage_dir.mkdir(parents=True, exist_ok=True)
-            (stage_dir / "main.tf").write_text('resource "null" "x" {}')
-
-            error = session._validate_terraform_stage(stage)
-            assert error is None
 
     def test_collect_stage_file_content(self, tmp_project):
         session, _, _ = self._make_session(tmp_project)
