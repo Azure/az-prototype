@@ -111,7 +111,7 @@ class PrototypeApp(App):
             orchestrator = StageOrchestrator(
                 self,
                 self.adapter,
-                self._project_dir,
+                self._project_dir or ".",
                 stage_kwargs=self._stage_kwargs,
             )
             orchestrator.run(start_stage=self._start_stage)

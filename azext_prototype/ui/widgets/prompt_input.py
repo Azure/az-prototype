@@ -104,7 +104,7 @@ class PromptInput(TextArea):
     #   everything else → default TextArea behavior
     # ------------------------------------------------------------------ #
 
-    def _on_key(self, event) -> None:
+    async def _on_key(self, event) -> None:
         # Always let Ctrl+C bubble up to the app's quit binding
         if event.key == "ctrl+c":
             return
@@ -130,7 +130,7 @@ class PromptInput(TextArea):
 
         # shift+enter and all other keys → default TextArea behavior
         # (TextArea's _on_key inserts a newline for shift+enter)
-        super()._on_key(event)
+        await super()._on_key(event)
 
     # ------------------------------------------------------------------ #
     # Submit logic

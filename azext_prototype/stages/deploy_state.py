@@ -384,7 +384,7 @@ class DeployState:
                 parent = s
                 break
 
-        if parent is None:
+        if parent is None or parent_idx is None:
             logger.warning("Stage %d not found for splitting.", stage_num)
             return
 

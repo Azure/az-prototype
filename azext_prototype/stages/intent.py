@@ -764,9 +764,9 @@ def read_files_for_session(
         for emb in result.embedded_images:
             images.append(
                 {
-                    "filename": f"{file_path.name}:{emb.filename}",
+                    "filename": f"{file_path.name}:{emb.source}",
                     "data": emb.data,
-                    "mime": emb.mime,
+                    "mime": emb.mime_type,
                 }
             )
 

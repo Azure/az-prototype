@@ -1753,6 +1753,7 @@ class DeploySession:
             else:
                 stage, stage_num, label = self._resolve_stage_from_arg(arg, _print)
                 if stage:
+                    assert stage_num is not None  # guaranteed when stage is resolved
                     if stage.get("deploy_status") == "deployed" and not label:
                         _print(f"  Stage {arg} already deployed. Use /redeploy {arg}.")
                     elif label:
@@ -1799,6 +1800,7 @@ class DeploySession:
             else:
                 stage, stage_num, label = self._resolve_stage_from_arg(arg, _print)
                 if stage:
+                    assert stage_num is not None  # guaranteed when stage is resolved
                     # Rollback first if deployed
                     if stage.get("deploy_status") == "deployed":
                         success = self._rollback_stage(stage_num, _print)
