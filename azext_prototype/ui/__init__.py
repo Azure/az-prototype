@@ -4,6 +4,8 @@ Provides Rich-based console output with:
 - Progress indicators for file operations and API calls
 - Claude Code-inspired styling with borders and colors
 - Styled prompts with instructions
+
+And a Textual-based TUI dashboard for interactive sessions.
 """
 
 from azext_prototype.ui.console import (

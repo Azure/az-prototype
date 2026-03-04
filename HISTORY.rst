@@ -3,6 +3,212 @@
 Release History
 ===============
 
+0.2.1b4
++++++++
+
+Discovery section gating and architecture task tracking
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Reliable section completion gate** — replaced heuristic phrase
+  matching (``_is_section_done()``) with an explicit AI confirmation
+  step.  Sections only advance when the AI responds with "Yes",
+  eliminating false-positive checkmarks from transitional language.
+* **"All topics covered" accuracy** — the message now only appears
+  when every section received explicit AI confirmation.  Otherwise a
+  softer prompt is shown.
+* **"continue" keyword** — users can type ``continue`` (in addition
+  to ``done``) to proceed from discovery to architecture generation.
+* **Architecture sections in task tree** — ``_generate_architecture_sections()``
+  now reports each section to the TUI task tree with ``in_progress`` /
+  ``completed`` status updates.  Dynamically discovered sections
+  (``[NEW_SECTION]`` markers) are appended in real time.
+* **Timer format** — elapsed times >= 60 s now display as ``1m04s``
+  instead of ``64s`` in the TUI info bar and per-section console
+  output.
+
+TUI console color, wrapping, and section pagination
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Color consolidation** — all color constants now live in ``theme.py``
+  as the single source of truth.  Duplicate theme dicts in ``console.py``
+  and hardcoded hex colors in ``task_tree.py``, ``tui_adapter.py``, and
+  ``console.py`` toolbar functions replaced with ``COLORS`` imports.
+* **Rich markup preservation** — ``TUIAdapter.print_fn()`` no longer
+  strips Rich markup tags.  Messages containing ``[success]``,
+  ``[info]``, etc. are routed to the new ``ConsoleView.write_markup()``
+  method so status messages retain their colors in the TUI.
+* **Horizontal wrapping** — ``ConsoleView`` (``RichLog``) now passes
+  ``wrap=True``, eliminating the horizontal scrollbar for long lines.
+* **Agent response rendering** — new ``TUIAdapter.response_fn()``
+  renders agent responses as colored Markdown via
+  ``ConsoleView.write_agent_response()``.  Wired through
+  ``DiscoverySession.run()`` → ``DesignStage.execute()`` →
+  ``StageOrchestrator._run_design()``.
+* **Section pagination** — multi-section agent responses (split on
+  ``## `` headings) are shown one section at a time with an "Enter to
+  continue" prompt between them.  Single-section responses render all
+  at once.
+* **Empty submit support** — ``PromptInput.enable(allow_empty=True)``
+  allows submitting with no text, used by the pagination "Enter to
+  continue" prompt.  Empty submissions are not echoed to the console.
+* **Clean Ctrl+C exit** — ``_run_tui()`` helper in ``custom.py``
+  suppresses ``SIGINT`` during the Textual run so Ctrl+C is handled
+  exclusively as a key event.  Prevents ``KeyboardInterrupt`` from
+  propagating to the Azure CLI framework and eliminates the Windows
+  "Terminate batch job (Y/N)?" prompt from ``az.cmd``.
+
+Build-deploy stage decoupling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Stable stage IDs** — build stages now carry a persistent ``id``
+  field (slug derived from name, e.g. ``"data-layer"``).  IDs survive
+  renumbering, stage insertion/removal, and design iteration.  Legacy
+  state files are backfilled on load.
+* **Build-deploy correspondence** — deploy stages link back to build
+  stages via ``build_stage_id`` instead of fragile stage numbers.
+  ``sync_from_build_state()`` performs smart reconciliation: matching
+  stages are updated while preserving deploy progress, new build stages
+  create new deploy stages, and removed build stages are marked
+  ``"removed"``.
+* **Stage splitting** — ``split_stage(N, substages)`` replaces one
+  deploy stage with N substages (``5a``, ``5b``, ``5c``) sharing the
+  same ``build_stage_id``.  Supports code splits (Type A), deploy-only
+  splits (Type B), and manual step insertion (Type C).
+* **Manual deployment steps** — stages with ``deploy_mode: "manual"``
+  display instructions and pause for user confirmation (Done / Skip /
+  Need help) instead of executing IaC commands.  Manual steps can
+  originate from the architect during plan derivation or from
+  remediation.
+* **New deploy statuses** — ``"removed"`` (build stage deleted),
+  ``"destroyed"`` (resources torn down), ``"awaiting_manual"`` (waiting
+  for user confirmation).
+* **New slash commands** — ``/split N`` (interactive stage splitting),
+  ``/destroy N`` (resource destruction with confirmation),
+  ``/manual N "instructions"`` (add/view manual step instructions).
+* **Compound stage references** — all stage-referencing commands
+  (``/deploy``, ``/rollback``, ``/redeploy``, ``/plan``, ``/describe``)
+  accept substage labels: ``/deploy 5a``, ``/rollback 5`` (all
+  substages in reverse order).
+* **Re-entry sync** — when the deploy session re-enters with an
+  existing deploy state, it syncs with the latest build state and
+  reports changes (new stages, removed stages, updated code).
+* **Display improvements** — removed stages show with strikethrough and
+  ``(Removed)`` suffix, manual steps show ``[Manual]`` badge, substages
+  display compound IDs (``2a``, ``2b``).
+
+Deploy auto-remediation
+~~~~~~~~~~~~~~~~~~~~~~~~
+* **Automatic deploy failure remediation** — when a deployment stage
+  fails, the system now automatically diagnoses (QA engineer),
+  determines a fix strategy (cloud architect), regenerates the code
+  (IaC/app agent), and retries deployment — up to 2 remediation
+  attempts before falling through to the interactive loop.
+* **Downstream impact tracking** — after fixing a stage, the
+  architect checks whether downstream stages need regeneration
+  due to changed outputs or dependencies.  Affected stages are
+  automatically regenerated before their deploy.
+* **Consistent QA routing** — ``/deploy N`` and ``/redeploy N``
+  slash commands now route through the remediation loop on failure,
+  not just print the error.
+* **Deploy state enhancements** — new ``remediating`` status,
+  per-stage ``remediation_attempts`` counter, ``add_patch_stages()``,
+  and ``renumber_stages()`` methods.
+
+Incremental build stage
+~~~~~~~~~~~~~~~~~~~~~~~~
+* **Design change detection** — ``BuildState`` now stores a design
+  snapshot (architecture hash + full text) after each build.  On
+  re-entry, the build session compares the current design against the
+  snapshot to determine whether regeneration is needed.
+* **Three-branch Phase 2** — the deployment plan derivation phase now
+  has three paths:
+
+  - **Branch A** (first build): derive a fresh plan and save the
+    design snapshot.
+  - **Branch B** (design changed): ask the architect agent to diff the
+    old and new architectures, classify each stage as unchanged /
+    modified / removed, identify new services, and apply targeted
+    updates (``mark_stages_stale``, ``remove_stages``, ``add_stages``).
+    When ``plan_restructured`` is flagged, the user is offered a full
+    plan re-derive.
+  - **Branch C** (no changes): report "Build is up to date" and skip
+    directly to the review loop.
+
+* **Incremental stage operations** on ``BuildState``:
+  ``set_design_snapshot()``, ``design_has_changed()``,
+  ``get_previous_architecture()``, ``mark_stages_stale()``,
+  ``remove_stages()``, ``add_stages()``, ``renumber_stages()``.
+* **Architecture diff via architect agent** —
+  ``_diff_architectures()`` sends old/new architecture + existing
+  stages to the architect, parses JSON classification, and falls back
+  to marking all stages as modified when the architect is unavailable.
+* **Legacy build compatibility** — builds without a design snapshot
+  (pre-incremental) are treated as "design changed" with all stages
+  marked for rebuild, preserving conversation history.
+
+TUI dashboard
+~~~~~~~~~~~~~~
+* **Added Textual TUI dashboard** — ``az prototype launch`` opens a full
+  terminal UI with four panels: scrollable console output (RichLog),
+  collapsible task tree with async status updates, growable multi-line
+  prompt (Enter to submit, Shift+Enter for newline), and an info bar
+  showing assist text and token usage.
+* **Stage orchestrator** — the TUI auto-detects the current project stage
+  from ``.prototype/state/`` files and launches the appropriate session.
+  Users can navigate between design, build, and deploy without exiting.
+* **Session-TUI bridge** — ``TUIAdapter`` connects synchronous sessions to
+  the async Textual event loop using ``call_from_thread`` and
+  ``threading.Event``.  Sessions run on worker threads with ``input_fn``
+  and ``print_fn`` routed through TUI widgets.
+* **Spinner → task tree** — ``_maybe_spinner`` on all four sessions
+  (discovery, build, deploy, backlog) now accepts a ``status_fn`` callback
+  so the TUI can show progress via the info bar instead of Rich spinners.
+* **Guarded console calls** — discovery slash commands (``/open``,
+  ``/status``, ``/why``, ``/summary``, ``/restart``, ``/help``) and
+  design stage header now route through ``_print`` when ``input_fn`` /
+  ``print_fn`` are injected, preventing Rich output conflicts in TUI mode.
+* **New dependency** — ``textual>=8.0.0``.
+* **Design command launches TUI** — ``az prototype design`` now opens the
+  TUI dashboard and auto-starts the design session, instead of running
+  synchronously in the terminal.  ``--status`` remains CLI-only.
+  Artifact paths are resolved to absolute before the TUI takes over.
+* **Section headers as tree branches** — during discovery, the
+  biz-analyst's AI responses are scanned for ``##`` / ``###`` headings
+  (e.g. "Project Context & Scope", "Data & Content") which appear as
+  collapsible sub-nodes under the Design branch in the task tree.
+  Duplicate headings are deduplicated by slug.
+
+Natural language intent detection
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **AI-powered command classification** — all four interactive sessions
+  (discovery, build, deploy, backlog) now accept natural language
+  instead of slash commands.  When an AI provider is available, a
+  lightweight classification call maps user input to the appropriate
+  command.  Falls back to keyword/regex scoring when AI is unavailable.
+* **Mid-session file reading** — ``"read artifacts from <path>"``
+  reads files (PDF, DOCX, PPTX, images, text) during any session and
+  injects the content into the conversation context.
+* **Deploy session natural language** — the deploy session no longer
+  requires slash commands.  ``"deploy stage 3"``, ``"rollback all"``,
+  ``"deploy stages 3 and 4"`` are interpreted and executed directly.
+* **Stage description command** — new ``/describe N`` command in both
+  build and deploy sessions.  Natural language variants like
+  ``"describe stage 3"`` or ``"what's being deployed in stage 2"``
+  show detailed resource, file, and status information for a stage.
+* **Project summary in TUI** — the welcome banner now shows a
+  one-line project summary extracted from discovery state or the
+  design architecture.
+
+Packaging
+~~~~~~~~~~
+* **Added ``__init__.py`` to data-only directories** — 15 data directories
+  (policies, standards, templates, knowledge, agent definitions) lacked
+  ``__init__.py``, causing setuptools "Package would be ignored" warnings
+  during wheel builds.  The ``templates/`` directory also contained Python
+  modules (``registry.py``, ``validate.py``) that were not included in the
+  wheel.  All data directories now have ``__init__.py`` so ``find_packages()``
+  discovers them correctly.
+* **Excluded ``__pycache__`` from package discovery** — ``setup.py`` now
+  filters ``__pycache__`` directories from ``find_packages()`` results to
+  prevent spurious build warnings.
+
 0.2.1b3
 +++++++
 

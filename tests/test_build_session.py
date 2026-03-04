@@ -722,13 +722,16 @@ class TestBuildSession:
 
         session = BuildSession(build_context, build_registry)
 
-        # Pre-populate with a generated stage
+        design = {"architecture": "Test"}
+
+        # Pre-populate with a generated stage and matching design snapshot
         session._build_state.set_deployment_plan([
             {"stage": 1, "name": "Foundation", "category": "infra",
              "services": [], "status": "generated", "dir": "", "files": ["main.tf"]},
             {"stage": 2, "name": "Documentation", "category": "docs",
              "services": [], "status": "pending", "dir": "concept/docs", "files": []},
         ])
+        session._build_state.set_design_snapshot(design)
 
         inputs = iter(["", "done"])
 
@@ -741,7 +744,7 @@ class TestBuildSession:
                 mock_orch.return_value.delegate.return_value = _make_response("QA ok")
 
                 result = session.run(
-                    design={"architecture": "Test"},
+                    design=design,
                     input_fn=lambda p: next(inputs),
                     print_fn=lambda m: None,
                 )
@@ -750,6 +753,407 @@ class TestBuildSession:
         # Only doc agent should have been called (for stage 2)
         assert mock_tf_agent.execute.call_count == 0
         assert mock_doc_agent.execute.call_count == 1
+
+
+# ======================================================================
+# Incremental build / design snapshot tests
+# ======================================================================
+
+class TestDesignSnapshot:
+    """Tests for design snapshot tracking and change detection in BuildState."""
+
+    def test_design_snapshot_set_on_first_build(self, tmp_project):
+        from azext_prototype.stages.build_state import BuildState
+
+        bs = BuildState(str(tmp_project))
+        design = {
+            "architecture": "## Architecture\nKey Vault + SQL Database",
+            "_metadata": {"iteration": 3},
+        }
+        bs.set_design_snapshot(design)
+
+        snapshot = bs.state["design_snapshot"]
+        assert snapshot["iteration"] == 3
+        assert snapshot["architecture_hash"] is not None
+        assert len(snapshot["architecture_hash"]) == 16
+        assert snapshot["architecture_text"] == design["architecture"]
+
+    def test_design_has_changed_detects_modification(self, tmp_project):
+        from azext_prototype.stages.build_state import BuildState
+
+        bs = BuildState(str(tmp_project))
+        original = {"architecture": "Key Vault + SQL"}
+        bs.set_design_snapshot(original)
+
+        modified = {"architecture": "Key Vault + SQL + Redis Cache"}
+        assert bs.design_has_changed(modified) is True
+
+    def test_design_has_changed_no_change(self, tmp_project):
+        from azext_prototype.stages.build_state import BuildState
+
+        bs = BuildState(str(tmp_project))
+        design = {"architecture": "Key Vault + SQL"}
+        bs.set_design_snapshot(design)
+
+        assert bs.design_has_changed(design) is False
+
+    def test_design_has_changed_legacy_no_snapshot(self, tmp_project):
+        from azext_prototype.stages.build_state import BuildState
+
+        bs = BuildState(str(tmp_project))
+        # No snapshot set — simulates legacy build
+        assert bs.design_has_changed({"architecture": "anything"}) is True
+
+    def test_get_previous_architecture(self, tmp_project):
+        from azext_prototype.stages.build_state import BuildState
+
+        bs = BuildState(str(tmp_project))
+        assert bs.get_previous_architecture() is None
+
+        design = {"architecture": "The full architecture text here"}
+        bs.set_design_snapshot(design)
+        assert bs.get_previous_architecture() == "The full architecture text here"
+
+    def test_design_snapshot_persists_across_load(self, tmp_project):
+        from azext_prototype.stages.build_state import BuildState
+
+        bs = BuildState(str(tmp_project))
+        design = {"architecture": "Persistent arch", "_metadata": {"iteration": 2}}
+        bs.set_design_snapshot(design)
+
+        bs2 = BuildState(str(tmp_project))
+        bs2.load()
+        assert bs2.design_has_changed(design) is False
+        assert bs2.get_previous_architecture() == "Persistent arch"
+
+
+class TestStageManipulation:
+    """Tests for mark_stages_stale, remove_stages, add_stages, renumber_stages."""
+
+    def _sample_stages(self):
+        return [
+            {"stage": 1, "name": "Foundation", "category": "infra",
+             "services": [], "status": "generated", "dir": "concept/infra/terraform/stage-1-foundation",
+             "files": ["main.tf"]},
+            {"stage": 2, "name": "Data", "category": "data",
+             "services": [{"name": "sql", "computed_name": "sql-1", "resource_type": "Microsoft.Sql/servers", "sku": ""}],
+             "status": "generated", "dir": "concept/infra/terraform/stage-2-data",
+             "files": ["sql.tf"]},
+            {"stage": 3, "name": "App", "category": "app",
+             "services": [], "status": "generated", "dir": "concept/apps/stage-3-api",
+             "files": ["app.py"]},
+            {"stage": 4, "name": "Documentation", "category": "docs",
+             "services": [], "status": "generated", "dir": "concept/docs",
+             "files": ["DEPLOY.md"]},
+        ]
+
+    def test_mark_stages_stale(self, tmp_project):
+        from azext_prototype.stages.build_state import BuildState
+
+        bs = BuildState(str(tmp_project))
+        bs.set_deployment_plan(self._sample_stages())
+
+        bs.mark_stages_stale([2, 3])
+
+        assert bs.get_stage(1)["status"] == "generated"
+        assert bs.get_stage(2)["status"] == "pending"
+        assert bs.get_stage(3)["status"] == "pending"
+        assert bs.get_stage(4)["status"] == "generated"
+
+    def test_remove_stages(self, tmp_project):
+        from azext_prototype.stages.build_state import BuildState
+
+        bs = BuildState(str(tmp_project))
+        bs.set_deployment_plan(self._sample_stages())
+        bs._state["files_generated"] = ["main.tf", "sql.tf", "app.py", "DEPLOY.md"]
+
+        bs.remove_stages([2])
+
+        stage_nums = [s["stage"] for s in bs.state["deployment_stages"]]
+        assert 2 not in stage_nums
+        assert len(bs.state["deployment_stages"]) == 3
+        # sql.tf should be removed from files_generated
+        assert "sql.tf" not in bs.state["files_generated"]
+        assert "main.tf" in bs.state["files_generated"]
+
+    def test_add_stages(self, tmp_project):
+        from azext_prototype.stages.build_state import BuildState
+
+        bs = BuildState(str(tmp_project))
+        bs.set_deployment_plan(self._sample_stages())
+
+        new_stages = [
+            {"name": "Redis Cache", "category": "data",
+             "services": [{"name": "redis", "computed_name": "redis-1",
+                           "resource_type": "Microsoft.Cache/redis", "sku": "Basic"}]},
+        ]
+        bs.add_stages(new_stages)
+
+        stages = bs.state["deployment_stages"]
+        # Should be inserted before docs (stage 4 originally)
+        # After renumbering: Foundation(1), Data(2), App(3), Redis(4), Docs(5)
+        assert len(stages) == 5
+        assert stages[3]["name"] == "Redis Cache"
+        assert stages[3]["stage"] == 4
+        assert stages[4]["name"] == "Documentation"
+        assert stages[4]["stage"] == 5
+
+    def test_renumber_stages(self, tmp_project):
+        from azext_prototype.stages.build_state import BuildState
+
+        bs = BuildState(str(tmp_project))
+        # Set up stages with gaps
+        bs._state["deployment_stages"] = [
+            {"stage": 1, "name": "A", "category": "infra", "services": [], "status": "generated", "dir": "", "files": []},
+            {"stage": 5, "name": "B", "category": "data", "services": [], "status": "pending", "dir": "", "files": []},
+            {"stage": 10, "name": "C", "category": "docs", "services": [], "status": "pending", "dir": "", "files": []},
+        ]
+
+        bs.renumber_stages()
+
+        assert bs.state["deployment_stages"][0]["stage"] == 1
+        assert bs.state["deployment_stages"][1]["stage"] == 2
+        assert bs.state["deployment_stages"][2]["stage"] == 3
+
+
+class TestArchitectureDiff:
+    """Tests for _diff_architectures and _parse_diff_result."""
+
+    def test_diff_architectures_parses_response(self, build_context, build_registry, mock_architect_agent_for_build):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        existing = [
+            {"stage": 1, "name": "Foundation", "category": "infra", "services": [{"name": "key-vault"}],
+             "status": "generated", "dir": "", "files": []},
+            {"stage": 2, "name": "Data", "category": "data", "services": [{"name": "sql"}],
+             "status": "generated", "dir": "", "files": []},
+        ]
+
+        diff_response = json.dumps({
+            "unchanged": [1],
+            "modified": [2],
+            "removed": [],
+            "added": [{"name": "Redis", "category": "data", "services": []}],
+            "plan_restructured": False,
+            "summary": "Modified data stage; added Redis.",
+        })
+        mock_architect_agent_for_build.execute.return_value = _make_response(
+            f"```json\n{diff_response}\n```"
+        )
+
+        result = session._diff_architectures("old arch", "new arch", existing)
+
+        assert result["unchanged"] == [1]
+        assert result["modified"] == [2]
+        assert result["removed"] == []
+        assert len(result["added"]) == 1
+        assert result["added"][0]["name"] == "Redis"
+        assert result["plan_restructured"] is False
+
+    def test_diff_architectures_fallback_no_architect(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        # Remove the architect agent
+        session = BuildSession(build_context, build_registry)
+        session._architect_agent = None
+
+        existing = [
+            {"stage": 1, "name": "A", "category": "infra", "services": [], "status": "generated", "dir": "", "files": []},
+            {"stage": 2, "name": "B", "category": "data", "services": [], "status": "generated", "dir": "", "files": []},
+        ]
+
+        result = session._diff_architectures("old", "new", existing)
+
+        # Fallback: all stages marked as modified
+        assert set(result["modified"]) == {1, 2}
+        assert result["unchanged"] == []
+
+    def test_parse_diff_result_defaults_to_unchanged(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        existing = [
+            {"stage": 1, "name": "A", "category": "infra", "services": [], "status": "generated", "dir": "", "files": []},
+            {"stage": 2, "name": "B", "category": "data", "services": [], "status": "generated", "dir": "", "files": []},
+            {"stage": 3, "name": "C", "category": "app", "services": [], "status": "generated", "dir": "", "files": []},
+        ]
+
+        # Only mention stage 2 as modified; 1 and 3 should default to unchanged
+        content = json.dumps({"modified": [2], "summary": "test"})
+        result = session._parse_diff_result(content, existing)
+
+        assert result is not None
+        assert 1 in result["unchanged"]
+        assert 3 in result["unchanged"]
+        assert result["modified"] == [2]
+
+    def test_parse_diff_result_invalid_json(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        result = session._parse_diff_result("This is not JSON", [])
+        assert result is None
+
+
+class TestIncrementalBuildSession:
+    """End-to-end tests for the incremental build flow."""
+
+    def test_incremental_run_no_changes(self, build_context, build_registry):
+        """When design hasn't changed and all stages are generated, report up to date."""
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        design = {"architecture": "Sample arch"}
+
+        # Set up: pre-populate with generated stages and a matching snapshot
+        session._build_state.set_deployment_plan([
+            {"stage": 1, "name": "Foundation", "category": "infra",
+             "services": [], "status": "generated", "dir": "", "files": ["main.tf"]},
+            {"stage": 2, "name": "Docs", "category": "docs",
+             "services": [], "status": "generated", "dir": "concept/docs", "files": ["README.md"]},
+        ])
+        session._build_state.set_design_snapshot(design)
+
+        printed = []
+        inputs = iter(["done"])
+
+        result = session.run(
+            design=design,
+            input_fn=lambda p: next(inputs),
+            print_fn=lambda m: printed.append(m),
+        )
+
+        output = "\n".join(printed)
+        assert "up to date" in output.lower()
+        assert result.review_accepted is True
+
+    def test_incremental_run_with_changes(self, build_context, build_registry, mock_architect_agent_for_build, mock_tf_agent):
+        """When design has changed, only affected stages should be regenerated."""
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        old_design = {"architecture": "Original architecture with Key Vault"}
+        new_design = {"architecture": "Updated architecture with Key Vault + Redis"}
+
+        # Set up existing build
+        session._build_state.set_deployment_plan([
+            {"stage": 1, "name": "Foundation", "category": "infra",
+             "services": [{"name": "key-vault"}], "status": "generated",
+             "dir": "concept/infra/terraform/stage-1-foundation", "files": ["main.tf"]},
+            {"stage": 2, "name": "Documentation", "category": "docs",
+             "services": [], "status": "generated", "dir": "concept/docs", "files": ["README.md"]},
+        ])
+        session._build_state.set_design_snapshot(old_design)
+
+        # Mock architect: stage 1 unchanged, no removed, add Redis
+        diff_response = json.dumps({
+            "unchanged": [1],
+            "modified": [],
+            "removed": [],
+            "added": [{"name": "Redis Cache", "category": "data",
+                        "services": [{"name": "redis-cache", "computed_name": "redis-1",
+                                      "resource_type": "Microsoft.Cache/redis", "sku": "Basic"}]}],
+            "plan_restructured": False,
+            "summary": "Added Redis Cache stage.",
+        })
+        mock_architect_agent_for_build.execute.return_value = _make_response(
+            f"```json\n{diff_response}\n```"
+        )
+
+        printed = []
+        inputs = iter(["", "done"])
+
+        with patch("azext_prototype.stages.build_session.GovernanceContext") as mock_gov_cls:
+            mock_gov_cls.return_value.check_response_for_violations.return_value = []
+            session._governance = mock_gov_cls.return_value
+            session._policy_resolver._governance = mock_gov_cls.return_value
+
+            with patch("azext_prototype.stages.build_session.AgentOrchestrator") as mock_orch:
+                mock_orch.return_value.delegate.return_value = _make_response("QA ok")
+
+                result = session.run(
+                    design=new_design,
+                    input_fn=lambda p: next(inputs),
+                    print_fn=lambda m: printed.append(m),
+                )
+
+        output = "\n".join(printed)
+        assert "Design changes detected" in output
+        assert "Added 1 new stage" in output
+        assert result.cancelled is False
+
+    def test_incremental_run_plan_restructured(self, build_context, build_registry, mock_architect_agent_for_build, mock_tf_agent):
+        """When plan_restructured is True, a full re-derive should be offered."""
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        old_design = {"architecture": "Simple architecture"}
+        new_design = {"architecture": "Completely redesigned architecture"}
+
+        session._build_state.set_deployment_plan([
+            {"stage": 1, "name": "Foundation", "category": "infra",
+             "services": [], "status": "generated", "dir": "", "files": ["main.tf"]},
+        ])
+        session._build_state.set_design_snapshot(old_design)
+
+        # First call: diff says plan_restructured
+        diff_response = json.dumps({
+            "unchanged": [],
+            "modified": [1],
+            "removed": [],
+            "added": [],
+            "plan_restructured": True,
+            "summary": "Major restructuring needed.",
+        })
+
+        # Second call: re-derive returns new plan
+        new_plan = {
+            "stages": [
+                {"stage": 1, "name": "New Foundation", "category": "infra",
+                 "dir": "concept/infra/terraform/stage-1-new",
+                 "services": [], "status": "pending", "files": []},
+                {"stage": 2, "name": "Documentation", "category": "docs",
+                 "dir": "concept/docs",
+                 "services": [], "status": "pending", "files": []},
+            ]
+        }
+
+        call_count = [0]
+        def architect_side_effect(ctx, task):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return _make_response(f"```json\n{diff_response}\n```")
+            else:
+                return _make_response(f"```json\n{json.dumps(new_plan)}\n```")
+
+        mock_architect_agent_for_build.execute.side_effect = architect_side_effect
+
+        printed = []
+        # First prompt: confirm re-derive (Enter), second: confirm plan, third: done
+        inputs = iter(["", "", "done"])
+
+        with patch("azext_prototype.stages.build_session.GovernanceContext") as mock_gov_cls:
+            mock_gov_cls.return_value.check_response_for_violations.return_value = []
+            session._governance = mock_gov_cls.return_value
+            session._policy_resolver._governance = mock_gov_cls.return_value
+
+            with patch("azext_prototype.stages.build_session.AgentOrchestrator") as mock_orch:
+                mock_orch.return_value.delegate.return_value = _make_response("QA ok")
+
+                result = session.run(
+                    design=new_design,
+                    input_fn=lambda p: next(inputs),
+                    print_fn=lambda m: printed.append(m),
+                )
+
+        output = "\n".join(printed)
+        assert "full plan re-derive" in output.lower()
+        assert result.cancelled is False
 
 
 # ======================================================================
@@ -1614,3 +2018,137 @@ class TestAdvisoryQA:
         assert "Advisory Notes" in output
         # Should NOT contain "QA Review:" as a section header
         assert "QA Review:" not in output
+
+
+# ======================================================================
+# Stable ID tests
+# ======================================================================
+
+class TestStableIds:
+
+    def test_stable_ids_assigned_on_set_deployment_plan(self, tmp_project):
+        from azext_prototype.stages.build_state import BuildState
+
+        bs = BuildState(str(tmp_project))
+        stages = [
+            {"stage": 1, "name": "Foundation", "category": "infra", "services": [], "status": "pending", "files": []},
+            {"stage": 2, "name": "Data Layer", "category": "data", "services": [], "status": "pending", "files": []},
+        ]
+        bs.set_deployment_plan(stages)
+
+        for s in bs.state["deployment_stages"]:
+            assert "id" in s
+            assert s["id"]  # non-empty
+        assert bs.state["deployment_stages"][0]["id"] == "foundation"
+        assert bs.state["deployment_stages"][1]["id"] == "data-layer"
+
+    def test_stable_ids_preserved_on_renumber(self, tmp_project):
+        from azext_prototype.stages.build_state import BuildState
+
+        bs = BuildState(str(tmp_project))
+        stages = [
+            {"stage": 1, "name": "Foundation", "category": "infra", "services": [], "status": "pending", "files": []},
+            {"stage": 2, "name": "Data Layer", "category": "data", "services": [], "status": "pending", "files": []},
+        ]
+        bs.set_deployment_plan(stages)
+
+        original_ids = [s["id"] for s in bs.state["deployment_stages"]]
+        bs.renumber_stages()
+        new_ids = [s["id"] for s in bs.state["deployment_stages"]]
+        assert original_ids == new_ids
+
+    def test_stable_ids_unique_on_name_collision(self, tmp_project):
+        from azext_prototype.stages.build_state import BuildState
+
+        bs = BuildState(str(tmp_project))
+        stages = [
+            {"stage": 1, "name": "Foundation", "category": "infra", "services": [], "status": "pending", "files": []},
+            {"stage": 2, "name": "Foundation", "category": "infra", "services": [], "status": "pending", "files": []},
+        ]
+        bs.set_deployment_plan(stages)
+
+        ids = [s["id"] for s in bs.state["deployment_stages"]]
+        assert len(set(ids)) == 2  # all unique
+        assert ids[0] == "foundation"
+        assert ids[1] == "foundation-2"
+
+    def test_stable_ids_backfilled_on_load(self, tmp_project):
+        from azext_prototype.stages.build_state import BuildState
+
+        # Write a legacy state file without ids
+        state_dir = Path(str(tmp_project)) / ".prototype" / "state"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        legacy = {
+            "deployment_stages": [
+                {"stage": 1, "name": "Foundation", "category": "infra", "services": [], "status": "generated", "files": []},
+            ],
+            "templates_used": [],
+            "iac_tool": "terraform",
+            "_metadata": {"created": None, "last_updated": None, "iteration": 0},
+        }
+        with open(state_dir / "build.yaml", "w") as f:
+            yaml.dump(legacy, f)
+
+        bs = BuildState(str(tmp_project))
+        bs.load()
+        assert bs.state["deployment_stages"][0]["id"] == "foundation"
+        assert bs.state["deployment_stages"][0]["deploy_mode"] == "auto"
+
+    def test_get_stage_by_id(self, tmp_project):
+        from azext_prototype.stages.build_state import BuildState
+
+        bs = BuildState(str(tmp_project))
+        stages = [
+            {"stage": 1, "name": "Foundation", "category": "infra", "services": [], "status": "pending", "files": []},
+            {"stage": 2, "name": "Data Layer", "category": "data", "services": [], "status": "pending", "files": []},
+        ]
+        bs.set_deployment_plan(stages)
+
+        found = bs.get_stage_by_id("data-layer")
+        assert found is not None
+        assert found["name"] == "Data Layer"
+        assert bs.get_stage_by_id("nonexistent") is None
+
+    def test_deploy_mode_in_stage_schema(self, tmp_project):
+        from azext_prototype.stages.build_state import BuildState
+
+        bs = BuildState(str(tmp_project))
+        stages = [
+            {
+                "stage": 1,
+                "name": "Manual Upload",
+                "category": "external",
+                "services": [],
+                "status": "pending",
+                "files": [],
+                "deploy_mode": "manual",
+                "manual_instructions": "Upload the notebook to the Fabric workspace.",
+            },
+            {
+                "stage": 2,
+                "name": "Foundation",
+                "category": "infra",
+                "services": [],
+                "status": "pending",
+                "files": [],
+            },
+        ]
+        bs.set_deployment_plan(stages)
+
+        assert bs.state["deployment_stages"][0]["deploy_mode"] == "manual"
+        assert "Upload" in bs.state["deployment_stages"][0]["manual_instructions"]
+        assert bs.state["deployment_stages"][1]["deploy_mode"] == "auto"
+        assert bs.state["deployment_stages"][1]["manual_instructions"] is None
+
+    def test_add_stages_assigns_ids(self, tmp_project):
+        from azext_prototype.stages.build_state import BuildState
+
+        bs = BuildState(str(tmp_project))
+        bs.set_deployment_plan([
+            {"stage": 1, "name": "Foundation", "category": "infra", "services": [], "status": "pending", "files": []},
+        ])
+        bs.add_stages([
+            {"name": "API Layer", "category": "app"},
+        ])
+        ids = [s["id"] for s in bs.state["deployment_stages"]]
+        assert "api-layer" in ids

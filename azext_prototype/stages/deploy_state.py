@@ -13,20 +13,37 @@ The state structure tracks:
 - Preflight check results
 - Per-stage deploy/rollback audit trail
 - Captured Terraform/Bicep outputs
+- Build-deploy correspondence via stable ``build_stage_id``
+- Substage splitting for 1:N divergence
 """
 
 from __future__ import annotations
 
 import logging
+import re
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import yaml
 
+from azext_prototype.stages.build_state import _slugify
+
 logger = logging.getLogger(__name__)
 
 DEPLOY_STATE_FILE = ".prototype/state/deploy.yaml"
+
+
+@dataclass
+class SyncResult:
+    """Result of syncing deploy state from build state."""
+
+    matched: int = 0
+    created: int = 0
+    orphaned: int = 0
+    updated_code: int = 0
+    details: list[str] = field(default_factory=list)
 
 
 def _default_deploy_state() -> dict[str, Any]:
@@ -50,12 +67,31 @@ def _default_deploy_state() -> dict[str, Any]:
     }
 
 
+def _enrich_deploy_fields(stage: dict) -> dict:
+    """Ensure a stage dict has all deploy-specific fields."""
+    stage.setdefault("deploy_status", "pending")
+    stage.setdefault("deploy_timestamp", None)
+    stage.setdefault("deploy_output", "")
+    stage.setdefault("deploy_error", "")
+    stage.setdefault("rollback_timestamp", None)
+    stage.setdefault("remediation_attempts", 0)
+    stage.setdefault("build_stage_id", None)
+    stage.setdefault("deploy_mode", "auto")
+    stage.setdefault("manual_instructions", None)
+    stage.setdefault("substage_label", None)
+    stage.setdefault("_is_substage", False)
+    stage.setdefault("_destruction_declined", False)
+    return stage
+
+
 class DeployState:
     """Manages persistent deploy state in YAML format.
 
     Provides:
     - Loading existing state on startup (re-entrant deploys)
     - Importing deployment stages from build state
+    - Smart sync with build state (preserves deploy progress)
+    - Stage splitting for 1:N build-deploy divergence
     - Per-stage deploy status transitions with ordering enforcement
     - Preflight result tracking
     - Deploy and rollback audit logging
@@ -93,6 +129,7 @@ class DeployState:
                     loaded = yaml.safe_load(f) or {}
                 self._state = _default_deploy_state()
                 self._deep_merge(self._state, loaded)
+                self._backfill_build_stage_ids()
                 self._loaded = True
                 logger.info("Loaded deploy state from %s", self._path)
             except (yaml.YAMLError, IOError) as e:
@@ -138,7 +175,7 @@ class DeployState:
 
         For each stage from the build state, adds deploy-specific fields:
         ``deploy_status``, ``deploy_timestamp``, ``deploy_output``,
-        ``deploy_error``, ``rollback_timestamp``.
+        ``deploy_error``, ``rollback_timestamp``, ``build_stage_id``.
 
         Returns True if stages were imported, False if build.yaml not found
         or contained no deployment stages.
@@ -163,11 +200,9 @@ class DeployState:
         enriched: list[dict] = []
         for stage in build_stages:
             enriched_stage = dict(stage)
-            enriched_stage.setdefault("deploy_status", "pending")
-            enriched_stage.setdefault("deploy_timestamp", None)
-            enriched_stage.setdefault("deploy_output", "")
-            enriched_stage.setdefault("deploy_error", "")
-            enriched_stage.setdefault("rollback_timestamp", None)
+            # Set build_stage_id from the build stage's id field
+            enriched_stage["build_stage_id"] = stage.get("id") or _slugify(stage.get("name", "stage"))
+            _enrich_deploy_fields(enriched_stage)
             enriched.append(enriched_stage)
 
         self._state["deployment_stages"] = enriched
@@ -176,6 +211,245 @@ class DeployState:
 
         logger.info("Imported %d stages from build state.", len(enriched))
         return True
+
+    def sync_from_build_state(self, build_state_path: str | Path) -> SyncResult:
+        """Smart reconciliation of deploy stages with current build state.
+
+        Unlike :meth:`load_from_build_state` (which overwrites), this method:
+
+        - **Matches** existing deploy stages to build stages by ``build_stage_id``
+        - **Updates** build-sourced fields (name, category, services, deploy_mode)
+          while preserving deploy state (status, timestamps, substage structure)
+        - **Creates** new deploy stages for new build stages
+        - **Orphans** deploy stages whose build stage was removed (sets ``removed``)
+        - Falls back to name+category matching for legacy stages
+
+        Returns a :class:`SyncResult` summarising the changes.
+        """
+        result = SyncResult()
+        path = Path(build_state_path)
+        if not path.exists():
+            result.details.append("Build state not found.")
+            return result
+
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                build_data = yaml.safe_load(f) or {}
+        except (yaml.YAMLError, IOError) as e:
+            result.details.append(f"Could not read build state: {e}")
+            return result
+
+        build_stages = build_data.get("deployment_stages", [])
+        if not build_stages:
+            result.details.append("Build state has no deployment_stages.")
+            return result
+
+        existing = self._state["deployment_stages"]
+
+        # Index existing deploy stages by build_stage_id
+        deploy_by_bid: dict[str, list[dict]] = {}
+        for ds in existing:
+            bid = ds.get("build_stage_id")
+            if bid:
+                deploy_by_bid.setdefault(bid, []).append(ds)
+
+        # Track which build_stage_ids we've matched
+        matched_bids: set[str] = set()
+        new_stages: list[dict] = []
+
+        for bs in build_stages:
+            bid = bs.get("id") or _slugify(bs.get("name", "stage"))
+            matched_bids.add(bid)
+
+            if bid in deploy_by_bid:
+                # Update matched deploy stages with build-sourced fields
+                for ds in deploy_by_bid[bid]:
+                    # Check if code changed
+                    old_dir = ds.get("dir", "")
+                    new_dir = bs.get("dir", "")
+                    old_files = ds.get("files", [])
+                    new_files = bs.get("files", [])
+                    code_changed = (old_dir != new_dir) or (sorted(old_files) != sorted(new_files))
+
+                    # Update build-sourced fields
+                    ds["name"] = bs.get("name", ds["name"])
+                    ds["category"] = bs.get("category", ds.get("category", "infra"))
+                    ds["services"] = bs.get("services", ds.get("services", []))
+                    ds["deploy_mode"] = bs.get("deploy_mode", ds.get("deploy_mode", "auto"))
+                    ds["manual_instructions"] = bs.get("manual_instructions", ds.get("manual_instructions"))
+                    if not ds.get("_is_substage"):
+                        ds["dir"] = new_dir
+                        ds["files"] = new_files
+
+                    if code_changed and ds.get("deploy_status") == "deployed":
+                        ds["_code_updated"] = True
+                        result.updated_code += 1
+
+                result.matched += 1
+            else:
+                # Legacy fallback: match by name+category
+                legacy_match = None
+                for ds in existing:
+                    if (
+                        not ds.get("build_stage_id")
+                        and ds.get("name") == bs.get("name")
+                        and ds.get("category") == bs.get("category")
+                    ):
+                        legacy_match = ds
+                        break
+
+                if legacy_match:
+                    legacy_match["build_stage_id"] = bid
+                    legacy_match["deploy_mode"] = bs.get("deploy_mode", "auto")
+                    legacy_match["manual_instructions"] = bs.get("manual_instructions")
+                    result.matched += 1
+                    matched_bids.add(bid)
+                else:
+                    # Create new deploy stage
+                    new_ds = dict(bs)
+                    new_ds["build_stage_id"] = bid
+                    _enrich_deploy_fields(new_ds)
+                    new_stages.append(new_ds)
+                    result.created += 1
+                    result.details.append(f"New stage: {bs.get('name', '?')}")
+
+        # Rebuild ordered list
+        ordered: list[dict] = []
+        processed_bids: set[str] = set()
+
+        for bs in build_stages:
+            bid = bs.get("id") or _slugify(bs.get("name", "stage"))
+            if bid in deploy_by_bid and bid not in processed_bids:
+                # Add existing deploy stages for this build stage (in existing order)
+                ordered.extend(deploy_by_bid[bid])
+                processed_bids.add(bid)
+            elif bid not in processed_bids:
+                # Add newly created stage
+                for ns in new_stages:
+                    if ns.get("build_stage_id") == bid:
+                        ordered.append(ns)
+                processed_bids.add(bid)
+
+        # Also add legacy-matched stages that weren't in deploy_by_bid
+        for ds in existing:
+            if ds not in ordered and ds.get("build_stage_id") in matched_bids:
+                ordered.append(ds)
+
+        # Orphaned stages (build stage removed)
+        for bid, deploy_stages in deploy_by_bid.items():
+            if bid not in matched_bids:
+                for ds in deploy_stages:
+                    if ds.get("deploy_status") not in ("removed", "destroyed"):
+                        ds["deploy_status"] = "removed"
+                        result.orphaned += 1
+                        result.details.append(f"Removed: {ds.get('name', '?')}")
+                    ordered.append(ds)
+
+        # Also catch any existing stages not yet in ordered
+        for ds in existing:
+            if ds not in ordered:
+                if ds.get("build_stage_id") not in matched_bids:
+                    if ds.get("deploy_status") not in ("removed", "destroyed"):
+                        ds["deploy_status"] = "removed"
+                        result.orphaned += 1
+                ordered.append(ds)
+
+        self._state["deployment_stages"] = ordered
+        self._state["iac_tool"] = build_data.get("iac_tool", self._state.get("iac_tool", "terraform"))
+        self.renumber_stages()
+
+        return result
+
+    # ------------------------------------------------------------------ #
+    # Stage splitting
+    # ------------------------------------------------------------------ #
+
+    def split_stage(self, stage_num: int, substages: list[dict]) -> None:
+        """Replace one deploy stage with N substages sharing the same ``build_stage_id``.
+
+        Each substage gets a letter suffix: ``"a"``, ``"b"``, ``"c"``, etc.
+        The original stage is removed from the list.
+
+        Args:
+            stage_num: The stage number to split.
+            substages: List of substage dicts with at minimum ``name``, ``dir``.
+        """
+        stages = self._state["deployment_stages"]
+        parent_idx = None
+        parent = None
+
+        for i, s in enumerate(stages):
+            if s["stage"] == stage_num and not s.get("substage_label"):
+                parent_idx = i
+                parent = s
+                break
+
+        if parent is None:
+            logger.warning("Stage %d not found for splitting.", stage_num)
+            return
+
+        build_stage_id = parent.get("build_stage_id")
+        labels = [chr(ord("a") + i) for i in range(len(substages))]
+
+        new_entries: list[dict] = []
+        for label, sub in zip(labels, substages):
+            entry = dict(parent)
+            entry.update(sub)
+            entry["stage"] = stage_num
+            entry["substage_label"] = label
+            entry["_is_substage"] = True
+            entry["build_stage_id"] = build_stage_id
+            _enrich_deploy_fields(entry)
+            # Reset deploy state for new substages
+            entry["deploy_status"] = "pending"
+            entry["deploy_timestamp"] = None
+            entry["deploy_output"] = ""
+            entry["deploy_error"] = ""
+            new_entries.append(entry)
+
+        # Replace parent with substages
+        stages[parent_idx : parent_idx + 1] = new_entries
+        self.save()
+
+    def get_stage_groups(self) -> dict[str | None, list[dict]]:
+        """Group deploy stages by ``build_stage_id`` for tree rendering.
+
+        Returns a dict mapping ``build_stage_id`` → list of deploy stages.
+        Stages without a ``build_stage_id`` are grouped under ``None``.
+        """
+        groups: dict[str | None, list[dict]] = {}
+        for s in self._state["deployment_stages"]:
+            bid = s.get("build_stage_id")
+            groups.setdefault(bid, []).append(s)
+        return groups
+
+    def get_stages_for_build_stage(self, build_stage_id: str) -> list[dict]:
+        """Return all deploy stages linked to a given build stage."""
+        return [
+            s
+            for s in self._state["deployment_stages"]
+            if s.get("build_stage_id") == build_stage_id
+        ]
+
+    def get_stage_by_display_id(self, display_id: str) -> dict | None:
+        """Parse a display ID like ``"5"`` or ``"5a"`` and return the matching stage.
+
+        Returns None if no match found.
+        """
+        stage_num, label = parse_stage_ref(display_id)
+        if stage_num is None:
+            return None
+
+        for s in self._state["deployment_stages"]:
+            if s["stage"] == stage_num:
+                if label is None and not s.get("substage_label"):
+                    return s
+                if label is not None and s.get("substage_label") == label:
+                    return s
+                # If asking for bare number and stage has substages, return first
+                if label is None and s.get("substage_label"):
+                    return s
+        return None
 
     # ------------------------------------------------------------------ #
     # Stage status transitions
@@ -219,16 +493,117 @@ class DeployState:
             self.add_rollback_log_entry(stage_num)
             self.save()
 
+    def mark_stage_remediating(self, stage_num: int) -> None:
+        """Mark a stage as undergoing remediation and bump attempt counter."""
+        stage = self.get_stage(stage_num)
+        if stage:
+            stage["deploy_status"] = "remediating"
+            stage["remediation_attempts"] = stage.get("remediation_attempts", 0) + 1
+            self.add_deploy_log_entry(stage_num, "remediating", f"attempt {stage['remediation_attempts']}")
+            self.save()
+
+    def reset_stage_to_pending(self, stage_num: int) -> None:
+        """Reset a failed/remediating stage back to pending for re-deploy."""
+        stage = self.get_stage(stage_num)
+        if stage:
+            stage["deploy_status"] = "pending"
+            stage["deploy_error"] = ""
+            self.save()
+
+    def mark_stage_removed(self, stage_num: int) -> None:
+        """Mark a stage as removed (build stage was deleted)."""
+        stage = self.get_stage(stage_num)
+        if stage:
+            stage["deploy_status"] = "removed"
+            self.add_deploy_log_entry(stage_num, "removed")
+            self.save()
+
+    def mark_stage_destroyed(self, stage_num: int) -> None:
+        """Mark a removed stage as destroyed (resources torn down)."""
+        stage = self.get_stage(stage_num)
+        if stage:
+            stage["deploy_status"] = "destroyed"
+            self.add_deploy_log_entry(stage_num, "destroyed")
+            self.save()
+
+    def mark_stage_awaiting_manual(self, stage_num: int) -> None:
+        """Mark a manual stage as awaiting user confirmation."""
+        stage = self.get_stage(stage_num)
+        if stage:
+            stage["deploy_status"] = "awaiting_manual"
+            self.add_deploy_log_entry(stage_num, "awaiting_manual")
+            self.save()
+
+    def add_patch_stages(self, new_stages: list[dict]) -> None:
+        """Insert new stages before the docs stage, enriched with deploy fields.
+
+        Follows the same insertion pattern as
+        :meth:`~.build_state.BuildState.add_stages`.
+        """
+        existing = self._state["deployment_stages"]
+
+        # Find insertion point — before the docs stage
+        insert_idx = len(existing)
+        for i, s in enumerate(existing):
+            if s.get("category") == "docs":
+                insert_idx = i
+                break
+
+        for ns in new_stages:
+            _enrich_deploy_fields(ns)
+            ns.setdefault("services", [])
+            ns.setdefault("files", [])
+            ns.setdefault("dir", "")
+            existing.insert(insert_idx, ns)
+            insert_idx += 1
+
+        self.renumber_stages()
+
+    def renumber_stages(self) -> None:
+        """Renumber stages sequentially.
+
+        Top-level stages get sequential integers starting from 1.
+        Substages inherit their parent's number (their labels are unchanged).
+        A group of substages with the same ``build_stage_id`` counts as
+        one logical stage for numbering purposes.
+        """
+        stages = self._state["deployment_stages"]
+        current_num = 0
+        seen_substage_bids: set[str | None] = set()
+
+        for stage in stages:
+            if not stage.get("substage_label"):
+                # Top-level stage
+                current_num += 1
+                stage["stage"] = current_num
+            else:
+                # Substage — check if this is the first substage in its group
+                bid = stage.get("build_stage_id")
+                if bid not in seen_substage_bids:
+                    current_num += 1
+                    seen_substage_bids.add(bid)
+                stage["stage"] = current_num
+
+        self.save()
+
     # ------------------------------------------------------------------ #
     # Stage queries
     # ------------------------------------------------------------------ #
 
     def get_stage(self, stage_num: int) -> dict | None:
-        """Return a specific stage by number."""
+        """Return a specific stage by number.
+
+        For stages with substages, returns the first matching stage
+        (the first substage or the top-level stage).
+        """
         for stage in self._state["deployment_stages"]:
             if stage["stage"] == stage_num:
                 return stage
         return None
+
+    def get_all_stages_for_num(self, stage_num: int) -> list[dict]:
+        """Return all stages/substages with the given stage number."""
+        return [s for s in self._state["deployment_stages"] if s["stage"] == stage_num]
 
     def get_pending_stages(self) -> list[dict]:
         """Return stages not yet deployed."""
@@ -248,18 +623,27 @@ class DeployState:
         Only stages that can be safely rolled back are included.
         """
         deployed = self.get_deployed_stages()
-        return sorted(deployed, key=lambda s: s["stage"], reverse=True)
+        return sorted(deployed, key=lambda s: (s["stage"], s.get("substage_label") or ""), reverse=True)
 
-    def can_rollback(self, stage_num: int) -> bool:
+    def can_rollback(self, stage_num: int, substage_label: str | None = None) -> bool:
         """Check if a stage can be rolled back.
 
         A stage can only be rolled back if no higher-numbered stage has
-        ``deploy_status == 'deployed'``.  This enforces the invariant:
-        cannot roll back stage N before rolling back stage N+1.
+        ``deploy_status == 'deployed'``.  For substages, checks within
+        the same stage number that no later substage is still deployed.
         """
         for stage in self._state["deployment_stages"]:
-            if stage["stage"] > stage_num and stage.get("deploy_status") == "deployed":
+            s_status = stage.get("deploy_status")
+            if s_status != "deployed":
+                continue
+            s_num = stage["stage"]
+            s_label = stage.get("substage_label")
+
+            if s_num > stage_num:
                 return False
+            if s_num == stage_num and substage_label is not None and s_label is not None:
+                if s_label > substage_label:
+                    return False
         return True
 
     # ------------------------------------------------------------------ #
@@ -352,33 +736,49 @@ class DeployState:
         lines.append("")
 
         stages = self._state.get("deployment_stages", [])
+        active_stages = [s for s in stages if s.get("deploy_status") not in ("removed", "destroyed")]
         deployed = len([s for s in stages if s.get("deploy_status") == "deployed"])
         failed = len([s for s in stages if s.get("deploy_status") == "failed"])
         rolled = len([s for s in stages if s.get("deploy_status") == "rolled_back"])
+        removed = len([s for s in stages if s.get("deploy_status") in ("removed", "destroyed")])
 
         lines.append(
-            f"  Stages: {len(stages)} total, {deployed} deployed"
+            f"  Stages: {len(active_stages)} active, {deployed} deployed"
             f"{f', {failed} failed' if failed else ''}"
             f"{f', {rolled} rolled back' if rolled else ''}"
+            f"{f', {removed} removed' if removed else ''}"
         )
         lines.append("")
 
         for stage in stages:
-            icon = _status_icon(stage.get("deploy_status", "pending"))
-            line = f"  {icon} Stage {stage['stage']}: {stage['name']}"
+            status = stage.get("deploy_status", "pending")
+            icon = _status_icon(status)
+            display_id = _format_display_id(stage)
+            deploy_mode = stage.get("deploy_mode", "auto")
+
+            if status in ("removed", "destroyed"):
+                line = f"  {icon} Stage {display_id}: ~~{stage['name']}~~ (Removed)"
+            else:
+                line = f"  {icon} Stage {display_id}: {stage['name']}"
+                if deploy_mode == "manual":
+                    line += " [Manual]"
+
             ts = stage.get("deploy_timestamp")
             if ts:
                 line += f"  ({ts[:19]})"
             lines.append(line)
 
             services = stage.get("services", [])
-            if services:
+            if services and status not in ("removed", "destroyed"):
                 svc_names = [s.get("computed_name") or s.get("name", "?") for s in services]
                 lines.append(f"      Resources: {', '.join(svc_names)}")
 
+            if deploy_mode == "manual" and stage.get("manual_instructions"):
+                preview = stage["manual_instructions"][:80]
+                lines.append(f"      Instructions: {preview}...")
+
             error = stage.get("deploy_error", "")
             if error:
-                # Truncate long errors
                 short = error[:120] + "..." if len(error) > 120 else error
                 lines.append(f"      Error: {short}")
 
@@ -402,14 +802,23 @@ class DeployState:
             status = stage.get("deploy_status", "pending")
             icon = _status_icon(status)
             svc_count = len(stage.get("services", []))
-            line = f"  {icon} Stage {stage['stage']}: {stage['name']} ({stage.get('category', '?')})"
-            if svc_count:
-                line += f" - {svc_count} service(s)"
+            display_id = _format_display_id(stage)
+            deploy_mode = stage.get("deploy_mode", "auto")
+
+            if status in ("removed", "destroyed"):
+                line = f"  {icon} Stage {display_id}: ~~{stage['name']}~~ ({stage.get('category', '?')}) (Removed)"
+            else:
+                line = f"  {icon} Stage {display_id}: {stage['name']} ({stage.get('category', '?')})"
+                if deploy_mode == "manual":
+                    line += " [Manual]"
+                if svc_count:
+                    line += f" - {svc_count} service(s)"
             lines.append(line)
 
+        active = [s for s in stages if s.get("deploy_status") not in ("removed", "destroyed")]
         deployed = len([s for s in stages if s.get("deploy_status") == "deployed"])
         lines.append("")
-        lines.append(f"  Progress: {deployed}/{len(stages)} stages deployed")
+        lines.append(f"  Progress: {deployed}/{len(active)} stages deployed")
 
         metadata = self._state.get("_metadata", {})
         if metadata.get("last_updated"):
@@ -472,6 +881,13 @@ class DeployState:
     # Internals
     # ------------------------------------------------------------------ #
 
+    def _backfill_build_stage_ids(self) -> None:
+        """Backfill ``build_stage_id`` and deploy fields on legacy state files."""
+        for stage in self._state["deployment_stages"]:
+            if not stage.get("build_stage_id"):
+                stage["build_stage_id"] = _slugify(stage.get("name", "stage"))
+            _enrich_deploy_fields(stage)
+
     def _deep_merge(self, base: dict, updates: dict) -> None:
         """Deep merge updates into base dict."""
         for key, value in updates.items():
@@ -479,6 +895,30 @@ class DeployState:
                 self._deep_merge(base[key], value)
             else:
                 base[key] = value
+
+
+# ================================================================== #
+# Module-level helpers
+# ================================================================== #
+
+
+def parse_stage_ref(arg: str) -> tuple[int | None, str | None]:
+    """Parse a stage reference like ``"5"`` or ``"5a"`` into (stage_num, substage_label).
+
+    Returns ``(None, None)`` if the string cannot be parsed.
+    """
+    m = re.match(r"^(\d+)([a-z]?)$", arg.strip())
+    if not m:
+        return None, None
+    stage_num = int(m.group(1))
+    label = m.group(2) or None
+    return stage_num, label
+
+
+def _format_display_id(stage: dict) -> str:
+    """Format a stage's display identifier, e.g. ``"5"`` or ``"5a"``."""
+    label = stage.get("substage_label") or ""
+    return f"{stage['stage']}{label}"
 
 
 def _status_icon(status: str) -> str:
@@ -489,4 +929,8 @@ def _status_icon(status: str) -> str:
         "deployed": " v",
         "failed": " x",
         "rolled_back": " ~",
+        "remediating": "<>",
+        "removed": "~~",
+        "destroyed": "xx",
+        "awaiting_manual": "!!",
     }.get(status, "  ")

@@ -9,6 +9,7 @@ import hashlib
 import json
 import logging
 import os
+import signal
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -366,6 +367,51 @@ def prototype_init(
     return result
 
 
+# ======================================================================
+# TUI Launch
+# ======================================================================
+
+
+def _run_tui(app) -> None:
+    """Run a Textual app with clean Ctrl+C handling.
+
+    Suppresses SIGINT during the Textual run so that Ctrl+C is handled
+    exclusively as a key event by the Textual binding (``ctrl+c`` →
+    ``action_quit``).  This prevents ``KeyboardInterrupt`` from
+    propagating to the Azure CLI framework and, on Windows, eliminates
+    the "Terminate batch job (Y/N)?" prompt from ``az.cmd``.
+    """
+    prev = signal.getsignal(signal.SIGINT)
+    try:
+        signal.signal(signal.SIGINT, lambda *_: None)
+        app.run()
+    except KeyboardInterrupt:
+        pass  # clean exit
+    finally:
+        signal.signal(signal.SIGINT, prev)
+
+
+@_quiet_output
+@track("prototype launch")
+def prototype_launch(cmd, stage=None):
+    """Launch the interactive TUI dashboard.
+
+    Auto-detects the current project stage and launches the appropriate
+    session inside a Textual terminal application.
+    """
+    from azext_prototype.ui.app import PrototypeApp
+
+    project_dir = _get_project_dir()
+
+    # Verify project is initialized
+    if not (Path(project_dir) / "prototype.yaml").is_file():
+        raise CLIError("Run 'az prototype init' first.")
+
+    app = PrototypeApp(start_stage=stage, project_dir=project_dir)
+    _run_tui(app)
+    return {"status": "completed"}
+
+
 @_quiet_output
 @track("prototype design")
 def prototype_design(
@@ -399,14 +445,15 @@ def prototype_design(
     user, who may accept the compliant recommendation or override the
     policy.  Overrides are tracked in the design state.
     """
-    from azext_prototype.stages.design_stage import DesignStage
-    from azext_prototype.stages.discovery_state import DiscoveryState
-    from azext_prototype.ui.console import console
-
-    project_dir, config, registry, agent_context = _prepare_command()
-
-    # Handle --status flag: just display current state and exit
+    # --status: keep existing CLI behavior (quick check, no TUI)
     if status:
+        from azext_prototype.stages.discovery_state import DiscoveryState
+        from azext_prototype.ui.console import console
+
+        project_dir = _get_project_dir()
+        if not (Path(project_dir) / "prototype.yaml").is_file():
+            raise CLIError("Run 'az prototype init' first.")
+
         discovery_state = DiscoveryState(project_dir)
         if discovery_state.exists:
             discovery_state.load()
@@ -432,21 +479,34 @@ def prototype_design(
 
         return {"status": "displayed"}
 
-    stage = DesignStage()
-    _check_guards(stage)
+    project_dir = _get_project_dir()
+    if not (Path(project_dir) / "prototype.yaml").is_file():
+        raise CLIError("Run 'az prototype init' first.")
 
-    try:
-        return stage.execute(
-            agent_context,
-            registry,
-            artifacts=artifacts,
-            context=context,
-            reset=reset,
-            interactive=interactive,
-            skip_discovery=skip_discovery,
-        )
-    finally:
-        _shutdown_mcp(agent_context)
+    # Resolve artifacts path to absolute before TUI takes over
+    resolved_artifacts = str(Path(artifacts).resolve()) if artifacts else None
+
+    stage_kwargs = {}
+    if resolved_artifacts:
+        stage_kwargs["artifacts"] = resolved_artifacts
+    if context:
+        stage_kwargs["context"] = context
+    if reset:
+        stage_kwargs["reset"] = True
+    if interactive:
+        stage_kwargs["interactive"] = True
+    if skip_discovery:
+        stage_kwargs["skip_discovery"] = True
+
+    from azext_prototype.ui.app import PrototypeApp
+
+    app = PrototypeApp(
+        start_stage="design",
+        project_dir=project_dir,
+        stage_kwargs=stage_kwargs,
+    )
+    _run_tui(app)
+    return {"status": "completed"}
 
 
 @_quiet_output

@@ -19,6 +19,7 @@ Phases:
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 from contextlib import contextmanager
 from pathlib import Path
@@ -28,6 +29,7 @@ from azext_prototype.agents.base import AgentCapability, AgentContext
 from azext_prototype.agents.registry import AgentRegistry
 from azext_prototype.ai.token_tracker import TokenTracker
 from azext_prototype.config import ProjectConfig
+from azext_prototype.parsers.file_extractor import parse_file_blocks, write_parsed_files
 from azext_prototype.stages.deploy_helpers import (
     DeploymentOutputCapture,
     RollbackManager,
@@ -48,12 +50,21 @@ from azext_prototype.stages.deploy_helpers import (
 )
 from azext_prototype.stages.deploy_state import DeployState
 from azext_prototype.stages.escalation import EscalationTracker
+from azext_prototype.stages.intent import IntentKind, build_deploy_classifier
 from azext_prototype.stages.qa_router import route_error_to_qa
 from azext_prototype.tracking import ChangeTracker
 from azext_prototype.ui.console import Console, DiscoveryPrompt
 from azext_prototype.ui.console import console as default_console
 
 logger = logging.getLogger(__name__)
+
+# Maximum auto-remediation cycles per stage before falling through to interactive
+_MAX_DEPLOY_REMEDIATION_ATTEMPTS = 2
+
+# Files that should never be written for each IaC tool.
+_BLOCKED_FILES: dict[str, set[str]] = {
+    "terraform": {"versions.tf"},
+}
 
 
 def _lookup_deployer_object_id(client_id: str | None = None) -> str | None:
@@ -95,6 +106,7 @@ _SLASH_COMMANDS = frozenset(
         "/rollback",
         "/redeploy",
         "/plan",
+        "/describe",
         "/outputs",
         "/preflight",
         "/login",
@@ -176,6 +188,19 @@ class DeploySession:
         qa_agents = registry.find_by_capability(AgentCapability.QA)
         self._qa_agent = qa_agents[0] if qa_agents else None
 
+        # Resolve IaC, dev, and architect agents for remediation
+        self._iac_agents: dict[str, Any] = {}
+        for cap, key in [(AgentCapability.TERRAFORM, "terraform"), (AgentCapability.BICEP, "bicep")]:
+            agents = registry.find_by_capability(cap)
+            if agents:
+                self._iac_agents[key] = agents[0]
+
+        dev_agents = registry.find_by_capability(AgentCapability.DEVELOP)
+        self._dev_agent = dev_agents[0] if dev_agents else None
+
+        architect_agents = registry.find_by_capability(AgentCapability.ARCHITECT)
+        self._architect_agent = architect_agents[0] if architect_agents else None
+
         # Escalation tracker
         self._escalation_tracker = EscalationTracker(agent_context.project_dir)
         if self._escalation_tracker.exists:
@@ -189,6 +214,12 @@ class DeploySession:
 
         # Token tracker
         self._token_tracker = TokenTracker()
+
+        # Intent classifier for natural language command detection
+        self._intent_classifier = build_deploy_classifier(
+            ai_provider=agent_context.ai_provider,
+            token_tracker=self._token_tracker,
+        )
 
         # Deployment helpers
         self._output_capture = DeploymentOutputCapture(agent_context.project_dir)
@@ -280,11 +311,22 @@ class DeploySession:
         _print = print_fn or self._console.print
 
         # ---- Phase 1: Load build state ----
+        build_path = Path(self._context.project_dir) / ".prototype" / "state" / "build.yaml"
         if not self._deploy_state._state["deployment_stages"]:
-            build_path = Path(self._context.project_dir) / ".prototype" / "state" / "build.yaml"
             if not self._deploy_state.load_from_build_state(build_path):
                 _print("  No build state found. Run 'az prototype build' first.")
                 return DeployResult(cancelled=True)
+        else:
+            # Re-entry: sync with latest build state
+            sync = self._deploy_state.sync_from_build_state(build_path)
+            if sync.created or sync.orphaned or sync.updated_code:
+                _print("")
+                _print("  Build state changed since last deploy:")
+                for detail in sync.details:
+                    _print(f"    - {detail}")
+                if sync.updated_code:
+                    _print(f"    - {sync.updated_code} deployed stage(s) have updated code")
+                _print("")
 
         # Resolve subscription / resource group / tenant / SP creds
         self._resolve_context(subscription, tenant, client_id, client_secret)
@@ -387,7 +429,34 @@ class DeploySession:
                 )
                 continue
 
-            _print("  Use slash commands to manage deployment. Type /help for a list.")
+            # Natural language intent detection
+            intent = self._intent_classifier.classify(user_input)
+            if intent.kind == IntentKind.COMMAND:
+                # Multi-stage support: "deploy stages 3 and 4"
+                import re as _re
+
+                numbers = _re.findall(r"\d+", intent.args) if intent.args else []
+                if len(numbers) > 1 and intent.command in ("/deploy", "/rollback"):
+                    for num in numbers:
+                        self._handle_slash_command(
+                            f"{intent.command} {num}",
+                            force,
+                            use_styled,
+                            _print,
+                            _input,
+                        )
+                else:
+                    cmd_line = f"{intent.command} {intent.args}".strip()
+                    self._handle_slash_command(
+                        cmd_line,
+                        force,
+                        use_styled,
+                        _print,
+                        _input,
+                    )
+                continue
+
+            _print("  Type /help for commands, or use natural language (e.g. 'deploy stage 3').")
 
         return self._build_result()
 
@@ -507,6 +576,13 @@ class DeploySession:
                 self._capture_stage_outputs(stage)
         else:
             _print(f"  Stage {stage_num} failed: {result.get('error', 'unknown error')}")
+
+            # Attempt non-interactive remediation
+            remediated = self._remediate_deploy_failure(
+                stage, result, False, _print, lambda p: "",
+            )
+            if remediated and remediated.get("status") == "deployed":
+                _print(f"  Stage {stage_num} deployed after remediation.")
 
         return self._build_result()
 
@@ -799,10 +875,30 @@ class DeploySession:
                 # Capture outputs after infra stages
                 if category in ("infra", "data", "integration"):
                     self._capture_stage_outputs(stage)
+            elif result.get("status") == "awaiting_manual":
+                instructions = result.get("instructions", "No instructions provided.")
+                _print("         Manual step required:")
+                _print(f"           {instructions}")
+                _print("")
+                _print("         When complete, enter: Done / Skip / Need help")
+                try:
+                    answer = _input("  > ").strip().lower()
+                except (EOFError, KeyboardInterrupt):
+                    _print("         Skipped.")
+                    continue
+                if answer in ("done", "d", "yes", "y"):
+                    self._deploy_state.mark_stage_deployed(stage_num)
+                    _print("         Marked as deployed.")
+                elif answer in ("skip", "s"):
+                    _print("         Skipped. Use /deploy to continue later.")
+                else:
+                    _print("         Pausing deployment. Use /deploy to continue.")
+                    break
             elif result.get("status") == "failed":
                 _print(f"         Failed: {result.get('error', 'unknown error')[:120]}")
-                self._handle_deploy_failure(stage, result, use_styled, _print, _input)
-                break  # Stop sequential deployment — user decides via interactive loop
+                remediated = self._handle_deploy_failure(stage, result, use_styled, _print, _input)
+                if remediated.get("status") != "deployed":
+                    break  # Stop sequential deployment — user decides via interactive loop
             else:
                 _print(f"         Skipped: {result.get('reason', 'no action needed')}")
 
@@ -812,13 +908,24 @@ class DeploySession:
         """Deploy one stage and update state."""
         stage_num = stage["stage"]
         category = stage.get("category", "infra")
+        deploy_mode = stage.get("deploy_mode", "auto")
+
+        # Manual steps don't execute — they return a special status
+        if deploy_mode == "manual":
+            self._deploy_state.mark_stage_awaiting_manual(stage_num)
+            return {
+                "status": "awaiting_manual",
+                "instructions": stage.get("manual_instructions", "No instructions provided."),
+            }
+
         stage_dir = Path(self._context.project_dir) / stage.get("dir", "")
 
         if not stage_dir.is_dir():
             return {"status": "skipped", "reason": f"Directory not found: {stage.get('dir', '?')}"}
 
         # Snapshot before deploy
-        self._rollback_mgr.snapshot_stage(stage_num, category, self._iac_tool)
+        build_stage_id = stage.get("build_stage_id")
+        self._rollback_mgr.snapshot_stage(stage_num, category, self._iac_tool, build_stage_id=build_stage_id)
         self._deploy_state.mark_stage_deploying(stage_num)
 
         # Resolve generated secrets for Terraform stages (TF_VAR_* env vars)
@@ -890,36 +997,557 @@ class DeploySession:
         use_styled: bool,
         _print: Callable[[str], None],
         _input: Callable[[str], str],
-    ) -> None:
-        """Route deployment failure to QA agent for diagnosis."""
-        error_text = result.get("error", "Unknown error")
-        stage_info = f"Stage {stage['stage']}: {stage['name']}"
+    ) -> dict[str, Any]:
+        """Attempt auto-remediation of a deploy failure, falling through to interactive options.
 
-        services = stage.get("services", [])
-        svc_names = [s.get("name", "") for s in services if s.get("name")]
+        Returns the final deploy result for the stage (may be ``"deployed"`` if
+        remediation succeeds, or the original failure if remediation is exhausted
+        or unavailable).
+        """
+        # Attempt auto-remediation when agents are available
+        remediated = self._remediate_deploy_failure(stage, result, use_styled, _print, _input)
+        if remediated and remediated.get("status") == "deployed":
+            return remediated
 
-        qa_result = route_error_to_qa(
-            error_text,
-            f"Deploy {stage_info}",
-            self._qa_agent,
-            self._context,
-            self._token_tracker,
-            _print,
-            services=svc_names,
-            escalation_tracker=self._escalation_tracker,
-            source_agent="deploy-session",
-            source_stage="deploy",
-        )
+        # Remediation not attempted — fall back to QA-only diagnosis
+        if remediated is None:
+            error_text = result.get("error", "Unknown error")
+            stage_info = f"Stage {stage['stage']}: {stage['name']}"
+            services = stage.get("services", [])
+            svc_names = [s.get("name", "") for s in services if s.get("name")]
 
-        if not qa_result["diagnosed"]:
-            _print("")
-            _print(f"  Error: {error_text[:500]}")
+            qa_result = route_error_to_qa(
+                error_text,
+                f"Deploy {stage_info}",
+                self._qa_agent,
+                self._context,
+                self._token_tracker,
+                _print,
+                services=svc_names,
+                escalation_tracker=self._escalation_tracker,
+                source_agent="deploy-session",
+                source_stage="deploy",
+            )
 
-        if use_styled and qa_result.get("response"):
-            self._console.print_token_status(self._token_tracker.format_status())
+            if not qa_result["diagnosed"]:
+                _print("")
+                _print(f"  Error: {error_text[:500]}")
 
+            if use_styled and qa_result.get("response"):
+                self._console.print_token_status(self._token_tracker.format_status())
+
+        # Show interactive options
         _print("")
         _print("  Options: /deploy (retry) | /rollback (undo) | /help | quit")
+        return remediated or result
+
+    # ------------------------------------------------------------------ #
+    # Internal — Deploy failure remediation
+    # ------------------------------------------------------------------ #
+
+    def _remediate_deploy_failure(
+        self,
+        stage: dict[str, Any],
+        result: dict[str, Any],
+        use_styled: bool,
+        _print: Callable[[str], None],
+        _input: Callable[[str], str],
+    ) -> dict[str, Any] | None:
+        """Closed-loop remediation: QA diagnoses -> architect guides -> IaC/dev fixes -> redeploy.
+
+        Returns the final deploy result, or ``None`` if remediation cannot be
+        attempted (no agents / no AI provider).
+        """
+        # Guard: need at minimum QA + one fix agent + AI provider
+        has_fix_agent = bool(self._iac_agents.get(self._iac_tool) or self._dev_agent)
+        if not self._qa_agent or not has_fix_agent or not self._context.ai_provider:
+            return None
+
+        error_text = result.get("error", "Unknown error")
+        stage_num = stage["stage"]
+        stage_info = f"Stage {stage_num}: {stage['name']}"
+        services = stage.get("services", [])
+        svc_names = [s.get("name", "") for s in services if s.get("name")]
+        final_result = result
+
+        for attempt in range(1, _MAX_DEPLOY_REMEDIATION_ATTEMPTS + 1):
+            current_attempts = stage.get("remediation_attempts", 0)
+            if current_attempts >= _MAX_DEPLOY_REMEDIATION_ATTEMPTS:
+                _print(f"  Auto-remediation exhausted ({current_attempts} attempts) for {stage_info}.")
+                break
+
+            # 1. QA diagnosis
+            qa_result = route_error_to_qa(
+                error_text,
+                f"Deploy {stage_info}",
+                self._qa_agent,
+                self._context,
+                self._token_tracker,
+                _print,
+                services=svc_names,
+                escalation_tracker=self._escalation_tracker,
+                source_agent="deploy-session",
+                source_stage="deploy",
+            )
+
+            if not qa_result["diagnosed"]:
+                _print("")
+                _print(f"  Error: {error_text[:500]}")
+                break
+
+            qa_diagnosis = qa_result.get("content", "")
+
+            # 2. Architect fix guidance
+            architect_guidance = self._get_architect_fix_guidance(stage, error_text, qa_diagnosis)
+
+            # 3. Mark stage as remediating
+            self._deploy_state.mark_stage_remediating(stage_num)
+            _print(f"  Remediating {stage_info} (attempt {attempt})...")
+
+            # 4. Build and execute fix task
+            agent, task = self._build_fix_task(stage, error_text, qa_diagnosis, architect_guidance)
+            if not agent:
+                _print("  No suitable agent available for remediation.")
+                break
+
+            with self._maybe_spinner(f"Fixing {stage_info}...", use_styled):
+                try:
+                    fix_response = agent.execute(self._context, task)
+                except Exception:
+                    logger.debug("Fix agent failed during remediation", exc_info=True)
+                    _print("  Fix agent encountered an error.")
+                    break
+
+            if fix_response:
+                self._token_tracker.record(fix_response)
+
+            fix_content = fix_response.content if fix_response else ""
+            if not fix_content:
+                _print("  Fix agent returned no content.")
+                break
+
+            # 5. Write fixed files
+            written = self._write_stage_files(stage, fix_content)
+            if written:
+                _print(f"  Wrote {len(written)} file(s): {', '.join(Path(f).name for f in written[:5])}")
+            else:
+                _print("  No file blocks found in fix response.")
+                break
+
+            # 6. Check downstream impact
+            downstream = self._check_downstream_impact(stage, architect_guidance)
+
+            # 7. Reset and re-deploy
+            self._deploy_state.reset_stage_to_pending(stage_num)
+
+            with self._maybe_spinner(f"Re-deploying {stage_info}...", use_styled):
+                final_result = self._deploy_single_stage(stage)
+
+            if final_result.get("status") == "deployed":
+                _print(f"  {stage_info} deployed successfully after remediation.")
+
+                # Capture outputs for infra stages
+                if stage.get("category") in ("infra", "data", "integration"):
+                    self._capture_stage_outputs(stage)
+
+                # Regenerate downstream stages if needed
+                if downstream:
+                    self._regenerate_downstream_stages(downstream, use_styled, _print)
+
+                return final_result
+
+            # Failed again — loop for next attempt
+            error_text = final_result.get("error", "unknown error")
+            _print(f"  Re-deploy failed: {error_text[:120]}")
+
+        return final_result
+
+    def _collect_stage_file_content(self, stage: dict, max_bytes: int = 20_000) -> str:
+        """Collect content of generated files for a single deploy stage.
+
+        Falls back to globbing the stage directory when the ``files`` list is
+        empty (deploy stages may not always have files tracked).
+        """
+        project_root = Path(self._context.project_dir)
+        parts: list[str] = []
+        total = 0
+
+        files = stage.get("files", [])
+
+        # Fallback: glob the stage directory for common IaC/app file types
+        if not files:
+            stage_dir = project_root / stage.get("dir", "")
+            if stage_dir.is_dir():
+                for pattern in ("*.tf", "*.bicep", "*.sh", "*.py", "*.cs", "*.json", "*.yaml"):
+                    for f in stage_dir.glob(pattern):
+                        try:
+                            rel = str(f.relative_to(project_root))
+                            files.append(rel)
+                        except ValueError:
+                            files.append(str(f))
+
+        if not files:
+            return ""
+
+        for filepath in files:
+            if total >= max_bytes:
+                parts.append("\n(remaining files omitted — size cap reached)")
+                break
+
+            full_path = project_root / filepath
+            try:
+                content = full_path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                parts.append(f"```{filepath}\n(could not read file)\n```")
+                continue
+
+            per_file_cap = 8_000
+            if len(content) > per_file_cap:
+                content = content[:per_file_cap] + "\n... (truncated)"
+
+            block = f"```{filepath}\n{content}\n```"
+            total += len(block)
+            parts.append(block)
+
+        return "\n\n".join(parts)
+
+    def _build_fix_task(
+        self,
+        stage: dict,
+        deploy_error: str,
+        qa_diagnosis: str,
+        architect_guidance: str,
+    ) -> tuple[Any | None, str]:
+        """Build a fix prompt for the IaC/dev agent and select the appropriate agent.
+
+        Returns ``(agent, task_prompt)`` or ``(None, "")`` when no suitable
+        agent is available.
+        """
+        category = stage.get("category", "infra")
+
+        # Select agent based on category (mirrors BuildSession._build_stage_task)
+        if category in ("infra", "data", "integration"):
+            agent = self._iac_agents.get(self._iac_tool)
+        elif category in ("app", "schema", "cicd", "external"):
+            agent = self._dev_agent
+        else:
+            agent = self._iac_agents.get(self._iac_tool) or self._dev_agent
+
+        if not agent:
+            return None, ""
+
+        # Collect current stage files
+        file_content = self._collect_stage_file_content(stage, max_bytes=20_000)
+
+        # Service list
+        services = stage.get("services", [])
+        svc_lines = "\n".join(
+            f"- {s.get('computed_name') or s.get('name', '?')}: "
+            f"{s.get('resource_type', 'N/A')} (SKU: {s.get('sku') or 'n/a'})"
+            for s in services
+        )
+
+        stage_dir = stage.get("dir", "concept")
+
+        task = (
+            f"Fix deployment Stage {stage['stage']}: {stage['name']}.\n\n"
+            f"The deployment FAILED with the following error. You MUST fix ALL issues.\n\n"
+            f"## Deploy Error\n```\n{deploy_error[:3000]}\n```\n\n"
+            f"## QA Diagnosis\n{qa_diagnosis[:2000]}\n\n"
+            f"## Architect Guidance\n{architect_guidance[:2000]}\n\n"
+        )
+
+        if file_content:
+            task += f"## Current Stage Files\n{file_content}\n\n"
+
+        if svc_lines:
+            task += f"## Services in This Stage\n{svc_lines}\n\n"
+
+        task += (
+            f"## Requirements\n"
+            f"- Fix ALL issues identified in the error and diagnosis above\n"
+            f"- Preserve all working functionality — only change what's broken\n"
+            f"- All files should be relative to {stage_dir}/\n"
+            f"- Output COMPLETE file contents in fenced code blocks with filenames\n"
+        )
+
+        return agent, task
+
+    def _write_stage_files(self, stage: dict, content: str) -> list[str]:
+        """Extract file blocks from AI response and write to disk.
+
+        Returns a list of written file paths relative to the project dir.
+        """
+        if not content:
+            return []
+
+        files = parse_file_blocks(content)
+        if not files:
+            return []
+
+        stage_dir = stage.get("dir", "concept")
+        output_dir = Path(self._context.project_dir) / stage_dir
+        blocked = _BLOCKED_FILES.get(self._iac_tool, set())
+
+        # Strip stage_dir prefix from filenames to avoid path duplication
+        cleaned: dict[str, str] = {}
+        for filename, file_content in files.items():
+            normalized = filename.replace("\\", "/")
+            stage_prefix = stage_dir.replace("\\", "/")
+            if normalized.startswith(stage_prefix + "/"):
+                normalized = normalized[len(stage_prefix) + 1:]
+            elif normalized.startswith(stage_prefix):
+                normalized = normalized[len(stage_prefix):]
+            normalized = normalized or filename
+
+            if normalized in blocked:
+                logger.info("Dropped blocked file: %s (IaC tool: %s)", normalized, self._iac_tool)
+                continue
+
+            cleaned[normalized] = file_content
+
+        written = write_parsed_files(cleaned, output_dir, verbose=False)
+
+        project_root = Path(self._context.project_dir)
+        written_relative = [str(p.relative_to(project_root)) for p in written]
+
+        # Sync build state with updated file list
+        self._sync_build_state(stage, written_relative)
+
+        return written_relative
+
+    def _sync_build_state(self, stage: dict, written_paths: list[str]) -> None:
+        """Best-effort sync of build.yaml after remediation writes.
+
+        Updates the matching stage's ``files`` list and marks it as
+        ``generated`` so subsequent builds stay consistent.  Uses
+        ``build_stage_id`` for matching when available, falling back
+        to stage number for legacy state files.
+        """
+        try:
+            from azext_prototype.stages.build_state import BuildState
+
+            bs = BuildState(self._context.project_dir)
+            if not bs.exists:
+                return
+            bs.load()
+
+            build_stage_id = stage.get("build_stage_id")
+            matched = False
+
+            if build_stage_id:
+                # Match by stable ID
+                target = bs.get_stage_by_id(build_stage_id)
+                if target:
+                    target["files"] = written_paths
+                    target["status"] = "generated"
+                    matched = True
+
+            if not matched:
+                # Fallback: match by stage number
+                stage_num = stage["stage"]
+                for build_stage in bs.state.get("deployment_stages", []):
+                    if build_stage["stage"] == stage_num:
+                        build_stage["files"] = written_paths
+                        build_stage["status"] = "generated"
+                        break
+
+            bs.save()
+        except Exception:
+            logger.debug("Could not sync build state after remediation", exc_info=True)
+
+    def _get_architect_fix_guidance(
+        self, stage: dict, deploy_error: str, qa_diagnosis: str
+    ) -> str:
+        """Ask the architect agent for specific fix guidance.
+
+        Returns guidance text, or a generic fallback if no architect is available.
+        """
+        if not self._architect_agent or not self._context.ai_provider:
+            return "Fix the issues identified in the QA diagnosis. Ensure all resource references are correct."
+
+        file_content = self._collect_stage_file_content(stage, max_bytes=10_000)
+
+        task = (
+            f"A deployment stage failed. Analyse the error and QA diagnosis, "
+            f"then provide SPECIFIC code changes needed to fix it.\n\n"
+            f"## Stage {stage['stage']}: {stage['name']}\n"
+            f"Category: {stage.get('category', 'infra')}\n\n"
+            f"## Deploy Error\n```\n{deploy_error[:2000]}\n```\n\n"
+            f"## QA Diagnosis\n{qa_diagnosis[:1500]}\n\n"
+        )
+
+        if file_content:
+            task += f"## Current Stage Files\n{file_content}\n\n"
+
+        task += (
+            "Provide:\n"
+            "1. Root cause of the failure\n"
+            "2. Specific code changes needed (which files, what to change)\n"
+            "3. Whether downstream stages might be affected by this fix "
+            "(e.g. changed outputs, renamed resources)\n"
+        )
+
+        try:
+            response = self._architect_agent.execute(self._context, task)
+            if response:
+                self._token_tracker.record(response)
+            if response and response.content:
+                return response.content
+        except Exception:
+            logger.debug("Architect fix guidance failed", exc_info=True)
+
+        return "Fix the issues identified in the QA diagnosis. Ensure all resource references are correct."
+
+    def _check_downstream_impact(
+        self, fixed_stage: dict, architect_guidance: str
+    ) -> list[int]:
+        """Ask the architect whether downstream stages need regeneration.
+
+        Returns a list of stage numbers that should be regenerated, or
+        empty list if none are affected.
+        """
+        if not self._architect_agent or not self._context.ai_provider:
+            return []
+
+        stages = self._deploy_state._state.get("deployment_stages", [])
+        fixed_num = fixed_stage["stage"]
+
+        # Only consider downstream stages that are pending or failed
+        downstream = [
+            s for s in stages
+            if s["stage"] > fixed_num and s.get("deploy_status") in ("pending", "failed")
+        ]
+        if not downstream:
+            return []
+
+        import json
+
+        stage_info = json.dumps(
+            [
+                {
+                    "stage": s["stage"],
+                    "name": s["name"],
+                    "category": s.get("category", ""),
+                    "build_stage_id": s.get("build_stage_id", ""),
+                    "services": [svc.get("name", "") for svc in s.get("services", [])],
+                }
+                for s in downstream
+            ],
+            indent=2,
+        )
+
+        task = (
+            f"Stage {fixed_num} ({fixed_stage['name']}) was just fixed during deployment.\n\n"
+            f"## Fix Context\n{architect_guidance[:1500]}\n\n"
+            f"## Downstream Stages\n```json\n{stage_info}\n```\n\n"
+            "Which downstream stages need their code regenerated because of "
+            "changed outputs, renamed resources, or modified dependencies from "
+            "the fix above?\n\n"
+            "Return ONLY a JSON array of affected stage numbers. "
+            "Return [] if no stages are affected.\n"
+            "Example: [3, 4]\n"
+        )
+
+        try:
+            response = self._architect_agent.execute(self._context, task)
+            if response:
+                self._token_tracker.record(response)
+            if response and response.content:
+                return self._parse_stage_numbers(response.content, downstream)
+        except Exception:
+            logger.debug("Downstream impact check failed", exc_info=True)
+
+        return []
+
+    @staticmethod
+    def _parse_stage_numbers(content: str, valid_stages: list[dict]) -> list[int]:
+        """Parse a JSON array of stage numbers from AI response."""
+        import json
+
+        valid_nums = {s["stage"] for s in valid_stages}
+
+        # Try to find a JSON array in the response
+        match = re.search(r"\[[\d\s,]*\]", content)
+        if match:
+            try:
+                numbers = json.loads(match.group())
+                return [n for n in numbers if isinstance(n, int) and n in valid_nums]
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        # Fallback: extract individual numbers
+        numbers = [int(n) for n in re.findall(r"\d+", content)]
+        return [n for n in numbers if n in valid_nums]
+
+    def _regenerate_downstream_stages(
+        self,
+        stage_nums: list[int],
+        use_styled: bool,
+        _print: Callable[[str], None],
+    ) -> None:
+        """Regenerate code for downstream stages affected by an upstream fix.
+
+        Only regenerates the code (writes files) — does NOT deploy.  The
+        normal deploy loop handles deployment of these stages.
+        """
+        if not stage_nums:
+            return
+
+        _print(f"  Regenerating {len(stage_nums)} downstream stage(s) affected by fix...")
+
+        for num in stage_nums:
+            stage = self._deploy_state.get_stage(num)
+            if not stage:
+                continue
+
+            category = stage.get("category", "infra")
+            if category in ("infra", "data", "integration"):
+                agent = self._iac_agents.get(self._iac_tool)
+            elif category in ("app", "schema", "cicd", "external"):
+                agent = self._dev_agent
+            else:
+                agent = self._iac_agents.get(self._iac_tool) or self._dev_agent
+
+            if not agent:
+                continue
+
+            file_content = self._collect_stage_file_content(stage, max_bytes=15_000)
+            stage_dir = stage.get("dir", "concept")
+
+            task = (
+                f"Regenerate code for Stage {num}: {stage['name']}.\n\n"
+                f"An upstream stage was fixed during deployment. This stage may need "
+                f"updates to match changed outputs or resource references.\n\n"
+            )
+            if file_content:
+                task += f"## Current Stage Files\n{file_content}\n\n"
+
+            task += (
+                f"## Requirements\n"
+                f"- Update any references to upstream resources if they changed\n"
+                f"- Preserve all existing functionality\n"
+                f"- All files should be relative to {stage_dir}/\n"
+                f"- Output COMPLETE file contents in fenced code blocks with filenames\n"
+            )
+
+            with self._maybe_spinner(f"Regenerating Stage {num}...", use_styled):
+                try:
+                    response = agent.execute(self._context, task)
+                except Exception:
+                    logger.debug("Downstream regeneration failed for Stage %d", num, exc_info=True)
+                    _print(f"  Could not regenerate Stage {num}.")
+                    continue
+
+            if response:
+                self._token_tracker.record(response)
+
+            if response and response.content:
+                written = self._write_stage_files(stage, response.content)
+                if written:
+                    _print(f"  Stage {num}: regenerated {len(written)} file(s).")
+                else:
+                    _print(f"  Stage {num}: no file blocks in regeneration response.")
 
     # ------------------------------------------------------------------ #
     # Internal — Rollback
@@ -1009,6 +1637,100 @@ class DeploySession:
     # Internal — Slash commands
     # ------------------------------------------------------------------ #
 
+    @staticmethod
+    def _parse_stage_ref(arg: str) -> tuple[int | None, str | None]:
+        """Parse a stage reference like ``"5"`` or ``"5a"``.
+
+        Returns ``(stage_num, substage_label)`` or ``(None, None)`` on failure.
+        """
+        from azext_prototype.stages.deploy_state import parse_stage_ref
+
+        return parse_stage_ref(arg)
+
+    def _resolve_stage_from_arg(
+        self, arg: str, _print: Callable[[str], None]
+    ) -> tuple[dict | None, int | None, str | None]:
+        """Parse a stage ref from an arg string and look it up.
+
+        Returns ``(stage_dict, stage_num, substage_label)`` or ``(None, None, None)``.
+        """
+        stage_num, label = self._parse_stage_ref(arg)
+        if stage_num is None:
+            _print(f"  Invalid stage reference: {arg}")
+            return None, None, None
+
+        if label:
+            stage = self._deploy_state.get_stage_by_display_id(arg)
+        else:
+            stage = self._deploy_state.get_stage(stage_num)
+
+        if not stage:
+            _print(f"  Stage {arg} not found.")
+            return None, stage_num, label
+
+        return stage, stage_num, label
+
+    def _deploy_stage_with_substages(
+        self,
+        stage_num: int,
+        use_styled: bool,
+        _print: Callable[[str], None],
+        _input: Callable[[str], str],
+    ) -> None:
+        """Deploy all substages of a stage number in order."""
+        all_stages = self._deploy_state.get_all_stages_for_num(stage_num)
+        for stage in all_stages:
+            if stage.get("deploy_status") == "deployed":
+                from azext_prototype.stages.deploy_state import _format_display_id
+
+                _print(f"  Stage {_format_display_id(stage)} already deployed.")
+                continue
+            self._deploy_one_stage_cmd(stage, use_styled, _print, _input)
+
+    def _deploy_one_stage_cmd(
+        self,
+        stage: dict,
+        use_styled: bool,
+        _print: Callable[[str], None],
+        _input: Callable[[str], str],
+    ) -> None:
+        """Deploy a single stage, handling manual mode and failures."""
+        from azext_prototype.stages.deploy_state import _format_display_id
+
+        display_id = _format_display_id(stage)
+        stage_num = stage["stage"]
+
+        with self._maybe_spinner(f"Deploying Stage {display_id}...", use_styled):
+            result = self._deploy_single_stage(stage)
+
+        if result.get("status") == "deployed":
+            _print(f"  Stage {display_id} deployed successfully.")
+            if stage.get("category") in ("infra", "data", "integration"):
+                self._capture_stage_outputs(stage)
+        elif result.get("status") == "awaiting_manual":
+            instructions = result.get("instructions", "No instructions provided.")
+            _print(f"  Stage {display_id} requires manual action:")
+            _print(f"    {instructions}")
+            _print("")
+            _print("  When complete, enter: Done / Skip / Need help")
+            try:
+                answer = _input("  > ").strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                _print("  Skipped.")
+                return
+            if answer in ("done", "d", "yes", "y"):
+                self._deploy_state.mark_stage_deployed(stage_num)
+                _print(f"  Stage {display_id} marked as deployed.")
+            elif answer in ("need help", "help", "h"):
+                _print("  Ask the QA engineer for guidance by describing your issue.")
+            else:
+                _print(f"  Stage {display_id} skipped. Use /deploy {display_id} when ready.")
+        elif result.get("status") == "failed":
+            _print(f"  Stage {display_id} failed: {result.get('error', '?')[:120]}")
+            self._handle_deploy_failure(stage, result, use_styled, _print, _input)
+        else:
+            _print(f"  Stage {display_id} skipped: {result.get('reason', 'no action needed')}")
+
     def _handle_slash_command(
         self,
         command_line: str,
@@ -1032,24 +1754,20 @@ class DeploySession:
             if arg == "all" or not arg:
                 self._deploy_pending_stages(force, use_styled, _print, _input)
             else:
-                try:
-                    stage_num = int(arg)
-                    stage = self._deploy_state.get_stage(stage_num)
-                    if not stage:
-                        _print(f"  Stage {stage_num} not found.")
-                    elif stage.get("deploy_status") == "deployed":
-                        _print(f"  Stage {stage_num} already deployed. Use /redeploy {stage_num}.")
+                stage, stage_num, label = self._resolve_stage_from_arg(arg, _print)
+                if stage:
+                    if stage.get("deploy_status") == "deployed" and not label:
+                        _print(f"  Stage {arg} already deployed. Use /redeploy {arg}.")
+                    elif label:
+                        # Deploy specific substage
+                        self._deploy_one_stage_cmd(stage, use_styled, _print, _input)
                     else:
-                        with self._maybe_spinner(f"Deploying Stage {stage_num}...", use_styled):
-                            result = self._deploy_single_stage(stage)
-                        if result.get("status") == "deployed":
-                            _print(f"  Stage {stage_num} deployed successfully.")
-                            if stage.get("category") in ("infra", "data", "integration"):
-                                self._capture_stage_outputs(stage)
+                        # Deploy all substages for this number
+                        all_for_num = self._deploy_state.get_all_stages_for_num(stage_num)
+                        if len(all_for_num) > 1:
+                            self._deploy_stage_with_substages(stage_num, use_styled, _print, _input)
                         else:
-                            _print(f"  Stage {stage_num} failed: {result.get('error', '?')[:120]}")
-                except ValueError:
-                    _print(f"  Invalid stage number: {arg}")
+                            self._deploy_one_stage_cmd(stage, use_styled, _print, _input)
             _print("")
 
         elif cmd == "/rollback":
@@ -1057,11 +1775,24 @@ class DeploySession:
             if arg == "all" or not arg:
                 self._rollback_all(_print, _input)
             else:
-                try:
-                    stage_num = int(arg)
-                    self._rollback_stage(stage_num, _print)
-                except ValueError:
-                    _print(f"  Invalid stage number: {arg}")
+                stage_num, label = self._parse_stage_ref(arg)
+                if stage_num is None:
+                    _print(f"  Invalid stage reference: {arg}")
+                elif label:
+                    # Rollback specific substage
+                    if self._deploy_state.can_rollback(stage_num, label):
+                        self._rollback_stage(stage_num, _print)
+                    else:
+                        _print(f"  Cannot rollback {arg}: later substages still deployed.")
+                else:
+                    # Rollback all substages in reverse
+                    all_for_num = self._deploy_state.get_all_stages_for_num(stage_num)
+                    if len(all_for_num) > 1:
+                        for s in reversed(all_for_num):
+                            if s.get("deploy_status") == "deployed":
+                                self._rollback_stage(s["stage"], _print)
+                    else:
+                        self._rollback_stage(stage_num, _print)
             _print("")
 
         elif cmd == "/redeploy":
@@ -1069,34 +1800,34 @@ class DeploySession:
             if not arg:
                 _print("  Usage: /redeploy N")
             else:
-                try:
-                    stage_num = int(arg)
-                    stage = self._deploy_state.get_stage(stage_num)
-                    if not stage:
-                        _print(f"  Stage {stage_num} not found.")
+                stage, stage_num, label = self._resolve_stage_from_arg(arg, _print)
+                if stage:
+                    # Rollback first if deployed
+                    if stage.get("deploy_status") == "deployed":
+                        success = self._rollback_stage(stage_num, _print)
+                        if not success:
+                            _print("  Rollback failed. Cannot redeploy.")
+                            return
+
+                    stage["deploy_status"] = "pending"
+                    self._deploy_state.save()
+
+                    from azext_prototype.stages.deploy_state import _format_display_id
+
+                    display_id = _format_display_id(stage)
+                    with self._maybe_spinner(f"Redeploying Stage {display_id}...", use_styled):
+                        result = self._deploy_single_stage(stage)
+
+                    if result.get("status") == "deployed":
+                        _print(f"  Stage {display_id} redeployed successfully.")
+                        if stage.get("category") in ("infra", "data", "integration"):
+                            self._capture_stage_outputs(stage)
+                    elif result.get("status") == "awaiting_manual":
+                        _print(f"  Stage {display_id} requires manual action:")
+                        _print(f"    {result.get('instructions', '')}")
                     else:
-                        # Rollback first if deployed
-                        if stage.get("deploy_status") == "deployed":
-                            success = self._rollback_stage(stage_num, _print)
-                            if not success:
-                                _print("  Rollback failed. Cannot redeploy.")
-                                return
-
-                        # Reset status to pending and redeploy
-                        stage["deploy_status"] = "pending"
-                        self._deploy_state.save()
-
-                        with self._maybe_spinner(f"Redeploying Stage {stage_num}...", use_styled):
-                            result = self._deploy_single_stage(stage)
-
-                        if result.get("status") == "deployed":
-                            _print(f"  Stage {stage_num} redeployed successfully.")
-                            if stage.get("category") in ("infra", "data", "integration"):
-                                self._capture_stage_outputs(stage)
-                        else:
-                            _print(f"  Stage {stage_num} failed: {result.get('error', '?')[:120]}")
-                except ValueError:
-                    _print(f"  Invalid stage number: {arg}")
+                        _print(f"  Stage {display_id} failed: {result.get('error', '?')[:120]}")
+                        self._handle_deploy_failure(stage, result, use_styled, _print, _input)
             _print("")
 
         elif cmd == "/plan":
@@ -1104,39 +1835,112 @@ class DeploySession:
             if not arg:
                 _print("  Usage: /plan N")
             else:
-                try:
-                    stage_num = int(arg)
-                    stage = self._deploy_state.get_stage(stage_num)
-                    if not stage:
-                        _print(f"  Stage {stage_num} not found.")
+                stage, stage_num, _label = self._resolve_stage_from_arg(arg, _print)
+                if stage:
+                    stage_dir = Path(self._context.project_dir) / stage.get("dir", "")
+                    if stage.get("deploy_mode") == "manual":
+                        _print(f"  Stage {arg} is a manual step — no plan preview.")
+                    elif not stage_dir.is_dir():
+                        _print(f"  Directory not found: {stage.get('dir', '?')}")
+                    elif stage.get("category") in ("infra", "data", "integration"):
+                        with self._maybe_spinner(f"Running plan for Stage {arg}...", use_styled):
+                            if self._iac_tool == "terraform":
+                                plan_env = self._deploy_env
+                                generated = resolve_stage_secrets(stage_dir, self._config)
+                                if generated:
+                                    plan_env = dict(self._deploy_env) if self._deploy_env else {}
+                                    plan_env.update(generated)
+                                result = plan_terraform(stage_dir, self._subscription, env=plan_env)
+                            else:
+                                result = whatif_bicep(
+                                    stage_dir,
+                                    self._subscription,
+                                    self._resource_group,
+                                    env=self._deploy_env,
+                                )
+                        if result.get("output"):
+                            _print(result["output"])
+                        if result.get("error"):
+                            _print(f"  Error: {result['error']}")
                     else:
-                        stage_dir = Path(self._context.project_dir) / stage.get("dir", "")
-                        if not stage_dir.is_dir():
-                            _print(f"  Directory not found: {stage.get('dir', '?')}")
-                        elif stage.get("category") in ("infra", "data", "integration"):
-                            with self._maybe_spinner(f"Running plan for Stage {stage_num}...", use_styled):
-                                if self._iac_tool == "terraform":
-                                    plan_env = self._deploy_env
-                                    generated = resolve_stage_secrets(stage_dir, self._config)
-                                    if generated:
-                                        plan_env = dict(self._deploy_env) if self._deploy_env else {}
-                                        plan_env.update(generated)
-                                    result = plan_terraform(stage_dir, self._subscription, env=plan_env)
-                                else:
-                                    result = whatif_bicep(
-                                        stage_dir,
-                                        self._subscription,
-                                        self._resource_group,
-                                        env=self._deploy_env,
-                                    )
-                            if result.get("output"):
-                                _print(result["output"])
-                            if result.get("error"):
-                                _print(f"  Error: {result['error']}")
+                        _print(f"  Stage {arg} is an app stage — no plan preview.")
+            _print("")
+
+        elif cmd == "/split":
+            _print("")
+            if not arg:
+                _print("  Usage: /split N")
+            else:
+                stage, stage_num, _label = self._resolve_stage_from_arg(arg, _print)
+                if stage and stage_num is not None:
+                    if stage.get("_is_substage"):
+                        _print(f"  Stage {arg} is already a substage. Cannot split further.")
+                    else:
+                        _print(f"  Splitting Stage {stage_num}: {stage['name']}")
+                        _print("  Enter names for the substages (one per line, blank line to finish):")
+                        substages: list[dict] = []
+                        while True:
+                            try:
+                                name = _input("    Name: ").strip()
+                            except (EOFError, KeyboardInterrupt):
+                                break
+                            if not name:
+                                break
+                            substages.append({"name": name, "dir": stage.get("dir", "")})
+                        if len(substages) >= 2:
+                            self._deploy_state.split_stage(stage_num, substages)
+                            _print(f"  Split into {len(substages)} substages.")
                         else:
-                            _print(f"  Stage {stage_num} is an app stage — no plan preview.")
-                except ValueError:
-                    _print(f"  Invalid stage number: {arg}")
+                            _print("  Split requires at least 2 substages. Cancelled.")
+            _print("")
+
+        elif cmd == "/destroy":
+            _print("")
+            if not arg:
+                _print("  Usage: /destroy N")
+            else:
+                stage, stage_num, _label = self._resolve_stage_from_arg(arg, _print)
+                if stage and stage_num is not None:
+                    _print(f"  Are you sure you want to destroy Stage {arg}: {stage['name']}? (y/N)")
+                    try:
+                        answer = _input("  > ").strip().lower()
+                    except (EOFError, KeyboardInterrupt):
+                        _print("  Cancelled.")
+                        return
+                    if answer in ("y", "yes"):
+                        success = self._rollback_stage(stage_num, _print)
+                        if success:
+                            self._deploy_state.mark_stage_destroyed(stage_num)
+                            _print(f"  Stage {arg} destroyed.")
+                        else:
+                            _print(f"  Could not destroy Stage {arg}.")
+                    else:
+                        _print("  Cancelled.")
+            _print("")
+
+        elif cmd == "/manual":
+            _print("")
+            if not arg:
+                _print('  Usage: /manual N "instructions"')
+            else:
+                # Parse: /manual 5 "instructions text"
+                manual_parts = arg.split(maxsplit=1)
+                ref = manual_parts[0]
+                instructions = manual_parts[1].strip('"').strip("'") if len(manual_parts) > 1 else ""
+                stage, stage_num, _label = self._resolve_stage_from_arg(ref, _print)
+                if stage:
+                    if instructions:
+                        stage["deploy_mode"] = "manual"
+                        stage["manual_instructions"] = instructions
+                        self._deploy_state.save()
+                        _print(f"  Stage {ref} set to manual mode with instructions.")
+                    else:
+                        current = stage.get("manual_instructions", "")
+                        if current:
+                            _print(f"  Current instructions: {current}")
+                        else:
+                            _print(f"  No manual instructions set for Stage {ref}.")
+                            _print('  Use: /manual N "your instructions here"')
             _print("")
 
         elif cmd == "/outputs":
@@ -1172,15 +1976,22 @@ class DeploySession:
                 _print("  az CLI not found on PATH.")
             _print("")
 
+        elif cmd == "/describe":
+            self._handle_describe(arg, _print)
+
         elif cmd == "/help":
             _print("")
             _print("  Available commands:")
             _print("    /status       - Show deployment progress per stage")
             _print("    /stages       - List all stages with status (alias)")
-            _print("    /deploy [N]   - Deploy stage N or all pending stages")
+            _print("    /deploy [N]   - Deploy stage N (or 5a for substage) or all")
             _print("    /rollback [N] - Roll back stage N or all (reverse order)")
             _print("    /redeploy N   - Rollback + redeploy stage N")
             _print("    /plan N       - Show what-if/terraform plan for stage N")
+            _print("    /split N      - Split a stage into substages")
+            _print("    /destroy N    - Destroy resources for a removed stage")
+            _print("    /manual N     - Add/view manual step instructions")
+            _print("    /describe N   - Show details for stage N")
             _print("    /outputs      - Show captured deployment outputs")
             _print("    /preflight    - Re-run preflight checks")
             _print("    /login        - Run az login interactively")
@@ -1188,9 +1999,79 @@ class DeploySession:
             _print("    done          - Accept deployment and exit")
             _print("    quit          - Exit deploy session")
             _print("")
+            _print("  Stage references accept substage labels: /deploy 5a")
+            _print("")
+            _print("  You can also use natural language:")
+            _print("    'deploy stage 3'            instead of  /deploy 3")
+            _print("    'rollback all'              instead of  /rollback all")
+            _print("    'deploy stages 3 and 4'     deploys multiple stages")
+            _print("    'describe stage 2'          instead of  /describe 2")
+            _print("")
 
         else:
             _print(f"  Unknown command: {cmd}. Type /help for a list.")
+
+    def _handle_describe(self, arg: str, _print: Callable[[str], None]) -> None:
+        """Show detailed description of a deploy stage."""
+        if not arg or not arg.strip():
+            _print("  Usage: /describe N (stage number)")
+            return
+
+        numbers = re.findall(r"\d+", arg)
+        if not numbers:
+            _print("  Usage: /describe N (stage number)")
+            return
+
+        stage_num = int(numbers[0])
+        stage = self._deploy_state.get_stage(stage_num)
+        if not stage:
+            _print(f"  Stage {stage_num} not found.")
+            return
+
+        _print("")
+        _print(f"  Stage {stage_num}: {stage.get('name', '?')}")
+        _print(f"  Category:      {stage.get('category', '?')}")
+        _print(f"  Deploy status: {stage.get('deploy_status', 'pending')}")
+        _print(f"  Dir:           {stage.get('dir', '?')}")
+
+        timestamp = stage.get("deployed_at", "")
+        if timestamp:
+            _print(f"  Deployed at:   {timestamp}")
+
+        services = stage.get("services", [])
+        if services:
+            _print(f"  Resources ({len(services)}):")
+            for svc in services:
+                name = svc.get("computed_name") or svc.get("name", "?")
+                rtype = svc.get("resource_type", "")
+                sku = svc.get("sku", "")
+                line = f"    - {name}"
+                if rtype:
+                    line += f"  ({rtype})"
+                if sku:
+                    line += f"  [{sku}]"
+                _print(line)
+
+        files = stage.get("files", [])
+        if files:
+            _print(f"  Files ({len(files)}):")
+            for f in files:
+                _print(f"    - {f}")
+
+        deploy_output = stage.get("deploy_output", "")
+        if deploy_output:
+            _print("  Deploy output:")
+            for line in deploy_output.split("\n")[:10]:
+                _print(f"    {line}")
+            if deploy_output.count("\n") > 10:
+                _print("    ... (truncated)")
+
+        deploy_error = stage.get("deploy_error", "")
+        if deploy_error:
+            _print("  Deploy error:")
+            _print(f"    {deploy_error[:200]}")
+
+        _print("")
 
     # ------------------------------------------------------------------ #
     # Internal — utilities
@@ -1208,10 +2089,18 @@ class DeploySession:
         )
 
     @contextmanager
-    def _maybe_spinner(self, message: str, use_styled: bool) -> Iterator[None]:
+    def _maybe_spinner(
+        self, message: str, use_styled: bool, *, status_fn: Callable | None = None
+    ) -> Iterator[None]:
         """Show a spinner when using styled output, otherwise no-op."""
         if use_styled:
             with self._console.spinner(message):
                 yield
+        elif status_fn:
+            status_fn(message, "start")
+            try:
+                yield
+            finally:
+                status_fn(message, "end")
         else:
             yield

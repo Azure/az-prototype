@@ -33,62 +33,9 @@ from rich.progress import (
     TextColumn,
     TimeElapsedColumn,
 )
-from rich.theme import Theme
+from azext_prototype.ui.theme import COLORS, PT_STYLE_DICT, RICH_THEME
 
-# -------------------------------------------------------------------- #
-# Color scheme (Claude Code inspired)
-# -------------------------------------------------------------------- #
-
-THEME = Theme(
-    {
-        # Background/secondary text
-        "dim": "#888888",
-        "muted": "#666666",
-        # Primary content — bright for readability on dark terminals
-        "content": "bright_white",
-        # Callouts and highlights
-        "success": "bright_green",
-        "error": "bright_red",
-        "warning": "bright_yellow",
-        "info": "bright_cyan",
-        "accent": "bright_magenta",  # Purple-ish for emphasis
-        # Prompt styling — #555555 is visible on dark terminals without being bright
-        "prompt.border": "#555555",
-        "prompt.instruction": "bright_cyan",
-        "prompt.input": "bright_white",
-        # Progress indicators
-        "progress.description": "bright_white",
-        "progress.percentage": "bright_cyan",
-        "progress.bar.complete": "bright_green",
-        "progress.bar.finished": "bright_green",
-        # Agent/stage names
-        "agent": "bright_magenta bold",
-        "stage": "bright_cyan bold",
-        # File paths
-        "path": "bright_cyan",
-        # Markdown rendering — colour hierarchy for contrast on dark terminals:
-        #   Headers: coloured + bold (stand out from body text)
-        #   Body:    white (readable but not blinding)
-        #   Bold:    bright_white bold (pops against regular white body)
-        #   Code:    green (distinct from prose)
-        #   Markers: cyan (numbered/bullet prefixes contrast with white text)
-        "markdown.paragraph": "white",
-        "markdown.h1": "bright_magenta bold underline",
-        "markdown.h2": "bright_magenta bold",
-        "markdown.h3": "bright_cyan bold",
-        "markdown.h4": "bright_cyan italic",
-        "markdown.bold": "bright_white bold",
-        "markdown.italic": "white italic",
-        "markdown.code": "bright_green",
-        "markdown.code_block": "bright_green",
-        "markdown.block_quote": "bright_yellow italic",
-        "markdown.item.bullet": "bright_cyan",
-        "markdown.item.number": "bright_cyan",
-        "markdown.link": "bright_cyan underline",
-        "markdown.link_url": "bright_cyan",
-        "markdown.hr": "#555555",
-    }
-)
+THEME = RICH_THEME
 
 # -------------------------------------------------------------------- #
 # Markdown preprocessing
@@ -113,16 +60,7 @@ def _preprocess_markdown(content: str) -> str:
 
 
 # prompt_toolkit style for the input area
-PT_STYLE = PTStyle.from_dict(
-    {
-        "prompt": "#888888",
-        "": "#ffffff",  # Default text color
-        # Toolbar below the prompt — noreverse prevents the default white-on-white
-        # inversion that prompt_toolkit applies.  Keep text dim like Claude Code's
-        # status bar.
-        "bottom-toolbar": "noreverse #888888",
-    }
-)
+PT_STYLE = PTStyle.from_dict(PT_STYLE_DICT)
 
 
 class Console:
@@ -481,9 +419,9 @@ class DiscoveryPrompt:
             def _toolbar():
                 cols = shutil.get_terminal_size().columns
                 return [
-                    ("#555555", "─" * cols),
+                    (COLORS["border"], "─" * cols),
                     ("", "\n"),
-                    ("#888888", hint),
+                    (COLORS["dim"], hint),
                 ]
 
             toolbar = _toolbar
@@ -491,7 +429,7 @@ class DiscoveryPrompt:
 
             def _toolbar_border_only():
                 cols = shutil.get_terminal_size().columns
-                return [("#555555", "─" * cols)]
+                return [(COLORS["border"], "─" * cols)]
 
             toolbar = _toolbar_border_only
 

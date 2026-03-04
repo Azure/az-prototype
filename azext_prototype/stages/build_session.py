@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import shutil
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Iterator
@@ -36,6 +37,11 @@ from azext_prototype.naming import create_naming_strategy
 from azext_prototype.parsers.file_extractor import parse_file_blocks, write_parsed_files
 from azext_prototype.stages.build_state import BuildState
 from azext_prototype.stages.escalation import EscalationTracker
+from azext_prototype.stages.intent import (
+    IntentKind,
+    build_build_classifier,
+    read_files_for_session,
+)
 from azext_prototype.stages.policy_resolver import PolicyResolver
 from azext_prototype.stages.qa_router import route_error_to_qa
 from azext_prototype.ui.console import Console, DiscoveryPrompt
@@ -49,7 +55,7 @@ logger = logging.getLogger(__name__)
 
 _QUIT_WORDS = frozenset({"q", "quit", "exit"})
 _DONE_WORDS = frozenset({"done", "finish", "accept", "lgtm"})
-_SLASH_COMMANDS = frozenset({"/status", "/stages", "/files", "/policy", "/help"})
+_SLASH_COMMANDS = frozenset({"/status", "/stages", "/files", "/policy", "/describe", "/help"})
 
 # Maximum remediation cycles per stage before proceeding
 _MAX_STAGE_REMEDIATION_ATTEMPTS = 2
@@ -167,6 +173,12 @@ class BuildSession:
         # Token tracker
         self._token_tracker = TokenTracker()
 
+        # Intent classifier for natural language command detection
+        self._intent_classifier = build_build_classifier(
+            ai_provider=agent_context.ai_provider,
+            token_tracker=self._token_tracker,
+        )
+
         # Project config
         config = ProjectConfig(agent_context.project_dir)
         config.load()
@@ -240,9 +252,12 @@ class BuildSession:
         _print(f"IaC Tool: {self._iac_tool}")
         _print("")
 
-        # ---- Phase 2: Derive deployment plan ----
+        # ---- Phase 2: Derive deployment plan (three-branch) ----
         existing_stages = self._build_state._state.get("deployment_stages", [])
+        skip_generation = False
+
         if not existing_stages:
+            # Branch A: First build — derive fresh plan and save design snapshot
             _print("Deriving deployment plan...")
             _print("")
 
@@ -254,41 +269,126 @@ class BuildSession:
                 return BuildResult(cancelled=True)
 
             self._build_state.set_deployment_plan(stages)
-        else:
-            _print("Resuming from existing deployment plan.")
+            self._build_state.set_design_snapshot(design)
+
+        elif self._build_state.design_has_changed(design):
+            # Branch B: Design changed — incremental rebuild
+            _print("Design changes detected since last build.")
             _print("")
+
+            old_arch = self._build_state.get_previous_architecture()
+
+            if old_arch:
+                with self._maybe_spinner("Analyzing design changes...", use_styled):
+                    diff_result = self._diff_architectures(old_arch, architecture, existing_stages)
+            else:
+                # Legacy build with no snapshot text — treat all as modified
+                diff_result = {
+                    "unchanged": [],
+                    "modified": [s["stage"] for s in existing_stages],
+                    "removed": [],
+                    "added": [],
+                    "plan_restructured": False,
+                    "summary": "No previous architecture snapshot — marking all stages for rebuild.",
+                }
+
+            _print(f"  {diff_result.get('summary', 'Changes analyzed.')}")
+            _print("")
+
+            if diff_result.get("plan_restructured"):
+                _print("The design changes are significant enough to require a full plan re-derive.")
+                _print("Press Enter to re-derive the full plan, or type 'quit' to cancel.")
+                _print("")
+                try:
+                    if use_styled:
+                        confirm = self._prompt.simple_prompt("> ")
+                    else:
+                        confirm = _input("> ").strip()
+                except (EOFError, KeyboardInterrupt):
+                    return BuildResult(cancelled=True)
+                if confirm.lower() in _QUIT_WORDS:
+                    return BuildResult(cancelled=True)
+
+                with self._maybe_spinner("Re-deriving deployment plan...", use_styled):
+                    stages = self._derive_deployment_plan(architecture, templates)
+                if not stages:
+                    _print("Could not derive deployment plan from architecture.")
+                    return BuildResult(cancelled=True)
+                self._build_state.set_deployment_plan(stages)
+            else:
+                # Apply targeted updates
+                removed = diff_result.get("removed", [])
+                added = diff_result.get("added", [])
+                modified = diff_result.get("modified", [])
+
+                if removed:
+                    self._clean_removed_stage_files(removed, existing_stages)
+                    self._build_state.remove_stages(removed)
+                    _print(f"  Removed {len(removed)} stage(s).")
+
+                if added:
+                    self._build_state.add_stages(added)
+                    _print(f"  Added {len(added)} new stage(s).")
+
+                if modified:
+                    self._build_state.mark_stages_stale(modified)
+                    _print(f"  Marked {len(modified)} stage(s) for regeneration.")
+
+                if removed or added:
+                    self._fix_stage_dirs()
+
+            # Update the design snapshot
+            self._build_state.set_design_snapshot(design)
+
+        else:
+            # Branch C: No design changes
+            pending_check = self._build_state.get_pending_stages()
+            if pending_check:
+                _print("Resuming from existing deployment plan.")
+                _print("")
+            else:
+                _print("Build is up to date — no design changes detected.")
+                _print("")
+                skip_generation = True
 
         # Present the plan
         _print(self._build_state.format_stage_status())
         _print("")
-        _print("Review the deployment plan above.")
-        _print("Press Enter to start building, or provide feedback to adjust.")
-        _print("")
 
-        try:
-            if use_styled:
-                confirmation = self._prompt.simple_prompt("> ")
-            else:
-                confirmation = _input("> ").strip()
-        except (EOFError, KeyboardInterrupt):
-            return BuildResult(cancelled=True)
+        if not skip_generation:
+            _print("Review the deployment plan above.")
+            _print("Press Enter to start building, or provide feedback to adjust.")
+            _print("")
 
-        if confirmation.lower() in _QUIT_WORDS:
-            return BuildResult(cancelled=True)
+            try:
+                if use_styled:
+                    confirmation = self._prompt.simple_prompt("> ")
+                else:
+                    confirmation = _input("> ").strip()
+            except (EOFError, KeyboardInterrupt):
+                return BuildResult(cancelled=True)
 
-        # If user provides feedback, adjust the plan
-        if confirmation and confirmation.lower() not in _DONE_WORDS and confirmation.strip():
-            with self._maybe_spinner("Adjusting deployment plan...", use_styled):
-                adjusted = self._adjust_plan(confirmation, architecture, templates)
-            if adjusted:
-                self._build_state.set_deployment_plan(adjusted)
-                _print("")
-                _print(self._build_state.format_stage_status())
-                _print("")
+            if confirmation.lower() in _QUIT_WORDS:
+                return BuildResult(cancelled=True)
+
+            # If user provides feedback, adjust the plan
+            if confirmation and confirmation.lower() not in _DONE_WORDS and confirmation.strip():
+                with self._maybe_spinner("Adjusting deployment plan...", use_styled):
+                    adjusted = self._adjust_plan(confirmation, architecture, templates)
+                if adjusted:
+                    self._build_state.set_deployment_plan(adjusted)
+                    _print("")
+                    _print(self._build_state.format_stage_status())
+                    _print("")
 
         # ---- Phase 3: Staged generation ----
-        pending = self._build_state.get_pending_stages()
-        total_stages = len(self._build_state._state["deployment_stages"])
+        if skip_generation:
+            pending = []
+            total_stages = len(self._build_state._state["deployment_stages"])
+            generated_count = total_stages
+        else:
+            pending = self._build_state.get_pending_stages()
+            total_stages = len(self._build_state._state["deployment_stages"])
         generated_count = len(self._build_state.get_generated_stages())
 
         for stage in pending:
@@ -413,7 +513,7 @@ class BuildSession:
             _print("")
 
         # ---- Phase 4: Advisory QA review ----
-        if scope == "all" and self._qa_agent:
+        if not skip_generation and scope == "all" and self._qa_agent:
             _print("Running advisory review...")
 
             file_content = self._collect_generated_file_content()
@@ -487,9 +587,10 @@ class BuildSession:
             _print("")
 
         # ---- Phase 5: Build report ----
-        _print("")
-        _print(self._build_state.format_build_report())
-        _print("")
+        if not skip_generation:
+            _print("")
+            _print(self._build_state.format_build_report())
+            _print("")
 
         # ---- Phase 6: Review loop ----
         _print("Review the build output above.")
@@ -516,9 +617,23 @@ class BuildSession:
             lower = user_input.lower()
 
             # Slash commands
-            if lower in _SLASH_COMMANDS:
+            if lower.startswith("/"):
                 self._handle_slash_command(lower, _print)
                 continue
+
+            # Natural language intent detection
+            intent = self._intent_classifier.classify(user_input)
+            if intent.kind == IntentKind.COMMAND:
+                if intent.command == "/describe" and intent.args:
+                    self._handle_describe(intent.args, _print)
+                else:
+                    self._handle_slash_command(intent.command, _print)
+                continue
+            if intent.kind == IntentKind.READ_FILES:
+                text, _ = read_files_for_session(intent.args, self._context.project_dir, _print)
+                if text:
+                    user_input = f"{user_input}\n\n## File Content\n{text}"
+                # Fall through to feedback handler with enriched input
 
             if lower in _QUIT_WORDS:
                 return BuildResult(
@@ -652,6 +767,11 @@ class BuildSession:
             "Each stage must have: stage (number), name, category "
             "(infra|data|app|schema|integration|docs|cicd|external), dir (output "
             f"directory path), services (array), status ('pending'), files (empty array).\n\n"
+            "Optional per-stage fields:\n"
+            "- deploy_mode: 'auto' (default, deploy via IaC/scripts) or 'manual' "
+            "(step that cannot be scripted, e.g., portal configuration)\n"
+            "- manual_instructions: when deploy_mode is 'manual', provide clear "
+            "step-by-step instructions for the user\n\n"
             f"Use '{self._iac_tool}' for IaC directories.  Infrastructure stage dirs "
             f"should be like: concept/infra/{self._iac_tool}/stage-N-name/\n"
             "App stage dirs: concept/apps/stage-N-name/\n"
@@ -714,17 +834,18 @@ class BuildSession:
         for s in stages:
             if not isinstance(s, dict):
                 continue
-            normalised.append(
-                {
-                    "stage": s.get("stage", len(normalised) + 1),
-                    "name": s.get("name", f"Stage {len(normalised) + 1}"),
-                    "category": s.get("category", "infra"),
-                    "dir": s.get("dir", ""),
-                    "services": s.get("services", []),
-                    "status": "pending",
-                    "files": [],
-                }
-            )
+            entry = {
+                "stage": s.get("stage", len(normalised) + 1),
+                "name": s.get("name", f"Stage {len(normalised) + 1}"),
+                "category": s.get("category", "infra"),
+                "dir": s.get("dir", ""),
+                "services": s.get("services", []),
+                "status": "pending",
+                "files": [],
+                "deploy_mode": s.get("deploy_mode", "auto"),
+                "manual_instructions": s.get("manual_instructions"),
+            }
+            normalised.append(entry)
         return normalised
 
     def _fallback_deployment_plan(self, templates: list) -> list[dict]:
@@ -939,6 +1060,178 @@ class BuildSession:
         if response and response.content:
             return self._parse_deployment_plan(response.content)
         return None
+
+    # ------------------------------------------------------------------ #
+    # Internal — incremental rebuild helpers
+    # ------------------------------------------------------------------ #
+
+    def _diff_architectures(
+        self,
+        old_arch: str,
+        new_arch: str,
+        existing_stages: list[dict],
+    ) -> dict:
+        """Ask the architect to compare old and new architectures.
+
+        Returns a dict classifying each existing stage as unchanged,
+        modified, or removed, plus any new stages to add.
+
+        Falls back to marking all stages as modified when the architect
+        is unavailable or the response cannot be parsed.
+        """
+        all_modified_fallback: dict = {
+            "unchanged": [],
+            "modified": [s["stage"] for s in existing_stages],
+            "removed": [],
+            "added": [],
+            "plan_restructured": False,
+            "summary": "Could not analyze changes — marking all stages for rebuild.",
+        }
+
+        if not self._architect_agent or not self._context.ai_provider:
+            return all_modified_fallback
+
+        stage_info = json.dumps(
+            [
+                {
+                    "stage": s["stage"],
+                    "name": s["name"],
+                    "category": s.get("category", "infra"),
+                    "services": [svc.get("name", "") for svc in s.get("services", [])],
+                }
+                for s in existing_stages
+            ],
+            indent=2,
+        )
+
+        task = (
+            "Compare the OLD and NEW architecture designs and determine how each "
+            "existing deployment stage is affected.\n\n"
+            f"## Old Architecture\n{old_arch}\n\n"
+            f"## New Architecture\n{new_arch}\n\n"
+            f"## Existing Deployment Stages\n```json\n{stage_info}\n```\n\n"
+            "## Instructions\n"
+            "Classify each stage number as:\n"
+            "- **unchanged**: no impact from the design changes\n"
+            "- **modified**: services or configuration in this stage changed\n"
+            "- **removed**: the services in this stage no longer exist in the new design\n\n"
+            "Also identify any NEW services that need new stages.\n\n"
+            "Set `plan_restructured: true` ONLY if the fundamental deployment "
+            "order or stage boundaries need to change (e.g., services moved between "
+            "stages, major dependency changes). Minor additions/removals should NOT "
+            "set this flag.\n\n"
+            "Return ONLY valid JSON:\n"
+            "```json\n"
+            '{\n'
+            '  "unchanged": [1, 2],\n'
+            '  "modified": [3],\n'
+            '  "removed": [4],\n'
+            '  "added": [{"name": "Redis Cache", "category": "data", "services": '
+            '[{"name": "redis-cache", "computed_name": "", "resource_type": '
+            '"Microsoft.Cache/redis", "sku": "Basic"}]}],\n'
+            '  "plan_restructured": false,\n'
+            '  "summary": "Added Redis cache; modified API to use Redis"\n'
+            '}\n'
+            "```\n"
+        )
+
+        try:
+            response = self._architect_agent.execute(self._context, task)
+            if response:
+                self._token_tracker.record(response)
+            if response and response.content:
+                result = self._parse_diff_result(response.content, existing_stages)
+                if result:
+                    return result
+        except Exception:
+            logger.debug("Architecture diff failed", exc_info=True)
+
+        return all_modified_fallback
+
+    def _parse_diff_result(self, content: str, existing_stages: list[dict]) -> dict | None:
+        """Parse the architect's diff response into a structured result.
+
+        Validates that referenced stage numbers actually exist.  Stages
+        not mentioned by the architect default to ``unchanged``.
+        """
+        # Try fenced JSON block first
+        json_match = re.search(r"```(?:json)?\s*\n(.*?)\n```", content, re.DOTALL)
+        raw = json_match.group(1) if json_match else content.strip()
+
+        try:
+            data = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return None
+
+        if not isinstance(data, dict):
+            return None
+
+        existing_nums = {s["stage"] for s in existing_stages}
+
+        unchanged = [n for n in data.get("unchanged", []) if isinstance(n, int) and n in existing_nums]
+        modified = [n for n in data.get("modified", []) if isinstance(n, int) and n in existing_nums]
+        removed = [n for n in data.get("removed", []) if isinstance(n, int) and n in existing_nums]
+
+        # Stages not mentioned default to unchanged
+        mentioned = set(unchanged) | set(modified) | set(removed)
+        for num in existing_nums:
+            if num not in mentioned:
+                unchanged.append(num)
+
+        added = data.get("added", [])
+        if not isinstance(added, list):
+            added = []
+        # Normalise added stages
+        normalised_added = []
+        for item in added:
+            if isinstance(item, dict) and item.get("name"):
+                normalised_added.append({
+                    "name": item["name"],
+                    "category": item.get("category", "infra"),
+                    "services": item.get("services", []),
+                    "dir": item.get("dir", ""),
+                })
+
+        return {
+            "unchanged": sorted(unchanged),
+            "modified": sorted(modified),
+            "removed": sorted(removed),
+            "added": normalised_added,
+            "plan_restructured": bool(data.get("plan_restructured", False)),
+            "summary": data.get("summary", "Design changes analyzed."),
+        }
+
+    def _clean_removed_stage_files(self, removed_nums: list[int], stages: list[dict]) -> None:
+        """Delete generated directories from disk for removed stages."""
+        project_root = Path(self._context.project_dir)
+        for stage in stages:
+            if stage["stage"] in removed_nums:
+                stage_dir = stage.get("dir", "")
+                if stage_dir:
+                    full_path = project_root / stage_dir
+                    if full_path.exists() and full_path.is_dir():
+                        shutil.rmtree(full_path, ignore_errors=True)
+                        logger.info("Removed stage directory: %s", full_path)
+
+    def _fix_stage_dirs(self) -> None:
+        """Update stage directory paths to match current stage numbers.
+
+        After renumbering, stage dirs like ``stage-4-redis`` may need to
+        become ``stage-3-redis`` if a prior stage was removed.
+        """
+        for stage in self._build_state._state.get("deployment_stages", []):
+            old_dir = stage.get("dir", "")
+            if not old_dir:
+                continue
+            # Match pattern: .../stage-N-name
+            match = re.match(r"^(.*?/?)stage-\d+(-.*)?$", old_dir)
+            if match:
+                prefix = match.group(1)
+                suffix = match.group(2) or ""
+                new_dir = f"{prefix}stage-{stage['stage']}{suffix}"
+                if new_dir != old_dir:
+                    stage["dir"] = new_dir
+        self._build_state.save()
 
     # ------------------------------------------------------------------ #
     # Internal — stage generation
@@ -1332,33 +1625,85 @@ class BuildSession:
 
     def _handle_slash_command(self, command: str, _print: Callable) -> None:
         """Handle build-session slash commands."""
-        if command == "/status":
+        parts = command.strip().split(maxsplit=1)
+        cmd = parts[0]
+        arg = parts[1].strip() if len(parts) > 1 else ""
+
+        if cmd in ("/status", "/stages"):
             _print("")
             _print(self._build_state.format_stage_status())
             _print("")
-        elif command == "/stages":
-            _print("")
-            _print(self._build_state.format_stage_status())
-            _print("")
-        elif command == "/files":
+        elif cmd == "/files":
             _print("")
             _print(self._build_state.format_files_list())
             _print("")
-        elif command == "/policy":
+        elif cmd == "/policy":
             _print("")
             _print(self._build_state.format_policy_summary())
             _print("")
-        elif command == "/help":
+        elif cmd == "/describe":
+            self._handle_describe(arg, _print)
+        elif cmd == "/help":
             _print("")
             _print("Available commands:")
-            _print("  /status  - Show stage completion summary")
-            _print("  /stages  - Show full deployment plan")
-            _print("  /files   - List all generated files")
-            _print("  /policy  - Show policy check summary")
-            _print("  /help    - Show this help")
-            _print("  done     - Accept build and exit")
-            _print("  quit     - Cancel and exit")
+            _print("  /status      - Show stage completion summary")
+            _print("  /stages      - Show full deployment plan")
+            _print("  /files       - List all generated files")
+            _print("  /policy      - Show policy check summary")
+            _print("  /describe N  - Show details for stage N")
+            _print("  /help        - Show this help")
+            _print("  done         - Accept build and exit")
+            _print("  quit         - Cancel and exit")
             _print("")
+            _print("  You can also use natural language:")
+            _print("    'what's the build status'   instead of  /status")
+            _print("    'show the generated files'  instead of  /files")
+            _print("    'describe stage 2'          instead of  /describe 2")
+            _print("")
+
+    def _handle_describe(self, arg: str, _print: Callable) -> None:
+        """Show detailed description of a build stage."""
+        if not arg or not arg.strip():
+            _print("  Usage: /describe N (stage number)")
+            return
+
+        numbers = re.findall(r"\d+", arg)
+        if not numbers:
+            _print("  Usage: /describe N (stage number)")
+            return
+
+        stage_num = int(numbers[0])
+        stage = self._build_state.get_stage(stage_num)
+        if not stage:
+            _print(f"  Stage {stage_num} not found.")
+            return
+
+        _print("")
+        _print(f"  Stage {stage_num}: {stage.get('name', '?')}")
+        _print(f"  Category: {stage.get('category', '?')}")
+        _print(f"  Status:   {stage.get('status', 'pending')}")
+        _print(f"  Dir:      {stage.get('dir', '?')}")
+
+        services = stage.get("services", [])
+        if services:
+            _print(f"  Resources ({len(services)}):")
+            for svc in services:
+                name = svc.get("computed_name") or svc.get("name", "?")
+                rtype = svc.get("resource_type", "")
+                sku = svc.get("sku", "")
+                line = f"    - {name}"
+                if rtype:
+                    line += f"  ({rtype})"
+                if sku:
+                    line += f"  [{sku}]"
+                _print(line)
+
+        files = stage.get("files", [])
+        if files:
+            _print(f"  Files ({len(files)}):")
+            for f in files:
+                _print(f"    - {f}")
+        _print("")
 
     # ------------------------------------------------------------------ #
     # Internal — utilities
@@ -1533,10 +1878,18 @@ class BuildSession:
         return "\n\n".join(parts)
 
     @contextmanager
-    def _maybe_spinner(self, message: str, use_styled: bool) -> Iterator[None]:
+    def _maybe_spinner(
+        self, message: str, use_styled: bool, *, status_fn: Callable | None = None
+    ) -> Iterator[None]:
         """Show a spinner when using styled output, otherwise no-op."""
         if use_styled:
             with self._console.spinner(message):
                 yield
+        elif status_fn:
+            status_fn(message, "start")
+            try:
+                yield
+            finally:
+                status_fn(message, "end")
         else:
             yield

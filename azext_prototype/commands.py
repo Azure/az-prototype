@@ -6,6 +6,7 @@ def load_command_table(self, _):
 
     with self.command_group("prototype", is_preview=True) as g:
         g.custom_command("init", "prototype_init")
+        g.custom_command("launch", "prototype_launch")
         g.custom_command("design", "prototype_design")
         g.custom_command("build", "prototype_build")
         g.custom_command("deploy", "prototype_deploy")

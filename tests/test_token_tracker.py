@@ -230,6 +230,39 @@ class TestContextWindowLookup:
         assert pct is not None
         assert abs(pct - 50.0) < 0.1  # 4096 / 8192 = 50%
 
+    def test_claude_model_exact(self):
+        """Claude models should have known context windows."""
+        t = TokenTracker()
+        t.record(AIResponse(
+            content="x", model="claude-sonnet-4",
+            usage={"prompt_tokens": 100_000, "completion_tokens": 0},
+        ))
+        pct = t.budget_pct
+        assert pct is not None
+        assert abs(pct - 50.0) < 0.1  # 100000 / 200000 = 50%
+
+    def test_claude_model_substring(self):
+        """Claude model names with suffixes should match via substring."""
+        t = TokenTracker()
+        t.record(AIResponse(
+            content="x", model="claude-sonnet-4-20250514",
+            usage={"prompt_tokens": 50_000, "completion_tokens": 0},
+        ))
+        pct = t.budget_pct
+        assert pct is not None
+        assert abs(pct - 25.0) < 0.1  # 50000 / 200000 = 25%
+
+    def test_gemini_model(self):
+        """Gemini models should have known context windows."""
+        t = TokenTracker()
+        t.record(AIResponse(
+            content="x", model="gemini-2.0-flash",
+            usage={"prompt_tokens": 524_288, "completion_tokens": 0},
+        ))
+        pct = t.budget_pct
+        assert pct is not None
+        assert abs(pct - 50.0) < 0.1  # 524288 / 1048576 = 50%
+
 
 # -------------------------------------------------------------------- #
 # Console.print_token_status — unit tests

@@ -3,7 +3,7 @@
 
 from setuptools import find_packages, setup
 
-VERSION = "0.2.1b3"
+VERSION = "0.2.1b4"
 CLASSIFIERS = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -25,6 +25,8 @@ DEPENDENCIES = [
     "opencensus-ext-azure>=1.1.0",
     # prompt_toolkit for multi-line input (Shift+Enter, backslash continuation)
     "prompt_toolkit>=3.0.0",
+    # Textual TUI dashboard for interactive sessions
+    "textual>=8.0.0",
     # Pin psutil — only 7.1.1 ships a pre-built win32 binary wheel.
     # Later versions (7.1.2+) require a source build which fails on
     # Azure CLI's bundled 32-bit Python (no setuptools).
@@ -46,7 +48,10 @@ setup(
     author_email="joshuadavis@microsoft.com",
     url="https://github.com/Azure/az-prototype",
     classifiers=CLASSIFIERS,
-    packages=find_packages(exclude=["tests", "tests.*"]),
+    packages=[
+        p for p in find_packages(exclude=["tests", "tests.*"])
+        if "__pycache__" not in p
+    ],
     install_requires=DEPENDENCIES,
     include_package_data=True,
     package_data={

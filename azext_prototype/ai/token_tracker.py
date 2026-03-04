@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 # Used for budget-percentage display.  Values are the *input* context
 # window (not total output limit).
 _CONTEXT_WINDOWS: dict[str, int] = {
+    # GPT models
     "gpt-4o": 128_000,
     "gpt-4o-mini": 128_000,
     "gpt-4-turbo": 128_000,
@@ -19,10 +20,19 @@ _CONTEXT_WINDOWS: dict[str, int] = {
     "gpt-4-32k": 32_768,
     "gpt-35-turbo": 16_385,
     "gpt-3.5-turbo": 16_385,
+    # O-series
     "o1": 200_000,
     "o1-mini": 128_000,
     "o1-preview": 128_000,
     "o3-mini": 200_000,
+    # Claude models (Copilot)
+    "claude-sonnet-4": 200_000,
+    "claude-sonnet-4.5": 200_000,
+    "claude-haiku-4.5": 200_000,
+    "claude-opus-4": 200_000,
+    # Gemini models (Copilot)
+    "gemini-2.0-flash": 1_048_576,
+    "gemini-2.5-pro": 1_048_576,
 }
 
 

@@ -48,6 +48,15 @@ def load_arguments(self, _):
             help="AI model to use (default: claude-sonnet-4.5 for copilot, gpt-4o for others).",
         )
 
+    # --- az prototype launch ---
+    with self.argument_context("prototype launch") as c:
+        c.argument(
+            "stage",
+            arg_type=get_enum_type(["design", "build", "deploy"]),
+            help="Start the TUI at a specific stage instead of auto-detecting.",
+            default=None,
+        )
+
     # --- az prototype design ---
     with self.argument_context("prototype design") as c:
         c.argument(

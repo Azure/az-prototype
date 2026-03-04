@@ -18,7 +18,9 @@ The state structure tracks:
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -26,6 +28,29 @@ from typing import Any
 import yaml
 
 logger = logging.getLogger(__name__)
+
+
+def _slugify(name: str) -> str:
+    """Convert a stage name to a URL-safe slug for use as a stable ID.
+
+    Example: "Data Layer" → "data-layer"
+    """
+    slug = name.lower().strip()
+    slug = re.sub(r"[^a-z0-9]+", "-", slug)
+    slug = slug.strip("-")
+    return slug or "stage"
+
+
+def _ensure_unique_id(slug: str, existing: set[str]) -> str:
+    """Append a numeric suffix if *slug* already exists in *existing*."""
+    if slug not in existing:
+        return slug
+    for i in range(2, 1000):
+        candidate = f"{slug}-{i}"
+        if candidate not in existing:
+            return candidate
+    return f"{slug}-{len(existing)}"
+
 
 BUILD_STATE_FILE = ".prototype/state/build.yaml"
 
@@ -44,6 +69,11 @@ def _default_build_state() -> dict[str, Any]:
         "review_decisions": [],
         "conversation_history": [],
         "resources": [],
+        "design_snapshot": {
+            "iteration": None,
+            "architecture_hash": None,
+            "architecture_text": None,
+        },
         "_metadata": {
             "created": None,
             "last_updated": None,
@@ -91,6 +121,7 @@ class BuildState:
                     loaded = yaml.safe_load(f) or {}
                 self._state = _default_build_state()
                 self._deep_merge(self._state, loaded)
+                self._backfill_ids()
                 self._loaded = True
                 logger.info("Loaded build state from %s", self._path)
             except (yaml.YAMLError, IOError) as e:
@@ -154,6 +185,7 @@ class BuildState:
             }
         """
         self._state["deployment_stages"] = stages
+        self._assign_stable_ids()
         # Rebuild the aggregated resources list
         self._rebuild_resources()
         self.save()
@@ -209,6 +241,115 @@ class BuildState:
             if stage["stage"] == stage_num:
                 return stage
         return None
+
+    def get_stage_by_id(self, stage_id: str) -> dict | None:
+        """Return a specific stage by its stable ``id``."""
+        for stage in self._state["deployment_stages"]:
+            if stage.get("id") == stage_id:
+                return stage
+        return None
+
+    # ------------------------------------------------------------------ #
+    # Design snapshot — change detection for incremental rebuilds
+    # ------------------------------------------------------------------ #
+
+    def set_design_snapshot(self, design: dict) -> None:
+        """Store a snapshot of the current design for future change detection.
+
+        Captures the design iteration number, a content hash of the
+        architecture text, and the full architecture text for diffing.
+        """
+        architecture = design.get("architecture", "")
+        self._state["design_snapshot"] = {
+            "iteration": design.get("_metadata", {}).get("iteration"),
+            "architecture_hash": hashlib.sha256(architecture.encode("utf-8")).hexdigest()[:16],
+            "architecture_text": architecture,
+        }
+        self.save()
+
+    def design_has_changed(self, design: dict) -> bool:
+        """Check whether the design has changed since the last build.
+
+        Returns ``True`` when the architecture content hash differs from
+        the stored snapshot, or when no snapshot exists (legacy builds).
+        """
+        snapshot = self._state.get("design_snapshot", {})
+        stored_hash = snapshot.get("architecture_hash")
+        if not stored_hash:
+            return True
+
+        architecture = design.get("architecture", "")
+        current_hash = hashlib.sha256(architecture.encode("utf-8")).hexdigest()[:16]
+        return current_hash != stored_hash
+
+    def get_previous_architecture(self) -> str | None:
+        """Return the stored architecture text from the last build, if any."""
+        snapshot = self._state.get("design_snapshot", {})
+        return snapshot.get("architecture_text")
+
+    def mark_stages_stale(self, stage_nums: list[int]) -> None:
+        """Reset specific stages to ``pending`` without clearing their files.
+
+        This allows the generation phase to re-generate only these stages
+        while preserving previously generated work on unaffected stages.
+        """
+        for stage in self._state["deployment_stages"]:
+            if stage["stage"] in stage_nums:
+                stage["status"] = "pending"
+        self.save()
+
+    def remove_stages(self, stage_nums: list[int]) -> None:
+        """Remove stages by number and clean up file references."""
+        nums_set = set(stage_nums)
+        removed_files: list[str] = []
+        for stage in self._state["deployment_stages"]:
+            if stage["stage"] in nums_set:
+                removed_files.extend(stage.get("files", []))
+
+        self._state["deployment_stages"] = [
+            s for s in self._state["deployment_stages"] if s["stage"] not in nums_set
+        ]
+
+        # Remove from files_generated
+        if removed_files:
+            removed_set = set(removed_files)
+            self._state["files_generated"] = [
+                f for f in self._state["files_generated"] if f not in removed_set
+            ]
+
+        self._rebuild_resources()
+        self.save()
+
+    def add_stages(self, new_stages: list[dict]) -> None:
+        """Insert new stages before the docs stage and assign sequential numbers.
+
+        New stages are inserted just before the last documentation stage
+        (if one exists), otherwise appended at the end.
+        """
+        existing = self._state["deployment_stages"]
+
+        # Find insertion point — before the docs stage
+        insert_idx = len(existing)
+        for i, s in enumerate(existing):
+            if s.get("category") == "docs":
+                insert_idx = i
+                break
+
+        for ns in new_stages:
+            ns.setdefault("status", "pending")
+            ns.setdefault("files", [])
+            ns.setdefault("dir", "")
+            existing.insert(insert_idx, ns)
+            insert_idx += 1
+
+        self._assign_stable_ids()
+        self.renumber_stages()
+
+    def renumber_stages(self) -> None:
+        """Renumber all stages sequentially starting from 1."""
+        for idx, stage in enumerate(self._state["deployment_stages"], start=1):
+            stage["stage"] = idx
+        self.save()
 
     # ------------------------------------------------------------------ #
     # Policy tracking
@@ -459,6 +600,31 @@ class BuildState:
     # ------------------------------------------------------------------ #
     # Internals
     # ------------------------------------------------------------------ #
+
+    def _assign_stable_ids(self) -> None:
+        """Ensure every deployment stage has a unique ``id`` field.
+
+        Stages that already have an ``id`` keep it.  Stages without one
+        get an ID derived from :func:`_slugify` on their name.
+        """
+        existing_ids: set[str] = set()
+        for stage in self._state["deployment_stages"]:
+            sid = stage.get("id")
+            if sid:
+                existing_ids.add(sid)
+
+        for stage in self._state["deployment_stages"]:
+            if not stage.get("id"):
+                slug = _slugify(stage.get("name", "stage"))
+                stage["id"] = _ensure_unique_id(slug, existing_ids)
+                existing_ids.add(stage["id"])
+            # Ensure deploy_mode defaults
+            stage.setdefault("deploy_mode", "auto")
+            stage.setdefault("manual_instructions", None)
+
+    def _backfill_ids(self) -> None:
+        """Backfill ``id``, ``deploy_mode``, and ``manual_instructions`` on legacy state files."""
+        self._assign_stable_ids()
 
     def _deep_merge(self, base: dict, updates: dict) -> None:
         """Deep merge updates into base dict."""

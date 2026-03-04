@@ -10,9 +10,13 @@ from azext_prototype.ai.provider import AIMessage, AIResponse
 from azext_prototype.stages.discovery import (
     DiscoverySession,
     DiscoveryResult,
+    Section,
+    extract_section_headers,
+    parse_sections,
     _READY_MARKER,
     _QUIT_WORDS,
     _DONE_WORDS,
+    _SECTION_COMPLETE_MARKER,
 )
 
 
@@ -321,6 +325,24 @@ class TestSessionEnding:
             )
             assert not result.cancelled, f"'{word}' should end gracefully, not cancel"
 
+    def test_end_in_done_words(self):
+        """'end' should be recognized as a done word."""
+        assert "end" in _DONE_WORDS
+
+    def test_end_word_finishes_session(self, mock_agent_context, mock_registry, mock_biz_agent):
+        """Typing 'end' should complete the session (not cancel)."""
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("Hi! Tell me about your project."),
+            _make_response("## Summary\nHere's what we discussed."),
+        ]
+        session = DiscoverySession(mock_agent_context, mock_registry)
+        result = session.run(
+            input_fn=lambda _: "end",
+            print_fn=lambda x: None,
+        )
+        assert not result.cancelled
+        assert result.exchange_count >= 1
+
     def test_eof_exits_gracefully(self, mock_agent_context, mock_registry, mock_biz_agent):
         mock_agent_context.ai_provider.chat.return_value = _make_response("Hi!")
         session = DiscoverySession(mock_agent_context, mock_registry)
@@ -581,7 +603,7 @@ class TestDesignStageDiscoveryIntegration:
 
         mock_agent_context.project_dir = str(project_with_config)
         mock_agent_context.ai_provider.chat.return_value = _make_response(
-            "## Architecture\nMock output"
+            "Tell me more about your project."
         )
 
         inputs = iter(["Build a REST API", "PostgreSQL, 50 users", "done"])
@@ -605,7 +627,7 @@ class TestDesignStageDiscoveryIntegration:
 
         mock_agent_context.project_dir = str(project_with_config)
         mock_agent_context.ai_provider.chat.return_value = _make_response(
-            "## Architecture\nShould not appear"
+            "Tell me about your project."
         )
 
         result = stage.execute(
@@ -629,7 +651,7 @@ class TestDesignStageDiscoveryIntegration:
 
         mock_agent_context.project_dir = str(project_with_config)
         mock_agent_context.ai_provider.chat.return_value = _make_response(
-            "## Architecture\nDesign with overrides"
+            "Architecture design with overrides."
         )
 
         mock_result = DiscoveryResult(
@@ -818,7 +840,7 @@ class TestRestartCommand:
 
 class TestWhyCommand:
     def test_why_no_argument_shows_usage(
-        self, mock_agent_context, mock_registry, mock_biz_agent, capsys,
+        self, mock_agent_context, mock_registry, mock_biz_agent,
     ):
         """/why with no argument should show usage hint, not crash."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -828,17 +850,18 @@ class TestWhyCommand:
 
         session = DiscoverySession(mock_agent_context, mock_registry)
         inputs = iter(["/why", "done"])
+        output = []
 
         session.run(
             input_fn=lambda _: next(inputs),
-            print_fn=lambda x: None,
+            print_fn=output.append,
         )
 
-        captured = capsys.readouterr()
-        assert "Usage" in captured.out or "/why" in captured.out
+        combined = "\n".join(str(x) for x in output)
+        assert "Usage" in combined or "/why" in combined
 
     def test_why_with_matching_query(
-        self, mock_agent_context, mock_registry, mock_biz_agent, capsys,
+        self, mock_agent_context, mock_registry, mock_biz_agent,
     ):
         """/why should find exchanges mentioning the queried topic."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -849,17 +872,18 @@ class TestWhyCommand:
 
         session = DiscoverySession(mock_agent_context, mock_registry)
         inputs = iter(["Use managed identity for auth", "/why managed identity", "done"])
+        output = []
 
         session.run(
             input_fn=lambda _: next(inputs),
-            print_fn=lambda x: None,
+            print_fn=output.append,
         )
 
-        captured = capsys.readouterr()
-        assert "Exchange" in captured.out
+        combined = "\n".join(str(x) for x in output)
+        assert "Exchange" in combined
 
     def test_why_no_matches(
-        self, mock_agent_context, mock_registry, mock_biz_agent, capsys,
+        self, mock_agent_context, mock_registry, mock_biz_agent,
     ):
         """/why with no matching history should show 'no exchanges found'."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -869,14 +893,15 @@ class TestWhyCommand:
 
         session = DiscoverySession(mock_agent_context, mock_registry)
         inputs = iter(["/why kubernetes", "done"])
+        output = []
 
         session.run(
             input_fn=lambda _: next(inputs),
-            print_fn=lambda x: None,
+            print_fn=output.append,
         )
 
-        captured = capsys.readouterr()
-        assert "No exchanges found" in captured.out
+        combined = "\n".join(str(x) for x in output)
+        assert "No exchanges found" in combined
 
 
 # ======================================================================
@@ -1185,3 +1210,661 @@ class TestUpdatedSummaryFormat:
         user_msgs = [m.content for m in messages if m.role == "user"]
         summary_prompt = user_msgs[-1]
         assert "None" in summary_prompt or "skip" in summary_prompt.lower()
+
+
+# ======================================================================
+# Natural Language Intent Detection — Integration
+# ======================================================================
+
+
+class TestNaturalLanguageIntentDiscovery:
+    """Test that natural language triggers the correct slash commands."""
+
+    def test_nl_open_items(self, mock_agent_context, mock_registry):
+        """'what are the open items' should trigger the /open display."""
+        # Use return_value — any call returns a valid response (no headings
+        # to avoid triggering section-at-a-time gating)
+        mock_agent_context.ai_provider.chat.return_value = _make_response(
+            "Tell me about your project."
+        )
+        session = DiscoverySession(mock_agent_context, mock_registry)
+        output = []
+        inputs = iter(["what are the open items", "done"])
+        result = session.run(
+            input_fn=lambda _: next(inputs),
+            print_fn=output.append,
+        )
+        # The /open handler should have run and printed open items info
+        assert any("open" in o.lower() for o in output if isinstance(o, str))
+
+    def test_nl_status(self, mock_agent_context, mock_registry):
+        """'where do we stand' should trigger the /status display."""
+        mock_agent_context.ai_provider.chat.return_value = _make_response(
+            "Tell me about your project."
+        )
+        session = DiscoverySession(mock_agent_context, mock_registry)
+        output = []
+        inputs = iter(["where do we stand", "done"])
+        result = session.run(
+            input_fn=lambda _: next(inputs),
+            print_fn=output.append,
+        )
+        assert any("status" in o.lower() or "discovery" in o.lower() for o in output if isinstance(o, str))
+
+
+# ======================================================================
+# extract_section_headers
+# ======================================================================
+
+class TestExtractSectionHeaders:
+    """Unit tests for extract_section_headers()."""
+
+    def test_extracts_h2_headings(self):
+        text = "## Project Context & Scope\nSome text\n## Data & Content\nMore text"
+        result = extract_section_headers(text)
+        assert result == [("Project Context & Scope", 2), ("Data & Content", 2)]
+
+    def test_extracts_h3_headings(self):
+        text = "### Authentication\nDetails\n### Authorization\nMore details"
+        result = extract_section_headers(text)
+        assert result == [("Authentication", 3), ("Authorization", 3)]
+
+    def test_mixed_h2_h3(self):
+        text = "## Overview\nText\n### Sub-section\nText\n## Architecture\nText"
+        result = extract_section_headers(text)
+        assert result == [("Overview", 2), ("Sub-section", 3), ("Architecture", 2)]
+
+    def test_skips_structural_headings(self):
+        text = (
+            "## Project Context\nText\n"
+            "## Summary\nText\n"
+            "## Policy Overrides\nText\n"
+            "## Next Steps\nText\n"
+        )
+        result = extract_section_headers(text)
+        assert result == [("Project Context", 2)]
+
+    def test_skips_policy_override_singular(self):
+        text = "## Policy Override\nText"
+        result = extract_section_headers(text)
+        assert result == []
+
+    def test_skips_short_headings(self):
+        text = "## AB\nText\n## OK\nMore"
+        result = extract_section_headers(text)
+        assert result == []
+
+    def test_empty_string(self):
+        assert extract_section_headers("") == []
+
+    def test_no_headings(self):
+        text = "Just plain text without any headings at all."
+        assert extract_section_headers(text) == []
+
+    def test_h1_not_extracted(self):
+        """Only ## and ### are extracted, not #."""
+        text = "# Title\n## Section One\nContent"
+        result = extract_section_headers(text)
+        assert result == [("Section One", 2)]
+
+    def test_strips_whitespace(self):
+        text = "##   Padded Heading   \nText"
+        result = extract_section_headers(text)
+        assert result == [("Padded Heading", 2)]
+
+    def test_case_insensitive_skip(self):
+        text = "## SUMMARY\nText\n## NEXT STEPS\nText\n## Actual Content\nText"
+        result = extract_section_headers(text)
+        assert result == [("Actual Content", 2)]
+
+    def test_bold_headings_extracted(self):
+        """**Bold Heading** on its own line should be extracted as level 2."""
+        text = (
+            "Let me ask about your project.\n"
+            "\n"
+            "**Hosting & Deployment**\n"
+            "How do you plan to host this?\n"
+            "\n"
+            "**Data Layer**\n"
+            "What database will you use?"
+        )
+        result = extract_section_headers(text)
+        assert ("Hosting & Deployment", 2) in result
+        assert ("Data Layer", 2) in result
+
+    def test_bold_inline_not_extracted(self):
+        """Bold text mid-line should NOT be extracted as a heading."""
+        text = "I think **this is important** for the project."
+        result = extract_section_headers(text)
+        assert result == []
+
+    def test_bold_and_markdown_headings_merged(self):
+        """Both ## headings and **bold headings** should be found with levels."""
+        text = (
+            "## Architecture Overview\n"
+            "Details here.\n"
+            "\n"
+            "**Security Considerations**\n"
+            "More details."
+        )
+        result = extract_section_headers(text)
+        assert ("Architecture Overview", 2) in result
+        assert ("Security Considerations", 2) in result
+
+    def test_bold_headings_deduped(self):
+        """Duplicate headings (same text in both formats) should appear once."""
+        text = (
+            "## Security\n"
+            "Details.\n"
+            "\n"
+            "**Security**\n"
+            "More details."
+        )
+        result = extract_section_headers(text)
+        texts = [h[0] for h in result]
+        assert texts.count("Security") == 1
+
+    def test_bold_headings_skip_structural(self):
+        """Bold structural headings (Summary, Next Steps) should be skipped."""
+        text = "**Summary**\nText\n**Actual Topic**\nMore text"
+        result = extract_section_headers(text)
+        texts = [h[0] for h in result]
+        assert "Summary" not in texts
+        assert "Actual Topic" in texts
+
+    def test_bold_heading_too_short(self):
+        """Bold headings under 3 chars should be skipped."""
+        text = "**AB**\nText"
+        result = extract_section_headers(text)
+        assert result == []
+
+    def test_skip_what_ive_understood(self):
+        """'What I've Understood So Far' and variants should be filtered."""
+        text = (
+            "## What I've Understood So Far\nStuff\n"
+            "## What We've Covered\nMore stuff\n"
+            "## Actual Topic\nReal content"
+        )
+        result = extract_section_headers(text)
+        texts = [h[0] for h in result]
+        assert "What I've Understood So Far" not in texts
+        assert "What We've Covered" not in texts
+        assert "Actual Topic" in texts
+
+    def test_position_ordering(self):
+        """Headers should be sorted by their position in the response."""
+        text = (
+            "**First Bold**\n"
+            "Text\n"
+            "## Second Markdown\n"
+            "Text\n"
+            "**Third Bold**\n"
+            "Text"
+        )
+        result = extract_section_headers(text)
+        assert result == [("First Bold", 2), ("Second Markdown", 2), ("Third Bold", 2)]
+
+
+# ======================================================================
+# section_fn callback integration
+# ======================================================================
+
+class TestSectionFnCallback:
+    """Verify that section_fn is called with extracted headers during a session."""
+
+    def test_section_fn_receives_headers(
+        self, mock_agent_context, mock_registry,
+    ):
+        """section_fn should be called upfront with all headers from the AI response."""
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response(
+                "## Project Context & Scope\n"
+                "Let me ask about your project.\n"
+                "## Data & Content\n"
+                "What kind of data will you store?"
+            ),
+            # Summary after "done" exits the section loop
+            _make_response("## Summary\nAll done."),
+        ]
+
+        session = DiscoverySession(mock_agent_context, mock_registry)
+        captured_headers = []
+
+        def _section_fn(headers):
+            captured_headers.extend(headers)
+
+        # "done" exits from the section loop immediately
+        result = session.run(
+            input_fn=lambda _: "done",
+            print_fn=lambda x: None,
+            section_fn=_section_fn,
+        )
+
+        texts = [h[0] for h in captured_headers]
+        assert "Project Context & Scope" in texts
+        assert "Data & Content" in texts
+
+    def test_section_fn_not_called_when_none(
+        self, mock_agent_context, mock_registry,
+    ):
+        """When section_fn is None, no error should occur."""
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("## Some Heading\nContent"),
+            _make_response("## Summary\nDone"),
+        ]
+
+        session = DiscoverySession(mock_agent_context, mock_registry)
+        # Should not raise — section_fn defaults to None
+        result = session.run(
+            input_fn=lambda _: "done",
+            print_fn=lambda x: None,
+        )
+        assert not result.cancelled
+
+
+# ======================================================================
+# response_fn callback integration
+# ======================================================================
+
+class TestResponseFnCallback:
+    """Verify that response_fn is called with agent responses during a session."""
+
+    def test_response_fn_receives_agent_responses(
+        self, mock_agent_context, mock_registry,
+    ):
+        """response_fn should be called with cleaned agent responses."""
+        # Use a response without ## headings so it takes the non-sectioned path
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("Let me understand your project. What are you building?"),
+            _make_response("An API. Got it."),
+            _make_response("Final summary."),
+        ]
+
+        session = DiscoverySession(mock_agent_context, mock_registry)
+        captured = []
+
+        def _response_fn(content):
+            captured.append(content)
+
+        inputs = iter(["A REST API", "done"])
+        result = session.run(
+            input_fn=lambda _: next(inputs),
+            print_fn=lambda x: None,
+            response_fn=_response_fn,
+        )
+
+        # response_fn should have been called for the opening and the reply
+        assert len(captured) == 2
+        assert "understand your project" in captured[0]
+        assert "API" in captured[1]
+
+    def test_response_fn_not_called_when_none(
+        self, mock_agent_context, mock_registry,
+    ):
+        """When response_fn is None, print_fn should be used instead."""
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("What are you building?"),
+            _make_response("## Summary\nDone"),
+        ]
+
+        session = DiscoverySession(mock_agent_context, mock_registry)
+        printed = []
+
+        result = session.run(
+            input_fn=lambda _: "done",
+            print_fn=lambda x: printed.append(x),
+        )
+
+        # print_fn should have received the response
+        assert any("building" in p.lower() for p in printed if isinstance(p, str))
+
+    def test_response_fn_takes_precedence_over_print_fn(
+        self, mock_agent_context, mock_registry,
+    ):
+        """response_fn should be used instead of print_fn for agent responses."""
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("Tell me about your project."),
+            _make_response("## Summary\nDone."),
+        ]
+
+        session = DiscoverySession(mock_agent_context, mock_registry)
+        printed = []
+        response_captured = []
+
+        result = session.run(
+            input_fn=lambda _: "done",
+            print_fn=lambda x: printed.append(x),
+            response_fn=lambda x: response_captured.append(x),
+        )
+
+        # response_fn should have the agent response
+        assert len(response_captured) == 1
+        assert "Tell me about your project" in response_captured[0]
+        # print_fn should NOT have the agent response text
+        assert not any("Tell me about your project" in p for p in printed if isinstance(p, str))
+
+
+# ======================================================================
+# parse_sections()
+# ======================================================================
+
+class TestParseSections:
+    """Verify section parsing from AI responses."""
+
+    def test_basic_section_splitting(self):
+        text = (
+            "Here's my analysis.\n\n"
+            "## Authentication\n"
+            "How do users sign in?\n\n"
+            "## Data Layer\n"
+            "What database do you prefer?"
+        )
+        preamble, sections = parse_sections(text)
+        assert preamble == "Here's my analysis."
+        assert len(sections) == 2
+        assert sections[0].heading == "Authentication"
+        assert sections[0].level == 2
+        assert "How do users sign in?" in sections[0].content
+        assert sections[1].heading == "Data Layer"
+        assert "What database" in sections[1].content
+
+    def test_preamble_only(self):
+        text = "No headings here, just a plain response."
+        preamble, sections = parse_sections(text)
+        assert preamble == text
+        assert sections == []
+
+    def test_empty_preamble(self):
+        text = "## First Topic\nQuestion here."
+        preamble, sections = parse_sections(text)
+        assert preamble == ""
+        assert len(sections) == 1
+
+    def test_skip_headings_filtered(self):
+        text = (
+            "## Authentication\nHow do users sign in?\n\n"
+            "## Summary\nThis is a summary.\n\n"
+            "## Next Steps\nDo this next."
+        )
+        _, sections = parse_sections(text)
+        assert len(sections) == 1
+        assert sections[0].heading == "Authentication"
+
+    def test_task_id_generation(self):
+        text = "## Data & Content\nWhat kind of data?"
+        _, sections = parse_sections(text)
+        assert len(sections) == 1
+        assert sections[0].task_id == "design-section-data-content"
+
+    def test_bold_headings(self):
+        text = (
+            "Here's what I need to know.\n\n"
+            "**Authentication & Security**\n"
+            "How do users log in?\n\n"
+            "**Data Storage**\n"
+            "What database?"
+        )
+        preamble, sections = parse_sections(text)
+        assert len(sections) == 2
+        assert sections[0].heading == "Authentication & Security"
+        assert sections[0].level == 2
+
+    def test_level_3_headings(self):
+        text = "### Sub-topic\nDetailed question."
+        _, sections = parse_sections(text)
+        assert len(sections) == 1
+        assert sections[0].level == 3
+
+    def test_mixed_heading_levels(self):
+        text = (
+            "## Main Topic\nOverview.\n\n"
+            "### Sub-topic\nDetail."
+        )
+        _, sections = parse_sections(text)
+        assert len(sections) == 2
+        assert sections[0].level == 2
+        assert sections[1].level == 3
+
+    def test_empty_string(self):
+        preamble, sections = parse_sections("")
+        assert preamble == ""
+        assert sections == []
+
+    def test_duplicate_headings_deduped(self):
+        text = (
+            "## Authentication\nFirst mention.\n\n"
+            "## Authentication\nSecond mention."
+        )
+        _, sections = parse_sections(text)
+        assert len(sections) == 1
+
+
+# ======================================================================
+# Section completion via AI "Yes" gate
+# ======================================================================
+
+class TestSectionDoneDetection:
+    """Verify section completion detection via AI 'Yes' gate.
+
+    The old heuristic-based ``_is_section_done()`` has been replaced with
+    an explicit AI confirmation step.  When the AI responds with exactly
+    "Yes" (case-insensitive, optional trailing period) the section is
+    considered complete.
+    """
+
+    def test_continue_in_done_words(self):
+        """'continue' should be accepted as a done keyword."""
+        assert "continue" in _DONE_WORDS
+
+
+# ======================================================================
+# Section-at-a-time flow integration
+# ======================================================================
+
+class TestSectionAtATimeFlow:
+    """Verify sections are shown one at a time with follow-ups."""
+
+    def test_sections_shown_one_at_a_time(
+        self, mock_agent_context, mock_registry,
+    ):
+        """Each section should be shown individually, collecting user input."""
+        mock_agent_context.ai_provider.chat.side_effect = [
+            # Initial response with 2 sections
+            _make_response(
+                "Great, let me explore a few areas.\n\n"
+                "## Authentication\n"
+                "How do users sign in?\n\n"
+                "## Data Layer\n"
+                "What database do you need?"
+            ),
+            # Follow-up for section 1 (auth) — marks section done
+            _make_response("Yes"),
+            # Follow-up for section 2 (data) — marks section done
+            _make_response("Yes"),
+            # Summary after free-form "done"
+            _make_response("## Summary\nAll done."),
+        ]
+
+        session = DiscoverySession(mock_agent_context, mock_registry)
+        printed = []
+        inputs = iter([
+            "We use Entra ID",     # Answer for section 1
+            "SQL Database",         # Answer for section 2
+            "done",                 # Exit free-form loop
+        ])
+
+        result = session.run(
+            input_fn=lambda _: next(inputs),
+            print_fn=lambda x: printed.append(x),
+        )
+        assert not result.cancelled
+        # Both sections should have been displayed
+        printed_text = "\n".join(str(p) for p in printed)
+        assert "Authentication" in printed_text
+        assert "Data Layer" in printed_text
+
+    def test_skip_advances_to_next_section(
+        self, mock_agent_context, mock_registry,
+    ):
+        """Typing 'skip' should advance to the next section."""
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response(
+                "## Auth\nHow do users sign in?\n\n"
+                "## Data\nWhat database?"
+            ),
+            # Follow-up for data section
+            _make_response("Yes"),
+            # Summary
+            _make_response("## Summary\nDone."),
+        ]
+
+        session = DiscoverySession(mock_agent_context, mock_registry)
+        inputs = iter([
+            "skip",        # Skip auth section
+            "Cosmos DB",   # Answer data section
+            "done",        # Exit free-form
+        ])
+
+        result = session.run(
+            input_fn=lambda _: next(inputs),
+            print_fn=lambda x: None,
+        )
+        assert not result.cancelled
+
+    def test_done_exits_section_loop(
+        self, mock_agent_context, mock_registry,
+    ):
+        """Typing 'done' during section loop should jump to summary."""
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response(
+                "## Auth\nHow do users sign in?\n\n"
+                "## Data\nWhat database?"
+            ),
+            # Summary produced after "done"
+            _make_response("## Summary\nFinal summary."),
+        ]
+
+        session = DiscoverySession(mock_agent_context, mock_registry)
+        result = session.run(
+            input_fn=lambda _: "done",
+            print_fn=lambda x: None,
+        )
+        assert not result.cancelled
+        assert result.requirements  # Should have summary
+
+    def test_quit_cancels_from_section_loop(
+        self, mock_agent_context, mock_registry,
+    ):
+        """Typing 'quit' during section loop should cancel the session."""
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response(
+                "## Auth\nHow do users sign in?\n\n"
+                "## Data\nWhat database?"
+            ),
+        ]
+
+        session = DiscoverySession(mock_agent_context, mock_registry)
+        result = session.run(
+            input_fn=lambda _: "quit",
+            print_fn=lambda x: None,
+        )
+        assert result.cancelled
+
+    def test_follow_ups_iterate_within_section(
+        self, mock_agent_context, mock_registry,
+    ):
+        """Multiple follow-ups within a section should work."""
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("## Auth\nHow do users sign in?"),
+            # First follow-up — needs more info
+            _make_response("What about service-to-service auth?"),
+            # Second follow-up — section done
+            _make_response("Yes"),
+            # Summary
+            _make_response("## Summary\nDone."),
+        ]
+
+        session = DiscoverySession(mock_agent_context, mock_registry)
+        inputs = iter([
+            "Entra ID for users",          # First answer
+            "Managed identity for services",  # Second answer
+            "done",                          # Exit free-form
+        ])
+
+        result = session.run(
+            input_fn=lambda _: next(inputs),
+            print_fn=lambda x: None,
+        )
+        assert not result.cancelled
+        assert result.exchange_count >= 3  # opening + 2 follow-ups
+
+    def test_update_task_fn_called(
+        self, mock_agent_context, mock_registry,
+    ):
+        """update_task_fn should be called with in_progress and completed."""
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("## Auth\nHow do users sign in?"),
+            _make_response("Yes"),
+            _make_response("## Summary\nDone."),
+        ]
+
+        session = DiscoverySession(mock_agent_context, mock_registry)
+        task_updates = []
+
+        def _update_task_fn(tid, status):
+            task_updates.append((tid, status))
+
+        inputs = iter(["Entra ID", "done"])
+        result = session.run(
+            input_fn=lambda _: next(inputs),
+            print_fn=lambda x: None,
+            update_task_fn=_update_task_fn,
+        )
+
+        # Should have in_progress then completed for the auth section
+        assert ("design-section-auth", "in_progress") in task_updates
+        assert ("design-section-auth", "completed") in task_updates
+
+    def test_no_sections_fallback(
+        self, mock_agent_context, mock_registry,
+    ):
+        """When no sections are found, should display full response."""
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("Tell me what you want to build."),
+            _make_response("## Summary\nDone."),
+        ]
+
+        session = DiscoverySession(mock_agent_context, mock_registry)
+        printed = []
+
+        result = session.run(
+            input_fn=lambda _: "done",
+            print_fn=lambda x: printed.append(x),
+        )
+
+        assert not result.cancelled
+        printed_text = "\n".join(str(p) for p in printed)
+        assert "Tell me what you want to build" in printed_text
+
+    def test_yes_gate_not_displayed(
+        self, mock_agent_context, mock_registry,
+    ):
+        """AI 'Yes' confirmation should not be printed to the user."""
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("## Auth\nHow do users sign in?"),
+            _make_response("Yes"),
+            _make_response("## Summary\nDone."),
+        ]
+
+        session = DiscoverySession(mock_agent_context, mock_registry)
+        printed = []
+
+        inputs = iter(["Entra ID", "continue"])
+        result = session.run(
+            input_fn=lambda _: next(inputs),
+            print_fn=lambda x: printed.append(x),
+        )
+
+        printed_text = "\n".join(str(p) for p in printed)
+        # The "Yes" response should not appear in output
+        assert "\nYes\n" not in printed_text

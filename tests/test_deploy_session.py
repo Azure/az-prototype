@@ -736,6 +736,10 @@ class TestDeploySession:
         # Mock QA agent response
         session._qa_agent = MagicMock()
         session._qa_agent.execute.return_value = _make_response("Check your service principal credentials.")
+        # Clear fix agents so remediation is skipped (this test verifies QA routing only)
+        session._iac_agents = {}
+        session._dev_agent = None
+        session._architect_agent = None
 
         inputs = iter(["", "done"])  # confirm, then done
         output = []
@@ -2269,3 +2273,1176 @@ class TestDeployerObjectIdLookup:
         session._resolve_context("sub-123", None)
 
         assert "TF_VAR_deployer_object_id" not in session._deploy_env
+
+
+# ======================================================================
+# Natural Language Intent Detection — Deploy Integration
+# ======================================================================
+
+
+class TestNaturalLanguageIntentDeploy:
+    """Test that natural language triggers correct deploy commands."""
+
+    def _make_session(self, project_dir, build_stages=None):
+        """Create a DeploySession with dependencies mocked."""
+        from azext_prototype.agents.base import AgentContext
+        from azext_prototype.agents.registry import AgentRegistry
+        from azext_prototype.agents.builtin import register_all_builtin
+        from azext_prototype.stages.deploy_session import DeploySession
+
+        config_path = Path(project_dir) / "prototype.yaml"
+        if not config_path.exists():
+            config_data = {
+                "project": {"name": "test", "location": "eastus", "iac_tool": "terraform"},
+                "ai": {"provider": "github-models"},
+            }
+            with open(config_path, "w") as f:
+                yaml.dump(config_data, f)
+
+        _write_build_yaml(project_dir, stages=build_stages)
+
+        context = AgentContext(
+            project_config={"project": {"iac_tool": "terraform"}},
+            project_dir=str(project_dir),
+            ai_provider=MagicMock(),
+        )
+        registry = AgentRegistry()
+        register_all_builtin(registry)
+
+        return DeploySession(context, registry)
+
+    @patch("azext_prototype.stages.deploy_session.subprocess.run", return_value=MagicMock(returncode=0, stdout="Terraform v1.7.0\n", stderr=""))
+    @patch("azext_prototype.stages.deploy_session.check_az_login", return_value=True)
+    @patch("azext_prototype.stages.deploy_session.get_current_subscription", return_value="sub-123")
+    @patch("azext_prototype.stages.deploy_session.deploy_terraform", return_value={"status": "deployed"})
+    def test_nl_deploy_stage_1(self, mock_tf, mock_sub, mock_login, mock_subprocess, tmp_project):
+        """'deploy stage 1' in natural language triggers deploy."""
+        stages = [
+            {
+                "stage": 1, "name": "Infra", "category": "infra",
+                "services": [], "dir": "concept/infra/terraform",
+                "status": "generated", "files": [],
+            },
+        ]
+        (tmp_project / "concept" / "infra" / "terraform").mkdir(parents=True, exist_ok=True)
+
+        session = self._make_session(tmp_project, build_stages=stages)
+        inputs = iter(["", "deploy stage 1", "done"])
+        output = []
+        result = session.run(
+            subscription="sub-123",
+            input_fn=lambda p: next(inputs),
+            print_fn=lambda msg: output.append(msg),
+        )
+        joined = "\n".join(output)
+        # Should show deploy success or at least process the deploy command
+        assert "deployed" in joined.lower() or "Stage 1" in joined
+
+    def test_nl_describe_stage(self, tmp_project):
+        """'describe stage 1' shows stage details."""
+        session = self._make_session(tmp_project)
+        inputs = iter(["", "describe stage 1", "done"])
+        output = []
+        session.run(
+            subscription="sub-123",
+            input_fn=lambda p: next(inputs),
+            print_fn=lambda msg: output.append(msg),
+        )
+        joined = "\n".join(output)
+        assert "Foundation" in joined or "Stage 1" in joined
+
+
+# ======================================================================
+# Deploy State Remediation tests
+# ======================================================================
+
+class TestDeployStateRemediation:
+    """Tests for remediation state tracking in DeployState."""
+
+    def test_mark_stage_remediating(self, tmp_project):
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        ds.mark_stage_failed(1, "auth error")
+        ds.mark_stage_remediating(1)
+
+        stage = ds.get_stage(1)
+        assert stage["deploy_status"] == "remediating"
+        assert stage["remediation_attempts"] == 1
+
+    def test_remediation_attempts_increment(self, tmp_project):
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        ds.mark_stage_remediating(1)
+        assert ds.get_stage(1)["remediation_attempts"] == 1
+
+        ds.mark_stage_remediating(1)
+        assert ds.get_stage(1)["remediation_attempts"] == 2
+
+        ds.mark_stage_remediating(1)
+        assert ds.get_stage(1)["remediation_attempts"] == 3
+
+    def test_reset_stage_to_pending(self, tmp_project):
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        ds.mark_stage_failed(1, "timeout")
+        assert ds.get_stage(1)["deploy_status"] == "failed"
+        assert ds.get_stage(1)["deploy_error"] == "timeout"
+
+        ds.reset_stage_to_pending(1)
+        stage = ds.get_stage(1)
+        assert stage["deploy_status"] == "pending"
+        assert stage["deploy_error"] == ""
+
+    def test_add_patch_stages(self, tmp_project):
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        new_stages = [
+            {"stage": 0, "name": "Patch Fix", "category": "infra"},
+        ]
+        ds.add_patch_stages(new_stages)
+
+        stages = ds.state["deployment_stages"]
+        assert len(stages) == 4
+        # Should have deploy-specific fields
+        patch_stage = [s for s in stages if s["name"] == "Patch Fix"][0]
+        assert patch_stage["deploy_status"] == "pending"
+        assert patch_stage["remediation_attempts"] == 0
+        assert patch_stage["deploy_timestamp"] is None
+
+    def test_add_patch_stages_before_docs(self, tmp_project):
+        from azext_prototype.stages.deploy_state import DeployState
+
+        stages = [
+            {"stage": 1, "name": "Infra", "category": "infra", "services": [], "dir": "s1", "files": []},
+            {"stage": 2, "name": "Docs", "category": "docs", "services": [], "dir": "s2", "files": []},
+        ]
+        build_path = _write_build_yaml(tmp_project, stages=stages)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        ds.add_patch_stages([{"stage": 0, "name": "Patch", "category": "infra"}])
+
+        stage_names = [s["name"] for s in ds.state["deployment_stages"]]
+        # Patch should be before Docs
+        assert stage_names.index("Patch") < stage_names.index("Docs")
+
+    def test_renumber_stages(self, tmp_project):
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        # Manually set non-sequential numbers
+        ds.state["deployment_stages"][0]["stage"] = 10
+        ds.state["deployment_stages"][1]["stage"] = 20
+        ds.state["deployment_stages"][2]["stage"] = 30
+
+        ds.renumber_stages()
+
+        nums = [s["stage"] for s in ds.state["deployment_stages"]]
+        assert nums == [1, 2, 3]
+
+    def test_remediation_attempts_in_load_from_build_state(self, tmp_project):
+        """Verify remediation_attempts field is added during build state import."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        for stage in ds.state["deployment_stages"]:
+            assert "remediation_attempts" in stage
+            assert stage["remediation_attempts"] == 0
+
+    def test_remediating_status_icon(self, tmp_project):
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        ds.mark_stage_remediating(1)
+        status = ds.format_stage_status()
+        assert "<>" in status
+
+
+# ======================================================================
+# Deploy Remediation Loop tests
+# ======================================================================
+
+class TestDeployRemediation:
+    """Tests for the deploy auto-remediation loop in DeploySession."""
+
+    _SENTINEL = object()
+
+    def _make_session(self, project_dir, iac_tool="terraform", build_stages=None, ai_provider=_SENTINEL):
+        from azext_prototype.agents.base import AgentContext
+        from azext_prototype.agents.registry import AgentRegistry
+        from azext_prototype.agents.builtin import register_all_builtin
+        from azext_prototype.stages.deploy_session import DeploySession
+
+        config_path = Path(project_dir) / "prototype.yaml"
+        if not config_path.exists():
+            config_data = {
+                "project": {"name": "test", "location": "eastus", "iac_tool": iac_tool},
+                "ai": {"provider": "github-models"},
+            }
+            with open(config_path, "w") as f:
+                yaml.dump(config_data, f)
+
+        _write_build_yaml(project_dir, stages=build_stages, iac_tool=iac_tool)
+
+        provider = MagicMock() if ai_provider is self._SENTINEL else ai_provider
+        context = AgentContext(
+            project_config={"project": {"iac_tool": iac_tool}},
+            project_dir=str(project_dir),
+            ai_provider=provider,
+        )
+        registry = AgentRegistry()
+        register_all_builtin(registry)
+
+        session = DeploySession(context, registry)
+        # Pre-load build state into deploy state
+        build_path = Path(project_dir) / ".prototype" / "state" / "build.yaml"
+        session._deploy_state.load_from_build_state(build_path)
+        return session
+
+    def test_remediation_succeeds_first_attempt(self, tmp_project):
+        """Deploy fails -> QA diagnoses -> fix agent fixes -> redeploy succeeds."""
+        stages = [
+            {"stage": 1, "name": "Infra", "category": "infra", "services": [],
+             "dir": "concept/infra/terraform", "status": "generated", "files": []},
+        ]
+        (tmp_project / "concept" / "infra" / "terraform").mkdir(parents=True, exist_ok=True)
+        (tmp_project / "concept" / "infra" / "terraform" / "main.tf").write_text("# original")
+
+        session = self._make_session(tmp_project, build_stages=stages)
+
+        # Mock QA agent
+        session._qa_agent = MagicMock()
+        session._qa_agent.execute.return_value = _make_response("Missing provider configuration. Add required_providers block.")
+
+        # Mock architect agent
+        session._architect_agent = MagicMock()
+        session._architect_agent.execute.return_value = _make_response(
+            "Root cause: missing provider. Add azurerm provider config.\nNo downstream impact."
+        )
+
+        # Mock IaC agent (terraform)
+        mock_iac = MagicMock()
+        mock_iac.execute.return_value = _make_response(
+            "```main.tf\n# fixed provider config\nterraform { required_providers { azurerm = { source = \"hashicorp/azurerm\" } } }\n```"
+        )
+        session._iac_agents["terraform"] = mock_iac
+
+        result = {"status": "failed", "error": "Error: No provider configured"}
+        stage = session._deploy_state.get_stage(1)
+        output = []
+
+        with patch("azext_prototype.stages.deploy_session.deploy_terraform", return_value={"status": "deployed"}):
+            remediated = session._remediate_deploy_failure(
+                stage, result, False, lambda msg: output.append(msg), lambda p: "",
+            )
+
+        assert remediated is not None
+        assert remediated["status"] == "deployed"
+        joined = "\n".join(output)
+        assert "Remediating" in joined
+        assert "deployed successfully after remediation" in joined
+
+    def test_remediation_succeeds_second_attempt(self, tmp_project):
+        """First redeploy fails, second attempt succeeds."""
+        stages = [
+            {"stage": 1, "name": "Infra", "category": "infra", "services": [],
+             "dir": "concept/infra/terraform", "status": "generated", "files": []},
+        ]
+        (tmp_project / "concept" / "infra" / "terraform").mkdir(parents=True, exist_ok=True)
+        (tmp_project / "concept" / "infra" / "terraform" / "main.tf").write_text("# original")
+
+        session = self._make_session(tmp_project, build_stages=stages)
+
+        session._qa_agent = MagicMock()
+        session._qa_agent.execute.return_value = _make_response("Diagnosis: missing config")
+
+        session._architect_agent = MagicMock()
+        session._architect_agent.execute.return_value = _make_response("Fix the provider.\n[]")
+
+        mock_iac = MagicMock()
+        mock_iac.execute.return_value = _make_response(
+            "```main.tf\n# fixed\n```"
+        )
+        session._iac_agents["terraform"] = mock_iac
+
+        result = {"status": "failed", "error": "Error: provider error"}
+        stage = session._deploy_state.get_stage(1)
+        output = []
+
+        deploy_call_count = [0]
+
+        def mock_deploy(*args, **kwargs):
+            deploy_call_count[0] += 1
+            if deploy_call_count[0] <= 1:
+                return {"status": "failed", "error": "still broken"}
+            return {"status": "deployed"}
+
+        with patch.object(session, "_deploy_single_stage", side_effect=mock_deploy):
+            remediated = session._remediate_deploy_failure(
+                stage, result, False, lambda msg: output.append(msg), lambda p: "",
+            )
+
+        assert remediated is not None
+        assert remediated["status"] == "deployed"
+        assert deploy_call_count[0] == 2
+
+    def test_remediation_exhausted(self, tmp_project):
+        """All remediation attempts fail — falls through."""
+        stages = [
+            {"stage": 1, "name": "Infra", "category": "infra", "services": [],
+             "dir": "concept/infra/terraform", "status": "generated", "files": []},
+        ]
+        (tmp_project / "concept" / "infra" / "terraform").mkdir(parents=True, exist_ok=True)
+        (tmp_project / "concept" / "infra" / "terraform" / "main.tf").write_text("# original")
+
+        session = self._make_session(tmp_project, build_stages=stages)
+
+        session._qa_agent = MagicMock()
+        session._qa_agent.execute.return_value = _make_response("Diagnosis: broken")
+
+        session._architect_agent = MagicMock()
+        session._architect_agent.execute.return_value = _make_response("Fix it.\n[]")
+
+        mock_iac = MagicMock()
+        mock_iac.execute.return_value = _make_response("```main.tf\n# attempt\n```")
+        session._iac_agents["terraform"] = mock_iac
+
+        result = {"status": "failed", "error": "persistent error"}
+        stage = session._deploy_state.get_stage(1)
+        output = []
+
+        with patch.object(session, "_deploy_single_stage", return_value={"status": "failed", "error": "still broken"}):
+            remediated = session._remediate_deploy_failure(
+                stage, result, False, lambda msg: output.append(msg), lambda p: "",
+            )
+
+        assert remediated is not None
+        assert remediated["status"] == "failed"
+        joined = "\n".join(output)
+        assert "Re-deploy failed" in joined
+
+    def test_remediation_no_agents(self, tmp_project):
+        """Gracefully skipped when no fix agents are available."""
+        stages = [
+            {"stage": 1, "name": "Infra", "category": "infra", "services": [],
+             "dir": "concept/infra/terraform", "status": "generated", "files": []},
+        ]
+        session = self._make_session(tmp_project, build_stages=stages)
+
+        # Clear all agents
+        session._qa_agent = None
+        session._iac_agents = {}
+        session._dev_agent = None
+        session._architect_agent = None
+
+        result = {"status": "failed", "error": "auth error"}
+        stage = session._deploy_state.get_stage(1)
+        output = []
+
+        remediated = session._remediate_deploy_failure(
+            stage, result, False, lambda msg: output.append(msg), lambda p: "",
+        )
+
+        assert remediated is None  # No remediation attempted
+
+    def test_remediation_qa_cannot_diagnose(self, tmp_project):
+        """Stops early when QA can't diagnose."""
+        stages = [
+            {"stage": 1, "name": "Infra", "category": "infra", "services": [],
+             "dir": "concept/infra/terraform", "status": "generated", "files": []},
+        ]
+        session = self._make_session(tmp_project, build_stages=stages)
+
+        # QA returns no diagnosis
+        session._qa_agent = MagicMock()
+        session._qa_agent.execute.return_value = _make_response("")
+
+        mock_iac = MagicMock()
+        session._iac_agents["terraform"] = mock_iac
+
+        result = {"status": "failed", "error": "auth error"}
+        stage = session._deploy_state.get_stage(1)
+        output = []
+
+        remediated = session._remediate_deploy_failure(
+            stage, result, False, lambda msg: output.append(msg), lambda p: "",
+        )
+
+        # Should not have called the IaC agent since QA couldn't diagnose
+        mock_iac.execute.assert_not_called()
+
+    def test_remediation_updates_build_state(self, tmp_project):
+        """Build.yaml files list is updated after remediation writes."""
+        stages = [
+            {"stage": 1, "name": "Infra", "category": "infra", "services": [],
+             "dir": "concept/infra/terraform", "status": "generated",
+             "files": ["concept/infra/terraform/main.tf"]},
+        ]
+        (tmp_project / "concept" / "infra" / "terraform").mkdir(parents=True, exist_ok=True)
+        (tmp_project / "concept" / "infra" / "terraform" / "main.tf").write_text("# original")
+
+        session = self._make_session(tmp_project, build_stages=stages)
+
+        content = "```main.tf\n# fixed content\n```"
+        stage = session._deploy_state.get_stage(1)
+        written = session._write_stage_files(stage, content)
+
+        assert len(written) == 1
+        assert "main.tf" in written[0]
+
+        # Verify build state was updated
+        from azext_prototype.stages.build_state import BuildState
+        bs = BuildState(str(tmp_project))
+        bs.load()
+        build_stage = bs.state["deployment_stages"][0]
+        assert build_stage["files"] == written
+
+    @patch("azext_prototype.stages.deploy_session.subprocess.run", return_value=MagicMock(returncode=0, stdout="Terraform v1.7.0\n", stderr=""))
+    @patch("azext_prototype.stages.deploy_session.check_az_login", return_value=True)
+    @patch("azext_prototype.stages.deploy_session.get_current_subscription", return_value="sub-123")
+    @patch("azext_prototype.stages.deploy_session.deploy_terraform")
+    def test_slash_deploy_routes_through_remediation(self, mock_tf, mock_sub, mock_login, mock_subprocess, tmp_project):
+        """/deploy N triggers remediation on failure."""
+        stages = [
+            {"stage": 1, "name": "Infra", "category": "infra", "services": [],
+             "dir": "concept/infra/terraform", "status": "generated", "files": []},
+        ]
+        (tmp_project / "concept" / "infra" / "terraform").mkdir(parents=True, exist_ok=True)
+
+        session = self._make_session(tmp_project, build_stages=stages)
+
+        mock_tf.return_value = {"status": "failed", "error": "auth error"}
+        output = []
+
+        with patch.object(session, "_handle_deploy_failure", return_value={"status": "failed", "error": "auth error"}) as mock_handle:
+            session._handle_slash_command(
+                "/deploy 1", False, False,
+                lambda msg: output.append(msg), lambda p: "",
+            )
+
+        # _handle_deploy_failure should have been called
+        mock_handle.assert_called_once()
+
+    @patch("azext_prototype.stages.deploy_session.deploy_terraform")
+    def test_slash_redeploy_routes_through_remediation(self, mock_tf, tmp_project):
+        """/redeploy N triggers remediation on failure."""
+        stages = [
+            {"stage": 1, "name": "Infra", "category": "infra", "services": [],
+             "dir": "concept/infra/terraform", "status": "generated", "files": []},
+        ]
+        (tmp_project / "concept" / "infra" / "terraform").mkdir(parents=True, exist_ok=True)
+
+        session = self._make_session(tmp_project, build_stages=stages)
+        session._deploy_env = {"ARM_SUBSCRIPTION_ID": "sub-123"}
+
+        mock_tf.return_value = {"status": "failed", "error": "deploy error"}
+        output = []
+
+        with patch.object(session, "_handle_deploy_failure", return_value={"status": "failed", "error": "deploy error"}) as mock_handle:
+            session._handle_slash_command(
+                "/redeploy 1", False, False,
+                lambda msg: output.append(msg), lambda p: "",
+            )
+
+        mock_handle.assert_called_once()
+
+    def test_downstream_impact_detected(self, tmp_project):
+        """Architect flags downstream stages for regeneration."""
+        stages = [
+            {"stage": 1, "name": "Foundation", "category": "infra", "services": [],
+             "dir": "concept/infra/terraform/stage-1", "status": "generated", "files": []},
+            {"stage": 2, "name": "Data Layer", "category": "data", "services": [],
+             "dir": "concept/infra/terraform/stage-2", "status": "generated", "files": []},
+            {"stage": 3, "name": "App", "category": "app", "services": [],
+             "dir": "concept/apps/stage-3", "status": "generated", "files": []},
+        ]
+        session = self._make_session(tmp_project, build_stages=stages)
+
+        # Mark stage 2 and 3 as pending (downstream)
+        session._deploy_state.get_stage(2)["deploy_status"] = "pending"
+        session._deploy_state.get_stage(3)["deploy_status"] = "pending"
+
+        # Architect returns stage 2 as affected
+        session._architect_agent = MagicMock()
+        session._architect_agent.execute.return_value = _make_response("Affected stages: [2]")
+
+        stage = session._deploy_state.get_stage(1)
+        result = session._check_downstream_impact(stage, "Changed outputs from foundation")
+
+        assert 2 in result
+        assert 1 not in result  # Not downstream of itself
+
+    def test_downstream_regeneration(self, tmp_project):
+        """Flagged downstream stages get regenerated code."""
+        stages = [
+            {"stage": 1, "name": "Foundation", "category": "infra", "services": [],
+             "dir": "concept/infra/terraform/stage-1", "status": "generated", "files": []},
+            {"stage": 2, "name": "Data Layer", "category": "data", "services": [],
+             "dir": "concept/infra/terraform/stage-2", "status": "generated", "files": []},
+        ]
+        for s in stages:
+            (tmp_project / s["dir"]).mkdir(parents=True, exist_ok=True)
+            (tmp_project / s["dir"] / "main.tf").write_text("# original")
+
+        session = self._make_session(tmp_project, build_stages=stages)
+
+        # Mock IaC agent to return regenerated content
+        mock_iac = MagicMock()
+        mock_iac.execute.return_value = _make_response(
+            "```main.tf\n# regenerated with fixed references\n```"
+        )
+        session._iac_agents["terraform"] = mock_iac
+
+        output = []
+        session._regenerate_downstream_stages(
+            [2], False, lambda msg: output.append(msg),
+        )
+
+        joined = "\n".join(output)
+        assert "regenerated" in joined.lower()
+        # Verify the file was actually written
+        content = (tmp_project / "concept" / "infra" / "terraform" / "stage-2" / "main.tf").read_text()
+        assert "regenerated" in content
+
+    def test_handle_deploy_failure_returns_result(self, tmp_project):
+        """_handle_deploy_failure returns the remediation result."""
+        stages = [
+            {"stage": 1, "name": "Infra", "category": "infra", "services": [],
+             "dir": "concept/infra/terraform", "status": "generated", "files": []},
+        ]
+        session = self._make_session(tmp_project, build_stages=stages)
+
+        # No agents available — remediation returns None
+        session._qa_agent = None
+        session._iac_agents = {}
+        session._dev_agent = None
+
+        result = {"status": "failed", "error": "auth error"}
+        stage = session._deploy_state.get_stage(1)
+        output = []
+
+        returned = session._handle_deploy_failure(
+            stage, result, False,
+            lambda msg: output.append(msg), lambda p: "",
+        )
+
+        # Should return original result when remediation not possible
+        assert returned["status"] == "failed"
+        # Should still show interactive options
+        joined = "\n".join(output)
+        assert "/deploy" in joined
+
+    def test_no_ai_provider_skips_remediation(self, tmp_project):
+        """Remediation is skipped when ai_provider is None."""
+        stages = [
+            {"stage": 1, "name": "Infra", "category": "infra", "services": [],
+             "dir": "concept/infra/terraform", "status": "generated", "files": []},
+        ]
+        session = self._make_session(tmp_project, build_stages=stages, ai_provider=None)
+
+        result = {"status": "failed", "error": "auth error"}
+        stage = session._deploy_state.get_stage(1)
+
+        remediated = session._remediate_deploy_failure(
+            stage, result, False, lambda msg: None, lambda p: "",
+        )
+
+        assert remediated is None
+
+
+# ======================================================================
+# Build-Deploy Decoupling: Stable IDs, Sync, Splitting, Manual Steps
+# ======================================================================
+
+def _build_yaml_with_ids(stages=None, iac_tool="terraform"):
+    """Build YAML with stable IDs."""
+    if stages is None:
+        stages = [
+            {
+                "stage": 1, "name": "Foundation", "category": "infra", "id": "foundation",
+                "deploy_mode": "auto", "manual_instructions": None,
+                "services": [{"name": "key-vault", "computed_name": "kv-1", "resource_type": "Microsoft.KeyVault/vaults", "sku": "standard"}],
+                "status": "generated", "dir": "concept/infra/terraform/stage-1-foundation", "files": ["main.tf"],
+            },
+            {
+                "stage": 2, "name": "Data Layer", "category": "data", "id": "data-layer",
+                "deploy_mode": "auto", "manual_instructions": None,
+                "services": [{"name": "sql-db", "computed_name": "sql-1", "resource_type": "Microsoft.Sql/servers", "sku": "S0"}],
+                "status": "generated", "dir": "concept/infra/terraform/stage-2-data", "files": ["main.tf"],
+            },
+            {
+                "stage": 3, "name": "Application", "category": "app", "id": "application",
+                "deploy_mode": "auto", "manual_instructions": None,
+                "services": [{"name": "web-app", "computed_name": "app-1", "resource_type": "Microsoft.Web/sites", "sku": "B1"}],
+                "status": "generated", "dir": "concept/apps/stage-3-application", "files": ["app.py"],
+            },
+        ]
+    return {
+        "iac_tool": iac_tool,
+        "deployment_stages": stages,
+        "_metadata": {"created": "2026-01-01T00:00:00", "last_updated": "2026-01-01T00:00:00", "iteration": 1},
+    }
+
+
+def _write_build_yaml_with_ids(project_dir, stages=None, iac_tool="terraform"):
+    """Write build.yaml with stable IDs."""
+    state_dir = Path(project_dir) / ".prototype" / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    data = _build_yaml_with_ids(stages, iac_tool)
+    with open(state_dir / "build.yaml", "w", encoding="utf-8") as f:
+        yaml.dump(data, f, default_flow_style=False)
+    return state_dir / "build.yaml"
+
+
+class TestSyncFromBuildState:
+
+    def test_sync_from_build_state_fresh(self, tmp_project):
+        """First sync creates deploy stages from build stages."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml_with_ids(tmp_project)
+        ds = DeployState(str(tmp_project))
+        result = ds.sync_from_build_state(build_path)
+
+        assert result.created == 3
+        assert result.matched == 0
+        assert result.orphaned == 0
+        assert len(ds.state["deployment_stages"]) == 3
+        assert ds.state["deployment_stages"][0]["build_stage_id"] == "foundation"
+
+    def test_sync_from_build_state_preserves_deploy_status(self, tmp_project):
+        """Matched stages keep their deploy state."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml_with_ids(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        # Deploy stage 1
+        ds.mark_stage_deployed(1, output="done")
+
+        # Re-sync
+        result = ds.sync_from_build_state(build_path)
+        assert result.matched == 3
+        assert result.created == 0
+
+        stage1 = ds.state["deployment_stages"][0]
+        assert stage1["deploy_status"] == "deployed"
+        assert stage1["deploy_output"] == "done"
+
+    def test_sync_from_build_state_detects_code_change(self, tmp_project):
+        """Changed files trigger _code_updated marking."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml_with_ids(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+        ds.mark_stage_deployed(1)
+
+        # Update build state with new files
+        updated_stages = _build_yaml_with_ids()["deployment_stages"]
+        updated_stages[0]["files"] = ["main.tf", "variables.tf"]  # changed
+        _write_build_yaml_with_ids(tmp_project, stages=updated_stages)
+
+        result = ds.sync_from_build_state(build_path)
+        assert result.updated_code == 1
+        assert ds.state["deployment_stages"][0].get("_code_updated") is True
+
+    def test_sync_from_build_state_creates_new(self, tmp_project):
+        """New build stage creates new deploy stage."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml_with_ids(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        # Add new stage to build
+        stages = _build_yaml_with_ids()["deployment_stages"]
+        stages.append({
+            "stage": 4, "name": "Monitoring", "category": "infra", "id": "monitoring",
+            "deploy_mode": "auto", "manual_instructions": None,
+            "services": [], "status": "generated", "dir": "concept/infra/terraform/stage-4-monitoring", "files": [],
+        })
+        _write_build_yaml_with_ids(tmp_project, stages=stages)
+
+        result = ds.sync_from_build_state(build_path)
+        assert result.created == 1
+        assert len(ds.state["deployment_stages"]) == 4
+        assert ds.state["deployment_stages"][3]["build_stage_id"] == "monitoring"
+
+    def test_sync_from_build_state_with_substages(self, tmp_project):
+        """Split stages preserved across sync."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml_with_ids(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        # Split stage 2 into substages
+        ds.split_stage(2, [
+            {"name": "Data Layer - Base", "dir": "concept/infra/terraform/stage-2-data"},
+            {"name": "Data Layer - Schema", "dir": "concept/db/schema"},
+        ])
+
+        # Re-sync — substages should be preserved
+        result = ds.sync_from_build_state(build_path)
+        data_stages = ds.get_stages_for_build_stage("data-layer")
+        assert len(data_stages) == 2
+        assert data_stages[0]["substage_label"] == "a"
+        assert data_stages[1]["substage_label"] == "b"
+
+    def test_sync_orphan_sets_removed_status(self, tmp_project):
+        """Removed build stage → deploy stage gets 'removed' status."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml_with_ids(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        # Remove a stage from build
+        stages = _build_yaml_with_ids()["deployment_stages"]
+        stages = [s for s in stages if s["id"] != "data-layer"]
+        _write_build_yaml_with_ids(tmp_project, stages=stages)
+
+        result = ds.sync_from_build_state(build_path)
+        assert result.orphaned == 1
+
+        removed = [s for s in ds.state["deployment_stages"] if s.get("deploy_status") == "removed"]
+        assert len(removed) == 1
+        assert removed[0]["build_stage_id"] == "data-layer"
+
+
+class TestStageSpitting:
+
+    def test_split_stage(self, tmp_project):
+        """Split creates substages with shared build_stage_id."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml_with_ids(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        ds.split_stage(2, [
+            {"name": "Data - Base", "dir": "concept/infra/terraform/stage-2-data"},
+            {"name": "Data - Schema", "dir": "concept/db/schema"},
+        ])
+
+        # All substages share the same build_stage_id
+        data_stages = ds.get_stages_for_build_stage("data-layer")
+        assert len(data_stages) == 2
+        assert data_stages[0]["substage_label"] == "a"
+        assert data_stages[1]["substage_label"] == "b"
+        assert data_stages[0]["_is_substage"] is True
+        assert data_stages[1]["_is_substage"] is True
+
+    def test_split_stage_renumbering(self, tmp_project):
+        """After split, stage numbers are correct."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml_with_ids(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        ds.split_stage(2, [
+            {"name": "Data - Base", "dir": "dir1"},
+            {"name": "Data - Schema", "dir": "dir2"},
+        ])
+
+        stages = ds.state["deployment_stages"]
+        # Stage 1 stays as 1, substages get stage 2 with labels, stage 3 stays
+        assert stages[0]["stage"] == 1  # Foundation
+        assert stages[1]["stage"] == 2  # Data - Base (2a)
+        assert stages[1]["substage_label"] == "a"
+        assert stages[2]["stage"] == 2  # Data - Schema (2b)
+        assert stages[2]["substage_label"] == "b"
+        assert stages[3]["stage"] == 3  # Application
+
+    def test_get_stage_groups(self, tmp_project):
+        """Verify grouping by build_stage_id."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml_with_ids(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        ds.split_stage(2, [
+            {"name": "Data - Base", "dir": "dir1"},
+            {"name": "Data - Schema", "dir": "dir2"},
+        ])
+
+        groups = ds.get_stage_groups()
+        assert "foundation" in groups
+        assert "data-layer" in groups
+        assert "application" in groups
+        assert len(groups["data-layer"]) == 2
+        assert len(groups["foundation"]) == 1
+
+    def test_can_rollback_with_substages(self, tmp_project):
+        """Rollback checks work with substages."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml_with_ids(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        ds.split_stage(2, [
+            {"name": "Data - Base", "dir": "dir1"},
+            {"name": "Data - Schema", "dir": "dir2"},
+        ])
+
+        # Deploy both substages
+        substages = ds.get_stages_for_build_stage("data-layer")
+        substages[0]["deploy_status"] = "deployed"
+        substages[1]["deploy_status"] = "deployed"
+        ds.save()
+
+        # Can't rollback "a" while "b" is deployed
+        assert ds.can_rollback(2, "a") is False
+        # Can rollback "b"
+        assert ds.can_rollback(2, "b") is True
+
+    def test_get_stage_by_display_id(self, tmp_project):
+        """Parse and lookup by compound display ID."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml_with_ids(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        ds.split_stage(2, [
+            {"name": "Data - Base", "dir": "dir1"},
+            {"name": "Data - Schema", "dir": "dir2"},
+        ])
+
+        found = ds.get_stage_by_display_id("2a")
+        assert found is not None
+        assert found["name"] == "Data - Base"
+
+        found_b = ds.get_stage_by_display_id("2b")
+        assert found_b is not None
+        assert found_b["name"] == "Data - Schema"
+
+
+class TestDeployStateNewStatuses:
+
+    def test_load_from_build_state_backward_compat(self, tmp_project):
+        """Legacy build state without IDs still imports correctly."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        # Write legacy build yaml (no id field)
+        build_path = _write_build_yaml(tmp_project)
+        ds = DeployState(str(tmp_project))
+        result = ds.load_from_build_state(build_path)
+
+        assert result is True
+        # build_stage_id should be auto-generated from name
+        for stage in ds.state["deployment_stages"]:
+            assert stage.get("build_stage_id")
+
+    def test_destroy_stage(self, tmp_project):
+        """Destroyed status after rollback."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml_with_ids(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        ds.mark_stage_deployed(1)
+        ds.mark_stage_rolled_back(1)
+        ds.mark_stage_destroyed(1)
+
+        assert ds.get_stage(1)["deploy_status"] == "destroyed"
+
+    def test_destruction_declined_not_reprompted(self, tmp_project):
+        """_destruction_declined flag persists across save/load."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml_with_ids(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        stage = ds.get_stage(1)
+        stage["_destruction_declined"] = True
+        ds.save()
+
+        ds2 = DeployState(str(tmp_project))
+        ds2.load()
+        assert ds2.get_stage(1)["_destruction_declined"] is True
+
+    def test_awaiting_manual_status(self, tmp_project):
+        """Manual step sets awaiting_manual status."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml_with_ids(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        ds.mark_stage_awaiting_manual(1)
+        assert ds.get_stage(1)["deploy_status"] == "awaiting_manual"
+
+
+class TestManualStepDeploy:
+
+    def test_manual_step_deploy(self, tmp_project):
+        """Manual stage shows instructions, waits for confirmation."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        stages = [
+            {
+                "stage": 1, "name": "Upload Notebook", "category": "external", "id": "upload-notebook",
+                "deploy_mode": "manual", "manual_instructions": "Upload the notebook to Fabric workspace.",
+                "services": [], "status": "generated",
+                "dir": "concept/docs", "files": [],
+            },
+        ]
+        build_path = _write_build_yaml_with_ids(tmp_project, stages=stages)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        # Verify the manual stage imported correctly
+        stage = ds.get_stage(1)
+        assert stage["deploy_mode"] == "manual"
+        assert "Upload" in stage["manual_instructions"]
+
+    def test_manual_step_from_build(self, tmp_project):
+        """deploy_mode: 'manual' inherited from build stage via sync."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        stages = [
+            {
+                "stage": 1, "name": "Foundation", "category": "infra", "id": "foundation",
+                "deploy_mode": "auto", "manual_instructions": None,
+                "services": [], "status": "generated",
+                "dir": "concept/infra/terraform/stage-1-foundation", "files": [],
+            },
+            {
+                "stage": 2, "name": "Manual Config", "category": "external", "id": "manual-config",
+                "deploy_mode": "manual", "manual_instructions": "Configure the firewall rules manually.",
+                "services": [], "status": "generated",
+                "dir": "", "files": [],
+            },
+        ]
+        build_path = _write_build_yaml_with_ids(tmp_project, stages=stages)
+
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        manual_stage = ds.state["deployment_stages"][1]
+        assert manual_stage["deploy_mode"] == "manual"
+        assert "firewall" in manual_stage["manual_instructions"]
+
+    def test_code_split_syncs_back_to_build(self, tmp_project):
+        """Type A split: _sync_build_state uses build_stage_id for matching."""
+        from azext_prototype.stages.build_state import BuildState
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml_with_ids(tmp_project)
+
+        # Load into deploy state
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        # Load build state and verify get_stage_by_id works
+        bs = BuildState(str(tmp_project))
+        bs.load()
+
+        # Verify the build stage has the right id
+        build_stage = bs.get_stage_by_id("data-layer")
+        assert build_stage is not None
+        assert build_stage["name"] == "Data Layer"
+
+        # Deploy stage links back correctly
+        deploy_stage = ds.state["deployment_stages"][1]
+        assert deploy_stage["build_stage_id"] == "data-layer"
+
+
+class TestParseStageRef:
+
+    def test_parse_simple_number(self):
+        from azext_prototype.stages.deploy_state import parse_stage_ref
+
+        num, label = parse_stage_ref("5")
+        assert num == 5
+        assert label is None
+
+    def test_parse_substage(self):
+        from azext_prototype.stages.deploy_state import parse_stage_ref
+
+        num, label = parse_stage_ref("5a")
+        assert num == 5
+        assert label == "a"
+
+    def test_parse_invalid(self):
+        from azext_prototype.stages.deploy_state import parse_stage_ref
+
+        num, label = parse_stage_ref("abc")
+        assert num is None
+        assert label is None
+
+    def test_parse_empty(self):
+        from azext_prototype.stages.deploy_state import parse_stage_ref
+
+        num, label = parse_stage_ref("")
+        assert num is None
+
+    def test_parse_with_whitespace(self):
+        from azext_prototype.stages.deploy_state import parse_stage_ref
+
+        num, label = parse_stage_ref(" 3b ")
+        assert num == 3
+        assert label == "b"
+
+
+class TestRenumberWithSubstages:
+
+    def test_renumber_preserves_substage_labels(self, tmp_project):
+        """Substages keep their labels and inherit parent number."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml_with_ids(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        # Split stage 2
+        ds.split_stage(2, [
+            {"name": "Data - Base", "dir": "dir1"},
+            {"name": "Data - Schema", "dir": "dir2"},
+        ])
+
+        # Remove stage 1 — renumber should shift substages
+        stages = ds.state["deployment_stages"]
+        ds._state["deployment_stages"] = [s for s in stages if s.get("build_stage_id") != "foundation"]
+        ds.renumber_stages()
+
+        stages = ds.state["deployment_stages"]
+        # Now data substages should be stage 1
+        assert stages[0]["stage"] == 1
+        assert stages[0]["substage_label"] == "a"
+        assert stages[1]["stage"] == 1
+        assert stages[1]["substage_label"] == "b"
+        # Application should be stage 2
+        assert stages[2]["stage"] == 2
+        assert stages[2]["substage_label"] is None
+
+
+class TestFormatDisplayId:
+
+    def test_format_top_level(self):
+        from azext_prototype.stages.deploy_state import _format_display_id
+
+        assert _format_display_id({"stage": 3}) == "3"
+
+    def test_format_substage(self):
+        from azext_prototype.stages.deploy_state import _format_display_id
+
+        assert _format_display_id({"stage": 3, "substage_label": "b"}) == "3b"
+
+    def test_format_no_label(self):
+        from azext_prototype.stages.deploy_state import _format_display_id
+
+        assert _format_display_id({"stage": 1, "substage_label": None}) == "1"
+
+
+class TestNewStatusIcons:
+
+    def test_removed_icon(self):
+        from azext_prototype.stages.deploy_state import _status_icon
+
+        assert _status_icon("removed") == "~~"
+
+    def test_destroyed_icon(self):
+        from azext_prototype.stages.deploy_state import _status_icon
+
+        assert _status_icon("destroyed") == "xx"
+
+    def test_awaiting_manual_icon(self):
+        from azext_prototype.stages.deploy_state import _status_icon
+
+        assert _status_icon("awaiting_manual") == "!!"
+
+    def test_existing_icons_unchanged(self):
+        from azext_prototype.stages.deploy_state import _status_icon
+
+        assert _status_icon("pending") == "  "
+        assert _status_icon("deployed") == " v"
+        assert _status_icon("failed") == " x"
+        assert _status_icon("remediating") == "<>"
+
+
+class TestDeployReportFormatting:
+
+    def test_format_shows_removed_stages(self, tmp_project):
+        """Removed stages show with strikethrough in report."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml_with_ids(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+        ds.mark_stage_removed(2)
+
+        report = ds.format_deploy_report()
+        assert "(Removed)" in report
+        assert "~~Data Layer~~" in report
+
+    def test_format_shows_manual_badge(self, tmp_project):
+        """Manual stages show [Manual] badge."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        stages = [
+            {
+                "stage": 1, "name": "Manual Step", "category": "external", "id": "manual",
+                "deploy_mode": "manual", "manual_instructions": "Do the thing.",
+                "services": [], "status": "generated", "dir": "", "files": [],
+            },
+        ]
+        build_path = _write_build_yaml_with_ids(tmp_project, stages=stages)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        report = ds.format_deploy_report()
+        assert "[Manual]" in report
+
+        status = ds.format_stage_status()
+        assert "[Manual]" in status
+
+    def test_format_shows_substage_ids(self, tmp_project):
+        """Substages show compound display IDs like 2a, 2b."""
+        from azext_prototype.stages.deploy_state import DeployState
+
+        build_path = _write_build_yaml_with_ids(tmp_project)
+        ds = DeployState(str(tmp_project))
+        ds.load_from_build_state(build_path)
+
+        ds.split_stage(2, [
+            {"name": "Data - Base", "dir": "dir1"},
+            {"name": "Data - Schema", "dir": "dir2"},
+        ])
+
+        status = ds.format_stage_status()
+        assert "2a" in status
+        assert "2b" in status

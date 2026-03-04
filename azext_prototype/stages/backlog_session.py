@@ -34,6 +34,7 @@ from azext_prototype.stages.backlog_push import (
 )
 from azext_prototype.stages.backlog_state import BacklogState
 from azext_prototype.stages.escalation import EscalationTracker
+from azext_prototype.stages.intent import IntentKind, build_backlog_classifier
 from azext_prototype.stages.qa_router import route_error_to_qa
 from azext_prototype.ui.console import Console, DiscoveryPrompt
 from azext_prototype.ui.console import console as default_console
@@ -145,6 +146,12 @@ class BacklogSession:
         self._escalation_tracker = EscalationTracker(agent_context.project_dir)
         if self._escalation_tracker.exists:
             self._escalation_tracker.load()
+
+        # Intent classifier for natural language command detection
+        self._intent_classifier = build_backlog_classifier(
+            ai_provider=agent_context.ai_provider,
+            token_tracker=self._token_tracker,
+        )
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -303,6 +310,23 @@ class BacklogSession:
             if lower.startswith("/"):
                 handled = self._handle_slash_command(
                     lower,
+                    provider,
+                    org,
+                    project,
+                    _input,
+                    _print,
+                    use_styled,
+                )
+                if handled == "pushed":
+                    break
+                continue
+
+            # Natural language intent detection (commands only — not /add)
+            intent = self._intent_classifier.classify(user_input)
+            if intent.kind == IntentKind.COMMAND:
+                cmd_line = f"{intent.command} {intent.args}".strip()
+                handled = self._handle_slash_command(
+                    cmd_line,
                     provider,
                     org,
                     project,
@@ -792,6 +816,11 @@ class BacklogSession:
             _print("    'Update story 3 to include MFA'")
             _print("    'Remove story 7'")
             _print("")
+            _print("  You can also use natural language for commands:")
+            _print("    'show all items'     instead of  /list")
+            _print("    'push item 3'        instead of  /push 3")
+            _print("    'show me item 2'     instead of  /show 2")
+            _print("")
 
         return None
 
@@ -952,10 +981,18 @@ class BacklogSession:
             return ""
 
     @contextmanager
-    def _maybe_spinner(self, message: str, use_styled: bool) -> Iterator[None]:
+    def _maybe_spinner(
+        self, message: str, use_styled: bool, *, status_fn: Callable | None = None
+    ) -> Iterator[None]:
         """Show a spinner when using styled output, otherwise no-op."""
         if use_styled:
             with self._console.spinner(message):
                 yield
+        elif status_fn:
+            status_fn(message, "start")
+            try:
+                yield
+            finally:
+                status_fn(message, "end")
         else:
             yield

@@ -22,14 +22,21 @@ from __future__ import annotations
 
 import logging
 import re
+from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import date
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 
 from azext_prototype.agents.base import AgentCapability, AgentContext
 from azext_prototype.agents.registry import AgentRegistry
 from azext_prototype.ai.provider import AIMessage
 from azext_prototype.ai.token_tracker import TokenTracker
 from azext_prototype.stages.discovery_state import DiscoveryState
+from azext_prototype.stages.intent import (
+    IntentKind,
+    build_discovery_classifier,
+    read_files_for_session,
+)
 from azext_prototype.stages.qa_router import route_error_to_qa
 from azext_prototype.ui.console import Console, DiscoveryPrompt
 from azext_prototype.ui.console import console as default_console
@@ -37,12 +44,123 @@ from azext_prototype.ui.console import console as default_console
 logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------- #
+# Section header extraction
+# -------------------------------------------------------------------- #
+
+_SECTION_HEADING_RE = re.compile(r"^#{2,3}\s+(.+?)\s*$", re.MULTILINE)
+
+# Matches **Bold Heading** on its own line (common in conversational responses)
+_BOLD_HEADING_RE = re.compile(r"^\*\*([^*\n]{3,60})\*\*\s*$", re.MULTILINE)
+
+_SKIP_HEADINGS = frozenset({
+    "summary", "policy overrides", "policy override", "next steps",
+    "what i've understood so far", "what we've covered",
+    "what i've understood", "what we've established",
+})
+
+
+def extract_section_headers(response: str) -> list[tuple[str, int]]:
+    """Extract ## / ### headings and **bold headings** from an AI response.
+
+    Returns a list of ``(heading_text, level)`` tuples sorted by position.
+    Level 2 = top-level section (``##`` or ``**bold**``), level 3 = subsection (``###``).
+
+    Filters out structural headings (Summary, Policy Overrides, Next Steps,
+    "What I've Understood So Far", etc.) and very short matches.
+    """
+    matches: list[tuple[int, str, int]] = []  # (position, text, level)
+    for m in _SECTION_HEADING_RE.finditer(response):
+        text = m.group(1).strip()
+        hashes = len(m.group(0)) - len(m.group(0).lstrip("#"))
+        level = min(hashes, 3)  # ## = 2, ### = 3
+        matches.append((m.start(), text, level))
+    for m in _BOLD_HEADING_RE.finditer(response):
+        text = m.group(1).strip()
+        matches.append((m.start(), text, 2))
+    matches.sort(key=lambda x: x[0])
+
+    seen: set[str] = set()
+    headers: list[tuple[str, int]] = []
+    for _, text, level in matches:
+        lower = text.lower()
+        if lower in _SKIP_HEADINGS or len(text) < 3 or lower in seen:
+            continue
+        seen.add(lower)
+        headers.append((text, level))
+    return headers
+
+
+# -------------------------------------------------------------------- #
+# Section parsing — code-level gating for one-at-a-time display
+# -------------------------------------------------------------------- #
+
+
+@dataclass
+class Section:
+    """A parsed section from an AI response."""
+
+    heading: str
+    level: int       # 2=##, 3=###
+    content: str     # text from heading to next heading (includes heading line)
+    task_id: str     # "design-section-{slug}"
+
+
+def parse_sections(response: str) -> tuple[str, list[Section]]:
+    """Split *response* into ``(preamble, sections)``.
+
+    Preamble = text before the first heading.  Sections are filtered by
+    ``_SKIP_HEADINGS`` (same filter as :func:`extract_section_headers`).
+    """
+    # Collect heading positions
+    matches: list[tuple[int, str, int]] = []  # (position, text, level)
+    for m in _SECTION_HEADING_RE.finditer(response):
+        text = m.group(1).strip()
+        hashes = len(m.group(0)) - len(m.group(0).lstrip("#"))
+        level = min(hashes, 3)
+        matches.append((m.start(), text, level))
+    for m in _BOLD_HEADING_RE.finditer(response):
+        text = m.group(1).strip()
+        matches.append((m.start(), text, 2))
+    matches.sort(key=lambda x: x[0])
+
+    if not matches:
+        return response, []
+
+    preamble = response[: matches[0][0]].strip()
+
+    seen: set[str] = set()
+    sections: list[Section] = []
+    for idx, (pos, text, level) in enumerate(matches):
+        lower = text.lower()
+        if lower in _SKIP_HEADINGS or len(text) < 3 or lower in seen:
+            continue
+        seen.add(lower)
+
+        # Content runs from this heading to the next heading (or end)
+        end = matches[idx + 1][0] if idx + 1 < len(matches) else len(response)
+        content = response[pos:end].strip()
+
+        slug = re.sub(r"[^a-z0-9]+", "-", lower).strip("-")
+        task_id = f"design-section-{slug}"
+        sections.append(Section(heading=text, level=level, content=content, task_id=task_id))
+
+    return preamble, sections
+
+
+# -------------------------------------------------------------------- #
+# Section follow-up detection
+# -------------------------------------------------------------------- #
+
+_SECTION_COMPLETE_MARKER = "[SECTION_COMPLETE]"
+
+
+# -------------------------------------------------------------------- #
 # Sentinels
 # -------------------------------------------------------------------- #
 
 # User inputs that end the session
 _QUIT_WORDS = frozenset({"q", "quit", "exit"})
-_DONE_WORDS = frozenset({"done", "finish", "accept", "lgtm"})
+_DONE_WORDS = frozenset({"done", "end", "finish", "accept", "lgtm", "continue"})
 
 # Slash commands
 _SLASH_COMMANDS = frozenset({"/open", "/status", "/confirmed", "/help", "/summary", "/restart"})
@@ -139,6 +257,183 @@ class DiscoverySession:
         qa_agents = registry.find_by_capability(AgentCapability.QA)
         self._qa_agent = qa_agents[0] if qa_agents else None
 
+        # Intent classifier for natural language command detection
+        self._intent_classifier = build_discovery_classifier(
+            ai_provider=agent_context.ai_provider,
+            token_tracker=self._token_tracker,
+        )
+
+    # ------------------------------------------------------------------ #
+    # Spinner helper (mirrors build/deploy pattern)
+    # ------------------------------------------------------------------ #
+
+    @contextmanager
+    def _maybe_spinner(
+        self, message: str, use_styled: bool, *, status_fn: Callable | None = None
+    ) -> Iterator[None]:
+        """Show a spinner when using styled output, otherwise no-op."""
+        if use_styled:
+            with self._console.spinner(message):
+                yield
+        elif status_fn:
+            status_fn(message, "start")
+            try:
+                yield
+            finally:
+                status_fn(message, "end")
+        else:
+            yield
+
+    # ------------------------------------------------------------------ #
+    # Display helpers
+    # ------------------------------------------------------------------ #
+
+    def _show_content(self, content: str, use_styled: bool, _print: Callable) -> None:
+        """Display content using the appropriate output channel."""
+        if use_styled:
+            self._console.print_agent_response(content)
+            self._console.print_token_status(self._token_tracker.format_status())
+        elif self._response_fn:
+            self._response_fn(content)
+        else:
+            _print(content)
+
+    def _handle_read_files(
+        self,
+        args: str,
+        _print: Callable,
+        use_styled: bool,
+    ) -> None:
+        """Read files into the session and display the AI's analysis."""
+        text, images = read_files_for_session(args, self._context.project_dir, _print)
+        if not (text or images):
+            return
+        content: str | list = text
+        if images:
+            parts: list[dict] = []
+            if text:
+                parts.append({"type": "text", "text": f"Here are the files I'd like you to review:\n\n{text}"})
+            for img in images:
+                parts.append({"type": "image_url", "image_url": {"url": f"data:{img['mime']};base64,{img['data']}", "detail": "high"}})
+            content = parts if parts else text
+        elif text:
+            content = f"Here are the files I'd like you to review:\n\n{text}"
+        self._exchange_count += 1
+        with self._maybe_spinner("Analyzing files...", use_styled, status_fn=self._status_fn):
+            response = self._chat(content)
+        self._discovery_state.update_from_exchange(
+            f"[Read files from {args}]", response, self._exchange_count
+        )
+        self._extract_items_from_response(response)
+        clean = self._clean(response)
+        self._show_content(clean, use_styled, _print)
+        self._update_token_status()
+        self._emit_sections(clean)
+
+    # ------------------------------------------------------------------ #
+    # Section-at-a-time gating
+    # ------------------------------------------------------------------ #
+
+    _SKIP_WORDS = frozenset({"skip", "next", "move on"})
+
+    def _run_section_loop(
+        self,
+        sections: list[Section],
+        preamble: str,
+        _input: Callable[[str], str],
+        _print: Callable[[str], None],
+        use_styled: bool,
+    ) -> str | None:
+        """Walk sections one at a time.
+
+        Returns ``"cancelled"``, ``"done"``, or ``None`` (all sections covered,
+        fall through to free-form loop).
+        """
+        if preamble:
+            self._show_content(preamble, use_styled, _print)
+
+        all_confirmed = True
+
+        for i, section in enumerate(sections):
+            if self._update_task_fn:
+                self._update_task_fn(section.task_id, "in_progress")
+
+            self._show_content(section.content, use_styled, _print)
+            self._update_token_status()
+
+            # Inner follow-up loop (max 5 per section)
+            section_confirmed = False
+            for _ in range(5):
+                try:
+                    user_input = _input("> ").strip()
+                except (EOFError, KeyboardInterrupt):
+                    if self._update_task_fn:
+                        self._update_task_fn(section.task_id, "completed")
+                    return "done"
+
+                if not user_input:
+                    continue
+
+                lower = user_input.lower()
+                if lower in _QUIT_WORDS:
+                    return "cancelled"
+                if lower in _DONE_WORDS:
+                    # Mark remaining sections as completed
+                    for s in sections[i:]:
+                        if self._update_task_fn:
+                            self._update_task_fn(s.task_id, "completed")
+                    return "done"
+                if lower in self._SKIP_WORDS:
+                    break  # Advance to next section
+
+                # Handle slash commands
+                if lower in _SLASH_COMMANDS:
+                    self._handle_slash_command(lower)
+                    continue
+                if lower.startswith("/why"):
+                    self._handle_why_command(user_input)
+                    continue
+
+                # Normal answer — send focused follow-up with explicit gate
+                self._exchange_count += 1
+                topic = section.heading
+                prompt = (
+                    f"The user answered about **{topic}**: {user_input}\n"
+                    f"Do you have follow-up questions about **{topic}**? "
+                    f"If fully covered, respond ONLY with the word \"Yes\" "
+                    f"(meaning yes, this section is complete). "
+                    f"Otherwise, ask your follow-up questions."
+                )
+                with self._maybe_spinner("Thinking...", use_styled, status_fn=self._status_fn):
+                    response = self._chat(prompt)
+
+                self._discovery_state.update_from_exchange(user_input, response, self._exchange_count)
+                self._extract_items_from_response(response)
+
+                # Check if the AI confirmed the section is complete
+                stripped = response.strip().rstrip(".").lower()
+                if stripped == "yes":
+                    section_confirmed = True
+                    break  # Section complete — advance
+
+                clean = self._clean(response)
+                self._show_content(clean, use_styled, _print)
+                self._update_token_status()
+
+            if not section_confirmed:
+                all_confirmed = False
+
+            if self._update_task_fn:
+                self._update_task_fn(section.task_id, "completed")
+
+        # All sections walked
+        _print("")
+        if all_confirmed:
+            _print("All topics covered! Type anything to keep discussing, or 'continue' to proceed.")
+        else:
+            _print("Type anything to keep discussing, or 'continue' to proceed.")
+        return None
+
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
@@ -151,6 +446,10 @@ class DiscoverySession:
         input_fn: Callable[[str], str] | None = None,
         print_fn: Callable[[str], None] | None = None,
         context_only: bool = False,
+        status_fn: Callable | None = None,
+        section_fn: Callable[[list[tuple[str, int]]], None] | None = None,
+        response_fn: Callable[[str], None] | None = None,
+        update_task_fn: Callable[[str, str], None] | None = None,
     ) -> DiscoveryResult:
         """Run the discovery conversation.
 
@@ -180,6 +479,14 @@ class DiscoverySession:
         # Use injected I/O for tests, otherwise use styled console
         use_styled = input_fn is None and print_fn is None
         _input = input_fn or (lambda p: self._prompt.prompt(p))
+        _print = print_fn or self._console.print
+        # Store for use by slash command handlers
+        self._use_styled = use_styled
+        self._print = _print
+        self._status_fn = status_fn
+        self._section_fn = section_fn
+        self._response_fn = response_fn
+        self._update_task_fn = update_task_fn
 
         # Load existing discovery state for context
         existing_context = ""
@@ -193,7 +500,10 @@ class DiscoverySession:
 
         # ---- Fallback when no agent is available ----
         if not self._biz_agent:
-            self._console.print_warning("No biz-analyst agent available. Enter your requirements:")
+            if use_styled:
+                self._console.print_warning("No biz-analyst agent available. Enter your requirements:")
+            else:
+                _print("No biz-analyst agent available. Enter your requirements:")
             try:
                 text = _input("> ")
             except (EOFError, KeyboardInterrupt):
@@ -208,7 +518,7 @@ class DiscoverySession:
         # ---- Kick off the conversation ----
         opening = self._build_opening(seed_context, artifacts, existing_context, images=artifact_images)
 
-        with self._console.spinner("Analyzing your input..."):
+        with self._maybe_spinner("Analyzing your input...", use_styled, status_fn=status_fn):
             response = self._chat(opening)
 
         # Update discovery state with the initial exchange
@@ -216,14 +526,48 @@ class DiscoverySession:
         self._discovery_state.update_from_exchange(opening, response, self._exchange_count)
 
         clean_response = self._clean(response)
-        self._console.print_agent_response(clean_response)
-        if use_styled:
-            self._console.print_token_status(self._token_tracker.format_status())
+        preamble, sections = parse_sections(clean_response)
+
+        if sections:
+            # Populate tree with ALL sections upfront
+            if self._section_fn:
+                self._section_fn([(s.heading, s.level) for s in sections])
+
+            # Section-at-a-time loop
+            outcome = self._run_section_loop(sections, preamble, _input, _print, use_styled)
+            if outcome == "cancelled":
+                return DiscoveryResult(
+                    requirements="",
+                    conversation=list(self._messages),
+                    policy_overrides=[],
+                    exchange_count=self._exchange_count,
+                    cancelled=True,
+                )
+            if outcome == "done":
+                # Jump to summary production
+                with self._maybe_spinner("Generating requirements summary...", use_styled, status_fn=status_fn):
+                    summary = self._produce_summary()
+                    overrides = self._extract_overrides(summary)
+                return DiscoveryResult(
+                    requirements=summary,
+                    conversation=list(self._messages),
+                    policy_overrides=overrides,
+                    exchange_count=self._exchange_count,
+                )
+        else:
+            # No sections → show full response (backward compat / conversational response)
+            self._show_content(clean_response, use_styled, _print)
+            self._update_token_status()
+            if self._section_fn and not extract_section_headers(clean_response):
+                self._section_fn([("Discovery conversation", 2)])
 
         # ---- Check if agent needs more information ----
         # If context_only mode and agent signals READY, skip interactive loop
         if context_only and _READY_MARKER in response:
-            self._console.print_info("Context is sufficient. Proceeding with design.")
+            if use_styled:
+                self._console.print_info("Context is sufficient. Proceeding with design.")
+            else:
+                _print("Context is sufficient. Proceeding with design.")
             summary = self._produce_summary()
             overrides = self._extract_overrides(summary)
             return DiscoveryResult(
@@ -247,6 +591,9 @@ class DiscoverySession:
                     )
                     first_prompt = False
                 else:
+                    if first_prompt:
+                        _print("[dim]Type 'continue' when finished, or 'quit' to cancel.[/dim]")
+                        first_prompt = False
                     user_input = _input("> ").strip()
             except (EOFError, KeyboardInterrupt):
                 break
@@ -254,16 +601,10 @@ class DiscoverySession:
             if not user_input:
                 continue
 
-            # Handle slash commands
+            # Check quit/done FIRST — before intent classifier to avoid
+            # a wasteful AI call and ensure reliable exit behavior
             lower_input = user_input.lower()
-            if lower_input in _SLASH_COMMANDS:
-                self._handle_slash_command(lower_input)
-                continue
-            if lower_input.startswith("/why"):
-                self._handle_why_command(user_input)
-                continue
-
-            if user_input.lower() in _QUIT_WORDS:
+            if lower_input in _QUIT_WORDS:
                 return DiscoveryResult(
                     requirements="",
                     conversation=list(self._messages),
@@ -272,12 +613,32 @@ class DiscoverySession:
                     cancelled=True,
                 )
 
-            if user_input.lower() in _DONE_WORDS:
+            if lower_input in _DONE_WORDS:
                 break
+
+            # Handle slash commands
+            if lower_input in _SLASH_COMMANDS:
+                self._handle_slash_command(lower_input)
+                continue
+            if lower_input.startswith("/why"):
+                self._handle_why_command(user_input)
+                continue
+
+            # Natural language intent detection
+            intent = self._intent_classifier.classify(user_input)
+            if intent.kind == IntentKind.COMMAND:
+                if intent.command == "/why":
+                    self._handle_why_command(f"/why {intent.args}")
+                else:
+                    self._handle_slash_command(intent.command)
+                continue
+            if intent.kind == IntentKind.READ_FILES:
+                self._handle_read_files(intent.args, _print, use_styled)
+                continue
 
             self._exchange_count += 1
 
-            with self._console.spinner("Thinking..."):
+            with self._maybe_spinner("Thinking...", use_styled, status_fn=status_fn):
                 response = self._chat(user_input)
 
             # Update discovery state after each exchange
@@ -287,13 +648,16 @@ class DiscoverySession:
             self._extract_items_from_response(response)
 
             clean = self._clean(response)
-            self._console.print_agent_response(clean)
-            if use_styled:
-                self._console.print_token_status(self._token_tracker.format_status())
+            self._show_content(clean, use_styled, _print)
+            self._update_token_status()
+            self._emit_sections(clean)
 
             # Agent signalled convergence
             if _READY_MARKER in response:
-                self._console.print_info("Discovery complete. Press Enter to proceed, or keep typing.")
+                if use_styled:
+                    self._console.print_info("Discovery complete. Press Enter to proceed, or keep typing.")
+                else:
+                    _print("Discovery complete. Press Enter to proceed, or keep typing.")
                 try:
                     if use_styled:
                         more = self._prompt.simple_prompt("> ")
@@ -307,16 +671,17 @@ class DiscoverySession:
                     break
                 # User wants to continue
                 self._exchange_count += 1
-                with self._console.spinner("Thinking..."):
+                with self._maybe_spinner("Thinking...", use_styled, status_fn=status_fn):
                     response = self._chat(more)
                 self._discovery_state.update_from_exchange(more, response, self._exchange_count)
                 self._extract_items_from_response(response)
-                self._console.print_agent_response(self._clean(response))
-                if use_styled:
-                    self._console.print_token_status(self._token_tracker.format_status())
+                clean_more = self._clean(response)
+                self._show_content(clean_more, use_styled, _print)
+                self._update_token_status()
+                self._emit_sections(clean_more)
 
         # ---- Produce the final summary ----
-        with self._console.spinner("Generating requirements summary..."):
+        with self._maybe_spinner("Generating requirements summary...", use_styled, status_fn=status_fn):
             summary = self._produce_summary()
             overrides = self._extract_overrides(summary)
 
@@ -576,9 +941,10 @@ class DiscoverySession:
             "compliance requirements or security policies you need to "
             "follow.\n"
             "\n"
-            "Don't dump all of these at once.  Weave them naturally into "
-            "the conversation as each topic area comes up.  But make sure "
-            "you cover the relevant technical areas before signalling "
+            "In your initial response, cover ALL relevant technical areas "
+            "using separate ## headings for each.  Ask 2–4 focused questions "
+            "per area.  The system will present them to the user one at a "
+            "time.  Make sure you cover the relevant areas before signalling "
             "readiness — the architect cannot design without these details."
         )
 
@@ -622,88 +988,114 @@ class DiscoverySession:
 
     def _handle_slash_command(self, command: str) -> None:
         """Handle slash commands like /open, /status, /confirmed."""
+        _p = self._print
+        styled = self._use_styled
         if command == "/open":
-            self._console.print()
-            self._console.print(self._discovery_state.format_open_items())
-            self._console.print()
+            _p("")
+            _p(self._discovery_state.format_open_items())
+            _p("")
         elif command == "/confirmed":
-            self._console.print()
-            self._console.print(self._discovery_state.format_confirmed_items())
-            self._console.print()
+            _p("")
+            _p(self._discovery_state.format_confirmed_items())
+            _p("")
         elif command == "/status":
-            self._console.print()
-            self._console.print(f"Discovery Status: {self._discovery_state.format_status_summary()}")
-            self._console.print()
+            _p("")
+            _p(f"Discovery Status: {self._discovery_state.format_status_summary()}")
+            _p("")
             if self._discovery_state.open_count > 0:
-                self._console.print(self._discovery_state.format_open_items())
-                self._console.print()
+                _p(self._discovery_state.format_open_items())
+                _p("")
         elif command == "/summary":
             if not self._biz_agent or not self._context.ai_provider:
-                self._console.print_warning("No AI agent available for summary.")
+                if styled:
+                    self._console.print_warning("No AI agent available for summary.")
+                else:
+                    _p("No AI agent available for summary.")
                 return
-            self._console.print()
-            with self._console.spinner("Generating summary..."):
+            _p("")
+            with self._maybe_spinner("Generating summary...", styled, status_fn=self._status_fn):
                 summary = self._chat(
                     "Please provide a concise summary of everything we've "
                     "established so far — confirmed requirements, open questions, "
                     "constraints, and key decisions. This is a mid-session "
                     "checkpoint, not the final summary."
                 )
-            self._console.print_agent_response(self._clean(summary))
+            if styled:
+                self._console.print_agent_response(self._clean(summary))
+            elif self._response_fn:
+                self._response_fn(self._clean(summary))
+            else:
+                _p(self._clean(summary))
         elif command == "/restart":
-            self._console.print()
-            self._console.print_warning("Restarting discovery session...")
+            _p("")
+            if styled:
+                self._console.print_warning("Restarting discovery session...")
+            else:
+                _p("Restarting discovery session...")
             self._discovery_state.reset()
             self._messages.clear()
             self._exchange_count = 0
             if self._biz_agent and self._context.ai_provider:
                 opening = "I'd like to design a new Azure prototype."
-                with self._console.spinner("Starting fresh..."):
+                with self._maybe_spinner("Starting fresh...", styled, status_fn=self._status_fn):
                     response = self._chat(opening)
                 self._exchange_count += 1
                 self._discovery_state.update_from_exchange(opening, response, self._exchange_count)
-                self._console.print_agent_response(self._clean(response))
+                if styled:
+                    self._console.print_agent_response(self._clean(response))
+                elif self._response_fn:
+                    self._response_fn(self._clean(response))
+                else:
+                    _p(self._clean(response))
         elif command == "/help":
-            self._console.print()
-            self._console.print_dim("Available commands:")
-            self._console.print_dim("  /open      - List open items needing resolution")
-            self._console.print_dim("  /confirmed - List confirmed requirements")
-            self._console.print_dim("  /status    - Show overall discovery status")
-            self._console.print_dim("  /summary   - Show a narrative summary of progress so far")
-            self._console.print_dim("  /why <topic> - Find the exchange where a topic was discussed")
-            self._console.print_dim("  /restart   - Clear state and restart discovery from scratch")
-            self._console.print_dim("  /help      - Show this help message")
-            self._console.print_dim("  done       - Complete discovery and proceed to design")
-            self._console.print_dim("  quit       - Cancel and exit")
-            self._console.print()
+            _p("")
+            _p("Available commands:")
+            _p("  /open      - List open items needing resolution")
+            _p("  /confirmed - List confirmed requirements")
+            _p("  /status    - Show overall discovery status")
+            _p("  /summary   - Show a narrative summary of progress so far")
+            _p("  /why <topic> - Find the exchange where a topic was discussed")
+            _p("  /restart   - Clear state and restart discovery from scratch")
+            _p("  /help      - Show this help message")
+            _p("  done       - Complete discovery and proceed to design")
+            _p("  quit       - Cancel and exit")
+            _p("")
+            _p("  You can also use natural language:")
+            _p("    'what are the open items'     instead of  /open")
+            _p("    'where do we stand'           instead of  /status")
+            _p("    'give me a summary'           instead of  /summary")
+            _p("    'why did we choose Cosmos DB'  instead of  /why Cosmos DB")
+            _p("    'read artifacts from ./specs'  reads files into the session")
+            _p("")
 
     def _handle_why_command(self, raw_input: str) -> None:
         """Handle ``/why <query>`` — find the exchange where a topic was discussed."""
+        _p = self._print
         query = raw_input[4:].strip()
         if not query:
-            self._console.print()
-            self._console.print_dim("Usage: /why <topic>")
-            self._console.print_dim("  Example: /why managed identity")
-            self._console.print()
+            _p("")
+            _p("Usage: /why <topic>")
+            _p("  Example: /why managed identity")
+            _p("")
             return
 
         matches = self._discovery_state.search_history(query)
-        self._console.print()
+        _p("")
         if not matches:
-            self._console.print_dim(f"No exchanges found mentioning '{query}'.")
+            _p(f"No exchanges found mentioning '{query}'.")
         else:
-            self._console.print_dim(f"Found {len(matches)} exchange(s) mentioning '{query}':")
-            self._console.print()
+            _p(f"Found {len(matches)} exchange(s) mentioning '{query}':")
+            _p("")
             for m in matches:
-                self._console.print_dim(f"  Exchange {m['exchange']}:")
+                _p(f"  Exchange {m['exchange']}:")
                 user_text = m.get("user", "")
                 asst_text = m.get("assistant", "")
                 user_snippet = user_text[:150] + ("..." if len(user_text) > 150 else "")
                 asst_snippet = asst_text[:150] + ("..." if len(asst_text) > 150 else "")
-                self._console.print_dim(f"    You: {user_snippet}")
-                self._console.print_dim(f"    Agent: {asst_snippet}")
-                self._console.print()
-        self._console.print()
+                _p(f"    You: {user_snippet}")
+                _p(f"    Agent: {asst_snippet}")
+                _p("")
+        _p("")
 
     def _extract_items_from_response(self, response: str) -> None:
         """Extract open questions and confirmed items from agent response.
@@ -743,10 +1135,33 @@ class DiscoverySession:
     # Internal — helpers
     # ------------------------------------------------------------------ #
 
+    def _emit_sections(self, response: str) -> None:
+        """Notify section_fn callback with any headings found in *response*."""
+        if not self._section_fn:
+            return
+        headers = extract_section_headers(response)
+        if headers:
+            self._section_fn(headers)
+
+    def _update_token_status(self) -> None:
+        """Push token usage to the TUI status bar via ``status_fn("tokens")``.
+
+        Always pushes an update after an AI call — if the provider didn't
+        return usage data, shows a turn counter instead of leaving the
+        elapsed timer stuck.
+        """
+        if self._status_fn:
+            token_text = self._token_tracker.format_status()
+            if not token_text:
+                turns = self._token_tracker.turn_count
+                token_text = f"Turn {turns}" if turns > 0 else ""
+            if token_text:
+                self._status_fn(token_text, "tokens")
+
     @staticmethod
     def _clean(text: str) -> str:
-        """Strip the ``[READY]`` marker so the user sees natural text."""
-        return text.replace(_READY_MARKER, "").strip()
+        """Strip invisible markers so the user sees natural text."""
+        return text.replace(_READY_MARKER, "").replace(_SECTION_COMPLETE_MARKER, "").strip()
 
     @staticmethod
     def _extract_overrides(summary: str) -> list[dict[str, str]]:

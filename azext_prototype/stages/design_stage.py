@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -31,6 +32,34 @@ from azext_prototype.ui.console import Console
 from azext_prototype.ui.console import console as default_console
 
 logger = logging.getLogger(__name__)
+
+_NEW_SECTION_RE = re.compile(
+    r"\[NEW_SECTION:\s*(\{.*?\})\]",
+    re.DOTALL,
+)
+
+
+def _format_section_elapsed(seconds: float) -> str:
+    """Format elapsed seconds as ``12s`` or ``1m04s`` when >= 60."""
+    if seconds < 60:
+        return f"{seconds:.0f}s"
+    minutes = int(seconds) // 60
+    secs = int(seconds) % 60
+    return f"{minutes}m{secs:02d}s"
+
+
+def _extract_new_sections(content: str) -> list[dict]:
+    """Parse ``[NEW_SECTION: {...}]`` markers from AI response content."""
+    results = []
+    for m in _NEW_SECTION_RE.finditer(content):
+        try:
+            obj = json.loads(m.group(1))
+            if isinstance(obj, dict) and "name" in obj:
+                obj.setdefault("context", "")
+                results.append(obj)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return results
 
 
 class DesignStage(BaseStage):
@@ -87,9 +116,13 @@ class DesignStage(BaseStage):
         reset = kwargs.get("reset", False)
         interactive = kwargs.get("interactive", False)
         skip_discovery = kwargs.get("skip_discovery", False)
-        # Accept injected I/O callables (for tests)
+        # Accept injected I/O callables (for tests / TUI)
         input_fn = kwargs.get("input_fn")
         print_fn = kwargs.get("print_fn")
+        status_fn = kwargs.get("status_fn")
+        section_fn = kwargs.get("section_fn")
+        response_fn = kwargs.get("response_fn")
+        update_task_fn = kwargs.get("update_task_fn")
 
         self.state = StageState.IN_PROGRESS
         config = ProjectConfig(agent_context.project_dir)
@@ -103,7 +136,10 @@ class DesignStage(BaseStage):
         ui = default_console if use_styled else None
         _print = print_fn or default_console.print
 
-        default_console.print_header("Starting design session")
+        if use_styled:
+            default_console.print_header("Starting design session")
+        else:
+            _print("\n[bold bright_magenta]Starting design session[/bold bright_magenta]\n")
 
         # Load existing discovery state
         discovery_state = DiscoveryState(agent_context.project_dir)
@@ -111,6 +147,8 @@ class DesignStage(BaseStage):
             discovery_state.load()
             if ui:
                 ui.print_info("Loaded existing discovery context from previous session.")
+            else:
+                _print("[bright_cyan]\u2192[/bright_cyan] Loaded existing discovery context from previous session.")
 
         # Determine if this is a context-only invocation
         # (--context provided but no --artifacts)
@@ -129,10 +167,10 @@ class DesignStage(BaseStage):
                     ui.print_file_list(result["read"], success=True)
                 else:
                     for name in result["read"]:
-                        _print(f"    \u2713 {name}")
+                        _print(f"    [bright_green]\u2713[/bright_green] [bright_cyan]{name}[/bright_cyan]")
 
             if artifact_images:
-                _print(f"  Extracted {len(artifact_images)} image(s) for vision analysis")
+                _print(f"  [bright_cyan]\u2192[/bright_cyan] Extracted {len(artifact_images)} image(s) for vision analysis")
 
             if result["failed"]:
                 _print(f"  Could not read {len(result['failed'])} file(s):")
@@ -140,10 +178,10 @@ class DesignStage(BaseStage):
                     ui.print_file_list([f"{n}  ({r})" for n, r in result["failed"]], success=False)
                 else:
                     for name, reason in result["failed"]:
-                        _print(f"    \u2717 {name}  ({reason})")
+                        _print(f"    [bright_red]\u2717[/bright_red] {name}  ({reason})")
 
             if not result["read"] and not result["failed"]:
-                _print("  (no files found)")
+                _print("  [dim](no files found)[/dim]")
             _print("")
 
             design_state["artifacts"].append(
@@ -221,6 +259,10 @@ class DesignStage(BaseStage):
                 input_fn=input_fn,
                 print_fn=print_fn,
                 context_only=context_only,
+                status_fn=status_fn,
+                section_fn=section_fn,
+                response_fn=response_fn,
+                update_task_fn=update_task_fn,
             )
 
             if discovery_result.cancelled:
@@ -251,7 +293,17 @@ class DesignStage(BaseStage):
             config,
             additional_context,
             _print,
+            status_fn=status_fn,
         )
+
+        # Add architecture parent node and section children to the task tree
+        if section_fn:
+            section_fn([("Generate Architecture", 2)])
+        if update_task_fn:
+            update_task_fn("design-section-generate-architecture", "in_progress")
+        if section_fn:
+            section_fn([(s["name"], 3) for s in sections])
+
         design_output, _usage = self._generate_architecture_sections(
             ui,
             agent_context,
@@ -260,7 +312,13 @@ class DesignStage(BaseStage):
             sections,
             additional_context,
             _print,
+            section_fn=section_fn,
+            update_task_fn=update_task_fn,
+            status_fn=status_fn,
         )
+
+        if update_task_fn:
+            update_task_fn("design-section-generate-architecture", "completed")
 
         # 5. Run supporting IaC review
         iac_tool = config.get("project.iac_tool", "terraform")
@@ -274,7 +332,7 @@ class DesignStage(BaseStage):
                     design_output,
                 )
         else:
-            _print(f"\nReviewing {iac_tool} feasibility...")
+            _print(f"\n[bright_cyan]\u2192[/bright_cyan] Reviewing {iac_tool} feasibility...")
             self._run_iac_review(
                 agent_context,
                 registry,
@@ -329,11 +387,12 @@ class DesignStage(BaseStage):
             ui.print_dim("  az prototype analyze costs                    # Cost estimate")
             ui.print_dim("  az prototype build                            # Generate code")
         else:
-            _print(f"Design iteration {design_state['iteration']} complete.")
-            _print("Architecture docs: concept/docs/ARCHITECTURE.md")
-            _print("\nTo refine: az prototype design --context 'your changes'")
-            _print("To estimate costs: az prototype analyze costs")
-            _print("To proceed: az prototype build")
+            _print(f"[bold bright_green]\u2714[/bold bright_green] Design iteration {design_state['iteration']} complete.")
+            _print("[bright_cyan]\u2192[/bright_cyan] Architecture docs: [bright_cyan]concept/docs/ARCHITECTURE.md[/bright_cyan]")
+            _print("\n[dim]Next steps:[/dim]")
+            _print("[dim]  az prototype design --context 'your changes'  # Refine[/dim]")
+            _print("[dim]  az prototype analyze costs                    # Cost estimate[/dim]")
+            _print("[dim]  az prototype build                            # Generate code[/dim]")
 
         return {
             "status": "success",
@@ -493,6 +552,7 @@ class DesignStage(BaseStage):
         config: ProjectConfig,
         additional_context: str,
         _print,
+        status_fn=None,
     ) -> list[dict]:
         """Ask the architect for a section plan, return list of section dicts.
 
@@ -560,6 +620,9 @@ class DesignStage(BaseStage):
         sections: list[dict],
         additional_context: str,
         _print,
+        section_fn=None,
+        update_task_fn=None,
+        status_fn=None,
     ) -> tuple[str, dict]:
         """Generate each architecture section iteratively.
 
@@ -576,9 +639,20 @@ class DesignStage(BaseStage):
         accumulated: list[str] = []
         merged_usage: dict[str, int] = {}
 
-        for idx, section in enumerate(sections, 1):
+        # Start cumulative timer for the entire architecture generation
+        if status_fn:
+            status_fn("Generating architecture...", "start")
+
+        idx = 0
+        while idx < len(sections):
+            section = sections[idx]
             section_name = section["name"]
             section_context = section.get("context", "")
+            slug = re.sub(r"[^a-z0-9]+", "-", section_name.lower()).strip("-")
+            task_id = f"design-section-{slug}"
+
+            if update_task_fn:
+                update_task_fn(task_id, "in_progress")
 
             prompt = (
                 f"## Task\n"
@@ -613,11 +687,16 @@ class DesignStage(BaseStage):
                 f"## Instructions\n"
                 f'Generate ONLY the "{section_name}" section. Use markdown with a ## heading.\n'
                 f"Ensure consistency with the sections already generated above.\n"
-                f"Do not repeat content from prior sections."
+                f"Do not repeat content from prior sections.\n"
+                f"If while writing this section you determine an additional section is needed "
+                f"that is not in the architecture plan, include a line at the very end:\n"
+                f'[NEW_SECTION: {{"name": "Section Name", "context": "Brief description"}}]'
             )
 
+            section_start = time.monotonic()
+
             spinner_msg = f"Generating architecture ({section_name})..."
-            if ui:
+            if ui and not status_fn:
                 with ui.spinner(spinner_msg):
                     response = architect.execute(agent_context, prompt)
             else:
@@ -645,11 +724,32 @@ class DesignStage(BaseStage):
                     finish_reason=cont.finish_reason,
                 )
 
+            section_elapsed = time.monotonic() - section_start
+            elapsed_str = _format_section_elapsed(section_elapsed)
+            _print(f"  {section_name}...Done. ({elapsed_str})")
+
             accumulated.append(response.content)
 
             # Merge usage
             for k, v in response.usage.items():
                 merged_usage[k] = merged_usage.get(k, 0) + v
+
+            if update_task_fn:
+                update_task_fn(task_id, "completed")
+
+            # Check for dynamically discovered sections
+            new_sections = _extract_new_sections(response.content)
+            for ns in new_sections:
+                if not any(s["name"].lower() == ns["name"].lower() for s in sections):
+                    sections.append(ns)
+                    plan_summary += f"\n- {ns['name']}: {ns.get('context', '')}"
+                    if section_fn:
+                        section_fn([(ns["name"], 3)])
+
+            idx += 1
+
+        if status_fn:
+            status_fn("Generating architecture...", "end")
 
         return "\n\n".join(accumulated), merged_usage
 

@@ -316,65 +316,29 @@ class TestDeployHelpersDeep:
 class TestPrototypeDesign:
     """Test the design command."""
 
-    @patch(f"{_MOD}._prepare_command")
-    @patch(f"{_MOD}._check_guards")
-    def test_design_interactive(self, mock_guards, mock_prep, project_with_config, mock_ai_provider):
+    @patch(f"{_MOD}._run_tui")
+    @patch(f"{_MOD}._get_project_dir")
+    def test_design_interactive(self, mock_dir, mock_tui, project_with_config):
         from azext_prototype.custom import prototype_design
-        from azext_prototype.ai.provider import AIResponse
 
-        mock_ai_provider.chat.return_value = AIResponse(content="Architecture plan", model="gpt-4o")
-
-        mock_registry = MagicMock()
-        architect = MagicMock()
-        architect.name = "cloud-architect"
-        architect.execute.return_value = AIResponse(content="# Architecture\nDesign", model="gpt-4o")
-        mock_registry.find_by_capability.return_value = [architect]
-
-        mock_ctx = MagicMock()
-        mock_ctx.project_dir = str(project_with_config)
-        mock_prep.return_value = (str(project_with_config), MagicMock(), mock_registry, mock_ctx)
+        mock_dir.return_value = str(project_with_config)
 
         cmd = MagicMock()
-        # Discovery now happens inside DesignStage.execute — mock it
-        with patch("azext_prototype.stages.design_stage.DiscoverySession") as MockDS:
-            from azext_prototype.stages.discovery import DiscoveryResult
-            MockDS.return_value.run.return_value = DiscoveryResult(
-                requirements="User wants an API",
-                conversation=[],
-                policy_overrides=[],
-                exchange_count=2,
-            )
-            result = prototype_design(cmd, json_output=True)
-        # Design stage calls execute which returns a dict
+        result = prototype_design(cmd, json_output=True)
         assert isinstance(result, dict)
+        mock_tui.assert_called_once()
 
-    @patch(f"{_MOD}._prepare_command")
-    @patch(f"{_MOD}._check_guards")
-    def test_design_with_context(self, mock_guards, mock_prep, project_with_config, mock_ai_provider):
+    @patch(f"{_MOD}._run_tui")
+    @patch(f"{_MOD}._get_project_dir")
+    def test_design_with_context(self, mock_dir, mock_tui, project_with_config):
         from azext_prototype.custom import prototype_design
-        from azext_prototype.ai.provider import AIResponse
 
-        mock_registry = MagicMock()
-        architect = MagicMock()
-        architect.name = "cloud-architect"
-        architect.execute.return_value = AIResponse(content="# Architecture", model="gpt-4o")
-        mock_registry.find_by_capability.return_value = [architect]
-
-        mock_ctx = MagicMock()
-        mock_ctx.project_dir = str(project_with_config)
-        mock_prep.return_value = (str(project_with_config), MagicMock(), mock_registry, mock_ctx)
+        mock_dir.return_value = str(project_with_config)
 
         cmd = MagicMock()
-        with patch("azext_prototype.stages.design_stage.DiscoverySession") as MockDS:
-            from azext_prototype.stages.discovery import DiscoveryResult
-            MockDS.return_value.run.return_value = DiscoveryResult(
-                requirements="Build an API with Cosmos DB",
-                conversation=[],
-                policy_overrides=[],
-                exchange_count=2,
-            )
-            result = prototype_design(cmd, context="Build an API with Cosmos DB", json_output=True)
+        result = prototype_design(cmd, context="Build an API with Cosmos DB", json_output=True)
         assert isinstance(result, dict)
+        mock_tui.assert_called_once()
 
 
 class TestPrototypeGenerateDocs:

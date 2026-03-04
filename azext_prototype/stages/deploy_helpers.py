@@ -1182,12 +1182,19 @@ class RollbackManager:
 
         return instructions
 
-    def snapshot_stage(self, stage_num: int, scope: str, iac_tool: str) -> dict:
+    def snapshot_stage(
+        self,
+        stage_num: int,
+        scope: str,
+        iac_tool: str,
+        build_stage_id: str | None = None,
+    ) -> dict:
         """Record per-stage pre-deployment snapshot."""
         snapshot = {
             "stage": stage_num,
             "scope": scope,
             "iac_tool": iac_tool,
+            "build_stage_id": build_stage_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         if "stage_snapshots" not in self._state:
