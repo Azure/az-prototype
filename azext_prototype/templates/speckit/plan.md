@@ -27,6 +27,10 @@
 
 [DEPLOYMENT_STAGES]
 
+## Deploy Status
+
+[DEPLOY_STATUS]
+
 ## Project Structure
 
 ```text
@@ -39,7 +43,8 @@ concept/
     ├── constitution.md
     ├── spec.md
     ├── plan.md
-    └── tasks.md
+    ├── tasks.md
+    └── production.md
 ```
 
 ## Cost Estimate

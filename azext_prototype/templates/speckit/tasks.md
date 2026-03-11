@@ -2,29 +2,33 @@
 
 **Prerequisites**: spec.md (required), plan.md (required)
 
-## Format: `[ID] [P?] Description`
+## Status Markers
 
-- **[P]**: Can run in parallel with other [P] tasks
-- Tasks are organized by deployment stage
+- `[x]` Completed (build generated AND deploy succeeded)
+- `[ ]` Pending
+- `[!]` Failed or blocked
+- **[P]** Can run in parallel with other [P] tasks
 
-## Phase 1: Setup
+## Phase 1: Project Setup
 
-- [ ] T001 Initialize project structure with `az prototype init`
-- [ ] T002 Configure AI provider and naming strategy
-- [ ] T003 [P] Run discovery session to capture requirements
+[SETUP_TASKS]
 
-## Phase 2: Infrastructure
+## Phase 2: Architecture & Design
+
+[DESIGN_TASKS]
+
+## Phase 3: Infrastructure
 
 [INFRASTRUCTURE_TASKS]
 
-## Phase 3: Application
+## Phase 4: Application Code
 
 [APPLICATION_TASKS]
 
-## Phase 4: Deployment
+## Phase 5: Deployment & Validation
 
-[DEPLOYMENT_TASKS]
+[DEPLOY_TASKS]
 
-## Phase 5: Validation
+## Phase 6: Production Readiness
 
-[VALIDATION_TASKS]
+[PRODUCTION_TASKS]

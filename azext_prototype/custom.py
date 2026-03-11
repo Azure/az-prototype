@@ -2417,6 +2417,155 @@ def _load_discovery_scope(project_dir: str) -> dict | None:
     return None
 
 
+def _load_speckit_context(project_dir: str) -> str:
+    """Load enriched project context for spec-kit generation.
+
+    Gathers discovery state, build stages, deploy status, cost analysis,
+    and stage completion into a single markdown string.  Each section is
+    best-effort — missing state is silently skipped.
+    """
+    import yaml as _yaml
+
+    sections: list[str] = []
+
+    # Stage completion from prototype.yaml
+    try:
+        config = _load_config(project_dir)
+        stages = config.to_dict().get("stages", {})
+        parts = []
+        for s in ("init", "design", "build", "deploy"):
+            done = stages.get(s, {}).get("completed", False)
+            parts.append(f"{s.title()}: {'completed' if done else 'pending'}")
+        sections.append("## Project Stage Status\n" + " | ".join(parts))
+    except Exception:
+        pass
+
+    # Build stages
+    try:
+        from azext_prototype.stages.build_state import BuildState
+
+        bs = BuildState(project_dir)
+        if bs.exists:
+            bs.load()
+            dep_stages = bs.state.get("deployment_stages", [])
+            if dep_stages:
+                rows = ["| # | Name | Category | Status | Services |", "|----|------|----------|--------|----------|"]
+                for st in dep_stages:
+                    svcs = ", ".join(
+                        f"{s.get('computed_name', s.get('name', '?'))} "
+                        f"({s.get('resource_type', '?')}, {s.get('sku', '?')})"
+                        for s in st.get("services", [])
+                    )
+                    rows.append(
+                        f"| {st.get('stage', '?')} | {st.get('name', '?')} "
+                        f"| {st.get('category', '?')} | {st.get('status', '?')} "
+                        f"| {svcs} |"
+                    )
+                sections.append("## Build Stages\n" + "\n".join(rows))
+    except Exception:
+        pass
+
+    # Deploy status
+    try:
+        from azext_prototype.stages.deploy_state import DeployState
+
+        ds = DeployState(project_dir)
+        if ds.exists:
+            ds.load()
+            dep_stages = ds.state.get("deployment_stages", [])
+            if dep_stages:
+                rows = ["| # | Name | Deploy Status |", "|----|------|---------------|"]
+                for st in dep_stages:
+                    rows.append(
+                        f"| {st.get('stage', '?')} | {st.get('name', '?')} " f"| {st.get('deploy_status', 'pending')} |"
+                    )
+                sections.append("## Deploy Status\n" + "\n".join(rows))
+    except Exception:
+        pass
+
+    # Cost analysis
+    try:
+        cost_path = Path(project_dir) / ".prototype" / "state" / "cost_analysis.yaml"
+        if cost_path.exists():
+            with open(cost_path, "r", encoding="utf-8") as f:
+                cost_data = _yaml.safe_load(f) or {}
+            content = cost_data.get("content", "")
+            if content:
+                sections.append(f"## Cost Analysis\n{content}")
+    except Exception:
+        pass
+
+    # Discovery context
+    try:
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        disc = DiscoveryState(project_dir)
+        disc.load()
+        ctx = disc.format_as_context()
+        if ctx:
+            sections.append(f"## Discovery Context\n{ctx}")
+    except Exception:
+        pass
+
+    return "\n\n".join(sections)
+
+
+_SPECKIT_PROMPTS: dict[str, str] = {
+    "constitution.md": (
+        "Populate this constitution template using the project context below. "
+        "Replace [CONSTRAINTS] with specific budget, timeline, data-source, "
+        "and technology constraints drawn from the Discovery Context section. "
+        "Keep all existing principles exactly as-is.\n\n"
+        "## Template\n```\n{rendered}\n```\n\n"
+        "## Project Context\n{context}\n\n"
+        "Return ONLY the populated template content."
+    ),
+    "spec.md": (
+        "Populate this specification template using the project context below. "
+        "Use requirements from Discovery Context for FR/NFR sections. "
+        "Use scope (in_scope, out_of_scope, deferred) verbatim from the discovery data. "
+        "Map Azure services from Build Stages to the Service Inventory table.\n\n"
+        "## Template\n```\n{rendered}\n```\n\n"
+        "## Project Context\n{context}\n\n"
+        "Return ONLY the populated template content."
+    ),
+    "plan.md": (
+        "Populate this implementation plan template using the project context below. "
+        "Map Build Stages table 1:1 to Deployment Stages — include every stage. "
+        "Annotate each stage with its deploy status from the Deploy Status table. "
+        "Fill Cost Estimate from the Cost Analysis section. "
+        "Fill Deploy Status section with a summary of deployed/pending/failed stages.\n\n"
+        "## Template\n```\n{rendered}\n```\n\n"
+        "## Project Context\n{context}\n\n"
+        "Return ONLY the populated template content."
+    ),
+    "tasks.md": (
+        "Populate this task list template using the project context below. "
+        "Generate tasks mapped to the actual build/deploy stages listed in Build Stages and Deploy Status. "
+        "Use [x] for stages where build status=generated AND deploy status=deployed. "
+        "Use [!] for stages where deploy status=failed or rolled_back. "
+        "Use [ ] for all other stages (pending). "
+        "Phase 3 (Infrastructure) and Phase 4 (Application) tasks should map 1:1 to build stages. "
+        "Phase 6 (Production Readiness) should include hardening tasks: SKU upgrades, "
+        "networking lockdown, CI/CD setup, monitoring, DR planning.\n\n"
+        "## Template\n```\n{rendered}\n```\n\n"
+        "## Project Context\n{context}\n\n"
+        "Return ONLY the populated template content."
+    ),
+    "production.md": (
+        "Populate this production readiness template using the project context below. "
+        "Compare POC SKUs from Build Stages against production-grade equivalents. "
+        "Cover: SKU upgrades (with specific old→new recommendations), private networking, "
+        "CI/CD pipeline, monitoring & observability, disaster recovery, load testing, "
+        "and data migration. Use Cost Analysis L-tier as the production cost baseline "
+        "if available.\n\n"
+        "## Template\n```\n{rendered}\n```\n\n"
+        "## Project Context\n{context}\n\n"
+        "Return ONLY the populated template content."
+    ),
+}
+
+
 # ======================================================================
 # Knowledge Commands
 # ======================================================================
@@ -2596,6 +2745,7 @@ _SPECKIT_TEMPLATES = {
     "spec.md": "spec.md",
     "plan.md": "plan.md",
     "tasks.md": "tasks.md",
+    "production.md": "production.md",
 }
 
 
@@ -2644,6 +2794,7 @@ def _generate_templates(
     registry=None,
     template_map: dict[str, str] | None = None,
     template_kind: str = "docs",
+    prompt_overrides: dict[str, str] | None = None,
 ) -> list[str]:
     """Render templates into *output_dir*.
 
@@ -2687,14 +2838,17 @@ def _generate_templates(
                 from azext_prototype.agents.base import AgentContext
 
                 with console.spinner(f"Populating {template_name}..."):
-                    task = (
-                        f"Populate this documentation template using the architecture below. "
-                        f"Replace all [PLACEHOLDER] values with real content. "
-                        f"Keep the same markdown structure.\n\n"
-                        f"## Template\n```\n{rendered}\n```\n\n"
-                        f"## Architecture\n{design_context}\n\n"
-                        f"Return ONLY the populated template content."
-                    )
+                    if prompt_overrides and template_name in prompt_overrides:
+                        task = prompt_overrides[template_name].replace("{rendered}", rendered)
+                    else:
+                        task = (
+                            f"Populate this documentation template using the architecture below. "
+                            f"Replace all [PLACEHOLDER] values with real content. "
+                            f"Keep the same markdown structure.\n\n"
+                            f"## Template\n```\n{rendered}\n```\n\n"
+                            f"## Architecture\n{design_context}\n\n"
+                            f"Return ONLY the populated template content."
+                        )
                     ctx = AgentContext(
                         project_config=project_config,
                         project_dir=project_dir,
@@ -2912,7 +3066,10 @@ def prototype_generate_speckit(cmd, path=None, json_output=False):
     # Try to get AI provider and design context for population
     ai_provider = None
     design_context = _load_design_context(project_dir)
+    speckit_context = _load_speckit_context(project_dir)
     registry = None
+    prompt_overrides: dict[str, str] | None = None
+
     if design_context:
         try:
             from azext_prototype.ai.factory import create_ai_provider
@@ -2922,7 +3079,18 @@ def prototype_generate_speckit(cmd, path=None, json_output=False):
             console.print_info("Design context available — populating templates with AI.")
         except Exception:
             console.print_dim("  AI unavailable — using static templates.")
-    else:
+
+    # Build prompt overrides if we have enriched context
+    full_context = design_context
+    if speckit_context:
+        full_context = f"{design_context}\n\n{speckit_context}" if design_context else speckit_context
+    if full_context and ai_provider:
+        # Store partially-formatted prompts — {rendered} is filled at render time
+        prompt_overrides = {}
+        for tpl_name, prompt_tpl in _SPECKIT_PROMPTS.items():
+            prompt_overrides[tpl_name] = prompt_tpl.replace("{context}", full_context)
+
+    if not design_context and not speckit_context:
         console.print_dim("  No design context — using static templates.")
 
     generated = _generate_templates(
@@ -2932,10 +3100,11 @@ def prototype_generate_speckit(cmd, path=None, json_output=False):
         "speckit",
         include_manifest=True,
         ai_provider=ai_provider,
-        design_context=design_context,
+        design_context=full_context,
         registry=registry,
         template_map=_SPECKIT_TEMPLATES,
         template_kind="speckit",
+        prompt_overrides=prompt_overrides,
     )
     console.print_success(f"Spec-kit generated to {_rel_path(output_dir, project_dir)}/")
     return {"status": "generated", "templates": generated, "output_dir": str(output_dir)}

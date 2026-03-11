@@ -6,6 +6,21 @@ Release History
 0.2.1b5
 +++++++
 
+Spec-kit enrichment
+~~~~~~~~~~~~~~~~~~~~
+* **Enriched spec-kit with full project context** — ``generate speckit``
+  now loads discovery state, build stages, deploy status, cost analysis,
+  and stage completion to populate templates with real project data.
+* **Per-template prompt overrides** — each spec-kit template gets a
+  tailored AI prompt that tells the doc-agent exactly which context
+  sections to use and what output format to produce.
+* **production.md** — new template covering POC-to-production guidance:
+  SKU upgrades, networking, CI/CD, monitoring, DR, load testing, and
+  estimated production costs.
+* **Restructured tasks.md** — tasks now map 1:1 to build/deploy stages
+  with status markers: ``[x]`` completed, ``[!]`` failed, ``[ ]`` pending.
+  Added Phase 6 (Production Readiness) for hardening tasks.
+
 Init improvements
 ~~~~~~~~~~~~~~~~~~
 * **Removed eager directory creation from init** — ``concept/apps/``,
