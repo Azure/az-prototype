@@ -19,6 +19,10 @@ Init improvements
 * **Fixed "Next: cd ..." hint** — the summary panel now shows the
   actual project directory name instead of always displaying the
   ``--name`` value.
+* **Naming env/zone_id derived from --environment** — ``naming.env``
+  and ``naming.zone_id`` in ``prototype.yaml`` now reflect the chosen
+  environment (dev→dev/zd, staging→stg/zs, prod→prd/zp) instead of
+  always defaulting to ``dev``/``zd``.
 
 TUI post-design improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

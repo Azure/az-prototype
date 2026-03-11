@@ -168,6 +168,13 @@ class InitStage(BaseStage):
 
         resolved_model = model or _DEFAULT_MODELS.get(ai_provider, "gpt-4o")
 
+        # Derive naming env abbreviation and zone_id from the chosen environment
+        from azext_prototype.naming import _ENV_TO_ZONE
+
+        _ENV_ABBREV = {"dev": "dev", "staging": "stg", "prod": "prd"}
+        naming_env = _ENV_ABBREV.get(environment.lower(), environment)
+        naming_zone_id = _ENV_TO_ZONE.get(environment.lower(), "zd")
+
         config_data = config.create_default(
             {
                 "project": {
@@ -175,6 +182,10 @@ class InitStage(BaseStage):
                     "location": location,
                     "environment": environment,
                     "iac_tool": iac_tool,
+                },
+                "naming": {
+                    "env": naming_env,
+                    "zone_id": naming_zone_id,
                 },
                 "ai": {
                     "provider": ai_provider,

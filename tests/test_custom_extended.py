@@ -342,6 +342,8 @@ class TestPrototypeInit:
         config = ProjectConfig(str(out))
         config.load()
         assert config.get("project.environment") == "staging"
+        assert config.get("naming.env") == "stg"
+        assert config.get("naming.zone_id") == "zs"
 
     @patch(f"{_MOD}._check_requirements")
     @patch(f"{_MOD}._check_guards")

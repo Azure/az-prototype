@@ -450,6 +450,8 @@ class TestInitStageExecution:
         config = ProjectConfig(str(out))
         config.load()
         assert config.get("project.environment") == "prod"
+        assert config.get("naming.env") == "prd"
+        assert config.get("naming.zone_id") == "zp"
 
     def test_execute_model_override(self, tmp_path):
         """Explicit --model should override provider default."""
