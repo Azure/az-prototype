@@ -229,21 +229,21 @@ class TestPrototypeInit:
         mock_lic_cls.return_value = mock_lic
 
         cmd = MagicMock()
+        out = tmp_path / "test-proj"
         result = prototype_init(
             cmd,
             name="test-proj",
             location="eastus",
-            output_dir=str(tmp_path),
+            output_dir=str(out),
             ai_provider="github-models",
             json_output=True,
         )
 
         assert result["status"] == "success"
         assert result["github_user"] == "testuser"
-        project_dir = tmp_path / "test-proj"
-        assert project_dir.is_dir()
-        assert (project_dir / "prototype.yaml").exists()
-        assert (project_dir / ".gitignore").exists()
+        assert out.is_dir()
+        assert (out / "prototype.yaml").exists()
+        assert (out / ".gitignore").exists()
 
     @patch(f"{_MOD}._check_requirements")
     @patch(f"{_MOD}._check_guards")
@@ -255,7 +255,7 @@ class TestPrototypeInit:
             cmd,
             name="aoai-proj",
             location="eastus",
-            output_dir=str(tmp_path),
+            output_dir=str(tmp_path / "aoai-proj"),
             ai_provider="azure-openai",
             json_output=True,
         )
@@ -273,7 +273,7 @@ class TestPrototypeInit:
         # Need to bypass guards
         with patch.object(InitStage, "get_guards", return_value=[]):
             with pytest.raises(CLIError, match="Project name"):
-                prototype_init(cmd, name=None, location="eastus", output_dir=str(tmp_path))
+                prototype_init(cmd, name=None, location="eastus", output_dir=str(tmp_path / "no-name"))
 
     @patch(f"{_MOD}._check_requirements")
     def test_init_missing_location_raises(self, mock_check_req, tmp_path):
@@ -283,7 +283,7 @@ class TestPrototypeInit:
         cmd = MagicMock()
         with patch.object(InitStage, "get_guards", return_value=[]):
             with pytest.raises(CLIError, match="region is required"):
-                prototype_init(cmd, name="test-proj", location=None, output_dir=str(tmp_path))
+                prototype_init(cmd, name="test-proj", location=None, output_dir=str(tmp_path / "test-proj"))
 
     @patch(f"{_MOD}._check_requirements")
     @patch(f"{_MOD}._check_guards")
@@ -300,7 +300,7 @@ class TestPrototypeInit:
         with patch("builtins.input", return_value="n"):
             result = prototype_init(
                 cmd, name="existing-proj", location="eastus",
-                output_dir=str(tmp_path), ai_provider="azure-openai",
+                output_dir=str(proj_dir), ai_provider="azure-openai",
                 json_output=True,
             )
         assert result["status"] == "cancelled"
@@ -319,7 +319,7 @@ class TestPrototypeInit:
         with patch("builtins.input", return_value="y"):
             result = prototype_init(
                 cmd, name="reinit-proj", location="eastus",
-                output_dir=str(tmp_path), ai_provider="azure-openai",
+                output_dir=str(proj_dir), ai_provider="azure-openai",
                 json_output=True,
             )
         assert result["status"] == "success"
@@ -332,13 +332,14 @@ class TestPrototypeInit:
         from azext_prototype.config import ProjectConfig
 
         cmd = MagicMock()
+        out = tmp_path / "env-proj"
         result = prototype_init(
             cmd, name="env-proj", location="westus2",
-            output_dir=str(tmp_path), ai_provider="azure-openai",
+            output_dir=str(out), ai_provider="azure-openai",
             environment="staging", json_output=True,
         )
         assert result["status"] == "success"
-        config = ProjectConfig(str(tmp_path / "env-proj"))
+        config = ProjectConfig(str(out))
         config.load()
         assert config.get("project.environment") == "staging"
 
@@ -350,13 +351,14 @@ class TestPrototypeInit:
         from azext_prototype.config import ProjectConfig
 
         cmd = MagicMock()
+        out = tmp_path / "model-proj"
         result = prototype_init(
             cmd, name="model-proj", location="eastus",
-            output_dir=str(tmp_path), ai_provider="azure-openai",
+            output_dir=str(out), ai_provider="azure-openai",
             model="gpt-4o-mini", json_output=True,
         )
         assert result["status"] == "success"
-        config = ProjectConfig(str(tmp_path / "model-proj"))
+        config = ProjectConfig(str(out))
         config.load()
         assert config.get("ai.model") == "gpt-4o-mini"
 
@@ -368,13 +370,14 @@ class TestPrototypeInit:
         from azext_prototype.config import ProjectConfig
 
         cmd = MagicMock()
+        out = tmp_path / "defmodel-proj"
         result = prototype_init(
             cmd, name="defmodel-proj", location="eastus",
-            output_dir=str(tmp_path), ai_provider="azure-openai",
+            output_dir=str(out), ai_provider="azure-openai",
             json_output=True,
         )
         assert result["status"] == "success"
-        config = ProjectConfig(str(tmp_path / "defmodel-proj"))
+        config = ProjectConfig(str(out))
         config.load()
         assert config.get("ai.model") == "gpt-4o"
 
@@ -387,7 +390,7 @@ class TestPrototypeInit:
         cmd = MagicMock()
         prototype_init(
             cmd, name="telem-proj", location="westeurope",
-            output_dir=str(tmp_path), ai_provider="azure-openai",
+            output_dir=str(tmp_path / "telem-proj"), ai_provider="azure-openai",
             environment="staging", iac_tool="bicep",
         )
 
@@ -408,7 +411,7 @@ class TestPrototypeInit:
         cmd = MagicMock()
         prototype_init(
             cmd, name="telem-model-proj", location="eastus",
-            output_dir=str(tmp_path), ai_provider="azure-openai",
+            output_dir=str(tmp_path / "telem-model-proj"), ai_provider="azure-openai",
             model="gpt-4o-mini",
         )
 
