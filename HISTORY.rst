@@ -49,6 +49,9 @@ TUI stage tree fix
 * **``--json`` on cost analysis returns full content** — ``--json`` now
   suppresses console output and returns a structured JSON dict with the
   full cost report in the ``content`` field for machine consumption.
+* **``generate docs`` default output moved to ``concept/docs/``** —
+  documentation is now generated alongside other concept artifacts
+  instead of a separate ``docs/`` directory at the project root.
 
 TUI post-design improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

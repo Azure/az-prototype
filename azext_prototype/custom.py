@@ -2827,7 +2827,7 @@ def prototype_generate_docs(cmd, path=None, json_output=False):
     config = _load_config(project_dir)
     project_config = config.to_dict()
 
-    output_dir = Path(path) if path else Path(project_dir) / "docs"
+    output_dir = Path(path) if path else Path(project_dir) / "concept" / "docs"
 
     console.print_header("Generating Documentation")
 
