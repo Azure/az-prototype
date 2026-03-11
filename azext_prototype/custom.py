@@ -1886,7 +1886,12 @@ def prototype_agent_remove(cmd, name=None, json_output=False):
 @_quiet_output
 @track("prototype agent update")
 def prototype_agent_update(
-    cmd, name=None, description=None, capabilities=None, system_prompt_file=None, json_output=False,
+    cmd,
+    name=None,
+    description=None,
+    capabilities=None,
+    system_prompt_file=None,
+    json_output=False,
 ):
     """Update an existing custom agent.
 
