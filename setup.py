@@ -49,7 +49,7 @@ setup(
     url="https://github.com/Azure/az-prototype",
     classifiers=CLASSIFIERS,
     packages=[
-        p for p in find_packages(exclude=["tests", "tests.*"])
+        p for p in find_packages(exclude=["tests", "tests.*", "*.__pycache__", "*.__pycache__.*"])
         if "__pycache__" not in p
     ],
     install_requires=DEPENDENCIES,
@@ -67,6 +67,7 @@ setup(
             "knowledge/**/*.yaml",
         ]
     },
+    exclude_package_data={"": ["__pycache__", "*.pyc"]},
     entry_points={
         "azure.cli.extensions": [
             "prototype=azext_prototype",

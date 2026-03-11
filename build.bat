@@ -27,6 +27,7 @@ echo [2/3] Cleaning previous builds...
 if exist dist rmdir /s /q dist
 if exist build rmdir /s /q build
 for /d %%d in (*.egg-info) do rmdir /s /q "%%d"
+for /d /r azext_prototype %%d in (__pycache__) do if exist "%%d" rmdir /s /q "%%d"
 
 :: Build the wheel (--no-isolation avoids PermissionError on temp-env cleanup)
 echo [3/3] Building wheel...
