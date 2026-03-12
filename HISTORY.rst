@@ -6,6 +6,9 @@ Release History
 0.2.1b6
 +++++++
 
+* Renamed ``--script-resource-group`` deploy flag to ``--script-rg`` for
+  consistency with Azure CLI conventions.
+
 0.2.1b5
 +++++++
 
