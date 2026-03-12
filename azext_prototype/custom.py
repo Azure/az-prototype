@@ -600,7 +600,7 @@ def prototype_deploy(
     rollback_info=False,
     generate_scripts=False,
     script_deploy_type="webapp",
-    script_resource_group=None,
+    script_rg=None,
     script_registry=None,
     json_output=False,
 ):
@@ -629,7 +629,7 @@ def prototype_deploy(
         return _deploy_generate_scripts(
             cmd,
             deploy_type=script_deploy_type,
-            resource_group=script_resource_group,
+            resource_group=script_rg,
             registry=script_registry,
         )
 

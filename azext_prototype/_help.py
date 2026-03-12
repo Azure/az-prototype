@@ -250,10 +250,8 @@ long-summary: |
 examples:
     - name: Start interactive configuration
       text: az prototype config init
-    - name: Set naming strategy after init
-      text: az prototype config set --key naming.strategy --value microsoft-caf
-    - name: Change the landing zone
-      text: az prototype config set --key naming.zone_id --value zp
+    - name: Initialize with verbose output
+      text: az prototype config init --debug
 """
 
 helps["prototype config show"] = """
@@ -473,8 +471,8 @@ examples:
       text: az prototype agent list --json
     - name: Show expanded details
       text: az prototype agent list --detailed
-    - name: List only custom agents
-      text: az prototype agent list --show-builtin false
+    - name: List agents in JSON format with details
+      text: az prototype agent list --json --detailed
 """
 
 helps["prototype agent add"] = """
@@ -492,7 +490,7 @@ long-summary: |
     - --definition copies a built-in agent's YAML as a starting point
     - --file uses your own YAML or Python definition
 
-    After creation, test the agent with 'az prototype agent test --name <name>'.
+    After creation, test the agent with 'az prototype agent test --name `<name>`'.
 examples:
     - name: Interactive agent creation (default)
       text: az prototype agent add --name my-data-agent
