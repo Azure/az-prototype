@@ -204,8 +204,8 @@ def load_arguments(self, _):
             default="webapp",
         )
         c.argument(
-            "script_resource_group",
-            options_list=["--script-resource-group"],
+            "script_rg",
+            options_list=["--script-rg"],
             help="Default resource group name for --generate-scripts.",
         )
         c.argument(

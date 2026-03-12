@@ -18,7 +18,7 @@ def load_command_table(self, _):
 
     with self.command_group("prototype config", is_preview=True) as g:
         g.custom_command("init", "prototype_config_init")
-        g.custom_command("show", "prototype_config_show")
+        g.custom_show_command("show", "prototype_config_show")
         g.custom_command("get", "prototype_config_get")
         g.custom_command("set", "prototype_config_set")
 
@@ -34,7 +34,7 @@ def load_command_table(self, _):
         g.custom_command("list", "prototype_agent_list")
         g.custom_command("add", "prototype_agent_add")
         g.custom_command("override", "prototype_agent_override")
-        g.custom_command("show", "prototype_agent_show")
+        g.custom_show_command("show", "prototype_agent_show")
         g.custom_command("remove", "prototype_agent_remove")
         g.custom_command("update", "prototype_agent_update")
         g.custom_command("test", "prototype_agent_test")
