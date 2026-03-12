@@ -74,13 +74,38 @@ class StageOrchestrator:
     def run(self, start_stage: str | None = None) -> None:
         """Main orchestration loop — detect state, populate tree, prompt."""
         try:
-            current = start_stage or detect_stage(self._project_dir)
+            detected = detect_stage(self._project_dir)
+            current = start_stage or detected
+
+            # Guard: prevent skipping stages.  The user may only target the
+            # next stage after the furthest completed one (or re-run a
+            # completed stage).
+            stage_order = ["init", "design", "build", "deploy"]
+            detected_idx = stage_order.index(detected) if detected in stage_order else 0
+            target_idx = stage_order.index(current) if current in stage_order else 0
+            next_allowed_idx = detected_idx + 1
+
+            if target_idx > next_allowed_idx:
+                pf = self._adapter.print_fn
+                skipped = stage_order[next_allowed_idx:target_idx]
+                skipped_names = ", ".join(s.title() for s in skipped)
+                pf(
+                    f"[bright_red]![/bright_red] Cannot skip to "
+                    f"[bold]{current}[/bold] — {skipped_names} "
+                    f"{'has' if len(skipped) == 1 else 'have'} not been completed yet."
+                )
+                # Fall back to the next valid stage
+                current = stage_order[next_allowed_idx]
+                pf(f"  Resuming at [bold]{current}[/bold] stage.\n")
 
             # Always mark init as completed
             self._adapter.update_task("init", TaskStatus.COMPLETED)
 
-            # Populate tree and show welcome based on detected state
-            self._populate_from_state(current)
+            # Populate tree from *detected* state (what's actually completed),
+            # then mark the target stage as in-progress if it hasn't run yet.
+            self._populate_from_state(detected)
+            if current != detected:
+                self._adapter.update_task(current, TaskStatus.IN_PROGRESS)
             self._show_welcome(current)
 
             # Auto-run a stage when launched with stage_kwargs
@@ -328,7 +353,7 @@ class StageOrchestrator:
                 break
             elif user_input in ("design", "redesign"):
                 self._run_design()
-            elif user_input == "build":
+            elif user_input in ("build", "continue"):
                 self._run_build()
             elif user_input in ("deploy", "redeploy"):
                 self._run_deploy()

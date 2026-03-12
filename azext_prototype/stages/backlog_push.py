@@ -79,7 +79,11 @@ def format_github_body(item: dict) -> str:
     if tasks:
         lines.append("## Tasks")
         for task in tasks:
-            lines.append(f"- [ ] {task}")
+            if isinstance(task, dict):
+                check = "x" if task.get("done", False) else " "
+                lines.append(f"- [{check}] {task.get('title', '')}")
+            else:
+                lines.append(f"- [ ] {task}")
         lines.append("")
 
     # Children (for hierarchical items)
@@ -102,7 +106,11 @@ def format_github_body(item: dict) -> str:
             child_tasks = child.get("tasks", [])
             if child_tasks:
                 for t in child_tasks:
-                    lines.append(f"- [ ] {t}")
+                    if isinstance(t, dict):
+                        check = "x" if t.get("done", False) else " "
+                        lines.append(f"- [{check}] {t.get('title', '')}")
+                    else:
+                        lines.append(f"- [ ] {t}")
                 lines.append("")
 
     effort = item.get("effort", "")
@@ -138,7 +146,13 @@ def format_devops_description(item: dict) -> str:
     if tasks:
         parts.append("<h3>Tasks</h3><ul>")
         for task in tasks:
-            parts.append(f"<li>{task}</li>")
+            if isinstance(task, dict):
+                done = task.get("done", False)
+                label = task.get("title", "")
+                marker = "&#9745;" if done else "&#9744;"
+                parts.append(f"<li>{marker} {label}</li>")
+            else:
+                parts.append(f"<li>{task}</li>")
         parts.append("</ul>")
 
     effort = item.get("effort", "")

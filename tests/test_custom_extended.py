@@ -229,21 +229,21 @@ class TestPrototypeInit:
         mock_lic_cls.return_value = mock_lic
 
         cmd = MagicMock()
+        out = tmp_path / "test-proj"
         result = prototype_init(
             cmd,
             name="test-proj",
             location="eastus",
-            output_dir=str(tmp_path),
+            output_dir=str(out),
             ai_provider="github-models",
             json_output=True,
         )
 
         assert result["status"] == "success"
         assert result["github_user"] == "testuser"
-        project_dir = tmp_path / "test-proj"
-        assert project_dir.is_dir()
-        assert (project_dir / "prototype.yaml").exists()
-        assert (project_dir / ".gitignore").exists()
+        assert out.is_dir()
+        assert (out / "prototype.yaml").exists()
+        assert (out / ".gitignore").exists()
 
     @patch(f"{_MOD}._check_requirements")
     @patch(f"{_MOD}._check_guards")
@@ -255,7 +255,7 @@ class TestPrototypeInit:
             cmd,
             name="aoai-proj",
             location="eastus",
-            output_dir=str(tmp_path),
+            output_dir=str(tmp_path / "aoai-proj"),
             ai_provider="azure-openai",
             json_output=True,
         )
@@ -273,7 +273,7 @@ class TestPrototypeInit:
         # Need to bypass guards
         with patch.object(InitStage, "get_guards", return_value=[]):
             with pytest.raises(CLIError, match="Project name"):
-                prototype_init(cmd, name=None, location="eastus", output_dir=str(tmp_path))
+                prototype_init(cmd, name=None, location="eastus", output_dir=str(tmp_path / "no-name"))
 
     @patch(f"{_MOD}._check_requirements")
     def test_init_missing_location_raises(self, mock_check_req, tmp_path):
@@ -283,7 +283,7 @@ class TestPrototypeInit:
         cmd = MagicMock()
         with patch.object(InitStage, "get_guards", return_value=[]):
             with pytest.raises(CLIError, match="region is required"):
-                prototype_init(cmd, name="test-proj", location=None, output_dir=str(tmp_path))
+                prototype_init(cmd, name="test-proj", location=None, output_dir=str(tmp_path / "test-proj"))
 
     @patch(f"{_MOD}._check_requirements")
     @patch(f"{_MOD}._check_guards")
@@ -300,7 +300,7 @@ class TestPrototypeInit:
         with patch("builtins.input", return_value="n"):
             result = prototype_init(
                 cmd, name="existing-proj", location="eastus",
-                output_dir=str(tmp_path), ai_provider="azure-openai",
+                output_dir=str(proj_dir), ai_provider="azure-openai",
                 json_output=True,
             )
         assert result["status"] == "cancelled"
@@ -319,7 +319,7 @@ class TestPrototypeInit:
         with patch("builtins.input", return_value="y"):
             result = prototype_init(
                 cmd, name="reinit-proj", location="eastus",
-                output_dir=str(tmp_path), ai_provider="azure-openai",
+                output_dir=str(proj_dir), ai_provider="azure-openai",
                 json_output=True,
             )
         assert result["status"] == "success"
@@ -332,15 +332,18 @@ class TestPrototypeInit:
         from azext_prototype.config import ProjectConfig
 
         cmd = MagicMock()
+        out = tmp_path / "env-proj"
         result = prototype_init(
             cmd, name="env-proj", location="westus2",
-            output_dir=str(tmp_path), ai_provider="azure-openai",
+            output_dir=str(out), ai_provider="azure-openai",
             environment="staging", json_output=True,
         )
         assert result["status"] == "success"
-        config = ProjectConfig(str(tmp_path / "env-proj"))
+        config = ProjectConfig(str(out))
         config.load()
         assert config.get("project.environment") == "staging"
+        assert config.get("naming.env") == "stg"
+        assert config.get("naming.zone_id") == "zs"
 
     @patch(f"{_MOD}._check_requirements")
     @patch(f"{_MOD}._check_guards")
@@ -350,13 +353,14 @@ class TestPrototypeInit:
         from azext_prototype.config import ProjectConfig
 
         cmd = MagicMock()
+        out = tmp_path / "model-proj"
         result = prototype_init(
             cmd, name="model-proj", location="eastus",
-            output_dir=str(tmp_path), ai_provider="azure-openai",
+            output_dir=str(out), ai_provider="azure-openai",
             model="gpt-4o-mini", json_output=True,
         )
         assert result["status"] == "success"
-        config = ProjectConfig(str(tmp_path / "model-proj"))
+        config = ProjectConfig(str(out))
         config.load()
         assert config.get("ai.model") == "gpt-4o-mini"
 
@@ -368,13 +372,14 @@ class TestPrototypeInit:
         from azext_prototype.config import ProjectConfig
 
         cmd = MagicMock()
+        out = tmp_path / "defmodel-proj"
         result = prototype_init(
             cmd, name="defmodel-proj", location="eastus",
-            output_dir=str(tmp_path), ai_provider="azure-openai",
+            output_dir=str(out), ai_provider="azure-openai",
             json_output=True,
         )
         assert result["status"] == "success"
-        config = ProjectConfig(str(tmp_path / "defmodel-proj"))
+        config = ProjectConfig(str(out))
         config.load()
         assert config.get("ai.model") == "gpt-4o"
 
@@ -387,7 +392,7 @@ class TestPrototypeInit:
         cmd = MagicMock()
         prototype_init(
             cmd, name="telem-proj", location="westeurope",
-            output_dir=str(tmp_path), ai_provider="azure-openai",
+            output_dir=str(tmp_path / "telem-proj"), ai_provider="azure-openai",
             environment="staging", iac_tool="bicep",
         )
 
@@ -408,7 +413,7 @@ class TestPrototypeInit:
         cmd = MagicMock()
         prototype_init(
             cmd, name="telem-model-proj", location="eastus",
-            output_dir=str(tmp_path), ai_provider="azure-openai",
+            output_dir=str(tmp_path / "telem-model-proj"), ai_provider="azure-openai",
             model="gpt-4o-mini",
         )
 
@@ -650,7 +655,8 @@ class TestPrototypeDeployGenerateScripts:
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
-        # concept/apps exists but empty
+        # concept/apps exists but empty (not created by init; build creates it)
+        (project_with_config / "concept" / "apps").mkdir(parents=True, exist_ok=True)
         result = prototype_deploy(cmd, generate_scripts=True, json_output=True)
         assert result["status"] == "generated"
         assert len(result["scripts"]) == 0
@@ -882,6 +888,35 @@ class TestPrototypeAnalyzeCosts:
         cmd = MagicMock()
         with pytest.raises(CLIError, match="No cost analyst"):
             prototype_analyze_costs(cmd)
+
+
+class TestExtractCostTable:
+    """Test _extract_cost_table helper."""
+
+    def test_extracts_summary_table(self):
+        from azext_prototype.custom import _extract_cost_table
+
+        content = (
+            "# Executive Summary\n\nSome intro text.\n\n---\n\n"
+            "## Cost Summary Table\n\n"
+            " Service         Small    Medium    Large\n"
+            " ──────────────────────────────────────────\n"
+            " App Service     $0.00    $13.14    $74.00\n"
+            " TOTAL           $0.00    $13.14    $74.00\n"
+            "\n\n---\n\n"
+            "## T-Shirt Size Definitions\n\nMore details...\n"
+        )
+        result = _extract_cost_table(content)
+        assert "Cost Summary Table" in result
+        assert "$13.14" in result
+        assert "T-Shirt Size" not in result
+
+    def test_fallback_on_no_heading(self):
+        from azext_prototype.custom import _extract_cost_table
+
+        content = "No table here, just text about the architecture."
+        result = _extract_cost_table(content)
+        assert result == content
 
 
 class TestPrototypeConfigSet:
@@ -1274,7 +1309,7 @@ class TestAnalyzeCostsCache:
         mock_prep.return_value = self._make_mock_prep(project_with_design, registry, mock_ctx)
 
         cmd = MagicMock()
-        result = prototype_analyze_costs(cmd, output_format="json", refresh=False, json_output=True)
+        result = prototype_analyze_costs(cmd, refresh=False, json_output=True)
 
         assert result["status"] == "analyzed"
         agent.execute.assert_called_once()
@@ -1304,14 +1339,14 @@ class TestAnalyzeCostsCache:
         cache_data = {
             "context_hash": context_hash,
             "content": "Cached cost report content",
-            "result": {"status": "analyzed", "agent": "cost-analyst", "format": "markdown"},
+            "result": {"status": "analyzed", "agent": "cost-analyst"},
             "timestamp": "2026-01-01T00:00:00+00:00",
         }
         cache_path = project_with_design / ".prototype" / "state" / "cost_analysis.yaml"
         cache_path.write_text(_yaml.dump(cache_data, default_flow_style=False), encoding="utf-8")
 
         cmd = MagicMock()
-        result = prototype_analyze_costs(cmd, output_format="markdown", refresh=False, json_output=True)
+        result = prototype_analyze_costs(cmd, refresh=False, json_output=True)
 
         assert result["status"] == "analyzed"
         agent.execute.assert_not_called()  # Should NOT have called the agent
@@ -1337,13 +1372,13 @@ class TestAnalyzeCostsCache:
         cache_data = {
             "context_hash": context_hash,
             "content": "Old cached content",
-            "result": {"status": "analyzed", "agent": "cost-analyst", "format": "markdown"},
+            "result": {"status": "analyzed", "agent": "cost-analyst"},
         }
         cache_path = project_with_design / ".prototype" / "state" / "cost_analysis.yaml"
         cache_path.write_text(_yaml.dump(cache_data, default_flow_style=False), encoding="utf-8")
 
         cmd = MagicMock()
-        result = prototype_analyze_costs(cmd, output_format="json", refresh=True, json_output=True)
+        result = prototype_analyze_costs(cmd, refresh=True, json_output=True)
 
         assert result["status"] == "analyzed"
         agent.execute.assert_called_once()  # Should HAVE called the agent
@@ -1363,13 +1398,13 @@ class TestAnalyzeCostsCache:
         cache_data = {
             "context_hash": "stale_hash_0000",
             "content": "Stale cached content",
-            "result": {"status": "analyzed", "agent": "cost-analyst", "format": "markdown"},
+            "result": {"status": "analyzed", "agent": "cost-analyst"},
         }
         cache_path = project_with_design / ".prototype" / "state" / "cost_analysis.yaml"
         cache_path.write_text(_yaml.dump(cache_data, default_flow_style=False), encoding="utf-8")
 
         cmd = MagicMock()
-        result = prototype_analyze_costs(cmd, output_format="json", refresh=False, json_output=True)
+        result = prototype_analyze_costs(cmd, refresh=False, json_output=True)
 
         assert result["status"] == "analyzed"
         agent.execute.assert_called_once()  # Stale cache — must re-run
@@ -1386,7 +1421,7 @@ class TestAnalyzeCostsCache:
         mock_prep.return_value = self._make_mock_prep(project_with_design, registry, mock_ctx)
 
         cmd = MagicMock()
-        prototype_analyze_costs(cmd, output_format="json", refresh=False)
+        prototype_analyze_costs(cmd, refresh=False)
 
         cache_path = project_with_design / ".prototype" / "state" / "cost_analysis.yaml"
         assert cache_path.exists()
@@ -1477,7 +1512,7 @@ class TestAnalyzeConsoleOutput:
         mock_prep.return_value = (str(project_with_design), config, registry, mock_ctx)
 
         cmd = MagicMock()
-        result = prototype_analyze_costs(cmd, output_format="json", refresh=True, json_output=True)
+        result = prototype_analyze_costs(cmd, refresh=True, json_output=True)
 
         assert result["status"] == "analyzed"
 

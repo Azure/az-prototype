@@ -353,7 +353,7 @@ class TestPrototypeGenerateDocs:
         result = prototype_generate_docs(cmd, json_output=True)
         assert result["status"] == "generated"
         assert len(result["documents"]) >= 1
-        docs_dir = project_with_config / "docs"
+        docs_dir = project_with_config / "concept" / "docs"
         assert docs_dir.is_dir()
 
     @patch(f"{_MOD}._get_project_dir")

@@ -23,6 +23,7 @@ $PYTHON -m pip install --upgrade build setuptools wheel --quiet
 # Clean previous builds
 echo "[2/3] Cleaning previous builds..."
 rm -rf dist/ build/ *.egg-info
+find azext_prototype/ -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
 # Build the wheel
 echo "[3/3] Building wheel..."

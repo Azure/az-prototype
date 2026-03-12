@@ -17,17 +17,6 @@ logger = logging.getLogger(__name__)
 # Project directory structure created by init
 PROJECT_SCAFFOLD = {
     "concept": {
-        "apps": {},
-        "infra": {
-            "terraform": {},
-            "bicep": {},
-        },
-        "db": {
-            "sql": {},
-            "cosmos": {},
-            "databricks": {},
-            "fabric": {},
-        },
         "docs": {},
     },
     ".prototype": {
@@ -106,8 +95,13 @@ class InitStage(BaseStage):
                 available = tmpl_registry.list_names()
                 raise CLIError(f"Unknown template '{_template}'. " f"Available templates: {', '.join(available)}")
 
-        # --- Idempotency check ---
-        project_dir = Path(output_dir).resolve() / name
+        # --- Resolve project directory ---
+        # When --output-dir is explicitly provided, use it as the project root.
+        # Otherwise, create a subdirectory named after the project in cwd.
+        if output_dir != ".":
+            project_dir = Path(output_dir).resolve()
+        else:
+            project_dir = Path(".").resolve() / name
         config_path = project_dir / ProjectConfig.CONFIG_FILENAME
         if config_path.exists():
             console.print_warning(f"Project already initialized at {project_dir}")
@@ -174,6 +168,13 @@ class InitStage(BaseStage):
 
         resolved_model = model or _DEFAULT_MODELS.get(ai_provider, "gpt-4o")
 
+        # Derive naming env abbreviation and zone_id from the chosen environment
+        from azext_prototype.naming import _ENV_TO_ZONE
+
+        _ENV_ABBREV = {"dev": "dev", "staging": "stg", "prod": "prd"}
+        naming_env = _ENV_ABBREV.get(environment.lower(), environment)
+        naming_zone_id = _ENV_TO_ZONE.get(environment.lower(), "zd")
+
         config_data = config.create_default(
             {
                 "project": {
@@ -181,6 +182,10 @@ class InitStage(BaseStage):
                     "location": location,
                     "environment": environment,
                     "iac_tool": iac_tool,
+                },
+                "naming": {
+                    "env": naming_env,
+                    "zone_id": naming_zone_id,
                 },
                 "ai": {
                     "provider": ai_provider,
@@ -231,7 +236,7 @@ class InitStage(BaseStage):
             summary_lines.append(f"  Template:    {template.display_name} ({template.name})")
             summary_lines.append(f"  Services:    {', '.join(s.type for s in template.services)}")
         summary_lines.append("")
-        summary_lines.append(f"  Next: cd {name} && az prototype design")
+        summary_lines.append(f"  Next: cd {project_dir.name} && az prototype design")
         console.panel("\n".join(summary_lines), title="Project Initialized")
 
         return result

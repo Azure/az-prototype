@@ -15,7 +15,6 @@ from azext_prototype.ui.widgets.info_bar import InfoBar
 from azext_prototype.ui.widgets.prompt_input import PromptInput
 from azext_prototype.ui.widgets.task_tree import TaskTree
 
-
 # -------------------------------------------------------------------- #
 # TaskStore unit tests (no Textual needed)
 # -------------------------------------------------------------------- #
@@ -163,7 +162,11 @@ async def test_task_tree_add_child():
 
 @pytest.mark.asyncio
 async def test_task_tree_add_section():
-    """TaskTree.add_section() should create an expandable node that accepts children."""
+    """TaskTree.add_section() should create a node that accepts children.
+
+    The section starts as a leaf (no expand arrow) and gains the arrow
+    automatically when its first child is added.
+    """
     app = PrototypeApp()
     async with app.run_test() as pilot:
         tree = app.task_tree
@@ -171,14 +174,15 @@ async def test_task_tree_add_section():
         tree.add_section("design", section)
         assert tree.store.get("design-section-arch") is not None
         assert "design-section-arch" in tree._node_map
-        # The section node should be expandable (not a leaf)
+        # Before children are added, the section should be a leaf (no arrow)
         node = tree._node_map["design-section-arch"]
-        assert node.allow_expand is True
+        assert node.allow_expand is False
 
-        # Now add a child under the section
+        # Adding a child should enable the expand arrow
         child = TaskItem(id="design-section-compute", label="Compute")
         tree.add_task("design-section-arch", child)
         assert tree.store.get("design-section-compute") is not None
+        assert node.allow_expand is True
 
 
 @pytest.mark.asyncio

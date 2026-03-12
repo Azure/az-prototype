@@ -3,6 +3,111 @@
 Release History
 ===============
 
+0.2.1b5
++++++++
+
+Backlog enrichment
+~~~~~~~~~~~~~~~~~~~
+* **Enriched backlog with full project context** — ``generate backlog``
+  now loads build stages, deploy status, cost analysis, and stage
+  completion (same context as spec-kit) for richer item generation.
+* **Completed work items** — items for already-built/deployed stages are
+  generated with ``status: done`` and grouped under a "Completed POC Work"
+  epic, with tasks marked as done.
+* **Production Readiness epic** — dedicated epic for POC-to-production
+  work (SKU upgrades, networking, CI/CD, monitoring, DR), separate from
+  generic "Deferred / Future Work".
+* **Azure DevOps hierarchy** — generation prompt requests Feature → User
+  Story → Task structure with ``children[]``; push code now creates Task
+  work items linked to their parent User Story.
+* **Dict task format** — tasks can be ``{"title": "...", "done": true}``
+  objects; GitHub issues render completed tasks as ``[x]``, DevOps
+  descriptions show checkbox markers.  String tasks remain supported.
+
+Spec-kit enrichment
+~~~~~~~~~~~~~~~~~~~~
+* **Enriched spec-kit with full project context** — ``generate speckit``
+  now loads discovery state, build stages, deploy status, cost analysis,
+  and stage completion to populate templates with real project data.
+* **Per-template prompt overrides** — each spec-kit template gets a
+  tailored AI prompt that tells the doc-agent exactly which context
+  sections to use and what output format to produce.
+* **production.md** — new template covering POC-to-production guidance:
+  SKU upgrades, networking, CI/CD, monitoring, DR, load testing, and
+  estimated production costs.
+* **Restructured tasks.md** — tasks now map 1:1 to build/deploy stages
+  with status markers: ``[x]`` completed, ``[!]`` failed, ``[ ]`` pending.
+  Added Phase 6 (Production Readiness) for hardening tasks.
+
+Init improvements
+~~~~~~~~~~~~~~~~~~
+* **Removed eager directory creation from init** — ``concept/apps/``,
+  ``concept/infra/`` (terraform/, bicep/), and ``concept/db/`` (sql/,
+  cosmos/, databricks/, fabric/) are no longer created during
+  ``az prototype init``.  These directories are now created on demand
+  by the build stage only when they are actually needed.
+* **Fixed --output-dir nesting** — ``--output-dir ./my-output`` now
+  uses the specified directory as the project root instead of creating
+  a ``name/`` subdirectory inside it.
+* **Fixed "Next: cd ..." hint** — the summary panel now shows the
+  actual project directory name instead of always displaying the
+  ``--name`` value.
+* **--json flag on all commands** — added ``json_output`` parameter to
+  every command function so the global ``--json`` / ``-j`` flag is
+  accepted on all 24 commands (previously only 3 accepted it).
+* **Naming env/zone_id derived from --environment** — ``naming.env``
+  and ``naming.zone_id`` in ``prototype.yaml`` now reflect the chosen
+  environment (dev→dev/zd, staging→stg/zs, prod→prd/zp) instead of
+  always defaulting to ``dev``/``zd``.
+
+TUI stage tree fix
+~~~~~~~~~~~~~~~~~~
+* **Fixed stage tree showing completed checkmark for unstarted stages** —
+  when launching with ``--stage design`` from an init-only project, the
+  Design stage now correctly shows as in-progress (●) instead of
+  completed (✓).  Stage status is now derived from detected state files,
+  not the target stage.
+* **Stage skip guard** — ``--stage deploy`` from an init-only project
+  now prints a warning and falls back to the next valid stage (e.g.
+  design) instead of allowing users to skip ahead.
+* **Consistent "no project" error message** — all commands now show the
+  same red ``CLIError`` message when ``prototype.yaml`` is missing:
+  *"No prototype project found. Run 'az prototype init'."*
+* **Replaced ``--output-format`` with ``--table`` / ``--report``** — the
+  ``analyze costs`` command shows the cost summary table by default,
+  ``--table`` shows the summary without saving a file, ``--report``
+  shows the full detailed report, and ``--json`` returns raw JSON.
+  The ``generate backlog`` command uses ``--table`` instead of
+  ``--output-format``.
+* **``--json`` on cost analysis returns full content** — ``--json`` now
+  suppresses console output and returns a structured JSON dict with the
+  full cost report in the ``content`` field for machine consumption.
+* **``generate docs`` default output moved to ``concept/docs/``** —
+  documentation is now generated alongside other concept artifacts
+  instead of a separate ``docs/`` directory at the project root.
+* **Normalized path separators in generate output** — displayed paths
+  now use forward slashes on all platforms instead of mixed separators
+  on Windows.  Also handles cross-mount ``--path`` values (e.g.
+  ``Y:\output`` from a ``\\Mac\projects`` project) without crashing.
+* **Spec-kit generates its own templates** — ``generate speckit`` now
+  produces spec-kit-specific files (``constitution.md``, ``spec.md``,
+  ``plan.md``, ``tasks.md``) aligned with the `spec-kit
+  <https://github.com/github/spec-kit>`_ format instead of duplicating
+  the documentation templates.
+
+TUI post-design improvements
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Removed CLI "Next steps" from TUI** — the ``az prototype`` CLI
+  commands block is no longer printed into the TUI console after
+  architecture generation; replaced with a continuation prompt.
+* **"continue" launches build** — typing ``continue`` after design
+  completes now starts the build stage, matching the prompt text.
+* **Reduced console noise** — removed extra blank lines between
+  "Planning...", "Generating architecture...", and feasibility
+  check messages in the TUI output.
+* **Feasibility wording** — changed "Reviewing {iac} feasibility..."
+  to "Confirming {iac} feasibility..." and removed the arrow prefix.
+
 0.2.1b4
 +++++++
 

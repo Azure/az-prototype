@@ -236,10 +236,16 @@ def load_arguments(self, _):
 
     with self.argument_context("prototype analyze costs") as c:
         c.argument(
-            "output_format",
-            arg_type=get_enum_type(["table", "json", "markdown"]),
-            help="Output format for the cost report.",
-            default="markdown",
+            "table",
+            action="store_true",
+            default=False,
+            help="Display only the cost summary table.",
+        )
+        c.argument(
+            "report",
+            action="store_true",
+            default=False,
+            help="Display the full detailed cost report.",
         )
         c.argument(
             "refresh",
@@ -259,10 +265,10 @@ def load_arguments(self, _):
         c.argument("org", help="Organization or owner name (GitHub org/user or Azure DevOps org).")
         c.argument("project", help="Project name (Azure DevOps project or GitHub repo).")
         c.argument(
-            "output_format",
-            arg_type=get_enum_type(["table", "json", "markdown"]),
-            help="Output format for the backlog.",
-            default="markdown",
+            "table",
+            action="store_true",
+            default=False,
+            help="Display backlog as a table instead of markdown.",
         )
         c.argument(
             "quick",

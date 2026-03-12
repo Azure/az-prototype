@@ -41,7 +41,7 @@ def _get_checks(stage_name: str, project_dir: str) -> list[tuple]:
         (
             "project_exists",
             lambda: p.is_dir(),
-            f"Project directory not found: {project_dir}. Run 'az prototype init' first.",
+            "No prototype project found. Run 'az prototype init'.",
         ),
     ]
 
@@ -58,7 +58,7 @@ def _get_checks(stage_name: str, project_dir: str) -> list[tuple]:
             (
                 "config_exists",
                 lambda: (p / "prototype.yaml").is_file(),
-                "No prototype.yaml found. Run 'az prototype init' first.",
+                "No prototype project found. Run 'az prototype init'.",
             ),
         ],
         "build": [
@@ -66,7 +66,7 @@ def _get_checks(stage_name: str, project_dir: str) -> list[tuple]:
             (
                 "config_exists",
                 lambda: (p / "prototype.yaml").is_file(),
-                "No prototype.yaml found. Run 'az prototype init' first.",
+                "No prototype project found. Run 'az prototype init'.",
             ),
             (
                 "design_done",
@@ -79,7 +79,7 @@ def _get_checks(stage_name: str, project_dir: str) -> list[tuple]:
             (
                 "config_exists",
                 lambda: (p / "prototype.yaml").is_file(),
-                "No prototype.yaml found. Run 'az prototype init' first.",
+                "No prototype project found. Run 'az prototype init'.",
             ),
             (
                 "build_done",

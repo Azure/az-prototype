@@ -553,8 +553,8 @@ class TestPrototypeGenerateBacklog:
 
     @patch(f"{_CUSTOM_MODULE}._check_requirements")
     @patch(f"{_CUSTOM_MODULE}._get_project_dir")
-    def test_generate_backlog_json_format(self, mock_dir, mock_check_req, project_with_design, mock_ai_provider):
-        """Format field in result reflects output_format parameter."""
+    def test_generate_backlog_result_fields(self, mock_dir, mock_check_req, project_with_design, mock_ai_provider):
+        """Result dict includes expected fields."""
         from azext_prototype.custom import prototype_generate_backlog
         from azext_prototype.stages.backlog_session import BacklogResult
 
@@ -575,9 +575,10 @@ class TestPrototypeGenerateBacklog:
             mock_ctx.return_value = ctx
             MockSession.return_value.run.return_value = mock_result
 
-            result = prototype_generate_backlog(cmd, provider="github", org="o", project="p", output_format="json", json_output=True)
+            result = prototype_generate_backlog(cmd, provider="github", org="o", project="p", json_output=True)
 
-        assert result["format"] == "json"
+        assert result["status"] == "generated"
+        assert result["items_generated"] == 1
 
     @patch(f"{_CUSTOM_MODULE}._check_requirements")
     @patch(f"{_CUSTOM_MODULE}._get_project_dir")

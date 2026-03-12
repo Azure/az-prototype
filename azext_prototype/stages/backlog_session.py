@@ -30,6 +30,7 @@ from azext_prototype.stages.backlog_push import (
     check_gh_auth,
     push_devops_feature,
     push_devops_story,
+    push_devops_task,
     push_github_issue,
 )
 from azext_prototype.stages.backlog_state import BacklogState
@@ -447,28 +448,46 @@ class BacklogSession:
                 )
 
         task = (
-            "Analyze the following architecture and produce a comprehensive "
-            "backlog of work items.\n\n"
+            "Analyze the following architecture and project context to produce "
+            "a comprehensive backlog of work items.\n\n"
             "For each item provide:\n"
             "- epic (feature area grouping)\n"
             "- title\n"
             "- description (2-4 sentences explaining the purpose)\n"
             "- acceptance_criteria (numbered list)\n"
-            "- tasks (concrete actionable sub-tasks)\n"
+            "- tasks (concrete actionable sub-tasks as objects: "
+            '{"title": "...", "done": true/false})\n'
+            '- status ("done" if already completed, "todo" otherwise)\n'
             "- effort estimate (S / M / L / XL)\n\n"
         )
 
-        # Inject production backlog items from knowledge base
+        # Section 1: Completed work
+        task += (
+            "## Completed Work\n"
+            "Analyze the Build Stages and Deploy Status tables in the context below. "
+            "For each stage where build status=generated or deploy status=deployed, "
+            'create a backlog item reflecting completed work. Set status to "done" '
+            'and mark relevant tasks as done. Group under a "Completed POC Work" epic. '
+            "Include what was built and acceptance criteria that are satisfied.\n\n"
+        )
+
+        # Section 2: Production readiness
         production_items_text = self._get_production_items()
+        task += (
+            "## Production Readiness\n"
+            'Create a dedicated "Production Readiness" epic (NOT "Deferred / Future Work"). '
+            "Derive items from POC SKUs in Build Stages vs production equivalents. "
+            "Include: SKU upgrades, network hardening, CI/CD pipelines, monitoring/alerting, "
+            "disaster recovery, and security hardening.\n"
+        )
         if production_items_text:
             task += (
-                "## Production Backlog Items (from knowledge base)\n"
-                "The following production-readiness items were identified for "
-                "the services in this architecture. Include them as stories in "
-                "a 'Deferred / Future Work' epic:\n"
-                f"{production_items_text}\n\n"
+                "The following production-readiness items were identified from the knowledge base:\n"
+                f"{production_items_text}\n"
             )
+        task += "\n"
 
+        # Section 3: Scope boundaries
         if scope_text:
             task += (
                 "## Scope Boundaries\n"
@@ -478,20 +497,55 @@ class BacklogSession:
                 f"{scope_text}\n\n"
             )
 
+        # Section 4: Provider-aware JSON schema
+        if provider == "devops":
+            task += (
+                "## Output Format (Azure DevOps hierarchy)\n"
+                "Respond ONLY with a JSON array. Each element is a Feature with children:\n"
+                "```\n"
+                "{\n"
+                '  "epic": "...",\n'
+                '  "title": "Feature title",\n'
+                '  "description": "...",\n'
+                '  "acceptance_criteria": ["AC1", "AC2"],\n'
+                '  "tasks": [{"title": "Task 1", "done": false}],\n'
+                '  "effort": "M",\n'
+                '  "status": "todo",\n'
+                '  "children": [\n'
+                "    {\n"
+                '      "title": "User Story title",\n'
+                '      "description": "...",\n'
+                '      "acceptance_criteria": ["AC1"],\n'
+                '      "tasks": [{"title": "Task 1", "done": false}],\n'
+                '      "effort": "S",\n'
+                '      "status": "todo"\n'
+                "    }\n"
+                "  ]\n"
+                "}\n"
+                "```\n"
+                "Features map to DevOps Features, children to User Stories, tasks to Tasks.\n\n"
+            )
+        else:
+            task += (
+                "## Output Format (GitHub Issues)\n"
+                "Respond ONLY with a JSON array. Each element:\n"
+                "```\n"
+                "{\n"
+                '  "epic": "...",\n'
+                '  "title": "...",\n'
+                '  "description": "...",\n'
+                '  "acceptance_criteria": ["AC1", "AC2"],\n'
+                '  "tasks": [{"title": "Task 1", "done": false}],\n'
+                '  "effort": "M",\n'
+                '  "status": "todo"\n'
+                "}\n"
+                "```\n"
+                'For completed items, set "status": "done" and mark tasks as "done": true.\n\n'
+            )
+
         task += (
-            "Respond ONLY with a JSON array. Each element:\n"
-            "```\n"
-            "{\n"
-            '  "epic": "...",\n'
-            '  "title": "...",\n'
-            '  "description": "...",\n'
-            '  "acceptance_criteria": ["AC1", "AC2"],\n'
-            '  "tasks": ["Task 1", "Task 2"],\n'
-            '  "effort": "M"\n'
-            "}\n"
-            "```\n\n"
             "No markdown, no explanation — only the JSON array.\n\n"
-            f"## Architecture\n{design_context}"
+            f"## Architecture & Project Context\n{design_context}"
         )
 
         messages.append(AIMessage(role="user", content=task))
@@ -500,7 +554,7 @@ class BacklogSession:
         response = self._context.ai_provider.chat(
             messages,
             temperature=0.3,
-            max_tokens=8192,
+            max_tokens=16384,
         )
         self._token_tracker.record(response)
 
@@ -650,6 +704,12 @@ class BacklogSession:
                             child_url = child_result.get("url", "")
                             if child_url:
                                 push_urls.append(child_url)
+                            # Push pending tasks as DevOps Task work items
+                            story_id = child_result.get("id")
+                            for task in child.get("tasks", []):
+                                if isinstance(task, dict) and not task.get("done", False):
+                                    task_item = {"title": task.get("title", ""), "description": ""}
+                                    push_devops_task(org, project, task_item, parent_id=story_id)
 
         _print("")
         _print(f"  Done: {pushed_count} pushed, {failed_count} failed")
@@ -693,6 +753,28 @@ class BacklogSession:
             url = result.get("url", "")
             _print(f"  v {title}: {url}")
             self._backlog_state.mark_item_pushed(idx, url)
+
+            # Push children for DevOps hierarchical items
+            if provider == "devops":
+                parent_id = result.get("id")
+                children = item.get("children", [])
+                for child in children:
+                    child_result = push_devops_story(
+                        org,
+                        project,
+                        child,
+                        parent_id=parent_id,
+                    )
+                    if "error" not in child_result:
+                        child_url = child_result.get("url", "")
+                        if child_url:
+                            _print(f"    v {child.get('title', '')}: {child_url}")
+                        # Push pending tasks as DevOps Task work items
+                        story_id = child_result.get("id")
+                        for task in child.get("tasks", []):
+                            if isinstance(task, dict) and not task.get("done", False):
+                                task_item = {"title": task.get("title", ""), "description": ""}
+                                push_devops_task(org, project, task_item, parent_id=story_id)
 
     # ------------------------------------------------------------------ #
     # Slash commands
@@ -932,7 +1014,11 @@ class BacklogSession:
                 if tasks:
                     lines.append("**Tasks:**\n")
                     for t in tasks:
-                        lines.append(f"- [ ] {t}")
+                        if isinstance(t, dict):
+                            check = "x" if t.get("done", False) else " "
+                            lines.append(f"- [{check}] {t.get('title', '')}")
+                        else:
+                            lines.append(f"- [ ] {t}")
                     lines.append("")
 
                 lines.append("---\n")

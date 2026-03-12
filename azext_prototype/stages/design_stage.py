@@ -89,7 +89,7 @@ class DesignStage(BaseStage):
                 name="project_initialized",
                 description="Project must be initialized",
                 check_fn=lambda: Path("prototype.yaml").is_file(),
-                error_message="Run 'az prototype init' first.",
+                error_message="No prototype project found. Run 'az prototype init'.",
             ),
         ]
 
@@ -325,7 +325,7 @@ class DesignStage(BaseStage):
         # 5. Run supporting IaC review
         iac_tool = config.get("project.iac_tool", "terraform")
         if ui:
-            with ui.spinner(f"Reviewing {iac_tool} feasibility..."):
+            with ui.spinner(f"Confirming {iac_tool} feasibility..."):
                 self._run_iac_review(
                     agent_context,
                     registry,
@@ -334,7 +334,7 @@ class DesignStage(BaseStage):
                     design_output,
                 )
         else:
-            _print(f"\n[bright_cyan]\u2192[/bright_cyan] Reviewing {iac_tool} feasibility...")
+            _print(f"Confirming {iac_tool} feasibility...")
             self._run_iac_review(
                 agent_context,
                 registry,
@@ -396,10 +396,8 @@ class DesignStage(BaseStage):
                 "[bright_cyan]\u2192[/bright_cyan] Architecture docs:"
                 " [bright_cyan]concept/docs/ARCHITECTURE.md[/bright_cyan]"
             )
-            _print("\n[dim]Next steps:[/dim]")
-            _print("[dim]  az prototype design --context 'your changes'  # Refine[/dim]")
-            _print("[dim]  az prototype analyze costs                    # Cost estimate[/dim]")
-            _print("[dim]  az prototype build                            # Generate code[/dim]")
+            _print("")
+            _print("Architecture generated. Type 'continue' to begin build out.")
 
         return {
             "status": "success",
@@ -595,7 +593,7 @@ class DesignStage(BaseStage):
             with ui.spinner("Planning architecture sections..."):
                 response = architect.execute(agent_context, planning_prompt)
         else:
-            _print("\nPlanning architecture sections...")
+            _print("Planning architecture sections...")
             response = architect.execute(agent_context, planning_prompt)
 
         # Parse JSON from the response
@@ -707,7 +705,7 @@ class DesignStage(BaseStage):
                 with ui.spinner(spinner_msg):
                     response = architect.execute(agent_context, prompt)
             else:
-                _print(f"\n{spinner_msg}")
+                _print(spinner_msg)
                 response = architect.execute(agent_context, prompt)
 
             # Handle truncation for this section

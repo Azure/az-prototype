@@ -437,7 +437,7 @@ class DiscoverySession:
         # All sections walked
         _print("")
         if all_confirmed:
-            _print("All topics covered! Type anything to keep discussing, or 'continue' to proceed.")
+            _print("All topics covered! Type anything to keep discussing, or 'continue' to generate architecture.")
         else:
             _print("Type anything to keep discussing, or 'continue' to proceed.")
         return None

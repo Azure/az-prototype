@@ -691,7 +691,7 @@ class TestBacklogIntegration:
             call_args = provider.chat.call_args_list[0]
             messages = call_args[0][0]
             user_msg = [m for m in messages if m.role == "user"][0]
-            assert "Production Backlog Items" in user_msg.content
+            assert "production-readiness items were identified from the knowledge base" in user_msg.content
 
     def test_empty_production_items_no_injection(self, tmp_path):
         session, provider, project_dir = self._make_session(tmp_path)

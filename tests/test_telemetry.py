@@ -354,7 +354,7 @@ class TestGetExtensionVersion:
         from azext_prototype.telemetry import _get_extension_version
 
         version = _get_extension_version()
-        assert version == "0.2.1b4"
+        assert version == "0.2.1b5"
 
     def test_returns_unknown_on_error(self):
         from azext_prototype.telemetry import _get_extension_version

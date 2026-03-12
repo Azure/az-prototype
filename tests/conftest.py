@@ -42,14 +42,7 @@ def tmp_project(tmp_path):
     project_dir = tmp_path / "test-project"
     project_dir.mkdir()
 
-    # Scaffold directories
-    (project_dir / "concept" / "apps").mkdir(parents=True)
-    (project_dir / "concept" / "infra" / "terraform").mkdir(parents=True)
-    (project_dir / "concept" / "infra" / "bicep").mkdir(parents=True)
-    (project_dir / "concept" / "db" / "sql").mkdir(parents=True)
-    (project_dir / "concept" / "db" / "cosmos").mkdir(parents=True)
-    (project_dir / "concept" / "db" / "databricks").mkdir(parents=True)
-    (project_dir / "concept" / "db" / "fabric").mkdir(parents=True)
+    # Scaffold directories (only what init creates — no infra/apps/db)
     (project_dir / "concept" / "docs").mkdir(parents=True)
     (project_dir / ".prototype" / "agents").mkdir(parents=True)
     (project_dir / ".prototype" / "state").mkdir(parents=True)

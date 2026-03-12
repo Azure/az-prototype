@@ -205,9 +205,12 @@ jobs:
           # Ensure fork exists (no-op if already forked)
           gh repo fork Azure/azure-cli-extensions --clone=false || true
 
-          # Clone the fork via gh (handles auth automatically)
+          # Sync fork's main with upstream so we have the latest index/service files
           GH_USER=$(gh api user -q .login)
           echo "Fork owner: $GH_USER"
+          gh repo sync "${GH_USER}/azure-cli-extensions" --source Azure/azure-cli-extensions --branch main --force
+
+          # Clone the fork via gh (handles auth automatically)
           gh repo clone "${GH_USER}/azure-cli-extensions" azure-cli-extensions -- --depth 1
 
           # Add upstream for PR targeting

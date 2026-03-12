@@ -214,10 +214,14 @@ long-summary: |
     the command returns the cached result unless the design context has
     changed. Use --refresh to force a fresh analysis.
 examples:
-    - name: Generate cost estimate
+    - name: Show cost summary table (default)
       text: az prototype analyze costs
-    - name: Get costs in JSON format
-      text: az prototype analyze costs --output-format json
+    - name: Show cost summary table only (no file save)
+      text: az prototype analyze costs --table
+    - name: Show full detailed cost report
+      text: az prototype analyze costs --report
+    - name: Get costs as JSON
+      text: az prototype analyze costs --json
     - name: Force fresh analysis (bypass cache)
       text: az prototype analyze costs --refresh
 """

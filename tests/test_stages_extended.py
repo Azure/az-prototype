@@ -299,15 +299,12 @@ class TestInitStageExecution:
         project_dir = tmp_path / "my-project"
         stage._create_scaffold(project_dir)
 
-        assert (project_dir / "concept" / "apps").is_dir()
-        assert (project_dir / "concept" / "infra" / "terraform").is_dir()
-        assert (project_dir / "concept" / "infra" / "bicep").is_dir()
-        assert (project_dir / "concept" / "db" / "sql").is_dir()
-        assert (project_dir / "concept" / "db" / "cosmos").is_dir()
-        assert (project_dir / "concept" / "db" / "databricks").is_dir()
-        assert (project_dir / "concept" / "db" / "fabric").is_dir()
         assert (project_dir / "concept" / "docs").is_dir()
         assert (project_dir / ".prototype" / "agents").is_dir()
+        # infra, apps, db dirs are NOT created at init — only during build
+        assert not (project_dir / "concept" / "apps").exists()
+        assert not (project_dir / "concept" / "infra").exists()
+        assert not (project_dir / "concept" / "db").exists()
 
     def test_create_gitignore(self, tmp_path):
         stage = self._make_stage()
@@ -345,13 +342,14 @@ class TestInitStageExecution:
         ctx = AgentContext(project_config={}, project_dir=str(tmp_path), ai_provider=None)
         registry = AgentRegistry()
 
+        out = tmp_path / "test-proj"
         result = stage.execute(
             ctx, registry,
             name="test-proj", location="westus2", iac_tool="bicep",
-            ai_provider="github-models", output_dir=str(tmp_path),
+            ai_provider="github-models", output_dir=str(out),
         )
         assert result["status"] == "success"
-        assert (tmp_path / "test-proj" / "prototype.yaml").exists()
+        assert (out / "prototype.yaml").exists()
 
     @patch("azext_prototype.auth.copilot_license.CopilotLicenseValidator")
     @patch("azext_prototype.auth.github_auth.GitHubAuthManager")
@@ -377,7 +375,7 @@ class TestInitStageExecution:
         result = stage.execute(
             ctx, registry,
             name="lic-test", location="eastus", ai_provider="github-models",
-            output_dir=str(tmp_path),
+            output_dir=str(tmp_path / "lic-test"),
         )
         assert result["status"] == "success"
         assert result["copilot_license"]["status"] == "unverified"
@@ -393,7 +391,7 @@ class TestInitStageExecution:
         registry = AgentRegistry()
 
         with pytest.raises(CLIError, match="Project name"):
-            stage.execute(ctx, registry, name="", output_dir=str(tmp_path))
+            stage.execute(ctx, registry, name="", output_dir=str(tmp_path / "empty-name"))
 
     def test_execute_no_location_raises(self, tmp_path):
         stage = self._make_stage()
@@ -408,7 +406,7 @@ class TestInitStageExecution:
         with pytest.raises(CLIError, match="region is required"):
             stage.execute(
                 ctx, registry,
-                name="test-proj", location=None, output_dir=str(tmp_path),
+                name="test-proj", location=None, output_dir=str(tmp_path / "test-proj"),
             )
 
     def test_execute_azure_openai_skips_auth(self, tmp_path):
@@ -425,7 +423,7 @@ class TestInitStageExecution:
         result = stage.execute(
             ctx, registry,
             name="aoai-test", location="eastus", ai_provider="azure-openai",
-            output_dir=str(tmp_path),
+            output_dir=str(tmp_path / "aoai-test"),
         )
         assert result["status"] == "success"
         assert result["github_user"] is None
@@ -443,14 +441,17 @@ class TestInitStageExecution:
         ctx = AgentContext(project_config={}, project_dir=str(tmp_path), ai_provider=None)
         registry = AgentRegistry()
 
+        out = tmp_path / "env-test"
         stage.execute(
             ctx, registry,
             name="env-test", location="westus2", ai_provider="azure-openai",
-            environment="prod", output_dir=str(tmp_path),
+            environment="prod", output_dir=str(out),
         )
-        config = ProjectConfig(str(tmp_path / "env-test"))
+        config = ProjectConfig(str(out))
         config.load()
         assert config.get("project.environment") == "prod"
+        assert config.get("naming.env") == "prd"
+        assert config.get("naming.zone_id") == "zp"
 
     def test_execute_model_override(self, tmp_path):
         """Explicit --model should override provider default."""
@@ -464,12 +465,13 @@ class TestInitStageExecution:
         ctx = AgentContext(project_config={}, project_dir=str(tmp_path), ai_provider=None)
         registry = AgentRegistry()
 
+        out = tmp_path / "model-test"
         stage.execute(
             ctx, registry,
             name="model-test", location="eastus", ai_provider="azure-openai",
-            model="gpt-4o-mini", output_dir=str(tmp_path),
+            model="gpt-4o-mini", output_dir=str(out),
         )
-        config = ProjectConfig(str(tmp_path / "model-test"))
+        config = ProjectConfig(str(out))
         config.load()
         assert config.get("ai.model") == "gpt-4o-mini"
 
@@ -493,7 +495,7 @@ class TestInitStageExecution:
             result = stage.execute(
                 ctx, registry,
                 name="idem-test", location="eastus", ai_provider="azure-openai",
-                output_dir=str(tmp_path),
+                output_dir=str(proj),
             )
         assert result["status"] == "cancelled"
 
@@ -509,12 +511,13 @@ class TestInitStageExecution:
         ctx = AgentContext(project_config={}, project_dir=str(tmp_path), ai_provider=None)
         registry = AgentRegistry()
 
+        out = tmp_path / "complete-test"
         stage.execute(
             ctx, registry,
             name="complete-test", location="eastus", ai_provider="azure-openai",
-            output_dir=str(tmp_path),
+            output_dir=str(out),
         )
-        config = ProjectConfig(str(tmp_path / "complete-test"))
+        config = ProjectConfig(str(out))
         config.load()
         assert config.get("stages.init.completed") is True
         assert config.get("stages.init.timestamp") is not None
