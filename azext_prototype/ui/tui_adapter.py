@@ -258,7 +258,7 @@ class TUIAdapter:
                     elapsed = time.monotonic() - self._timer_start
                     self._app.info_bar.update_status(f"\u23f1 {_format_elapsed(elapsed)}")
                 self._timer_start = None
-                self._app.info_bar.update_assist("Enter = submit | Ctrl+J = newline | Ctrl+C = quit")
+                self._app.info_bar.update_assist("Enter = submit | Ctrl+J = newline | Ctrl+Q = quit")
                 self._request_screen_update()
 
             try:

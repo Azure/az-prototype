@@ -369,6 +369,17 @@ class DiscoverySession:
             self._show_content(section.content, use_styled, _print)
             self._update_token_status()
 
+            # Tell the user what to do with this section
+            remaining = len(sections) - i - 1
+            hint = (
+                f"[Topic {i + 1} of {len(sections)}] "
+                "Reply to discuss, 'skip' for next topic, or 'done' to finish."
+            )
+            if use_styled:
+                self._console.print_info(hint)
+            else:
+                _print(hint)
+
             # Inner follow-up loop (max 5 per section)
             section_confirmed = False
             for _ in range(5):
@@ -585,15 +596,23 @@ class DiscoverySession:
                 exchange_count=self._exchange_count,
             )
 
+        # ---- Call-to-action so the user knows what to do next ----
+        _cta = "Let me know if I missed anything above. Otherwise, are you ready to continue?"
+        if use_styled:
+            self._console.print_info(_cta)
+        else:
+            _print(_cta)
+
         # ---- Main conversation loop ----
         first_prompt = True
         while True:
             try:
                 if use_styled:
                     # Use bordered prompt with instruction and status
+                    instruction = DiscoveryPrompt.INSTRUCTION
                     user_input = self._prompt.prompt(
                         "> ",
-                        instruction=DiscoveryPrompt.INSTRUCTION if first_prompt else None,
+                        instruction=instruction,
                         show_quit_hint=first_prompt,
                         open_count=self._discovery_state.open_count,
                     )

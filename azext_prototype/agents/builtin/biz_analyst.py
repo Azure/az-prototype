@@ -67,7 +67,9 @@ having a conversation — not running a questionnaire.
 When analyzing the user's input, be COMPREHENSIVE — cover all relevant \
 topic areas in a single response. Use `## Heading` for each topic area \
 so the system can present them to the user one at a time. Ask 2–4 \
-focused questions per topic.
+focused questions per topic. Always end your response with your actual \
+questions — never end with a lead-in sentence (like "Let me ask \
+about...") without listing the questions themselves.
 
 When responding to follow-up answers about a SPECIFIC topic, stay \
 focused on that topic only. When you have no more questions about it, \

@@ -35,10 +35,6 @@ class PrototypeApp(App):
 
     CSS = APP_CSS
 
-    BINDINGS = [
-        ("ctrl+c", "quit", "Quit"),
-    ]
-
     def __init__(
         self,
         store: TaskStore | None = None,
@@ -92,7 +88,7 @@ class PrototypeApp(App):
     def on_mount(self) -> None:
         """Set up the initial state after widgets are mounted."""
         self.title = "az prototype"
-        self.info_bar.update_assist("Enter = submit | Ctrl+J = newline | Ctrl+C = quit")
+        self.info_bar.update_assist("Enter = submit | Ctrl+J = newline | Ctrl+Q = quit")
         self.prompt_input.disable()
 
         # Write a welcome banner

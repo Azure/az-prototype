@@ -105,10 +105,6 @@ class PromptInput(TextArea):
     # ------------------------------------------------------------------ #
 
     async def _on_key(self, event) -> None:
-        # Always let Ctrl+C bubble up to the app's quit binding
-        if event.key == "ctrl+c":
-            return
-
         if not self._enabled:
             event.prevent_default()
             event.stop()

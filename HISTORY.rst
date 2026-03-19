@@ -8,6 +8,17 @@ Release History
 
 * Renamed ``--script-resource-group`` deploy flag to ``--script-rg`` for
   consistency with Azure CLI conventions.
+* **TUI quit shortcut** — changed quit key from Ctrl+C to Ctrl+Q.
+  Textual 8.x reserves Ctrl+C for clipboard copy in TextArea widgets;
+  the info bar and adapter now advertise the correct shortcut.  Removed
+  the now-unnecessary SIGINT suppression from ``_run_tui()``.
+* **Discovery UX: clear call-to-action after AI response** — the system now
+  prints an explicit prompt ("Let me know if I missed anything above.
+  Otherwise, are you ready to continue?") after the initial AI response so
+  the user knows the session is waiting for input.
+* **Biz-analyst prompt fix** — agent prompt now requires responses to end
+  with actual questions, preventing dangling lead-in sentences that leave
+  the user unsure what to do next.
 
 0.2.1b5
 +++++++

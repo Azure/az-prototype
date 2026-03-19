@@ -399,7 +399,7 @@ class StageOrchestrator:
             if result.get("status") == "cancelled":
                 self._adapter.print_fn("[bright_yellow]![/bright_yellow] Design session cancelled.")
                 self._app.call_from_thread(self._app.exit)
-                return
+                raise ShutdownRequested()
             self._adapter.update_task("design", TaskStatus.COMPLETED)
             self._populate_design_subtasks()
         except ShutdownRequested:

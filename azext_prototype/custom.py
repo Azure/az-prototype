@@ -9,7 +9,6 @@ import hashlib
 import json
 import logging
 import os
-import signal
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -391,22 +390,11 @@ def prototype_init(
 
 
 def _run_tui(app) -> None:
-    """Run a Textual app with clean Ctrl+C handling.
-
-    Suppresses SIGINT during the Textual run so that Ctrl+C is handled
-    exclusively as a key event by the Textual binding (``ctrl+c`` →
-    ``action_quit``).  This prevents ``KeyboardInterrupt`` from
-    propagating to the Azure CLI framework and, on Windows, eliminates
-    the "Terminate batch job (Y/N)?" prompt from ``az.cmd``.
-    """
-    prev = signal.getsignal(signal.SIGINT)
+    """Run a Textual app, suppressing KeyboardInterrupt on exit."""
     try:
-        signal.signal(signal.SIGINT, lambda *_: None)
         app.run()
-    except KeyboardInterrupt:
-        pass  # clean exit
-    finally:
-        signal.signal(signal.SIGINT, prev)
+    except (KeyboardInterrupt, SystemExit):
+        pass
 
 
 @_quiet_output
