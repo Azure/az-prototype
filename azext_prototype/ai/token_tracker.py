@@ -7,6 +7,7 @@ providing at-a-glance token counts and context-window budget tracking.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 # Model context-window sizes (prompt token budget).
 # Used for budget-percentage display.  Values are the *input* context
@@ -96,6 +97,7 @@ class TokenTracker:
     _turn_count: int = field(default=0, repr=False)
     _model: str = field(default="", repr=False)
     _is_copilot: bool = field(default=False, repr=False)
+    _on_update: Any = field(default=None, repr=False)
 
     # ------------------------------------------------------------------
     # Public API
@@ -127,6 +129,13 @@ class TokenTracker:
         pru = self._compute_pru(model)
         self._this_turn_pru = pru
         self._session_pru += pru
+
+        # Auto-push status update to the UI if a callback is set
+        if self._on_update:
+            try:
+                self._on_update(self.format_status())
+            except Exception:
+                pass  # Never let UI callbacks break the AI flow
 
     @property
     def this_turn(self) -> int:

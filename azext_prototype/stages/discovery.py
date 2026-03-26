@@ -258,6 +258,8 @@ class DiscoverySession:
         self._messages: list[AIMessage] = []
         self._exchange_count: int = 0
         self._token_tracker = TokenTracker()
+        if self._console:
+            self._token_tracker._on_update = self._console.print_token_status
 
         # Resolve agents for joint discovery
         biz_agents = registry.find_by_capability(AgentCapability.BIZ_ANALYSIS)

@@ -212,8 +212,10 @@ class DeploySession:
         self._config = config
         self._iac_tool: str = config.get("project.iac_tool", "terraform")
 
-        # Token tracker
+        # Token tracker — auto-pushes status to UI after every AI call
         self._token_tracker = TokenTracker()
+        if self._console:
+            self._token_tracker._on_update = self._console.print_token_status
 
         # Intent classifier for natural language command detection
         self._intent_classifier = build_deploy_classifier(

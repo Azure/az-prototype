@@ -83,6 +83,11 @@ TUI & UX
   stage (e.g. design after build+deploy) now marks all downstream stages
   as pending in the TUI tree, reflecting that they depend on the changed
   output and will need to be re-run.
+* **Token status auto-updates after every AI call** — ``TokenTracker`` now
+  fires an ``_on_update`` callback after each ``record()`` call.  All four
+  sessions (discovery, build, deploy, backlog) wire this to the console so
+  the bottom-right status bar updates continuously, not just during specific
+  phases.
 * **TUI quit shortcut** changed from Ctrl+C to Ctrl+Q.
 * **Discovery UX** — clear call-to-action after AI response; trailing
   colons stripped from topic headings in the stage tree.

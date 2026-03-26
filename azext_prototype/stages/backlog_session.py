@@ -132,8 +132,10 @@ class BacklogSession:
         self._prompt = DiscoveryPrompt(self._console)
         self._backlog_state = backlog_state or BacklogState(agent_context.project_dir)
 
-        # Token tracker
+        # Token tracker — auto-pushes status to UI after every AI call
         self._token_tracker = TokenTracker()
+        if self._console:
+            self._token_tracker._on_update = self._console.print_token_status
 
         # Resolve project-manager agent
         pm_agents = registry.find_by_capability(AgentCapability.BACKLOG_GENERATION)
