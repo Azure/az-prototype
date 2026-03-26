@@ -13,7 +13,11 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from azext_prototype.governance.embeddings import EmbeddingBackend, cosine_similarity, create_backend
+from azext_prototype.governance.embeddings import (
+    EmbeddingBackend,
+    cosine_similarity,
+    create_backend,
+)
 
 logger = logging.getLogger(__name__)
 

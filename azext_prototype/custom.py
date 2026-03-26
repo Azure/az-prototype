@@ -556,6 +556,24 @@ def prototype_build(cmd, scope="all", dry_run=False, status=False, reset=False, 
     stage = BuildStage()
     _check_guards(stage)
 
+    # Launch TUI for interactive builds (same pattern as design stage).
+    # Skip TUI for dry-run, --json, or non-interactive (e.g. tests).
+    import sys
+
+    if not dry_run and not json_output and sys.stdout.isatty():
+        from azext_prototype.ui.app import PrototypeApp
+
+        stage_kwargs = {"scope": scope, "reset": reset, "auto_accept": auto_accept}
+
+        app = PrototypeApp(
+            start_stage="build",
+            project_dir=project_dir,
+            stage_kwargs=stage_kwargs,
+        )
+        _run_tui(app)
+        return {"status": "completed"}
+
+    # Non-TUI path: dry-run, --json, or non-interactive
     try:
         result = stage.execute(
             agent_context,
@@ -692,6 +710,32 @@ def prototype_deploy(
     deploy_stage = DeployStage()
     _check_guards(deploy_stage)
 
+    # Launch TUI for interactive deploys (same pattern as design/build).
+    # Skip TUI for dry-run, single-stage, --json, or non-interactive.
+    import sys
+
+    if not dry_run and stage is None and not json_output and sys.stdout.isatty():
+        from azext_prototype.ui.app import PrototypeApp
+
+        stage_kwargs = {
+            "force": force,
+            "reset": reset,
+            "subscription": subscription,
+            "tenant": tenant,
+        }
+        if service_principal:
+            stage_kwargs["client_id"] = sp_client_id
+            stage_kwargs["client_secret"] = sp_secret
+
+        app = PrototypeApp(
+            start_stage="deploy",
+            project_dir=project_dir,
+            stage_kwargs=stage_kwargs,
+        )
+        _run_tui(app)
+        return {"status": "completed"}
+
+    # Non-interactive: dry-run or single-stage deploy
     try:
         return deploy_stage.execute(
             agent_context,
