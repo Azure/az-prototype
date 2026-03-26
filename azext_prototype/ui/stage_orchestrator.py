@@ -110,8 +110,15 @@ class StageOrchestrator:
 
             # Auto-run a stage when launched with stage_kwargs
             if self._stage_kwargs and start_stage:
+                # Mark the target stage as in-progress before execution
+                # (overrides the COMPLETED status set by _populate_from_state)
+                self._adapter.update_task(start_stage, TaskStatus.IN_PROGRESS)
                 if start_stage == "design":
                     self._run_design(**self._stage_kwargs)
+                elif start_stage == "build":
+                    self._run_build(**self._stage_kwargs)
+                elif start_stage == "deploy":
+                    self._run_deploy(**self._stage_kwargs)
 
             # Enter the command loop
             self._command_loop(current)
@@ -409,7 +416,7 @@ class StageOrchestrator:
             self._adapter.update_task("design", TaskStatus.FAILED)
             self._adapter.print_fn(f"Design stage failed: {exc}")
 
-    def _run_build(self) -> None:
+    def _run_build(self, **kwargs) -> None:
         """Launch the build session."""
         self._adapter.clear_tasks("build")
         self._adapter.update_task("build", TaskStatus.IN_PROGRESS)
@@ -424,6 +431,7 @@ class StageOrchestrator:
                 registry,
                 input_fn=self._adapter.input_fn,
                 print_fn=self._adapter.print_fn,
+                **kwargs,
             )
             self._adapter.update_task("build", TaskStatus.COMPLETED)
             self._populate_build_subtasks()
@@ -434,7 +442,7 @@ class StageOrchestrator:
             self._adapter.update_task("build", TaskStatus.FAILED)
             self._adapter.print_fn(f"Build stage failed: {exc}")
 
-    def _run_deploy(self) -> None:
+    def _run_deploy(self, **kwargs) -> None:
         """Launch the deploy session."""
         self._adapter.clear_tasks("deploy")
         self._adapter.update_task("deploy", TaskStatus.IN_PROGRESS)
@@ -449,6 +457,7 @@ class StageOrchestrator:
                 registry,
                 input_fn=self._adapter.input_fn,
                 print_fn=self._adapter.print_fn,
+                **kwargs,
             )
             self._adapter.update_task("deploy", TaskStatus.COMPLETED)
             self._populate_deploy_subtasks()
