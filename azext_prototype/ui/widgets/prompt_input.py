@@ -63,34 +63,40 @@ class PromptInput(TextArea):
         """Enable the prompt for user input.
 
         When *allow_empty* is True, pressing Enter with no text submits
-        an empty string (used for "Enter to continue" pagination).
-        In that mode the ``"> "`` prefix is hidden and a placeholder is
-        shown instead, giving a clear visual distinction from input mode.
+        an empty string.  Both modes use the ``"> "`` prefix as real text
+        with the cursor positioned after it — never as placeholder — so
+        the blinking cursor doesn't overlap the ``>`` character.
         """
         self._enabled = True
         self._allow_empty = allow_empty
         self.read_only = False
-        if allow_empty:
-            # Pagination mode — show placeholder, no "> " prefix
-            self.text = ""
-            self.placeholder = placeholder
-        else:
-            # Input mode — show "> " prefix
-            self.text = _PROMPT_PREFIX
-            self.placeholder = ""
-            self.move_cursor_to_end_of_line()
+        self.cursor_blink = True
+        self.text = _PROMPT_PREFIX
+        self.placeholder = ""
         self.focus()
+        # Schedule cursor positioning after Textual completes all pending
+        # renders (text change + screen update from the adapter).
+        self.set_timer(0.05, self._deferred_cursor_fix)
 
     def disable(self) -> None:
         """Disable the prompt (session is processing)."""
         self._enabled = False
         self.read_only = True
+        self.cursor_blink = False
+        self.app.set_focus(None)
 
     def move_cursor_to_end_of_line(self) -> None:
         """Place the cursor after the '> ' prefix."""
         row = self.document.line_count - 1
         col = len(self.document.get_line(row))
-        self.move_cursor((row, col))
+        self.cursor_location = (row, col)
+
+    def _deferred_cursor_fix(self) -> None:
+        """Move cursor to end of prefix after all renders complete."""
+        if self._enabled and self.text.startswith(_PROMPT_PREFIX):
+            row = self.document.line_count - 1
+            col = len(self.document.get_line(row))
+            self.cursor_location = (row, col)
 
     # ------------------------------------------------------------------ #
     # Key handling
@@ -139,9 +145,8 @@ class PromptInput(TextArea):
             raw = raw[len(_PROMPT_PREFIX) :]
         value = raw.strip()
         if value or self._allow_empty:
+            # Always reset to clean "> " state before posting.
+            # This ensures the cursor is never at (0,0) on an empty widget.
+            self.text = _PROMPT_PREFIX
+            self.move_cursor_to_end_of_line()
             self.post_message(self.Submitted(value))
-            if self._allow_empty:
-                self.text = ""
-            else:
-                self.text = _PROMPT_PREFIX
-                self.move_cursor_to_end_of_line()
