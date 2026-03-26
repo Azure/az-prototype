@@ -164,12 +164,15 @@ class TUIAdapter:
     # input_fn — called from worker thread, blocks until user submits
     # ------------------------------------------------------------------ #
 
-    def input_fn(self, prompt_text: str = "> ") -> str:
+    def input_fn(self, prompt_text: str = "> ", allow_empty: bool = False) -> str:
         """Block the worker thread until the user submits input.
 
         1. Schedules prompt activation on the main thread.
         2. Waits on ``_input_event`` (checks for shutdown every 0.25 s).
         3. Returns the submitted text.
+
+        When *allow_empty* is True, pressing Enter with no text submits
+        an empty string (used for "Press Enter to continue" prompts).
 
         Raises :class:`ShutdownRequested` if the app is shutting down.
         """
@@ -179,7 +182,7 @@ class TUIAdapter:
         self._input_event.clear()
 
         def _enable_prompt() -> None:
-            self._app.prompt_input.enable(placeholder=prompt_text)
+            self._app.prompt_input.enable(placeholder=prompt_text, allow_empty=allow_empty)
             self._request_screen_update()
 
         try:

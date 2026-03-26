@@ -370,7 +370,12 @@ class BuildSession:
                 if use_styled:
                     confirmation = self._prompt.simple_prompt("> ")
                 else:
-                    confirmation = _input("> ").strip()
+                    # allow_empty=True so pressing Enter proceeds without text
+                    try:
+                        confirmation = _input("> ", allow_empty=True).strip()
+                    except TypeError:
+                        # Fallback for callables that don't accept allow_empty
+                        confirmation = _input("> ").strip()
             except (EOFError, KeyboardInterrupt):
                 return BuildResult(cancelled=True)
 

@@ -365,7 +365,10 @@ class DeploySession:
             if use_styled:
                 confirmation = self._prompt.simple_prompt("> ")
             else:
-                confirmation = _input("> ").strip()
+                try:
+                    confirmation = _input("> ", allow_empty=True).strip()
+                except TypeError:
+                    confirmation = _input("> ").strip()
         except (EOFError, KeyboardInterrupt):
             return DeployResult(cancelled=True)
 
