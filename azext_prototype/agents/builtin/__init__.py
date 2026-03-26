@@ -6,6 +6,7 @@ from azext_prototype.agents.builtin.biz_analyst import BizAnalystAgent
 from azext_prototype.agents.builtin.cloud_architect import CloudArchitectAgent
 from azext_prototype.agents.builtin.cost_analyst import CostAnalystAgent
 from azext_prototype.agents.builtin.doc_agent import DocumentationAgent
+from azext_prototype.agents.builtin.governor_agent import GovernorAgent
 from azext_prototype.agents.builtin.monitoring_agent import MonitoringAgent
 from azext_prototype.agents.builtin.project_manager import ProjectManagerAgent
 from azext_prototype.agents.builtin.qa_engineer import QAEngineerAgent
@@ -24,6 +25,7 @@ ALL_BUILTIN_AGENTS = [
     ProjectManagerAgent,
     SecurityReviewerAgent,
     MonitoringAgent,
+    GovernorAgent,
 ]
 
 

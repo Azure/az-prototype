@@ -95,6 +95,11 @@ jobs:
           echo "Stamped version: $TAG_VERSION"
           echo "Preview: $(python -c "import re; print(bool(re.search(r'(a|b|rc|alpha|beta|preview|dev)\d*', '$TAG_NAME')))")"
 
+      - name: Compute policy embeddings
+        run: |
+          pip install sentence-transformers
+          python scripts/compute_embeddings.py
+
       - name: Inject App Insights connection string and build wheel
         run: |
           WHEEL_SRC="azext_prototype/telemetry/__init__.py"

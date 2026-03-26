@@ -44,8 +44,10 @@ _COMPLETIONS_URL = f"{_BASE_URL}/chat/completions"
 _MODELS_URL = f"{_BASE_URL}/models"
 
 # Default request timeout in seconds.  Architecture generation and
-# large prompts can take several minutes; 5 minutes is a safe default.
-_DEFAULT_TIMEOUT = 300
+# large prompts can take several minutes; 8 minutes is a safe default.
+# The discovery system prompt alone is ~69KB (governance + templates +
+# architect context), so normal turns need generous timeouts.
+_DEFAULT_TIMEOUT = 480
 
 
 class CopilotProvider(AIProvider):
@@ -155,6 +157,20 @@ class CopilotProvider(AIProvider):
             prompt_chars,
         )
 
+        from azext_prototype.debug_log import debug as _dbg
+
+        _dbg(
+            "CopilotProvider.chat",
+            "Sending request",
+            model=target_model,
+            messages=len(messages),
+            prompt_chars=prompt_chars,
+            timeout=self._timeout,
+        )
+
+        import time as _time
+
+        _t0 = _time.perf_counter()
         try:
             resp = requests.post(
                 _COMPLETIONS_URL,
@@ -163,6 +179,8 @@ class CopilotProvider(AIProvider):
                 timeout=self._timeout,
             )
         except requests.Timeout:
+            elapsed = _time.perf_counter() - _t0
+            _dbg("CopilotProvider.chat", "TIMEOUT", elapsed_s=f"{elapsed:.1f}", timeout=self._timeout)
             raise CLIError(
                 f"Copilot API timed out after {self._timeout}s.\n"
                 "For very large prompts, increase the timeout:\n"
@@ -170,6 +188,15 @@ class CopilotProvider(AIProvider):
             )
         except requests.RequestException as exc:
             raise CLIError(f"Failed to reach Copilot API: {exc}") from exc
+
+        _elapsed = _time.perf_counter() - _t0
+        _dbg(
+            "CopilotProvider.chat",
+            "Response received",
+            elapsed_s=f"{_elapsed:.1f}",
+            status=resp.status_code,
+            response_chars=len(resp.text),
+        )
 
         # 401 → token may be invalid or revoked; retry once
         if resp.status_code == 401:
@@ -223,12 +250,31 @@ class CopilotProvider(AIProvider):
 
         usage = data.get("usage", {})
 
+        # Capture PRU (Premium Request Units) — may be in usage body or response headers
+        pru = usage.get("premium_request_units") or usage.get("pru") or usage.get("copilot_premium_request_units")
+        if pru is None:
+            pru_header = resp.headers.get("x-github-copilot-pru") or resp.headers.get("x-copilot-pru")
+            if pru_header:
+                try:
+                    pru = int(pru_header)
+                except (ValueError, TypeError):
+                    pass
+
+        # Log response headers in debug mode for PRU field discovery
+        _dbg(
+            "CopilotProvider.chat",
+            "Response usage and headers",
+            usage_keys=list(usage.keys()),
+            pru=pru,
+        )
+
         return AIResponse(
             content=content,
             model=target_model,
             usage={
                 "prompt_tokens": usage.get("prompt_tokens", 0),
                 "completion_tokens": usage.get("completion_tokens", 0),
+                "_copilot": True,  # Signals TokenTracker to compute PRUs
             },
             finish_reason=finish,
             tool_calls=tool_calls_data,

@@ -231,6 +231,12 @@ def _prepare_command(project_dir: str | None = None):
         (project_dir, config, registry, agent_context)
     """
     project_dir = project_dir or _get_project_dir()
+
+    # Initialize debug logging if DEBUG_PROTOTYPE=true
+    from azext_prototype.debug_log import init_debug_log, log_session_start
+
+    init_debug_log(project_dir)
+
     config = _load_config(project_dir)
 
     # Validate external tool versions before proceeding
@@ -240,6 +246,15 @@ def _prepare_command(project_dir: str | None = None):
     registry = _build_registry(config, project_dir)
     mcp_manager = _build_mcp_manager(config, project_dir)
     agent_context = _build_context(config, project_dir, mcp_manager=mcp_manager)
+
+    # Log session context for debug
+    log_session_start(
+        project_dir=project_dir,
+        ai_provider=config.get("ai.provider", ""),
+        model=config.get("ai.model", ""),
+        iac_tool=iac_tool or "",
+    )
+
     return project_dir, config, registry, agent_context
 
 

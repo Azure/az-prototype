@@ -31,7 +31,7 @@ from azext_prototype.agents.base import AgentCapability, AgentContext
 from azext_prototype.agents.registry import AgentRegistry
 from azext_prototype.ai.provider import AIMessage
 from azext_prototype.ai.token_tracker import TokenTracker
-from azext_prototype.stages.discovery_state import DiscoveryState
+from azext_prototype.stages.discovery_state import DiscoveryState, TrackedItem
 from azext_prototype.stages.intent import (
     IntentKind,
     build_discovery_classifier,
@@ -77,12 +77,12 @@ def extract_section_headers(response: str) -> list[tuple[str, int]]:
     """
     matches: list[tuple[int, str, int]] = []  # (position, text, level)
     for m in _SECTION_HEADING_RE.finditer(response):
-        text = m.group(1).strip()
+        text = m.group(1).strip().rstrip(":")
         hashes = len(m.group(0)) - len(m.group(0).lstrip("#"))
         level = min(hashes, 3)  # ## = 2, ### = 3
         matches.append((m.start(), text, level))
     for m in _BOLD_HEADING_RE.finditer(response):
-        text = m.group(1).strip()
+        text = m.group(1).strip().rstrip(":")
         matches.append((m.start(), text, 2))
     matches.sort(key=lambda x: x[0])
 
@@ -121,12 +121,12 @@ def parse_sections(response: str) -> tuple[str, list[Section]]:
     # Collect heading positions
     matches: list[tuple[int, str, int]] = []  # (position, text, level)
     for m in _SECTION_HEADING_RE.finditer(response):
-        text = m.group(1).strip()
+        text = m.group(1).strip().rstrip(":")
         hashes = len(m.group(0)) - len(m.group(0).lstrip("#"))
         level = min(hashes, 3)
         matches.append((m.start(), text, level))
     for m in _BOLD_HEADING_RE.finditer(response):
-        text = m.group(1).strip()
+        text = m.group(1).strip().rstrip(":")
         matches.append((m.start(), text, 2))
     matches.sort(key=lambda x: x[0])
 
@@ -152,13 +152,6 @@ def parse_sections(response: str) -> tuple[str, list[Section]]:
         sections.append(Section(heading=text, level=level, content=content, task_id=task_id))
 
     return preamble, sections
-
-
-# -------------------------------------------------------------------- #
-# Section follow-up detection
-# -------------------------------------------------------------------- #
-
-_SECTION_COMPLETE_MARKER = "[SECTION_COMPLETE]"
 
 
 # -------------------------------------------------------------------- #
@@ -354,11 +347,13 @@ class DiscoverySession:
     ) -> str | None:
         """Walk sections one at a time.
 
-        Returns ``"cancelled"``, ``"done"``, or ``None`` (all sections covered,
-        fall through to free-form loop).
+        Returns ``"cancelled"``, ``"done"``, ``"restart"``, or ``None``
+        (all sections covered, fall through to free-form loop).
         """
         if preamble:
             self._show_content(preamble, use_styled, _print)
+
+        from azext_prototype.debug_log import log_command
 
         all_confirmed = True
 
@@ -370,19 +365,20 @@ class DiscoverySession:
             self._update_token_status()
 
             # Tell the user what to do with this section
-            remaining = len(sections) - i - 1
             hint = (
-                f"[Topic {i + 1} of {len(sections)}] "
-                "Reply to discuss, 'skip' for next topic, or 'done' to finish."
+                f"[Topic {i + 1} of {len(sections)}] " "Reply to discuss, 'skip' for next topic, or 'done' to finish."
             )
             if use_styled:
                 self._console.print_info(hint)
             else:
                 _print(hint)
 
-            # Inner follow-up loop (max 5 per section)
+            # Inner follow-up loop (max 5 real AI exchanges per section).
+            # Slash commands and empty inputs do NOT count as exchanges.
             section_confirmed = False
-            for _ in range(5):
+            section_skipped = False
+            real_answers = 0
+            while real_answers < 5:
                 try:
                     user_input = _input("> ").strip()
                 except (EOFError, KeyboardInterrupt):
@@ -403,17 +399,24 @@ class DiscoverySession:
                             self._update_task_fn(s.task_id, "completed")
                     return "done"
                 if lower in self._SKIP_WORDS:
+                    self._discovery_state.mark_item(section.heading, "skipped")
+                    section_skipped = True
                     break  # Advance to next section
 
-                # Handle slash commands
+                # Handle slash commands — these do NOT count as exchanges
                 if lower in _SLASH_COMMANDS:
-                    self._handle_slash_command(lower)
+                    log_command(lower, topic=section.heading, real_answers=real_answers)
+                    cmd_result = self._handle_slash_command(lower)
+                    if cmd_result == "restart":
+                        return "restart"
                     continue
                 if lower.startswith("/why"):
+                    log_command(lower, topic=section.heading, real_answers=real_answers)
                     self._handle_why_command(user_input)
                     continue
 
-                # Normal answer — send focused follow-up with explicit gate
+                # Normal answer — this is the ONLY path that counts
+                real_answers += 1
                 self._exchange_count += 1
                 topic = section.heading
                 prompt = (
@@ -433,6 +436,7 @@ class DiscoverySession:
                 stripped = response.strip().rstrip(".").lower()
                 if stripped == "yes":
                     section_confirmed = True
+                    self._discovery_state.mark_item(section.heading, "answered", self._exchange_count)
                     break  # Section complete — advance
 
                 clean = self._clean(response)
@@ -441,6 +445,8 @@ class DiscoverySession:
 
             if not section_confirmed:
                 all_confirmed = False
+                if not section_skipped:
+                    self._discovery_state.mark_item(section.heading, "answered", self._exchange_count)
 
             if self._update_task_fn:
                 self._update_task_fn(section.task_id, "completed")
@@ -452,6 +458,188 @@ class DiscoverySession:
         else:
             _print("Type anything to keep discussing, or 'continue' to proceed.")
         return None
+
+    # ------------------------------------------------------------------ #
+    # Re-entry — resume at first unanswered topic
+    # ------------------------------------------------------------------ #
+
+    def _run_reentry(
+        self,
+        seed_context: str,
+        artifacts: str,
+        artifact_images: list[dict] | None,
+        _input: Callable[[str], str],
+        _print: Callable[[str], None],
+        use_styled: bool,
+        context_only: bool,
+        status_fn: Callable | None,
+    ) -> DiscoveryResult | None:
+        """Resume discovery at the first unanswered topic.
+
+        Returns a ``DiscoveryResult`` if the session ends (cancelled/done),
+        or ``None`` if all topics are covered and the caller should fall
+        through to the free-form conversation loop.
+        """
+        # Handle incremental context from new artifacts
+        if (seed_context or artifacts or artifact_images) and self._biz_agent:
+            self._handle_incremental_context(seed_context, artifacts, artifact_images, _print, use_styled, status_fn)
+
+        # Find first pending topic
+        first_pending = self._discovery_state.first_pending_index()
+        if first_pending is None:
+            return None  # All topics done — fall through to free-form
+
+        all_topics = self._discovery_state.items
+        pending_topics = [t for t in all_topics if t.status == "pending"]
+        answered_count = len(all_topics) - len(pending_topics)
+
+        # Show progress
+        msg = f"Resuming discovery: {answered_count}/{len(all_topics)} topics covered"
+        if use_styled:
+            self._console.print_info(msg)
+        else:
+            _print(msg)
+
+        # Populate TUI task tree with ALL topics
+        if self._section_fn:
+            self._section_fn([(t.heading, 2) for t in all_topics])
+        # Mark already-completed topics
+        if self._update_task_fn:
+            for t in all_topics:
+                if t.status in ("answered", "skipped"):
+                    slug = re.sub(r"[^a-z0-9]+", "-", t.heading.lower()).strip("-")
+                    task_id = f"design-section-{slug}"
+                    self._update_task_fn(task_id, "completed")
+
+        # Seed message history with compact summary (NOT full conversation)
+        existing_context = self._discovery_state.format_as_context()
+        if existing_context:
+            self._messages = [
+                AIMessage(role="user", content=f"Here's what we've established so far:\n\n{existing_context}"),
+                AIMessage(role="assistant", content="Understood. Let's continue where we left off."),
+            ]
+
+        # Restore exchange count from metadata
+        self._exchange_count = self._discovery_state.state.get("_metadata", {}).get("exchange_count", 0)
+
+        # Build Section objects from pending topics
+        pending_sections = []
+        for t in pending_topics:
+            slug = re.sub(r"[^a-z0-9]+", "-", t.heading.lower()).strip("-")
+            task_id = f"design-section-{slug}"
+            pending_sections.append(Section(heading=t.heading, level=2, content=t.detail, task_id=task_id))
+
+        # Reuse existing section loop
+        outcome = self._run_section_loop(pending_sections, "", _input, _print, use_styled)
+        if outcome == "cancelled":
+            return DiscoveryResult(
+                requirements="",
+                conversation=list(self._messages),
+                policy_overrides=[],
+                exchange_count=self._exchange_count,
+                cancelled=True,
+            )
+        if outcome == "restart":
+            return None  # Fall through — state was already reset by /restart handler
+        if outcome == "done":
+            with self._maybe_spinner("Generating requirements summary...", use_styled, status_fn=status_fn):
+                summary = self._produce_summary()
+                overrides = self._extract_overrides(summary)
+            return DiscoveryResult(
+                requirements=summary,
+                conversation=list(self._messages),
+                policy_overrides=overrides,
+                exchange_count=self._exchange_count,
+            )
+
+        # All pending sections walked — fall through to free-form loop
+        return None
+
+    def _handle_incremental_context(
+        self,
+        seed_context: str,
+        artifacts: str,
+        artifact_images: list[dict] | None,
+        _print: Callable[[str], None],
+        use_styled: bool,
+        status_fn: Callable | None,
+    ) -> None:
+        """Ask AI to identify new topics from new artifacts/context.
+
+        Only called on re-entry when new content is provided. Appends
+        new topics without replacing existing ones.
+        """
+        existing_topics = self._discovery_state.items
+        existing_headings = [t.heading for t in existing_topics]
+
+        parts = ["We already have these discovery topics established:"]
+        for h in existing_headings:
+            parts.append(f"- {h}")
+        parts.append("")
+
+        if seed_context:
+            parts.append(f"New context provided:\n{seed_context}\n")
+        if artifacts:
+            parts.append(f"New artifacts provided:\n{artifacts}\n")
+
+        parts.append(
+            "Based on the new information above, identify any NEW topics "
+            "that are not already covered by the existing topics. "
+            "For each new topic, respond with a ## Heading and 2-4 focused "
+            "questions underneath. If no new topics are needed, respond "
+            "with exactly: [NO_NEW_TOPICS]"
+        )
+
+        prompt: str | list = "\n".join(parts)
+
+        # Add images if present
+        if artifact_images:
+            content: list[dict] = [{"type": "text", "text": prompt}]
+            for img in artifact_images:
+                content.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{img['mime']};base64,{img['data']}", "detail": "high"},
+                    }
+                )
+            prompt = content
+
+        with self._maybe_spinner("Analyzing new content for additional topics...", use_styled, status_fn=status_fn):
+            # Use lightweight chat — this is a classification task that
+            # doesn't need the full 69KB governance/template/architect payload.
+            if isinstance(prompt, str):
+                response = self._chat_lightweight(prompt)
+            else:
+                # Multi-modal (images) — must use full _chat() for vision support
+                response = self._chat(prompt)
+
+        if "[NO_NEW_TOPICS]" in response:
+            if use_styled:
+                self._console.print_info("No new topics needed from provided content.")
+            else:
+                _print("No new topics needed from provided content.")
+            return
+
+        _, new_sections = parse_sections(self._clean(response))
+        if new_sections:
+            new_topics = [
+                TrackedItem(
+                    heading=s.heading,
+                    detail=s.content,
+                    kind="topic",
+                    status="pending",
+                    answer_exchange=None,
+                )
+                for s in new_sections
+            ]
+            self._discovery_state.append_items(new_topics)
+            added = len(self._discovery_state.items) - len(existing_topics)
+            if added > 0:
+                msg = f"Added {added} new topic(s) from new content."
+                if use_styled:
+                    self._console.print_info(msg)
+                else:
+                    _print(msg)
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -507,6 +695,8 @@ class DiscoverySession:
         self._response_fn = response_fn
         self._update_task_fn = update_task_fn
 
+        from azext_prototype.debug_log import log_flow
+
         # Load existing discovery state for context
         existing_context = ""
         if self._discovery_state.exists:
@@ -516,6 +706,30 @@ class DiscoverySession:
                 self._console.print_info("Loaded existing discovery context from previous session.")
         else:
             self._discovery_state.load()  # Initialize empty state
+
+        log_flow(
+            "DiscoverySession.run",
+            "Entry",
+            has_items=self._discovery_state.has_items,
+            item_count=len(self._discovery_state.items),
+            pending=self._discovery_state.open_count,
+            seed_context_len=len(seed_context),
+            artifacts_len=len(artifacts),
+            images=len(artifact_images) if artifact_images else 0,
+            context_only=context_only,
+            existing_context_len=len(existing_context),
+        )
+
+        # ---- Re-entry path: resume at first unanswered topic ----
+        _reentry_handled = False
+        if self._discovery_state.has_items:
+            result = self._run_reentry(
+                seed_context, artifacts, artifact_images, _input, _print, use_styled, context_only, status_fn
+            )
+            if result is not None:
+                return result
+            # None = all topics done, skip opening and fall through to free-form loop
+            _reentry_handled = True
 
         # ---- Fallback when no agent is available ----
         if not self._biz_agent:
@@ -534,67 +748,84 @@ class DiscoverySession:
                 exchange_count=0,
             )
 
-        # ---- Kick off the conversation ----
-        opening = self._build_opening(seed_context, artifacts, existing_context, images=artifact_images)
+        # ---- Kick off the conversation (skipped on re-entry) ----
+        if not _reentry_handled:
+            opening = self._build_opening(seed_context, artifacts, existing_context, images=artifact_images)
 
-        with self._maybe_spinner("Analyzing your input...", use_styled, status_fn=status_fn):
-            response = self._chat(opening)
+            with self._maybe_spinner("Analyzing your input...", use_styled, status_fn=status_fn):
+                response = self._chat(opening)
 
-        # Update discovery state with the initial exchange
-        self._exchange_count += 1
-        self._discovery_state.update_from_exchange(opening, response, self._exchange_count)
+            # Update discovery state with the initial exchange
+            self._exchange_count += 1
+            self._discovery_state.update_from_exchange(opening, response, self._exchange_count)
 
-        clean_response = self._clean(response)
-        preamble, sections = parse_sections(clean_response)
+            clean_response = self._clean(response)
+            preamble, sections = parse_sections(clean_response)
 
-        if sections:
-            # Populate tree with ALL sections upfront
-            if self._section_fn:
-                self._section_fn([(s.heading, s.level) for s in sections])
+            # Persist topics on first run so re-entry can resume them
+            if sections and not self._discovery_state.has_items:
+                topics = [
+                    TrackedItem(
+                        heading=s.heading,
+                        detail=s.content,
+                        kind="topic",
+                        status="pending",
+                        answer_exchange=None,
+                    )
+                    for s in sections
+                ]
+                self._discovery_state.set_items(topics)
 
-            # Section-at-a-time loop
-            outcome = self._run_section_loop(sections, preamble, _input, _print, use_styled)
-            if outcome == "cancelled":
-                return DiscoveryResult(
-                    requirements="",
-                    conversation=list(self._messages),
-                    policy_overrides=[],
-                    exchange_count=self._exchange_count,
-                    cancelled=True,
-                )
-            if outcome == "done":
-                # Jump to summary production
-                with self._maybe_spinner("Generating requirements summary...", use_styled, status_fn=status_fn):
-                    summary = self._produce_summary()
-                    overrides = self._extract_overrides(summary)
+            if sections:
+                # Populate tree with ALL sections upfront
+                if self._section_fn:
+                    self._section_fn([(s.heading, s.level) for s in sections])
+
+                # Section-at-a-time loop
+                outcome = self._run_section_loop(sections, preamble, _input, _print, use_styled)
+                if outcome == "cancelled":
+                    return DiscoveryResult(
+                        requirements="",
+                        conversation=list(self._messages),
+                        policy_overrides=[],
+                        exchange_count=self._exchange_count,
+                        cancelled=True,
+                    )
+                if outcome == "restart":
+                    pass  # Fall through to free-form loop — state was reset by /restart
+                elif outcome == "done":
+                    # Jump to summary production
+                    with self._maybe_spinner("Generating requirements summary...", use_styled, status_fn=status_fn):
+                        summary = self._produce_summary()
+                        overrides = self._extract_overrides(summary)
+                    return DiscoveryResult(
+                        requirements=summary,
+                        conversation=list(self._messages),
+                        policy_overrides=overrides,
+                        exchange_count=self._exchange_count,
+                    )
+            else:
+                # No sections → show full response (backward compat / conversational response)
+                self._show_content(clean_response, use_styled, _print)
+                self._update_token_status()
+                if self._section_fn and not extract_section_headers(clean_response):
+                    self._section_fn([("Discovery conversation", 2)])
+
+            # ---- Check if agent needs more information ----
+            # If context_only mode and agent signals READY, skip interactive loop
+            if context_only and _READY_MARKER in response:
+                if use_styled:
+                    self._console.print_info("Context is sufficient. Proceeding with design.")
+                else:
+                    _print("Context is sufficient. Proceeding with design.")
+                summary = self._produce_summary()
+                overrides = self._extract_overrides(summary)
                 return DiscoveryResult(
                     requirements=summary,
                     conversation=list(self._messages),
                     policy_overrides=overrides,
                     exchange_count=self._exchange_count,
                 )
-        else:
-            # No sections → show full response (backward compat / conversational response)
-            self._show_content(clean_response, use_styled, _print)
-            self._update_token_status()
-            if self._section_fn and not extract_section_headers(clean_response):
-                self._section_fn([("Discovery conversation", 2)])
-
-        # ---- Check if agent needs more information ----
-        # If context_only mode and agent signals READY, skip interactive loop
-        if context_only and _READY_MARKER in response:
-            if use_styled:
-                self._console.print_info("Context is sufficient. Proceeding with design.")
-            else:
-                _print("Context is sufficient. Proceeding with design.")
-            summary = self._produce_summary()
-            overrides = self._extract_overrides(summary)
-            return DiscoveryResult(
-                requirements=summary,
-                conversation=list(self._messages),
-                policy_overrides=overrides,
-                exchange_count=self._exchange_count,
-            )
 
         # ---- Call-to-action so the user knows what to do next ----
         _cta = "Let me know if I missed anything above. Otherwise, are you ready to continue?"
@@ -645,7 +876,9 @@ class DiscoverySession:
 
             # Handle slash commands
             if lower_input in _SLASH_COMMANDS:
-                self._handle_slash_command(lower_input)
+                cmd_result = self._handle_slash_command(lower_input)
+                if cmd_result == "restart":
+                    break  # Session was reset — exit free-form loop
                 continue
             if lower_input.startswith("/why"):
                 self._handle_why_command(user_input)
@@ -657,7 +890,9 @@ class DiscoverySession:
                 if intent.command == "/why":
                     self._handle_why_command(f"/why {intent.args}")
                 else:
-                    self._handle_slash_command(intent.command)
+                    cmd_result = self._handle_slash_command(intent.command)
+                    if cmd_result == "restart":
+                        break
                 continue
             if intent.kind == IntentKind.READ_FILES:
                 self._handle_read_files(intent.args, _print, use_styled)
@@ -738,6 +973,8 @@ class DiscoverySession:
         If the provider rejects multi-modal content, falls back to
         text-only with a note that images could not be processed.
         """
+        from azext_prototype.debug_log import log_ai_call, log_ai_response, log_error
+
         assert self._biz_agent is not None
         assert self._context.ai_provider is not None
 
@@ -754,8 +991,24 @@ class DiscoverySession:
         architect_context = self._build_architect_context()
         if architect_context:
             full.append(AIMessage(role="system", content=architect_context))
+
+        sys_chars = sum(len(m.content) if isinstance(m.content, str) else 0 for m in full)
+        hist_chars = sum(len(m.content) if isinstance(m.content, str) else 0 for m in self._messages)
+        log_ai_call(
+            "DiscoverySession._chat",
+            system_msgs=len(full),
+            system_chars=sys_chars,
+            history_msgs=len(self._messages),
+            history_chars=hist_chars,
+            user_content=user_content,
+            model=getattr(self._context.ai_provider, "_model", "unknown"),
+            temperature=self._biz_agent._temperature,
+            max_tokens=self._biz_agent._max_tokens,
+        )
+
         full.extend(self._messages)
 
+        _t0 = __import__("time").perf_counter()
         try:
             response = self._context.ai_provider.chat(
                 full,
@@ -792,12 +1045,72 @@ class DiscoverySession:
                     self._token_tracker,
                     lambda msg: logger.info(msg),
                 )
+                log_error("DiscoverySession._chat", exc)
                 raise
+
+        _elapsed = __import__("time").perf_counter() - _t0
+        usage = response.usage if hasattr(response, "usage") and response.usage else {}
+        log_ai_response(
+            "DiscoverySession._chat",
+            elapsed=_elapsed,
+            response_content=response.content,
+            prompt_tokens=usage.get("prompt_tokens", 0),
+            completion_tokens=usage.get("completion_tokens", 0),
+            total_tokens=usage.get("total_tokens", 0),
+        )
 
         self._token_tracker.record(response)
         self._messages.append(
             AIMessage(role="assistant", content=response.content),
         )
+        return response.content
+
+    def _chat_lightweight(self, user_content: str) -> str:
+        """Call the AI with a minimal system prompt for classification tasks.
+
+        Skips governance policies, templates, and architect context to
+        keep the payload small (~0.5KB vs ~69KB).  Used for lightweight
+        operations like identifying new topics from incremental context.
+
+        Does NOT add messages to ``self._messages`` — the response is
+        ephemeral.
+        """
+        from azext_prototype.debug_log import log_ai_call, log_ai_response
+
+        assert self._context.ai_provider is not None
+
+        system = AIMessage(
+            role="system",
+            content=(
+                "You are a business analyst helping discover requirements for an Azure prototype. "
+                "Respond concisely and precisely. Follow the formatting instructions in the user message."
+            ),
+        )
+        user_msg = AIMessage(role="user", content=user_content)
+        log_ai_call(
+            "DiscoverySession._chat_lightweight",
+            system_msgs=1,
+            system_chars=len(system.content),
+            history_msgs=0,
+            history_chars=0,
+            user_content=user_content,
+            model=getattr(self._context.ai_provider, "_model", "unknown"),
+            temperature=0.3,
+            max_tokens=4096,
+        )
+        _t0 = __import__("time").perf_counter()
+        response = self._context.ai_provider.chat(
+            [system, user_msg],
+            temperature=0.3,
+            max_tokens=4096,
+        )
+        _elapsed = __import__("time").perf_counter() - _t0
+        log_ai_response(
+            "DiscoverySession._chat_lightweight",
+            elapsed=_elapsed,
+            response_content=response.content,
+        )
+        self._token_tracker.record(response)
         return response.content
 
     # ------------------------------------------------------------------ #
@@ -1013,8 +1326,12 @@ class DiscoverySession:
     # Internal — slash commands
     # ------------------------------------------------------------------ #
 
-    def _handle_slash_command(self, command: str) -> None:
-        """Handle slash commands like /open, /status, /confirmed."""
+    def _handle_slash_command(self, command: str) -> str | None:
+        """Handle slash commands like /open, /status, /confirmed.
+
+        Returns ``"restart"`` when ``/restart`` is executed so the caller
+        can break out of the current loop.  Returns ``None`` otherwise.
+        """
         _p = self._print
         styled = self._use_styled
         if command == "/open":
@@ -1074,6 +1391,7 @@ class DiscoverySession:
                     self._response_fn(self._clean(response))
                 else:
                     _p(self._clean(response))
+            return "restart"
         elif command == "/help":
             _p("")
             _p("Available commands:")
@@ -1094,6 +1412,7 @@ class DiscoverySession:
             _p("    'why did we choose Cosmos DB'  instead of  /why Cosmos DB")
             _p("    'read artifacts from ./specs'  reads files into the session")
             _p("")
+        return None
 
     def _handle_why_command(self, raw_input: str) -> None:
         """Handle ``/why <query>`` — find the exchange where a topic was discussed."""
@@ -1114,11 +1433,16 @@ class DiscoverySession:
             _p(f"Found {len(matches)} exchange(s) mentioning '{query}':")
             _p("")
             for m in matches:
-                _p(f"  Exchange {m['exchange']}:")
+                ex_num = m.get("exchange", "?")
+                topic = self._discovery_state.topic_at_exchange(ex_num) if isinstance(ex_num, int) else None
+                header = f"  Exchange {ex_num}"
+                if topic:
+                    header += f' (topic: "{topic}")'
+                _p(f"{header}:")
                 user_text = m.get("user", "")
                 asst_text = m.get("assistant", "")
-                user_snippet = user_text[:150] + ("..." if len(user_text) > 150 else "")
-                asst_snippet = asst_text[:150] + ("..." if len(asst_text) > 150 else "")
+                user_snippet = user_text[:500] + ("..." if len(user_text) > 500 else "")
+                asst_snippet = asst_text[:500] + ("..." if len(asst_text) > 500 else "")
                 _p(f"    You: {user_snippet}")
                 _p(f"    Agent: {asst_snippet}")
                 _p("")
@@ -1188,7 +1512,7 @@ class DiscoverySession:
     @staticmethod
     def _clean(text: str) -> str:
         """Strip invisible markers so the user sees natural text."""
-        return text.replace(_READY_MARKER, "").replace(_SECTION_COMPLETE_MARKER, "").strip()
+        return text.replace(_READY_MARKER, "").strip()
 
     @staticmethod
     def _extract_overrides(summary: str) -> list[dict[str, str]]:

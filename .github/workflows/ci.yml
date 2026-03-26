@@ -191,6 +191,11 @@ jobs:
           "
           echo "Stamped version: $CI_VERSION"
 
+      - name: Compute policy embeddings
+        run: |
+          python -m pip install sentence-transformers
+          python scripts/compute_embeddings.py
+
       - name: Inject App Insights connection string and build wheel
         run: |
           python -m pip install --upgrade pip "setuptools<70" wheel==0.30.0

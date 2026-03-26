@@ -12,6 +12,7 @@ subsequent iterations — all without leaving the stage.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
@@ -111,6 +112,8 @@ class DesignStage(BaseStage):
         after the first architecture pass, allowing the user to review
         the design and request changes iteratively.
         """
+        from azext_prototype.debug_log import debug as _dbg
+
         artifacts_path = kwargs.get("artifacts")
         additional_context = kwargs.get("context", "")
         reset = kwargs.get("reset", False)
@@ -123,6 +126,16 @@ class DesignStage(BaseStage):
         section_fn = kwargs.get("section_fn")
         response_fn = kwargs.get("response_fn")
         update_task_fn = kwargs.get("update_task_fn")
+
+        _dbg(
+            "DesignStage.execute",
+            "Entry",
+            artifacts=artifacts_path,
+            context_len=len(additional_context),
+            reset=reset,
+            interactive=interactive,
+            skip_discovery=skip_discovery,
+        )
 
         self.state = StageState.IN_PROGRESS
         config = ProjectConfig(agent_context.project_dir)
@@ -143,7 +156,9 @@ class DesignStage(BaseStage):
 
         # Load existing discovery state
         discovery_state = DiscoveryState(agent_context.project_dir)
-        if discovery_state.exists:
+        if reset:
+            discovery_state.reset()
+        elif discovery_state.exists:
             discovery_state.load()
             if ui:
                 ui.print_info("Loaded existing discovery context from previous session.")
@@ -154,48 +169,98 @@ class DesignStage(BaseStage):
         # (--context provided but no --artifacts)
         context_only = bool(additional_context) and not artifacts_path
 
-        # 1. Ingest artifacts if provided
+        # 1. Ingest artifacts if provided (with hash-based change detection)
         artifact_images: list[dict] = []
+        current_artifact_hashes: dict[str, str] = {}
         if artifacts_path:
-            result = self._read_artifacts_with_progress(artifacts_path, ui)
-            artifact_content = result["content"]
-            artifact_images = result.get("images", [])
+            # Compute content hashes for change detection
+            current_artifact_hashes = self._compute_artifact_hashes(artifacts_path)
+            stored_hashes = discovery_state.get_artifact_hashes()
 
-            if result["read"]:
-                _print(f"  Read {len(result['read'])} file(s):")
+            # Determine which files are new or changed
+            new_files = {p for p in current_artifact_hashes if p not in stored_hashes}
+            changed_files = {
+                p for p, h in current_artifact_hashes.items() if p in stored_hashes and stored_hashes[p] != h
+            }
+            delta_files = new_files | changed_files
+
+            if delta_files:
+                # Show summary of what changed
+                total = len(current_artifact_hashes)
+                parts = []
+                if new_files:
+                    parts.append(f"{len(new_files)} new")
+                if changed_files:
+                    parts.append(f"{len(changed_files)} changed")
+                summary = " and ".join(parts)
                 if ui:
-                    ui.print_file_list(result["read"], success=True)
+                    ui.print_info(f"{summary} artifact(s) of {total} total -- analyzing changes...")
                 else:
-                    for name in result["read"]:
-                        _print(f"    [bright_green]\u2713[/bright_green] [bright_cyan]{name}[/bright_cyan]")
+                    _print(f"  {summary} artifact(s) of {total} total -- analyzing changes...")
 
-            if artifact_images:
-                _print(
-                    f"  [bright_cyan]\u2192[/bright_cyan] Extracted {len(artifact_images)} image(s) for vision analysis"
-                )
+                result = self._read_artifacts_with_progress(artifacts_path, ui, include_only=delta_files)
+                artifact_content = result["content"]
+                artifact_images = result.get("images", [])
 
-            if result["failed"]:
-                _print(f"  Could not read {len(result['failed'])} file(s):")
+                if result["read"]:
+                    _print(f"  Read {len(result['read'])} file(s):")
+                    if ui:
+                        ui.print_file_list(result["read"], success=True)
+                    else:
+                        for name in result["read"]:
+                            _print(f"    [bright_green]\u2713[/bright_green] [bright_cyan]{name}[/bright_cyan]")
+
+                if artifact_images:
+                    n_img = len(artifact_images)
+                    _print(f"  [bright_cyan]\u2192[/bright_cyan] Extracted {n_img} image(s) for vision analysis")
+
+                if result["failed"]:
+                    _print(f"  Could not read {len(result['failed'])} file(s):")
+                    if ui:
+                        ui.print_file_list([f"{n}  ({r})" for n, r in result["failed"]], success=False)
+                    else:
+                        for name, reason in result["failed"]:
+                            _print(f"    [bright_red]\u2717[/bright_red] {name}  ({reason})")
+
+                if not result["read"] and not result["failed"]:
+                    _print("  [dim](no files found)[/dim]")
+                _print("")
+            else:
+                # No changes detected — skip reading
                 if ui:
-                    ui.print_file_list([f"{n}  ({r})" for n, r in result["failed"]], success=False)
+                    ui.print_info("No changes detected in artifacts -- skipping content analysis.")
                 else:
-                    for name, reason in result["failed"]:
-                        _print(f"    [bright_red]\u2717[/bright_red] {name}  ({reason})")
-
-            if not result["read"] and not result["failed"]:
-                _print("  [dim](no files found)[/dim]")
-            _print("")
+                    _print("  No changes detected in artifacts -- skipping content analysis.")
+                _print("")
+                artifact_content = ""
 
             design_state["artifacts"].append(
                 {
                     "path": artifacts_path,
-                    "content_summary": artifact_content[:500],
+                    "content_summary": artifact_content[:500] if artifact_content else "(unchanged)",
                     "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "delta_files": len(delta_files),
                 }
             )
-            agent_context.add_artifact("requirements", artifact_content)
+            if artifact_content:
+                agent_context.add_artifact("requirements", artifact_content)
+
+            # Persist inventory immediately so it survives cancelled/interrupted sessions
+            discovery_state.update_artifact_inventory(current_artifact_hashes)
         else:
             artifact_content = ""
+
+        # Context change detection
+        if additional_context:
+            ctx_hash = hashlib.sha256(additional_context.encode("utf-8")).hexdigest()
+            if ctx_hash == discovery_state.get_context_hash():
+                if ui:
+                    ui.print_info("Context unchanged from previous session -- skipping.")
+                else:
+                    _print("  Context unchanged from previous session -- skipping.")
+                additional_context = ""
+            else:
+                discovery_state.update_context_hash(ctx_hash)
 
         # 2. Discovery session
         if skip_discovery:
@@ -764,7 +829,34 @@ class DesignStage(BaseStage):
     # Artifact reading
     # ------------------------------------------------------------------
 
-    def _read_artifacts_with_progress(self, path: str, console: Console | None) -> dict:
+    @staticmethod
+    def _hash_file(file_path: Path) -> str:
+        """Compute SHA256 of a file using chunked reading (Python 3.10 compat)."""
+        h = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                h.update(chunk)
+        return h.hexdigest()
+
+    @staticmethod
+    def _compute_artifact_hashes(path: str) -> dict[str, str]:
+        """Walk an artifacts path and compute SHA256 for each file.
+
+        Returns ``{absolute_path_str: sha256_hex}`` for every file found.
+        """
+        artifacts_path = Path(path)
+        hashes: dict[str, str] = {}
+        if artifacts_path.is_file():
+            hashes[str(artifacts_path.resolve())] = DesignStage._hash_file(artifacts_path)
+        elif artifacts_path.is_dir():
+            for file_path in sorted(artifacts_path.rglob("*")):
+                if file_path.is_file():
+                    hashes[str(file_path.resolve())] = DesignStage._hash_file(file_path)
+        return hashes
+
+    def _read_artifacts_with_progress(
+        self, path: str, console: Console | None, include_only: set[str] | None = None
+    ) -> dict:
         """Read artifacts with progress indicator.
 
         When console is provided, shows a progress bar during file reading.
@@ -784,10 +876,14 @@ class DesignStage(BaseStage):
 
         # If it's a single file, just read it
         if artifacts_dir.is_file():
+            if include_only is not None and str(artifacts_dir.resolve()) not in include_only:
+                return {"content": "", "images": [], "read": [], "failed": []}
             return self._read_artifacts(path)
 
         # Count files first for progress
         files = [f for f in sorted(artifacts_dir.rglob("*")) if f.is_file()]
+        if include_only is not None:
+            files = [f for f in files if str(f.resolve()) in include_only]
 
         if not files:
             if console:
@@ -845,11 +941,11 @@ class DesignStage(BaseStage):
             "failed": failed_files,
         }
 
-    def _read_artifacts(self, path: str) -> dict:
-        """Read **all** files from an artifacts directory.
+    def _read_artifacts(self, path: str, include_only: set[str] | None = None) -> dict:
+        """Read files from an artifacts directory.
 
-        No file-extension filtering is applied — every file found is
-        read so that the AI has the fullest possible context.
+        When *include_only* is ``None`` every file is read.  Otherwise
+        only files whose ``str(resolve())`` is in the set are processed.
 
         Returns a dict with keys:
             ``content``  – concatenated text of all successfully-read files
@@ -894,11 +990,16 @@ class DesignStage(BaseStage):
                     image_count += 1
 
         if artifacts_dir.is_file():
-            result = self._read_file(artifacts_dir)
-            _process(artifacts_dir.name, result)
+            if include_only is not None and str(artifacts_dir.resolve()) not in include_only:
+                pass  # filtered out
+            else:
+                result = self._read_file(artifacts_dir)
+                _process(artifacts_dir.name, result)
         else:
             for file_path in sorted(artifacts_dir.rglob("*")):
                 if not file_path.is_file():
+                    continue
+                if include_only is not None and str(file_path.resolve()) not in include_only:
                     continue
                 rel = str(file_path.relative_to(artifacts_dir))
                 result = self._read_file(file_path)

@@ -8,6 +8,9 @@ eggs/
 sdist/
 wheels/
 
+# --- Generated at build time ---
+azext_prototype/governance/policies/policy_vectors.json
+
 # --- Python bytecode ---
 __pycache__/
 *.py[cod]

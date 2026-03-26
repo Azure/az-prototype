@@ -31,6 +31,7 @@ class AgentCapability(str, Enum):
     BACKLOG_GENERATION = "backlog_generation"
     SECURITY_REVIEW = "security_review"
     MONITORING = "monitoring"
+    GOVERNANCE = "governance"
 
 
 @dataclass
@@ -281,8 +282,26 @@ class BaseAgent:
         except Exception:  # pragma: no cover — never let validation break the agent
             return []
 
+    def set_governor_brief(self, brief_text: str) -> None:
+        """Set a governor-produced policy brief for this agent.
+
+        When set, ``get_system_messages()`` uses this concise brief
+        (~1-2KB) instead of the full governance text (~40KB+).
+        Call with an empty string to revert to full governance.
+        """
+        self._governor_brief = brief_text
+
     def _get_governance_text(self) -> str:
-        """Return formatted governance text for system messages."""
+        """Return formatted governance text for system messages.
+
+        If a governor brief has been set via ``set_governor_brief()``,
+        returns that instead of the full policy/template dump.
+        """
+        # Prefer governor brief if available
+        brief = getattr(self, "_governor_brief", "")
+        if brief:
+            return brief
+
         try:
             from azext_prototype.agents.governance import GovernanceContext
 

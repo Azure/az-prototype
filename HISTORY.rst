@@ -6,6 +6,29 @@ Release History
 0.2.1b6
 +++++++
 
+* **Unified discovery tracking (``TrackedItem``)** — consolidated three
+  independent tracking systems (``topics``, ``open_items``,
+  ``confirmed_items``) into a single ``items`` list of ``TrackedItem``
+  objects.  Each item carries a ``kind`` (``"topic"`` or ``"decision"``)
+  and a ``status`` (``"pending"``, ``"answered"``, ``"confirmed"``,
+  ``"skipped"``).  The ``/status``, ``/open``, and ``/confirmed`` slash
+  commands now query the unified list, so pending topics appear in open
+  counts instead of showing "No items tracked yet" while 20 topics are
+  active.  Legacy ``discovery.yaml`` files with old-format fields are
+  automatically migrated on load.  The old ``Topic`` name is kept as an
+  alias for backward compatibility.
+* **``--reset`` now clears discovery state** — ``az prototype design --reset``
+  previously only reset design state (``design.json``) but left discovery state
+  (``discovery.yaml``) intact, causing the re-entry path to trigger instead of
+  a clean first-run.  The flag now calls ``DiscoveryState.reset()`` to clear
+  topics, conversation history, and all structured fields.
+* **Immutable discovery topics across re-runs** — topics and their questions
+  are now established once, persisted to ``discovery.yaml``, and immutable.
+  Re-running ``az prototype design`` resumes at the first unanswered topic
+  without re-sending full conversation history or artifacts.  New artifacts
+  can only *add* topics (via AI analysis), never replace existing ones.
+  Backward-compatible: old state files without ``topics`` key get an empty
+  list via deep-merge and follow the first-run path.
 * Renamed ``--script-resource-group`` deploy flag to ``--script-rg`` for
   consistency with Azure CLI conventions.
 * **TUI quit shortcut** — changed quit key from Ctrl+C to Ctrl+Q.
@@ -19,6 +42,69 @@ Release History
 * **Biz-analyst prompt fix** — agent prompt now requires responses to end
   with actual questions, preventing dangling lead-in sentences that leave
   the user unsure what to do next.
+* **Artifact inventory with content hashing** — ``discovery.yaml`` now tracks
+  a SHA-256 hash for every artifact file and the ``--context`` string.
+  Re-running ``az prototype design --artifacts`` compares hashes against the
+  stored inventory and only reads/analyzes files that are new or changed.
+  Unchanged content is skipped entirely, preventing the AI from hallucinating
+  new topics on re-runs with identical artifacts.  The ``--context`` flag
+  receives the same treatment.  ``--reset`` clears the inventory.  Old
+  ``discovery.yaml`` files without inventory keys load cleanly via deep-merge.
+* **Fix: slash commands no longer consume topic iterations** — the inner
+  follow-up loop (max 5 per topic) now only counts real AI exchanges.
+  Slash commands (``/status``, ``/open``, ``/why``, etc.) and empty inputs
+  no longer advance the iteration counter, preventing premature topic
+  completion when users explore state mid-topic.
+* **Improved ``/why`` output** — snippets increased from 150 to 500 chars
+  and each exchange now shows which discovery topic was being discussed,
+  making the output meaningful instead of showing decontextualised fragments.
+* **Fix: ``/restart`` breaks out of section loop** — previously ``/restart``
+  reset state but left the session iterating stale topics.  It now returns
+  a signal that breaks the section loop cleanly.
+* Removed vestigial ``_SECTION_COMPLETE_MARKER`` (defined but never used).
+* Removed dead code: ``build_incremental_update_prompt()`` and ``items_by_kind()``.
+* **Fix: ``--context`` timeout on re-entry** — ``_handle_incremental_context()``
+  now uses a lightweight AI call (~0.5KB prompt) instead of the full system
+  message stack (~69KB of governance + templates + architect context) for
+  topic classification.  Normal discovery turns still use the full prompt.
+* **Increased Copilot default timeout** from 300s to 480s.  The full system
+  prompt stack legitimately needs more headroom for normal discovery turns.
+* **Exhaustive debug logging (``DEBUG_PROTOTYPE=true``)** — set the
+  environment variable to create a timestamped ``debug_YYYYMMDDHHMMSS.log``
+  in the project directory.  Logs full AI call payloads (system message
+  sizes, user content, response content, token counts, timing), every
+  state mutation (``mark_item``, ``save``), every decision branch
+  (reentry vs fresh, context hash match), every slash command, and full
+  error tracebacks.  Designed for end-to-end diagnostic by developers,
+  testers, or end-users.
+* **Governor agent — embedding-based policy enforcement** — new built-in
+  agent (``governor``) that replaces the previous approach of injecting
+  all 13 policy files (~40KB) into every agent's system prompt.  Uses
+  ``sentence-transformers`` (``all-MiniLM-L6-v2``) for semantic retrieval
+  with TF-IDF fallback.  Three modes: ``brief()`` retrieves the top-K
+  most relevant rules and formats a ~1-2KB directive set; ``review()``
+  evaluates generated output against the full policy set using parallel
+  chunked AI calls (``max_workers=2``).  Agents receive focused policy
+  briefs via ``set_governor_brief()`` instead of the full dump.
+  Neural embeddings for built-in policies are pre-computed at build time
+  (``scripts/compute_embeddings.py``) and shipped inside the wheel as
+  ``policy_vectors.json`` — no ``torch`` or ``sentence-transformers``
+  needed at runtime.  Works on all platforms including Azure CLI's 32-bit
+  Windows Python.  Custom policies use TF-IDF; non-Windows users can
+  ``pip install sentence-transformers`` for neural custom-policy embeddings.
+  Build scripts (``build.sh``, ``build.bat``) and all CI/CD workflows
+  (``ci.yml``, ``pr.yml``, ``release.yml``) updated to compute embeddings
+  before wheel construction.
+* **New ``AgentCapability.GOVERNANCE``** enum value for the governor agent.
+* Built-in agent count: 11 → 12 (added ``governor``).
+* **PRU tracking for Copilot users** — the status bar now shows Premium
+  Request Units when using the Copilot provider:
+  ``### tokens this turn · ### session · ### PRUs · ##%``.  PRUs are
+  computed locally per request using the official multiplier table
+  (e.g. Claude Sonnet 4 = 1 PRU, Claude Haiku 4.5 = 0.33, Claude
+  Opus 4.5 = 3).  Non-Copilot providers show no PRU display.  The
+  ``_PRU_MULTIPLIERS`` table in ``token_tracker.py`` is sourced from
+  the GitHub Copilot billing docs.
 
 0.2.1b5
 +++++++

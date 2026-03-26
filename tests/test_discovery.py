@@ -16,7 +16,6 @@ from azext_prototype.stages.discovery import (
     _READY_MARKER,
     _QUIT_WORDS,
     _DONE_WORDS,
-    _SECTION_COMPLETE_MARKER,
 )
 
 
@@ -67,10 +66,10 @@ def mock_registry(mock_biz_agent, mock_architect_agent):
 
 
 @pytest.fixture
-def mock_agent_context():
+def mock_agent_context(tmp_path):
     ctx = AgentContext(
         project_config={"project": {"name": "test", "location": "eastus"}},
-        project_dir="/tmp/test",
+        project_dir=str(tmp_path),
         ai_provider=MagicMock(),
     )
     return ctx
@@ -1868,3 +1867,954 @@ class TestSectionAtATimeFlow:
         printed_text = "\n".join(str(p) for p in printed)
         # The "Yes" response should not appear in output
         assert "\nYes\n" not in printed_text
+
+
+# ======================================================================
+# Topic persistence and re-entry
+# ======================================================================
+
+
+class TestTopicPersistence:
+    """Topics are established once, persisted, and immutable across re-runs."""
+
+    def test_topics_persisted_on_first_run(
+        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+    ):
+        """First run with sections should persist topics to discovery state."""
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("## Auth\nHow do users sign in?\n## Data\nWhat database?"),
+            _make_response("Yes"),  # Auth confirmed
+            _make_response("Yes"),  # Data confirmed
+            _make_response("## Summary\nDone."),
+        ]
+
+        ds = DiscoveryState(str(tmp_path))
+        session = DiscoverySession(mock_agent_context, mock_registry, discovery_state=ds)
+        inputs = iter(["Entra ID", "PostgreSQL", "done"])
+
+        session.run(
+            input_fn=lambda _: next(inputs),
+            print_fn=lambda x: None,
+        )
+
+        assert ds.has_topics
+        topics = ds.topics
+        assert len(topics) == 2
+        assert topics[0].heading == "Auth"
+        assert topics[1].heading == "Data"
+
+    def test_topics_marked_answered_on_confirm(
+        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+    ):
+        """AI 'Yes' confirmation marks topic as answered."""
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("## Auth\nHow do users sign in?\n## Data\nWhat database?"),
+            _make_response("Yes"),  # Auth confirmed
+            _make_response("Yes"),  # Data confirmed
+            _make_response("## Summary\nDone."),
+        ]
+
+        ds = DiscoveryState(str(tmp_path))
+        session = DiscoverySession(mock_agent_context, mock_registry, discovery_state=ds)
+        inputs = iter(["Entra ID", "PostgreSQL", "done"])
+
+        session.run(
+            input_fn=lambda _: next(inputs),
+            print_fn=lambda x: None,
+        )
+
+        topics = ds.topics
+        assert topics[0].status == "answered"
+        assert topics[0].answer_exchange is not None
+        assert topics[1].status == "answered"
+
+    def test_topic_marked_skipped(
+        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+    ):
+        """Skipping a section marks the topic as skipped."""
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("## Auth\nHow do users sign in?\n## Data\nWhat database?"),
+            _make_response("Yes"),  # Data confirmed
+            _make_response("## Summary\nDone."),
+        ]
+
+        ds = DiscoveryState(str(tmp_path))
+        session = DiscoverySession(mock_agent_context, mock_registry, discovery_state=ds)
+        inputs = iter(["skip", "PostgreSQL", "done"])
+
+        session.run(
+            input_fn=lambda _: next(inputs),
+            print_fn=lambda x: None,
+        )
+
+        topics = ds.topics
+        assert topics[0].status == "skipped"
+        assert topics[1].status == "answered"
+
+    def test_topics_remain_pending_on_quit(
+        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+    ):
+        """Quitting mid-session leaves remaining topics as pending."""
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("## Auth\nHow do users sign in?\n## Data\nWhat database?\n## Networking\nPublic or private?"),
+            _make_response("Yes"),  # Auth confirmed
+        ]
+
+        ds = DiscoveryState(str(tmp_path))
+        session = DiscoverySession(mock_agent_context, mock_registry, discovery_state=ds)
+        inputs = iter(["Entra ID", "quit"])
+
+        result = session.run(
+            input_fn=lambda _: next(inputs),
+            print_fn=lambda x: None,
+        )
+
+        assert result.cancelled
+        topics = ds.topics
+        assert topics[0].status == "answered"
+        assert topics[1].status == "pending"
+        assert topics[2].status == "pending"
+
+
+class TestTopicReentry:
+    """Re-entry resumes at the first unanswered topic."""
+
+    def test_reentry_resumes_at_first_pending(
+        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+    ):
+        """Re-run with existing topics resumes at first pending topic."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, Topic
+
+        # Pre-populate state with topics (Auth answered, Data pending)
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_topics([
+            Topic(heading="Auth", detail="## Auth\nHow do users sign in?", kind="topic", status="answered", answer_exchange=2),
+            Topic(heading="Data", detail="## Data\nWhat database?", kind="topic", status="pending", answer_exchange=None),
+        ])
+        ds.state["_metadata"]["exchange_count"] = 2
+        ds.save()
+
+        # Re-run: should skip Auth and start with Data
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("Yes"),  # Data confirmed
+            _make_response("## Summary\nDone."),
+        ]
+
+        ds2 = DiscoveryState(str(tmp_path))
+        session = DiscoverySession(mock_agent_context, mock_registry, discovery_state=ds2)
+        inputs = iter(["PostgreSQL", "done"])
+
+        result = session.run(
+            input_fn=lambda _: next(inputs),
+            print_fn=lambda x: None,
+        )
+
+        assert not result.cancelled
+        # Data should now be answered
+        topics = ds2.topics
+        assert topics[0].status == "answered"  # Auth unchanged
+        assert topics[1].status == "answered"  # Data now answered
+
+    def test_reentry_shows_progress_message(
+        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+    ):
+        """Re-entry should show a progress message."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, Topic
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_topics([
+            Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="answered", answer_exchange=1),
+            Topic(heading="Data", detail="## Data\nWhat?", kind="topic", status="pending", answer_exchange=None),
+            Topic(heading="Net", detail="## Net\nPublic?", kind="topic", status="pending", answer_exchange=None),
+        ])
+        ds.save()
+
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("Yes"),
+            _make_response("Yes"),
+            _make_response("## Summary\nDone."),
+        ]
+
+        ds2 = DiscoveryState(str(tmp_path))
+        session = DiscoverySession(mock_agent_context, mock_registry, discovery_state=ds2)
+        printed = []
+        inputs = iter(["PostgreSQL", "Public", "done"])
+
+        session.run(
+            input_fn=lambda _: next(inputs),
+            print_fn=printed.append,
+        )
+
+        combined = "\n".join(str(p) for p in printed)
+        assert "1/3 topics covered" in combined
+
+    def test_reentry_all_topics_done_falls_through(
+        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+    ):
+        """If all topics are done on re-entry, fall through to free-form loop."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, Topic
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_topics([
+            Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="answered", answer_exchange=1),
+            Topic(heading="Data", detail="## Data\nWhat?", kind="topic", status="answered", answer_exchange=2),
+        ])
+        ds.save()
+
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("## Summary\nDone."),  # Summary from free-form "done"
+        ]
+
+        ds2 = DiscoveryState(str(tmp_path))
+        session = DiscoverySession(mock_agent_context, mock_registry, discovery_state=ds2)
+
+        result = session.run(
+            input_fn=lambda _: "done",
+            print_fn=lambda x: None,
+        )
+
+        assert not result.cancelled
+
+    def test_reentry_does_not_resend_full_history(
+        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+    ):
+        """Re-entry seeds messages with compact summary, not full history."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, Topic
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.state["project"]["summary"] = "An inventory API"
+        ds.set_topics([
+            Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="answered", answer_exchange=1),
+            Topic(heading="Data", detail="## Data\nWhat?", kind="topic", status="pending", answer_exchange=None),
+        ])
+        ds.state["_metadata"]["exchange_count"] = 3
+        # Add large conversation history
+        for i in range(20):
+            ds.state["conversation_history"].append({
+                "exchange": i + 1,
+                "timestamp": "2026-01-01T00:00:00",
+                "user": f"Long user message {i}" * 50,
+                "assistant": f"Long assistant response {i}" * 50,
+            })
+        ds.save()
+
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("Yes"),
+            _make_response("## Summary\nDone."),
+        ]
+
+        ds2 = DiscoveryState(str(tmp_path))
+        session = DiscoverySession(mock_agent_context, mock_registry, discovery_state=ds2)
+        inputs = iter(["PostgreSQL", "done"])
+
+        session.run(
+            input_fn=lambda _: next(inputs),
+            print_fn=lambda x: None,
+        )
+
+        # The first AI call should NOT contain all 20 exchanges
+        first_call = mock_agent_context.ai_provider.chat.call_args_list[0]
+        messages = first_call[0][0]
+        user_msgs = [m for m in messages if m.role == "user"]
+        # Should have compact summary + the section follow-up prompt, not 20+ user messages
+        assert len(user_msgs) <= 5
+
+    def test_reentry_restores_exchange_count(
+        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+    ):
+        """Re-entry restores exchange count from metadata."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, Topic
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_topics([
+            Topic(heading="Data", detail="## Data\nWhat?", kind="topic", status="pending", answer_exchange=None),
+        ])
+        ds.state["_metadata"]["exchange_count"] = 5
+        ds.save()
+
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("Yes"),
+            _make_response("## Summary\nDone."),
+        ]
+
+        ds2 = DiscoveryState(str(tmp_path))
+        session = DiscoverySession(mock_agent_context, mock_registry, discovery_state=ds2)
+        inputs = iter(["PostgreSQL", "done"])
+
+        result = session.run(
+            input_fn=lambda _: next(inputs),
+            print_fn=lambda x: None,
+        )
+
+        # Exchange count should continue from 5, not restart at 0
+        assert result.exchange_count == 6
+
+
+class TestIncrementalTopics:
+    """New artifacts can add topics but not replace existing ones."""
+
+    def test_new_artifacts_add_topics(
+        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+    ):
+        """Re-entry with new artifacts should add new topics."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, Topic
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_topics([
+            Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="answered", answer_exchange=1),
+            Topic(heading="Data", detail="## Data\nWhat?", kind="topic", status="answered", answer_exchange=2),
+        ])
+        ds.save()
+
+        # AI identifies a new topic from the new artifact
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("## Caching\nWhat caching strategy do you need?"),  # incremental context
+            _make_response("Yes"),  # Caching confirmed
+            _make_response("## Summary\nDone."),
+        ]
+
+        ds2 = DiscoveryState(str(tmp_path))
+        session = DiscoverySession(mock_agent_context, mock_registry, discovery_state=ds2)
+        inputs = iter(["Redis", "done"])
+
+        session.run(
+            seed_context="We also need caching",
+            input_fn=lambda _: next(inputs),
+            print_fn=lambda x: None,
+        )
+
+        topics = ds2.topics
+        assert len(topics) == 3
+        assert topics[2].heading == "Caching"
+
+    def test_no_new_topics_marker(
+        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+    ):
+        """AI returns [NO_NEW_TOPICS] when artifacts don't warrant new topics."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, Topic
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_topics([
+            Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="answered", answer_exchange=1),
+        ])
+        ds.save()
+
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("[NO_NEW_TOPICS]"),  # No new topics needed
+            _make_response("What are you building?"),  # Free-form (all topics done)
+            _make_response("## Summary\nDone."),
+        ]
+
+        ds2 = DiscoveryState(str(tmp_path))
+        session = DiscoverySession(mock_agent_context, mock_registry, discovery_state=ds2)
+
+        session.run(
+            seed_context="Same project, just more detail",
+            input_fn=lambda _: "done",
+            print_fn=lambda x: None,
+        )
+
+        # Original topics unchanged
+        assert len(ds2.topics) == 1
+        assert ds2.topics[0].heading == "Auth"
+
+    def test_duplicate_headings_deduplicated(
+        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+    ):
+        """append_topics should not add duplicates (case-insensitive)."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, Topic
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_topics([
+            Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="answered", answer_exchange=1),
+        ])
+
+        ds.append_topics([
+            Topic(heading="auth", detail="## auth\nDuplicate?", kind="topic", status="pending", answer_exchange=None),
+            Topic(heading="Caching", detail="## Caching\nNew topic", kind="topic", status="pending", answer_exchange=None),
+        ])
+
+        topics = ds.topics
+        assert len(topics) == 2  # Auth (original) + Caching (new)
+        assert topics[0].heading == "Auth"
+        assert topics[1].heading == "Caching"
+
+
+class TestTopicStateHelpers:
+    """Unit tests for Topic dataclass and DiscoveryState topic helpers."""
+
+    def test_topic_to_dict_roundtrip(self):
+        from azext_prototype.stages.discovery_state import Topic
+
+        t = Topic(heading="Auth", detail="How do users sign in?", kind="topic", status="answered", answer_exchange=3)
+        d = t.to_dict()
+        t2 = Topic.from_dict(d)
+        assert t2.heading == "Auth"
+        assert t2.detail == "How do users sign in?"
+        assert t2.status == "answered"
+        assert t2.answer_exchange == 3
+
+    def test_topic_from_dict_defaults(self):
+        from azext_prototype.stages.discovery_state import Topic
+
+        t = Topic.from_dict({"heading": "Auth"})
+        assert t.detail == ""
+        assert t.status == "pending"
+        assert t.answer_exchange is None
+
+    def test_default_state_has_items_key(self):
+        from azext_prototype.stages.discovery_state import _default_discovery_state
+
+        state = _default_discovery_state()
+        assert "items" in state
+        assert state["items"] == []
+
+    def test_has_topics_false_on_empty(self, tmp_path):
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        assert not ds.has_topics
+
+    def test_first_pending_topic_index(self, tmp_path):
+        from azext_prototype.stages.discovery_state import DiscoveryState, Topic
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_topics([
+            Topic(heading="A", detail="Q", kind="topic", status="answered", answer_exchange=1),
+            Topic(heading="B", detail="Q", kind="topic", status="skipped", answer_exchange=None),
+            Topic(heading="C", detail="Q", kind="topic", status="pending", answer_exchange=None),
+        ])
+        assert ds.first_pending_topic_index() == 2
+
+    def test_first_pending_topic_index_none_when_all_done(self, tmp_path):
+        from azext_prototype.stages.discovery_state import DiscoveryState, Topic
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_topics([
+            Topic(heading="A", detail="Q", kind="topic", status="answered", answer_exchange=1),
+        ])
+        assert ds.first_pending_topic_index() is None
+
+    def test_mark_topic(self, tmp_path):
+        from azext_prototype.stages.discovery_state import DiscoveryState, Topic
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_topics([
+            Topic(heading="Auth", detail="Q", kind="topic", status="pending", answer_exchange=None),
+        ])
+        ds.mark_topic("Auth", "answered", 5)
+        topics = ds.topics
+        assert topics[0].status == "answered"
+        assert topics[0].answer_exchange == 5
+
+    def test_backward_compat_old_yaml_without_items(self, tmp_path):
+        """Old discovery.yaml without items key should get items: [] via deep_merge."""
+        import yaml
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        # Write a YAML file without items key (no topics/open_items/confirmed_items either)
+        state_dir = tmp_path / ".prototype" / "state"
+        state_dir.mkdir(parents=True)
+        old_state = {
+            "project": {"summary": "Old project", "goals": ["Goal 1"]},
+            "requirements": {"functional": [], "non_functional": []},
+            "constraints": [],
+            "decisions": [],
+            "risks": [],
+            "scope": {"in_scope": [], "out_of_scope": [], "deferred": []},
+            "architecture": {"services": [], "integrations": [], "data_flow": ""},
+            "conversation_history": [],
+            "_metadata": {"created": "2026-01-01", "last_updated": "2026-01-01", "exchange_count": 3},
+        }
+        with open(state_dir / "discovery.yaml", "w") as f:
+            yaml.dump(old_state, f)
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        assert not ds.has_items  # Empty list = no items
+        assert ds.state.get("items") == []
+        # Old data preserved
+        assert ds.state["project"]["summary"] == "Old project"
+
+
+class TestLegacyMigration:
+    """Verify old-format YAML (topics + open_items + confirmed_items) migrates on load."""
+
+    def test_migrate_old_topics(self, tmp_path):
+        """Legacy topics field is migrated into unified items."""
+        import yaml
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        state_dir = tmp_path / ".prototype" / "state"
+        state_dir.mkdir(parents=True)
+        old_state = {
+            "project": {"summary": "", "goals": []},
+            "requirements": {"functional": [], "non_functional": []},
+            "constraints": [],
+            "decisions": [],
+            "topics": [
+                {"heading": "Auth", "questions": "How do users sign in?", "status": "answered", "answer_exchange": 1},
+                {"heading": "Data", "questions": "What database?", "status": "pending", "answer_exchange": None},
+            ],
+            "open_items": [],
+            "confirmed_items": [],
+            "risks": [],
+            "scope": {"in_scope": [], "out_of_scope": [], "deferred": []},
+            "architecture": {"services": [], "integrations": [], "data_flow": ""},
+            "conversation_history": [],
+            "_metadata": {"created": "2026-01-01", "last_updated": "2026-01-01", "exchange_count": 2},
+        }
+        with open(state_dir / "discovery.yaml", "w") as f:
+            yaml.dump(old_state, f)
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+
+        assert "topics" not in ds.state
+        assert "open_items" not in ds.state
+        assert "confirmed_items" not in ds.state
+        assert len(ds.items) == 2
+        assert ds.items[0].heading == "Auth"
+        assert ds.items[0].detail == "How do users sign in?"
+        assert ds.items[0].kind == "topic"
+        assert ds.items[0].status == "answered"
+        assert ds.items[1].heading == "Data"
+        assert ds.items[1].status == "pending"
+
+    def test_migrate_old_open_and_confirmed_items(self, tmp_path):
+        """Legacy open_items and confirmed_items migrate as decisions."""
+        import yaml
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        state_dir = tmp_path / ".prototype" / "state"
+        state_dir.mkdir(parents=True)
+        old_state = {
+            "project": {"summary": "", "goals": []},
+            "requirements": {"functional": [], "non_functional": []},
+            "constraints": [],
+            "decisions": [],
+            "open_items": ["Which region?", "Auth method?"],
+            "confirmed_items": ["Use PostgreSQL"],
+            "risks": [],
+            "scope": {"in_scope": [], "out_of_scope": [], "deferred": []},
+            "architecture": {"services": [], "integrations": [], "data_flow": ""},
+            "conversation_history": [],
+            "_metadata": {"created": "2026-01-01", "last_updated": "2026-01-01", "exchange_count": 3},
+        }
+        with open(state_dir / "discovery.yaml", "w") as f:
+            yaml.dump(old_state, f)
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+
+        assert "open_items" not in ds.state
+        assert "confirmed_items" not in ds.state
+        assert len(ds.items) == 3
+        # Two pending decisions from open_items
+        pending = ds.items_by_status("pending")
+        assert len(pending) == 2
+        assert all(i.kind == "decision" for i in pending)
+        # One confirmed decision from confirmed_items
+        confirmed = ds.items_by_status("confirmed")
+        assert len(confirmed) == 1
+        assert confirmed[0].heading == "Use PostgreSQL"
+
+    def test_migrate_combined_topics_and_items(self, tmp_path):
+        """Legacy state with both topics AND open_items merges correctly."""
+        import yaml
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        state_dir = tmp_path / ".prototype" / "state"
+        state_dir.mkdir(parents=True)
+        old_state = {
+            "project": {"summary": "", "goals": []},
+            "requirements": {"functional": [], "non_functional": []},
+            "constraints": [],
+            "decisions": [],
+            "topics": [
+                {"heading": "Auth", "questions": "How?", "status": "answered", "answer_exchange": 1},
+            ],
+            "open_items": ["Which region?"],
+            "confirmed_items": ["Use Terraform"],
+            "risks": [],
+            "scope": {"in_scope": [], "out_of_scope": [], "deferred": []},
+            "architecture": {"services": [], "integrations": [], "data_flow": ""},
+            "conversation_history": [],
+            "_metadata": {"created": "2026-01-01", "last_updated": "2026-01-01", "exchange_count": 2},
+        }
+        with open(state_dir / "discovery.yaml", "w") as f:
+            yaml.dump(old_state, f)
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+
+        assert len(ds.items) == 3
+        assert ds.items[0].kind == "topic"  # Auth
+        assert ds.items[1].kind == "decision"  # Which region?
+        assert ds.items[1].status == "pending"
+        assert ds.items[2].kind == "decision"  # Use Terraform
+        assert ds.items[2].status == "confirmed"
+
+
+class TestUnifiedStatusCommands:
+    """Verify /status, /open, /confirmed show data from unified items."""
+
+    def test_status_shows_topics(self, tmp_path):
+        """format_status_summary counts topics as items."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, Topic
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_items([
+            Topic(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=1),
+            Topic(heading="Data", detail="Q?", kind="topic", status="pending", answer_exchange=None),
+            Topic(heading="Net", detail="Q?", kind="topic", status="pending", answer_exchange=None),
+        ])
+
+        assert ds.open_count == 2
+        assert ds.confirmed_count == 1
+        summary = ds.format_status_summary()
+        assert "1 confirmed" in summary
+        assert "2 open" in summary
+
+    def test_open_items_shows_pending_topics(self, tmp_path):
+        """format_open_items lists pending topics."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, Topic
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_items([
+            Topic(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=1),
+            Topic(heading="Data", detail="Q?", kind="topic", status="pending", answer_exchange=None),
+        ])
+
+        text = ds.format_open_items()
+        assert "Data" in text
+        assert "Auth" not in text
+        assert "Topics:" in text
+
+    def test_confirmed_items_shows_answered_topics(self, tmp_path):
+        """format_confirmed_items lists answered topics."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, Topic
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_items([
+            Topic(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=1),
+            Topic(heading="Data", detail="Q?", kind="topic", status="pending", answer_exchange=None),
+        ])
+
+        text = ds.format_confirmed_items()
+        assert "Auth" in text
+        assert "Data" not in text
+
+    def test_status_no_items(self, tmp_path):
+        """format_status_summary with no items."""
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+
+        assert ds.format_status_summary() == "No items tracked yet."
+        assert "No open items" in ds.format_open_items()
+        assert "No items confirmed" in ds.format_confirmed_items()
+
+    def test_mixed_kinds_in_open(self, tmp_path):
+        """format_open_items groups topics and decisions separately."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, TrackedItem
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_items([
+            TrackedItem(heading="Auth", detail="Q?", kind="topic", status="pending", answer_exchange=None),
+            TrackedItem(heading="Which region?", detail="Which region?", kind="decision", status="pending", answer_exchange=None),
+        ])
+
+        text = ds.format_open_items()
+        assert "Topics:" in text
+        assert "Auth" in text
+        assert "Decisions:" in text
+        assert "Which region?" in text
+
+
+class TestArtifactInventoryState:
+    """Tests for artifact inventory and context hash tracking in DiscoveryState."""
+
+    def test_default_state_has_inventory_keys(self):
+        from azext_prototype.stages.discovery_state import _default_discovery_state
+
+        state = _default_discovery_state()
+        assert "artifact_inventory" in state
+        assert state["artifact_inventory"] == {}
+        assert "context_hash" in state
+        assert state["context_hash"] == ""
+
+    def test_artifact_inventory_roundtrip(self, tmp_path):
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.update_artifact_inventory({"/abs/path/file.txt": "abc123", "/abs/path/img.png": "def456"})
+
+        # Reload from disk
+        ds2 = DiscoveryState(str(tmp_path))
+        ds2.load()
+        hashes = ds2.get_artifact_hashes()
+        assert hashes == {"/abs/path/file.txt": "abc123", "/abs/path/img.png": "def456"}
+
+    def test_get_artifact_hashes_flat_mapping(self, tmp_path):
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.update_artifact_inventory({"/a/b.txt": "hash1", "/c/d.txt": "hash2"})
+
+        hashes = ds.get_artifact_hashes()
+        assert isinstance(hashes, dict)
+        assert hashes["/a/b.txt"] == "hash1"
+        assert hashes["/c/d.txt"] == "hash2"
+
+    def test_update_artifact_inventory_is_additive(self, tmp_path):
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.update_artifact_inventory({"/a/first.txt": "aaa"})
+        ds.update_artifact_inventory({"/b/second.txt": "bbb"})
+
+        hashes = ds.get_artifact_hashes()
+        assert len(hashes) == 2
+        assert hashes["/a/first.txt"] == "aaa"
+        assert hashes["/b/second.txt"] == "bbb"
+
+    def test_update_artifact_inventory_overwrites_hash(self, tmp_path):
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.update_artifact_inventory({"/a/file.txt": "old_hash"})
+        ds.update_artifact_inventory({"/a/file.txt": "new_hash"})
+
+        assert ds.get_artifact_hashes()["/a/file.txt"] == "new_hash"
+
+    def test_context_hash_roundtrip(self, tmp_path):
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.update_context_hash("ctx_hash_abc")
+
+        ds2 = DiscoveryState(str(tmp_path))
+        ds2.load()
+        assert ds2.get_context_hash() == "ctx_hash_abc"
+
+    def test_reset_clears_inventory(self, tmp_path):
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.update_artifact_inventory({"/a/file.txt": "hash1"})
+        ds.update_context_hash("ctx_hash")
+
+        ds.reset()
+        assert ds.get_artifact_hashes() == {}
+        assert ds.get_context_hash() == ""
+
+    def test_legacy_state_without_inventory_loads(self, tmp_path):
+        """Old discovery.yaml without inventory keys loads cleanly via _deep_merge."""
+        import yaml
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        state_dir = tmp_path / ".prototype" / "state"
+        state_dir.mkdir(parents=True)
+        # Write a minimal legacy state without the new keys
+        legacy = {
+            "project": {"summary": "test", "goals": []},
+            "requirements": {"functional": [], "non_functional": []},
+            "constraints": [],
+            "decisions": [],
+            "items": [],
+            "risks": [],
+            "scope": {"in_scope": [], "out_of_scope": [], "deferred": []},
+            "architecture": {"services": [], "integrations": [], "data_flow": ""},
+            "conversation_history": [],
+            "_metadata": {"created": None, "last_updated": None, "exchange_count": 0},
+        }
+        with open(state_dir / "discovery.yaml", "w") as f:
+            yaml.dump(legacy, f)
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        # New keys should be present with defaults
+        assert ds.get_artifact_hashes() == {}
+        assert ds.get_context_hash() == ""
+        assert ds.state["project"]["summary"] == "test"
+
+
+class TestSectionLoopSlashCommands:
+    """Verify that slash commands do NOT consume inner loop iterations."""
+
+    def test_slash_commands_do_not_advance_topic(
+        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+    ):
+        """Issuing 5+ slash commands should NOT mark a topic as answered."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, Topic
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_topics([
+            Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="pending", answer_exchange=None),
+            Topic(heading="Data", detail="## Data\nWhat?", kind="topic", status="pending", answer_exchange=None),
+        ])
+        ds.save()
+
+        # AI identifies no new topics (re-entry), then confirms section after real answer
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("Yes"),   # Auth confirmed after real answer
+            _make_response("Yes"),   # Data confirmed after real answer
+            _make_response("## Summary\nDone."),
+        ]
+
+        ds2 = DiscoveryState(str(tmp_path))
+        # 6 slash commands first (more than old limit of 5), then a real answer, then done
+        inputs = iter([
+            "/status", "/open", "/confirmed", "/status", "/open", "/confirmed",
+            "Use Azure AD B2C",  # Real answer for Auth
+            "Use Cosmos DB",     # Real answer for Data
+            "done",
+        ])
+
+        session = DiscoverySession(mock_agent_context, mock_registry, discovery_state=ds2)
+        session.run(
+            input_fn=lambda _: next(inputs),
+            print_fn=lambda x: None,
+        )
+
+        topics = ds2.topics
+        # Auth should be answered (via real AI exchange), not prematurely
+        assert topics[0].status == "answered"
+        assert topics[0].answer_exchange is not None
+        # Data should also be answered
+        assert topics[1].status == "answered"
+
+    def test_empty_input_does_not_advance_topic(
+        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+    ):
+        """Pressing Enter 5+ times should NOT mark a topic as answered."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, Topic
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_topics([
+            Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="pending", answer_exchange=None),
+        ])
+        ds.save()
+
+        mock_agent_context.ai_provider.chat.side_effect = [
+            _make_response("Yes"),  # Auth confirmed after real answer
+            _make_response("## Summary\nDone."),
+        ]
+
+        ds2 = DiscoveryState(str(tmp_path))
+        # 6 empty inputs, then a real answer, then done
+        inputs = iter(["", "", "", "", "", "", "Use Azure AD", "done"])
+
+        session = DiscoverySession(mock_agent_context, mock_registry, discovery_state=ds2)
+        session.run(
+            input_fn=lambda _: next(inputs),
+            print_fn=lambda x: None,
+        )
+
+        topics = ds2.topics
+        assert topics[0].status == "answered"
+        assert topics[0].answer_exchange is not None
+
+
+class TestRestartSignal:
+    """Verify /restart breaks out of section loop."""
+
+    def test_restart_returns_signal_from_handler(self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path):
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+
+        mock_agent_context.ai_provider.chat.return_value = _make_response("Welcome!")
+        session = DiscoverySession(mock_agent_context, mock_registry, discovery_state=ds)
+        # Set up I/O attributes that _handle_slash_command needs
+        session._print = lambda x: None
+        session._use_styled = False
+        session._status_fn = None
+        session._response_fn = None
+        session._messages = []
+        result = session._handle_slash_command("/restart")
+        assert result == "restart"
+
+    def test_non_restart_returns_none(self, mock_agent_context, mock_registry, mock_biz_agent):
+        session = DiscoverySession(mock_agent_context, mock_registry)
+        session._print = lambda x: None
+        session._use_styled = False
+        result = session._handle_slash_command("/status")
+        assert result is None
+
+        result = session._handle_slash_command("/open")
+        assert result is None
+
+
+class TestTopicAtExchange:
+    """Verify topic_at_exchange() cross-references exchanges with topics."""
+
+    def test_finds_topic_at_exchange(self, tmp_path):
+        from azext_prototype.stages.discovery_state import DiscoveryState, TrackedItem
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_items([
+            TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=2),
+            TrackedItem(heading="Data", detail="Q?", kind="topic", status="answered", answer_exchange=4),
+            TrackedItem(heading="Scale", detail="Q?", kind="topic", status="pending", answer_exchange=None),
+        ])
+
+        assert ds.topic_at_exchange(1) == "Auth"
+        assert ds.topic_at_exchange(2) == "Auth"
+        assert ds.topic_at_exchange(3) == "Data"
+        assert ds.topic_at_exchange(4) == "Data"
+        assert ds.topic_at_exchange(5) is None  # Beyond all answered topics
+
+    def test_no_answered_topics(self, tmp_path):
+        from azext_prototype.stages.discovery_state import DiscoveryState, TrackedItem
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_items([
+            TrackedItem(heading="Auth", detail="Q?", kind="topic", status="pending", answer_exchange=None),
+        ])
+
+        assert ds.topic_at_exchange(1) is None
+
+    def test_empty_state(self, tmp_path):
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        assert ds.topic_at_exchange(1) is None
