@@ -145,6 +145,9 @@ class BuildStage(BaseStage):
             )
 
         # Interactive build session (default)
+        section_fn = kwargs.get("section_fn")
+        update_task_fn = kwargs.get("update_task_fn")
+
         session = BuildSession(
             agent_context,
             registry,
@@ -152,6 +155,8 @@ class BuildStage(BaseStage):
             build_state=build_state,
             auto_accept=auto_accept,
             status_fn=status_fn,
+            section_fn=section_fn,
+            update_task_fn=update_task_fn,
         )
         result = session.run(
             design=design,

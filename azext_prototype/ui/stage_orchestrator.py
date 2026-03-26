@@ -429,6 +429,19 @@ class StageOrchestrator:
         self._adapter.clear_tasks("build")
         self._adapter.update_task("build", TaskStatus.IN_PROGRESS)
 
+        def _build_section_fn(headers: list[tuple[str, int]]) -> None:
+            """Add build stage entries to the tree under 'build'."""
+            for header_text, _ in headers:
+                stage_num = header_text.split(":")[0].replace("Stage ", "").strip()
+                task_id = f"build-stage-{stage_num}"
+                self._adapter.add_task("build", task_id, header_text)
+
+        def _build_update_fn(task_id: str, status: str) -> None:
+            """Update a build stage's status in the tree."""
+            status_map = {"in_progress": TaskStatus.IN_PROGRESS, "completed": TaskStatus.COMPLETED}
+            ts = status_map.get(status, TaskStatus.PENDING)
+            self._adapter.update_task(task_id, ts)
+
         try:
             _, config, registry, agent_context = self._prepare()
             from azext_prototype.stages.build_stage import BuildStage
@@ -440,6 +453,8 @@ class StageOrchestrator:
                 input_fn=self._adapter.input_fn,
                 print_fn=self._adapter.print_fn,
                 status_fn=self._adapter.status_fn,
+                section_fn=_build_section_fn,
+                update_task_fn=_build_update_fn,
                 **kwargs,
             )
             self._adapter.update_task("build", TaskStatus.COMPLETED)

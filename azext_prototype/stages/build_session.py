@@ -131,11 +131,15 @@ class BuildSession:
         build_state: BuildState | None = None,
         auto_accept: bool = False,
         status_fn: Any = None,
+        section_fn: Any = None,
+        update_task_fn: Any = None,
     ) -> None:
         self._context = agent_context
         self._registry = registry
         self._console = console or default_console
         self._status_fn = status_fn
+        self._section_fn = section_fn
+        self._update_task_fn = update_task_fn
         self._prompt = DiscoveryPrompt(self._console)
         self._build_state = build_state or BuildState(agent_context.project_dir)
 
@@ -392,6 +396,20 @@ class BuildSession:
                     _print(self._build_state.format_stage_status())
                     _print("")
 
+        # ---- Populate TUI tree with deployment stages ----
+        if self._section_fn:
+            all_stages = self._build_state._state.get("deployment_stages", [])
+            self._section_fn([
+                (f"Stage {s.get('stage', 0)}: {s.get('name', '')}", 2)
+                for s in all_stages
+            ])
+            # Mark already-generated stages as completed
+            if self._update_task_fn:
+                for s in all_stages:
+                    if s.get("status") in ("generated", "accepted"):
+                        slug = f"build-stage-{s.get('stage', 0)}"
+                        self._update_task_fn(slug, "completed")
+
         # ---- Phase 3: Staged generation ----
         if skip_generation:
             pending = []
@@ -414,6 +432,9 @@ class BuildSession:
                 svc_display += f" (+{len(svc_names) - 3} more)"
 
             generated_count += 1
+            task_id = f"build-stage-{stage_num}"
+            if self._update_task_fn:
+                self._update_task_fn(task_id, "in_progress")
             _print(f"[{generated_count}/{total_stages}] Stage {stage_num}: {stage_name}")
             if svc_display:
                 _print(f"       Resources: {svc_display}")
@@ -465,6 +486,8 @@ class BuildSession:
             written_paths = self._write_stage_files(stage, content)
 
             self._build_state.mark_stage_generated(stage_num, written_paths, agent.name)
+            if self._update_task_fn:
+                self._update_task_fn(task_id, "completed")
 
             if written_paths:
                 if use_styled:
