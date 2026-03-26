@@ -6,118 +6,100 @@ Release History
 0.2.1b6
 +++++++
 
+Discovery session
+~~~~~~~~~~~~~~~~~~~
 * **Unified discovery tracking (``TrackedItem``)** — consolidated three
   independent tracking systems (``topics``, ``open_items``,
   ``confirmed_items``) into a single ``items`` list of ``TrackedItem``
   objects.  Each item carries a ``kind`` (``"topic"`` or ``"decision"``)
   and a ``status`` (``"pending"``, ``"answered"``, ``"confirmed"``,
-  ``"skipped"``).  The ``/status``, ``/open``, and ``/confirmed`` slash
-  commands now query the unified list, so pending topics appear in open
-  counts instead of showing "No items tracked yet" while 20 topics are
-  active.  Legacy ``discovery.yaml`` files with old-format fields are
-  automatically migrated on load.  The old ``Topic`` name is kept as an
-  alias for backward compatibility.
-* **``--reset`` now clears discovery state** — ``az prototype design --reset``
-  previously only reset design state (``design.json``) but left discovery state
-  (``discovery.yaml``) intact, causing the re-entry path to trigger instead of
-  a clean first-run.  The flag now calls ``DiscoveryState.reset()`` to clear
-  topics, conversation history, and all structured fields.
-* **Immutable discovery topics across re-runs** — topics and their questions
-  are now established once, persisted to ``discovery.yaml``, and immutable.
-  Re-running ``az prototype design`` resumes at the first unanswered topic
-  without re-sending full conversation history or artifacts.  New artifacts
-  can only *add* topics (via AI analysis), never replace existing ones.
-  Backward-compatible: old state files without ``topics`` key get an empty
-  list via deep-merge and follow the first-run path.
-* Renamed ``--script-resource-group`` deploy flag to ``--script-rg`` for
-  consistency with Azure CLI conventions.
-* **TUI quit shortcut** — changed quit key from Ctrl+C to Ctrl+Q.
-  Textual 8.x reserves Ctrl+C for clipboard copy in TextArea widgets;
-  the info bar and adapter now advertise the correct shortcut.  Removed
-  the now-unnecessary SIGINT suppression from ``_run_tui()``.
-* **Discovery UX: clear call-to-action after AI response** — the system now
-  prints an explicit prompt ("Let me know if I missed anything above.
-  Otherwise, are you ready to continue?") after the initial AI response so
-  the user knows the session is waiting for input.
-* **Biz-analyst prompt fix** — agent prompt now requires responses to end
-  with actual questions, preventing dangling lead-in sentences that leave
-  the user unsure what to do next.
-* **Artifact inventory with content hashing** — ``discovery.yaml`` now tracks
-  a SHA-256 hash for every artifact file and the ``--context`` string.
-  Re-running ``az prototype design --artifacts`` compares hashes against the
-  stored inventory and only reads/analyzes files that are new or changed.
-  Unchanged content is skipped entirely, preventing the AI from hallucinating
-  new topics on re-runs with identical artifacts.  The ``--context`` flag
-  receives the same treatment.  ``--reset`` clears the inventory.  Old
-  ``discovery.yaml`` files without inventory keys load cleanly via deep-merge.
-* **Fix: slash commands no longer consume topic iterations** — the inner
-  follow-up loop (max 5 per topic) now only counts real AI exchanges.
-  Slash commands (``/status``, ``/open``, ``/why``, etc.) and empty inputs
-  no longer advance the iteration counter, preventing premature topic
-  completion when users explore state mid-topic.
-* **Improved ``/why`` output** — snippets increased from 150 to 500 chars
-  and each exchange now shows which discovery topic was being discussed,
-  making the output meaningful instead of showing decontextualised fragments.
-* **Fix: ``/restart`` breaks out of section loop** — previously ``/restart``
-  reset state but left the session iterating stale topics.  It now returns
-  a signal that breaks the section loop cleanly.
-* Removed vestigial ``_SECTION_COMPLETE_MARKER`` (defined but never used).
-* Removed dead code: ``build_incremental_update_prompt()`` and ``items_by_kind()``.
-* **Fix: ``###`` subsections no longer treated as separate topics** — only
-  ``##`` (level-2) headings become discovery topics.  Level-3 subsections
-  (e.g. "### In Scope", "### Out of Scope") are folded into their parent
-  topic's content.  The biz-analyst prompt now explicitly prohibits ``###``
-  headings and instructs the AI to use bold text or bullets for sub-categories.
-* **Fix: ``--context`` timeout on re-entry** — ``_handle_incremental_context()``
-  now uses a lightweight AI call (~0.5KB prompt) instead of the full system
-  message stack (~69KB of governance + templates + architect context) for
-  topic classification.  Normal discovery turns still use the full prompt.
-* **Fix: ``--context`` now records decisions and exits cleanly** — when
-  ``--context`` adds a simple directive (e.g. "change app name to X") and
-  no new topics are needed, the context is recorded as a confirmed decision
-  in discovery state and the session exits immediately.  Previously, the
-  context was discarded and the user was forced through pending topics.
-  Decision items (``kind="decision"``) auto-extracted from AI responses are
-  no longer walked interactively in the section loop — only ``kind="topic"``
-  items require user input.
-* **Increased Copilot default timeout** from 300s to 480s.  The full system
-  prompt stack legitimately needs more headroom for normal discovery turns.
-* **Exhaustive debug logging (``DEBUG_PROTOTYPE=true``)** — set the
-  environment variable to create a timestamped ``debug_YYYYMMDDHHMMSS.log``
-  in the project directory.  Logs full AI call payloads (system message
-  sizes, user content, response content, token counts, timing), every
-  state mutation (``mark_item``, ``save``), every decision branch
-  (reentry vs fresh, context hash match), every slash command, and full
-  error tracebacks.  Designed for end-to-end diagnostic by developers,
-  testers, or end-users.
+  ``"skipped"``).  Legacy state files are automatically migrated on load.
+* **Immutable discovery topics across re-runs** — topics are established
+  once, persisted to ``discovery.yaml``, and immutable.  Re-running
+  ``az prototype design`` resumes at the first unanswered topic.  New
+  artifacts can only *add* topics, never replace existing ones.
+* **Artifact inventory with content hashing** — ``discovery.yaml`` tracks
+  SHA-256 hashes for every artifact file and the ``--context`` string.
+  Re-runs only read/analyze new or changed files; unchanged content is
+  skipped entirely.
+* **``--context`` records decisions and exits cleanly** — simple directives
+  (e.g. "change app name to X") are recorded as confirmed decisions and
+  the session exits immediately.  Decision items (``kind="decision"``) are
+  no longer walked interactively — only ``kind="topic"`` items require input.
+* **``--reset`` now clears discovery state** — clears topics, conversation
+  history, artifact inventory, and all structured fields.
+* **``###`` subsections folded into parent topics** — only ``##`` (level-2)
+  headings become discovery topics.  Level-3 subsections are included in
+  their parent topic's content.  The biz-analyst prompt explicitly prohibits
+  ``###`` headings.
+
+Slash commands
+~~~~~~~~~~~~~~~
+* **Slash commands no longer consume topic iterations** — the inner
+  follow-up loop (max 5 per topic) only counts real AI exchanges.
+  Slash commands and empty inputs do not advance the counter.
+* **Improved ``/why`` output** — snippets increased from 150 to 500 chars;
+  each exchange shows which discovery topic was being discussed.
+* **``/restart`` breaks out of section loop** — previously reset state but
+  left the session iterating stale topics.
+
+Governor agent
+~~~~~~~~~~~~~~~
 * **Governor agent — embedding-based policy enforcement** — new built-in
-  agent (``governor``) that replaces the previous approach of injecting
-  all 13 policy files (~40KB) into every agent's system prompt.  Uses
-  ``sentence-transformers`` (``all-MiniLM-L6-v2``) for semantic retrieval
-  with TF-IDF fallback.  Three modes: ``brief()`` retrieves the top-K
-  most relevant rules and formats a ~1-2KB directive set; ``review()``
-  evaluates generated output against the full policy set using parallel
-  chunked AI calls (``max_workers=2``).  Agents receive focused policy
-  briefs via ``set_governor_brief()`` instead of the full dump.
-  Neural embeddings for built-in policies are pre-computed at build time
-  (``scripts/compute_embeddings.py``) and shipped inside the wheel as
-  ``policy_vectors.json`` — no ``torch`` or ``sentence-transformers``
-  needed at runtime.  Works on all platforms including Azure CLI's 32-bit
-  Windows Python.  Custom policies use TF-IDF; non-Windows users can
-  ``pip install sentence-transformers`` for neural custom-policy embeddings.
-  Build scripts (``build.sh``, ``build.bat``) and all CI/CD workflows
-  (``ci.yml``, ``pr.yml``, ``release.yml``) updated to compute embeddings
+  agent (``governor``) that replaces injecting all 13 policy files (~40KB)
+  into every agent's system prompt.  Three modes: ``brief()`` retrieves the
+  top-K most relevant rules (~1-2KB); ``review()`` evaluates output against
+  the full policy set using parallel chunked AI calls (``max_workers=2``).
+  Agents receive focused policy briefs via ``set_governor_brief()``.
+* **Pre-computed neural embeddings** — built-in policy embeddings are
+  generated at build time (``scripts/compute_embeddings.py``) using
+  ``sentence-transformers`` (``all-MiniLM-L6-v2``) and shipped inside the
+  wheel as ``policy_vectors.json``.  No ``torch`` needed at runtime — works
+  on all platforms including Azure CLI's 32-bit Windows Python.  Custom
+  policies use TF-IDF; non-Windows users can install
+  ``sentence-transformers`` for neural custom-policy embeddings.
+* **New ``AgentCapability.GOVERNANCE``** enum value.  Built-in agent count:
+  11 → 12.
+
+AI provider & telemetry
+~~~~~~~~~~~~~~~~~~~~~~~~
+* **Copilot default timeout** increased from 300s to 480s.
+* **Lightweight AI call for ``--context`` re-entry** — topic classification
+  uses a ~0.5KB prompt instead of the full ~69KB governance/template stack.
+* **PRU tracking for Copilot users** — status bar shows Premium Request
+  Units computed locally from the official multiplier table (e.g. Claude
+  Sonnet 4 = 1, Haiku 4.5 = 0.33, Opus 4.5 = 3).  Non-Copilot providers
+  are unaffected.
+
+TUI & UX
+~~~~~~~~~
+* **Build and deploy now launch TUI** — ``az prototype build`` and
+  ``az prototype deploy`` route through the TUI (``PrototypeApp``) for
+  interactive sessions, matching the design stage.  Dry-run, ``--json``,
+  single-stage deploy, and non-interactive contexts use the legacy path.
+* **TUI quit shortcut** changed from Ctrl+C to Ctrl+Q.
+* **Discovery UX** — clear call-to-action after AI response; trailing
+  colons stripped from topic headings in the stage tree.
+
+Debug logging
+~~~~~~~~~~~~~~
+* **Exhaustive debug logging (``DEBUG_PROTOTYPE=true``)** — creates a
+  timestamped ``debug_YYYYMMDDHHMMSS.log`` in the project directory.
+  Logs full AI call payloads (system message sizes, user content, response
+  content, token counts, timing), every state mutation, every decision
+  branch, every slash command, and full error tracebacks.
+
+Build & CI/CD
+~~~~~~~~~~~~~~
+* Build scripts (``build.sh``, ``build.bat``) and all CI/CD workflows
+  (``ci.yml``, ``pr.yml``, ``release.yml``) compute policy embeddings
   before wheel construction.
-* **New ``AgentCapability.GOVERNANCE``** enum value for the governor agent.
-* Built-in agent count: 11 → 12 (added ``governor``).
-* **PRU tracking for Copilot users** — the status bar now shows Premium
-  Request Units when using the Copilot provider:
-  ``### tokens this turn · ### session · ### PRUs · ##%``.  PRUs are
-  computed locally per request using the official multiplier table
-  (e.g. Claude Sonnet 4 = 1 PRU, Claude Haiku 4.5 = 0.33, Claude
-  Opus 4.5 = 3).  Non-Copilot providers show no PRU display.  The
-  ``_PRU_MULTIPLIERS`` table in ``token_tracker.py`` is sourced from
-  the GitHub Copilot billing docs.
+* Renamed ``--script-resource-group`` deploy flag to ``--script-rg``.
+
+Cleanup
+~~~~~~~~
+* Removed vestigial ``_SECTION_COMPLETE_MARKER`` (defined but never used).
+* Removed dead code: ``build_incremental_update_prompt()``, ``items_by_kind()``.
 
 0.2.1b5
 +++++++
