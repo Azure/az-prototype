@@ -281,6 +281,18 @@ class DiscoveryState:
         )
         self.save()
 
+    def add_confirmed_decision(self, text: str) -> None:
+        """Record a context directive as a confirmed decision.
+
+        This is used when ``--context`` adds information that doesn't
+        warrant new topics (e.g. "change the app name to X").  The
+        decision is stored in the ``decisions`` list so it reaches
+        the architect via ``format_as_context()``.
+        """
+        if text and text not in self._state["decisions"]:
+            self._state["decisions"].append(text)
+            self.save()
+
     def resolve_item(self, item: str, confirmed_text: str | None = None) -> None:
         """Find matching item and mark it confirmed."""
         for existing in self._state["items"]:

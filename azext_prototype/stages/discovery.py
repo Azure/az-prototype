@@ -493,16 +493,33 @@ class DiscoverySession:
         through to the free-form conversation loop.
         """
         # Handle incremental context from new artifacts
+        has_new_topics = False
         if (seed_context or artifacts or artifact_images) and self._biz_agent:
-            self._handle_incremental_context(seed_context, artifacts, artifact_images, _print, use_styled, status_fn)
+            has_new_topics = self._handle_incremental_context(
+                seed_context, artifacts, artifact_images, _print, use_styled, status_fn
+            )
 
-        # Find first pending topic
-        first_pending = self._discovery_state.first_pending_index()
-        if first_pending is None:
+        # When --context only and no new topics, exit immediately.
+        # The context was recorded as a decision — no need to force
+        # the user through pending topics for a simple directive.
+        if context_only and not has_new_topics:
+            if use_styled:
+                self._console.print_info("Context recorded. Use 'az prototype design' to resume discovery.")
+            else:
+                _print("Context recorded. Use 'az prototype design' to resume discovery.")
+            return DiscoveryResult(
+                requirements=self._discovery_state.format_as_context(),
+                conversation=list(self._messages),
+                policy_overrides=[],
+                exchange_count=self._exchange_count,
+            )
+
+        # Find first pending topic (topic kind only — decisions are not walked)
+        all_topics = self._discovery_state.topic_items
+        pending_topics = [t for t in all_topics if t.status == "pending"]
+        if not pending_topics:
             return None  # All topics done — fall through to free-form
 
-        all_topics = self._discovery_state.items
-        pending_topics = [t for t in all_topics if t.status == "pending"]
         answered_count = len(all_topics) - len(pending_topics)
 
         # Show progress
@@ -512,7 +529,7 @@ class DiscoverySession:
         else:
             _print(msg)
 
-        # Populate TUI task tree with ALL topics
+        # Populate TUI task tree with topics only (not decisions)
         if self._section_fn:
             self._section_fn([(t.heading, 2) for t in all_topics])
         # Mark already-completed topics
@@ -575,11 +592,16 @@ class DiscoverySession:
         _print: Callable[[str], None],
         use_styled: bool,
         status_fn: Callable | None,
-    ) -> None:
+    ) -> bool:
         """Ask AI to identify new topics from new artifacts/context.
 
         Only called on re-entry when new content is provided. Appends
         new topics without replacing existing ones.
+
+        Returns ``True`` if new topics were added, ``False`` if the AI
+        determined no new topics are needed.  When no new topics are
+        needed, the seed context (if any) is recorded as a confirmed
+        decision so it reaches the architect.
         """
         existing_topics = self._discovery_state.items
         existing_headings = [t.heading for t in existing_topics]
@@ -626,11 +648,18 @@ class DiscoverySession:
                 response = self._chat(prompt)
 
         if "[NO_NEW_TOPICS]" in response:
-            if use_styled:
-                self._console.print_info("No new topics needed from provided content.")
+            # Record the context as a confirmed decision so it persists
+            # and reaches the architect via format_as_context()
+            if seed_context:
+                self._discovery_state.add_confirmed_decision(seed_context)
+                msg = f"Context recorded as decision: {seed_context}"
             else:
-                _print("No new topics needed from provided content.")
-            return
+                msg = "No new topics needed from provided content."
+            if use_styled:
+                self._console.print_info(msg)
+            else:
+                _print(msg)
+            return False
 
         _, new_sections = parse_sections(self._clean(response))
         if new_sections:
@@ -652,6 +681,12 @@ class DiscoverySession:
                     self._console.print_info(msg)
                 else:
                     _print(msg)
+                return True
+
+        # No sections parsed — record context as decision if provided
+        if seed_context:
+            self._discovery_state.add_confirmed_decision(seed_context)
+        return False
 
     # ------------------------------------------------------------------ #
     # Public API

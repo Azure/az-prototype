@@ -72,6 +72,14 @@ Release History
   now uses a lightweight AI call (~0.5KB prompt) instead of the full system
   message stack (~69KB of governance + templates + architect context) for
   topic classification.  Normal discovery turns still use the full prompt.
+* **Fix: ``--context`` now records decisions and exits cleanly** — when
+  ``--context`` adds a simple directive (e.g. "change app name to X") and
+  no new topics are needed, the context is recorded as a confirmed decision
+  in discovery state and the session exits immediately.  Previously, the
+  context was discarded and the user was forced through pending topics.
+  Decision items (``kind="decision"``) auto-extracted from AI responses are
+  no longer walked interactively in the section loop — only ``kind="topic"``
+  items require user input.
 * **Increased Copilot default timeout** from 300s to 480s.  The full system
   prompt stack legitimately needs more headroom for normal discovery turns.
 * **Exhaustive debug logging (``DEBUG_PROTOTYPE=true``)** — set the
