@@ -1263,15 +1263,17 @@ class TestExtractSectionHeaders:
         result = extract_section_headers(text)
         assert result == [("Project Context & Scope", 2), ("Data & Content", 2)]
 
-    def test_extracts_h3_headings(self):
+    def test_h3_only_returns_empty(self):
+        """Level-3 only responses produce no headers (subsections are not topics)."""
         text = "### Authentication\nDetails\n### Authorization\nMore details"
         result = extract_section_headers(text)
-        assert result == [("Authentication", 3), ("Authorization", 3)]
+        assert result == []
 
-    def test_mixed_h2_h3(self):
+    def test_mixed_h2_h3_returns_only_h2(self):
+        """Level-3 subsections are filtered out — only level-2 topics returned."""
         text = "## Overview\nText\n### Sub-section\nText\n## Architecture\nText"
         result = extract_section_headers(text)
-        assert result == [("Overview", 2), ("Sub-section", 3), ("Architecture", 2)]
+        assert result == [("Overview", 2), ("Architecture", 2)]
 
     def test_skips_structural_headings(self):
         text = (
@@ -1608,21 +1610,42 @@ class TestParseSections:
         assert sections[0].heading == "Authentication & Security"
         assert sections[0].level == 2
 
-    def test_level_3_headings(self):
+    def test_level_3_only_returns_empty(self):
+        """Level-3 only response produces no sections (not treated as topics)."""
         text = "### Sub-topic\nDetailed question."
         _, sections = parse_sections(text)
-        assert len(sections) == 1
-        assert sections[0].level == 3
+        assert len(sections) == 0
 
-    def test_mixed_heading_levels(self):
+    def test_subsections_folded_into_parent(self):
+        """Level-3 subsections are folded into their parent level-2 section."""
         text = (
             "## Main Topic\nOverview.\n\n"
             "### Sub-topic\nDetail."
         )
         _, sections = parse_sections(text)
-        assert len(sections) == 2
+        assert len(sections) == 1
+        assert sections[0].heading == "Main Topic"
         assert sections[0].level == 2
-        assert sections[1].level == 3
+        # Subsection content is included in the parent's content
+        assert "### Sub-topic" in sections[0].content
+        assert "Detail." in sections[0].content
+
+    def test_multiple_subsections_folded(self):
+        """Multiple ### subsections under one ## are all included."""
+        text = (
+            "## Scope Boundary\nLet's clarify scope.\n\n"
+            "### In Scope\n- Item A\n- Item B\n\n"
+            "### Out of Scope\n- Item C\n\n"
+            "## Next Topic\nQuestions here."
+        )
+        _, sections = parse_sections(text)
+        assert len(sections) == 2
+        assert sections[0].heading == "Scope Boundary"
+        assert "### In Scope" in sections[0].content
+        assert "### Out of Scope" in sections[0].content
+        assert "Item A" in sections[0].content
+        assert "Item C" in sections[0].content
+        assert sections[1].heading == "Next Topic"
 
     def test_empty_string(self):
         preamble, sections = parse_sections("")

@@ -63,6 +63,11 @@ Release History
   a signal that breaks the section loop cleanly.
 * Removed vestigial ``_SECTION_COMPLETE_MARKER`` (defined but never used).
 * Removed dead code: ``build_incremental_update_prompt()`` and ``items_by_kind()``.
+* **Fix: ``###`` subsections no longer treated as separate topics** — only
+  ``##`` (level-2) headings become discovery topics.  Level-3 subsections
+  (e.g. "### In Scope", "### Out of Scope") are folded into their parent
+  topic's content.  The biz-analyst prompt now explicitly prohibits ``###``
+  headings and instructs the AI to use bold text or bullets for sub-categories.
 * **Fix: ``--context`` timeout on re-entry** — ``_handle_incremental_context()``
   now uses a lightweight AI call (~0.5KB prompt) instead of the full system
   message stack (~69KB of governance + templates + architect context) for

@@ -86,9 +86,13 @@ def extract_section_headers(response: str) -> list[tuple[str, int]]:
         matches.append((m.start(), text, 2))
     matches.sort(key=lambda x: x[0])
 
+    # Only return level-2 headings — level-3 subsections are part of
+    # their parent topic and should not become separate tree entries.
     seen: set[str] = set()
     headers: list[tuple[str, int]] = []
     for _, text, level in matches:
+        if level > 2:
+            continue
         lower = text.lower()
         if lower in _SKIP_HEADINGS or len(text) < 3 or lower in seen:
             continue
@@ -133,23 +137,31 @@ def parse_sections(response: str) -> tuple[str, list[Section]]:
     if not matches:
         return response, []
 
-    preamble = response[: matches[0][0]].strip()
+    # Only create sections from level-2 (##) headings.
+    # Level-3 (###) subsections are folded into their parent's content.
+    level2 = [(pos, text) for pos, text, level in matches if level == 2]
+
+    if not level2:
+        return response, []
+
+    preamble = response[: level2[0][0]].strip()
 
     seen: set[str] = set()
     sections: list[Section] = []
-    for idx, (pos, text, level) in enumerate(matches):
+    for idx, (pos, text) in enumerate(level2):
         lower = text.lower()
         if lower in _SKIP_HEADINGS or len(text) < 3 or lower in seen:
             continue
         seen.add(lower)
 
-        # Content runs from this heading to the next heading (or end)
-        end = matches[idx + 1][0] if idx + 1 < len(matches) else len(response)
+        # Content runs to the next level-2 heading (or end of response).
+        # This naturally includes any ### subsections within this topic.
+        end = level2[idx + 1][0] if idx + 1 < len(level2) else len(response)
         content = response[pos:end].strip()
 
         slug = re.sub(r"[^a-z0-9]+", "-", lower).strip("-")
         task_id = f"design-section-{slug}"
-        sections.append(Section(heading=text, level=level, content=content, task_id=task_id))
+        sections.append(Section(heading=text, level=2, content=content, task_id=task_id))
 
     return preamble, sections
 
