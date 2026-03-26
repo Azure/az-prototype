@@ -217,7 +217,7 @@ class DeploySession:
         # Token tracker — auto-pushes status to UI after every AI call
         self._token_tracker = TokenTracker()
         if self._status_fn:
-            self._token_tracker._on_update = self._status_fn
+            self._token_tracker._on_update = lambda text: self._status_fn(text, "tokens")
         elif self._console:
             self._token_tracker._on_update = self._console.print_token_status
 
@@ -2095,15 +2095,16 @@ class DeploySession:
 
     @contextmanager
     def _maybe_spinner(self, message: str, use_styled: bool, *, status_fn: Callable | None = None) -> Iterator[None]:
-        """Show a spinner when using styled output, otherwise no-op."""
+        """Show a spinner/status when using styled output or TUI."""
+        _sfn = status_fn or self._status_fn
         if use_styled:
             with self._console.spinner(message):
                 yield
-        elif status_fn:
-            status_fn(message, "start")
+        elif _sfn:
+            _sfn(message, "start")
             try:
                 yield
             finally:
-                status_fn(message, "end")
+                _sfn(message, "end")
         else:
             yield

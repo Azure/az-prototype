@@ -439,7 +439,7 @@ class StageOrchestrator:
                 registry,
                 input_fn=self._adapter.input_fn,
                 print_fn=self._adapter.print_fn,
-                status_fn=self._adapter.print_token_status,
+                status_fn=self._adapter.status_fn,
                 **kwargs,
             )
             self._adapter.update_task("build", TaskStatus.COMPLETED)
@@ -466,7 +466,7 @@ class StageOrchestrator:
                 registry,
                 input_fn=self._adapter.input_fn,
                 print_fn=self._adapter.print_fn,
-                status_fn=self._adapter.print_token_status,
+                status_fn=self._adapter.status_fn,
                 **kwargs,
             )
             self._adapter.update_task("deploy", TaskStatus.COMPLETED)
