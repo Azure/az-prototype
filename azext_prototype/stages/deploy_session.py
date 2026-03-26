@@ -2106,5 +2106,8 @@ class DeploySession:
                 yield
             finally:
                 _sfn(message, "end")
+                token_text = self._token_tracker.format_status()
+                if token_text:
+                    _sfn(token_text, "tokens")
         else:
             yield
