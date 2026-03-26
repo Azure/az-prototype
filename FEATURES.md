@@ -19,7 +19,7 @@
 
 ## Multi-Agent System
 
-- 11 built-in AI agents with specialized roles: architecture, infrastructure, application code, security, monitoring, QA, cost analysis, documentation, project management, and business analysis
+- 12 built-in AI agents with specialized roles: architecture, infrastructure, application code, security, monitoring, governance, QA, cost analysis, documentation, project management, and business analysis
 - Three-tier agent resolution — custom agents override built-in agents, or extend the system with new roles
 - Formal agent contracts — declared inputs, outputs, and delegation targets for dependency validation
 - Parallel execution — independent agent tasks run concurrently with automatic dependency ordering

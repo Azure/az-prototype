@@ -250,7 +250,7 @@ az prototype config show
 | `Invalid Azure OpenAI endpoint` | Endpoint must match `https://<resource>.openai.azure.com/`. Public OpenAI endpoints are blocked. |
 | Slow responses | Try a smaller/faster model like `gpt-4o-mini`. The `copilot` provider uses direct HTTP (no SDK overhead). |
 | Token limit exceeded | Switch to a model with a larger context window (`gpt-4.1`, `gemini-2.5-pro`). |
-| Timeout on large prompts | Increase the timeout: `set COPILOT_TIMEOUT=300` (default is 300 seconds). |
+| Timeout on large prompts | Increase the timeout: `set COPILOT_TIMEOUT=600` (default is 480 seconds). |
 
 ---
 

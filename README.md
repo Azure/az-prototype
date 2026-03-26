@@ -67,7 +67,7 @@ View the [command reference](./COMMANDS.md) to see the full list of commands and
 ## Agent System
 
 ### Built-in Agents
-Ships with 11 pre-defined agents:
+Ships with 12 pre-defined agents:
 
 | Agent | Capability | Description |
 |-------|-----------|-------------|
@@ -82,6 +82,7 @@ Ships with 11 pre-defined agents:
 | `project-manager` | Coordination | Scope management, task assignment, escalation |
 | `security-reviewer` | Security | Pre-deployment IaC security scanning |
 | `monitoring-agent` | Monitoring | Observability configuration generation |
+| `governor` | Governance | Embedding-based policy retrieval and enforcement |
 
 ### Custom Agents
 Add your own agents via YAML or Python:
