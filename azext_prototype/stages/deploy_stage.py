@@ -84,6 +84,8 @@ class DeployStage(BaseStage):
         tenant = kwargs.get("tenant")
         client_id = kwargs.get("client_id")
         client_secret = kwargs.get("client_secret")
+        print_fn = kwargs.get("print_fn")
+        status_fn = kwargs.get("status_fn")
 
         self.state = StageState.IN_PROGRESS
 
@@ -104,7 +106,12 @@ class DeployStage(BaseStage):
             return {"status": "reset"}
 
         # Create session
-        session = DeploySession(agent_context, registry)
+        session = DeploySession(
+            agent_context,
+            registry,
+            console=default_console if print_fn is None else None,
+            status_fn=status_fn,
+        )
 
         # --dry-run (with optional --stage N)
         if dry_run:

@@ -130,10 +130,12 @@ class BuildSession:
         console: Console | None = None,
         build_state: BuildState | None = None,
         auto_accept: bool = False,
+        status_fn: Any = None,
     ) -> None:
         self._context = agent_context
         self._registry = registry
         self._console = console or default_console
+        self._status_fn = status_fn
         self._prompt = DiscoveryPrompt(self._console)
         self._build_state = build_state or BuildState(agent_context.project_dir)
 
@@ -172,7 +174,9 @@ class BuildSession:
 
         # Token tracker — auto-pushes status to UI after every AI call
         self._token_tracker = TokenTracker()
-        if self._console:
+        if self._status_fn:
+            self._token_tracker._on_update = self._status_fn
+        elif self._console:
             self._token_tracker._on_update = self._console.print_token_status
 
         # Intent classifier for natural language command detection

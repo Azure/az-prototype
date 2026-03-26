@@ -110,6 +110,7 @@ class BuildStage(BaseStage):
         auto_accept = kwargs.get("auto_accept", False)
         input_fn = kwargs.get("input_fn")
         print_fn = kwargs.get("print_fn")
+        status_fn = kwargs.get("status_fn")
 
         self.state = StageState.IN_PROGRESS
         config = ProjectConfig(agent_context.project_dir)
@@ -150,6 +151,7 @@ class BuildStage(BaseStage):
             console=default_console if print_fn is None else None,
             build_state=build_state,
             auto_accept=auto_accept,
+            status_fn=status_fn,
         )
         result = session.run(
             design=design,

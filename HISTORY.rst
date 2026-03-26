@@ -85,9 +85,9 @@ TUI & UX
   output and will need to be re-run.
 * **Token status auto-updates after every AI call** — ``TokenTracker`` now
   fires an ``_on_update`` callback after each ``record()`` call.  All four
-  sessions (discovery, build, deploy, backlog) wire this to the console so
-  the bottom-right status bar updates continuously, not just during specific
-  phases.
+  sessions (discovery, build, deploy, backlog) wire this to the console or
+  TUI adapter so the bottom-right status bar updates continuously during
+  all phases (including deployment plan derivation), not just code generation.
 * **TUI quit shortcut** changed from Ctrl+C to Ctrl+Q.
 * **Discovery UX** — clear call-to-action after AI response; trailing
   colons stripped from topic headings in the stage tree.
