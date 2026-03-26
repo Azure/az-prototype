@@ -77,6 +77,12 @@ TUI & UX
   ``az prototype deploy`` route through the TUI (``PrototypeApp``) for
   interactive sessions, matching the design stage.  Dry-run, ``--json``,
   single-stage deploy, and non-interactive contexts use the legacy path.
+  Stage kwargs (``--reset``, ``--scope``, etc.) are passed through to
+  the stage execution.
+* **Downstream stages marked pending on re-run** — re-running an earlier
+  stage (e.g. design after build+deploy) now marks all downstream stages
+  as pending in the TUI tree, reflecting that they depend on the changed
+  output and will need to be re-run.
 * **TUI quit shortcut** changed from Ctrl+C to Ctrl+Q.
 * **Discovery UX** — clear call-to-action after AI response; trailing
   colons stripped from topic headings in the stage tree.

@@ -106,6 +106,14 @@ class StageOrchestrator:
             self._populate_from_state(detected)
             if current != detected:
                 self._adapter.update_task(current, TaskStatus.IN_PROGRESS)
+
+            # When re-running an earlier stage, mark all downstream stages
+            # as pending — they depend on the output of the current stage
+            # and will need to be re-run after it changes.
+            if target_idx < detected_idx:
+                for i in range(target_idx + 1, len(stage_order)):
+                    self._adapter.update_task(stage_order[i], TaskStatus.PENDING)
+
             self._show_welcome(current)
 
             # Auto-run a stage when launched with stage_kwargs
