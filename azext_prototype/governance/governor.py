@@ -129,48 +129,67 @@ def brief(
 
 
 def _format_brief(rules: list[IndexedRule]) -> str:
-    """Format retrieved rules as concise directives with rationale."""
-    lines = ["## Governance Policy Brief", ""]
-    lines.append("The following governance rules apply to this task:")
+    """Format a fixed-size governance posture summary.
+
+    Produces a concise summary (~800-1000 chars) regardless of how many
+    rules were retrieved.  Scales to thousands of policies because the
+    output is a summary with capped directives, not a dump of every rule.
+
+    The anti-pattern scanner remains the enforcement backstop — the
+    brief's job is to GUIDE, the scanner GUARANTEES compliance.
+    """
+    must_rules = [r for r in rules if r.severity == "required"]
+
+    lines = ["## Governance Posture for This Stage", ""]
+    lines.append("ALL generated code MUST comply with these requirements:")
     lines.append("")
 
-    current_category = ""
-    for rule in rules:
-        if rule.category != current_category:
-            current_category = rule.category
-            lines.append(f"### {current_category.title()}")
-        severity_marker = "MUST" if rule.severity == "required" else "SHOULD"
-        lines.append(f"- **{rule.rule_id}** ({severity_marker}): {rule.description}")
-        # Include rationale for MUST rules — tells the model HOW to comply
-        if rule.severity == "required" and rule.rationale:
-            lines.append(f"  Implementation: {rule.rationale}")
+    # Part 1: Top 8 MUST directives (deduplicated, concise)
+    seen: set[str] = set()
+    directives: list[str] = []
+    for rule in must_rules:
+        key = rule.description[:50].lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        directives.append(rule.description)
+        if len(directives) >= 8:
+            break
+    for i, d in enumerate(directives, 1):
+        lines.append(f"{i}. {d}")
 
-    # Append ALL anti-patterns with correct alternatives.
-    # Loaded from governance-managed YAML files — zero hardcoded logic.
+    # Part 2: Correct property values from anti-patterns (deduplicated, max 15)
     try:
         from azext_prototype.governance import anti_patterns
 
         ap_checks = anti_patterns.load()
-        if ap_checks:
+        correct: list[str] = []
+        for check in ap_checks:
+            correct.extend(check.correct_patterns)
+
+        # Deduplicate, skip comments, prioritize networking patterns, cap at 15
+        seen_cp: set[str] = set()
+        unique: list[str] = []
+        # Networking patterns first (publicNetworkAccess etc.)
+        net_checks = [c for c in ap_checks if c.domain == "networking"]
+        other_checks = [c for c in ap_checks if c.domain != "networking"]
+        for check in net_checks + other_checks:
+            for cp in check.correct_patterns:
+                if cp.lower() not in seen_cp and not cp.startswith("#"):
+                    seen_cp.add(cp.lower())
+                    unique.append(cp)
+        unique = unique[:15]
+
+        if unique:
             lines.append("")
-            lines.append("## Code Patterns That Will Be Rejected")
-            lines.append("The following patterns trigger automatic build rejection.")
-            lines.append("Use the CORRECT alternative shown for each.")
-            lines.append("")
-            for check in ap_checks:
-                lines.append(f"- {check.warning_message}")
-                if check.correct_patterns:
-                    lines.append("  INSTEAD ALWAYS USE:")
-                    for cp in check.correct_patterns:
-                        lines.append(f"    `{cp}`")
-                else:
-                    for sp in check.search_patterns:
-                        lines.append(f"  NEVER GENERATE: `{sp}`")
+            lines.append("## Correct Property Values (use these EXACTLY)")
+            for cp in unique:
+                lines.append(f"  `{cp}`")
     except Exception:
         pass
 
     lines.append("")
-    lines.append("Ensure generated code follows these rules.")
+    lines.append("Code that violates any requirement above will be rejected.")
     return "\n".join(lines)
 
 
