@@ -39,14 +39,17 @@ rules:
     severity: required
     description: >-
       Every Azure PaaS resource that supports publicNetworkAccess MUST
-      explicitly set it to Disabled.  In Terraform azapi_resource body
-      blocks, set publicNetworkAccess = "Disabled".  In Bicep, set
-      properties.publicNetworkAccess = 'Disabled'.  Never omit this
-      property — Azure defaults to Enabled.
+      explicitly set it to Disabled — including publicNetworkAccessForIngestion
+      and publicNetworkAccessForQuery on Log Analytics and Application Insights.
+      This applies to ALL environments including POC and development.
+      There are NO exceptions — POC environments MUST be secure.
+      In Terraform azapi_resource body blocks, set publicNetworkAccess = "Disabled".
+      In Bicep, set properties.publicNetworkAccess = 'Disabled'.
     rationale: >-
       Azure PaaS services default to public access enabled.  Omitting the
-      property results in a public endpoint.  Explicit Disabled is required
-      for both Terraform and Bicep.
+      property results in a public endpoint.  This rule applies to POC,
+      development, AND production — there are no security exemptions for
+      non-production environments.
     applies_to: [terraform-agent, bicep-agent]
 
   - id: NET-003

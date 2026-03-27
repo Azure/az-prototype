@@ -9,18 +9,24 @@ description: Network isolation, firewall rules, and public exposure detection
 patterns:
   - search_patterns:
       - "public_network_access_enabled = true"
-      - "public_network_access = \"enabled\""
-      - "publicnetworkaccess = \"enabled\""
+      - 'public_network_access = "enabled"'
+      - 'publicnetworkaccess = "enabled"'
+      - 'publicnetworkaccessforingestion = "enabled"'
+      - 'publicnetworkaccessforquery = "enabled"'
+      - "# poc acceptable"
+      - "# production backlog"
     safe_patterns:
       - "public_network_access_enabled = false"
-      - "publicnetworkaccess = \"disabled\""
+      - 'publicnetworkaccess = "disabled"'
+      - 'publicnetworkaccessforingestion = "disabled"'
+      - 'publicnetworkaccessforquery = "disabled"'
       - "public_network_access_enabled = var."
     correct_patterns:
       - 'publicNetworkAccess = "Disabled"'
       - "public_network_access_enabled = false"
       - 'publicNetworkAccessForIngestion = "Disabled"'
       - 'publicNetworkAccessForQuery = "Disabled"'
-    warning_message: "Public network access is enabled — disable public access and use private endpoints or service endpoints."
+    warning_message: "Public network access is enabled — disable public access and use private endpoints or service endpoints. This applies to ALL environments including POC."
 
   - search_patterns:
       - "0.0.0.0/0"
