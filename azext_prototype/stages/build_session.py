@@ -399,10 +399,7 @@ class BuildSession:
         # ---- Populate TUI tree with deployment stages ----
         if self._section_fn:
             all_stages = self._build_state._state.get("deployment_stages", [])
-            self._section_fn([
-                (f"Stage {s.get('stage', 0)}: {s.get('name', '')}", 2)
-                for s in all_stages
-            ])
+            self._section_fn([(f"Stage {s.get('stage', 0)}: {s.get('name', '')}", 2) for s in all_stages])
             # Mark already-generated stages as completed
             if self._update_task_fn:
                 for s in all_stages:
@@ -424,6 +421,8 @@ class BuildSession:
             pending = self._build_state.get_pending_stages()
             total_stages = len(self._build_state._state["deployment_stages"])
         generated_count = len(self._build_state.get_generated_stages())
+
+        from azext_prototype.debug_log import log_flow as _dbg_flow
 
         for stage in pending:
             stage_num = stage["stage"]
@@ -447,53 +446,37 @@ class BuildSession:
             # Use condensed per-stage context (from one-time condensation call)
             focused_context = stage_contexts.get(stage_num, "")
 
-            # Apply governor brief + stage-specific knowledge BEFORE building
-            # the task so the ## MANDATORY GOVERNANCE RULES section is injected.
             agent = self._select_agent(stage)
             if not agent:
                 _print(f"       Skipped (no agent for category '{stage.get('category', '')}')")
                 continue
-            self._apply_governor_brief(agent, stage_name, services)
-            self._apply_stage_knowledge(agent, stage)
 
-            agent, task = self._build_stage_task(stage, focused_context, templates)
+            with self._agent_build_context(agent, stage):
+                _, task = self._build_stage_task(stage, focused_context, templates)
 
-            # Disable standards during generation — the governance brief already
-            # has all the rules, standards add 10KB of redundant guidance
-            saved_standards = agent._include_standards
-            agent._include_standards = False
-            try:
-                with self._maybe_spinner(f"Building Stage {stage_num}: {stage_name}...", use_styled):
-                    response = agent.execute(self._context, task)
-            except Exception as exc:
-                _print(f"       Agent error in Stage {stage_num} — routing to QA for diagnosis...")
-                svc_names_list = [s.get("name", "") for s in services if s.get("name")]
-                route_error_to_qa(
-                    exc,
-                    f"Build Stage {stage_num}: {stage_name}",
-                    self._qa_agent,
-                    self._context,
-                    self._token_tracker,
-                    _print,
-                    services=svc_names_list,
-                    escalation_tracker=self._escalation_tracker,
-                    source_agent=agent.name,
-                    source_stage="build",
-                )
-                # Restore and skip to next stage
-                agent.set_knowledge_override("")
-                agent._include_standards = saved_standards
-                continue
-            # Restore on success path
-            agent.set_knowledge_override("")
-            agent._include_standards = saved_standards
+                try:
+                    with self._maybe_spinner(f"Building Stage {stage_num}: {stage_name}...", use_styled):
+                        response = agent.execute(self._context, task)
+                except Exception as exc:
+                    _print(f"       Agent error in Stage {stage_num} — routing to QA for diagnosis...")
+                    svc_names_list = [s.get("name", "") for s in services if s.get("name")]
+                    route_error_to_qa(
+                        exc,
+                        f"Build Stage {stage_num}: {stage_name}",
+                        self._qa_agent,
+                        self._context,
+                        self._token_tracker,
+                        _print,
+                        services=svc_names_list,
+                        escalation_tracker=self._escalation_tracker,
+                        source_agent=agent.name,
+                        source_stage="build",
+                    )
+                    continue
 
             if response:
                 self._token_tracker.record(response)
             content = response.content if response else ""
-
-            from azext_prototype.debug_log import log_flow as _dbg_flow
-            from azext_prototype.parsers.file_extractor import parse_file_blocks as _dbg_parse
 
             _dbg_flow(
                 "build_session.generate",
@@ -504,7 +487,7 @@ class BuildSession:
             )
 
             # Debug: check what the parser would extract
-            _dbg_files = _dbg_parse(content) if content else {}
+            _dbg_files = parse_file_blocks(content) if content else {}
             _dbg_flow(
                 "build_session.generate",
                 f"Stage {stage_num} parse_file_blocks",
@@ -1324,6 +1307,24 @@ class BuildSession:
     # Internal — governor integration
     # ------------------------------------------------------------------ #
 
+    @contextmanager
+    def _agent_build_context(self, agent: Any, stage: dict) -> Iterator[Any]:
+        """Configure agent for focused build generation, restore after.
+
+        Applies the governor brief + stage-specific knowledge and disables
+        standards (already covered by the governance brief).  On exit the
+        knowledge override is cleared and standards are restored.
+        """
+        self._apply_governor_brief(agent, stage.get("name", ""), stage.get("services", []))
+        self._apply_stage_knowledge(agent, stage)
+        saved_standards = agent._include_standards
+        agent._include_standards = False
+        try:
+            yield agent
+        finally:
+            agent.set_knowledge_override("")
+            agent._include_standards = saved_standards
+
     def _apply_stage_knowledge(self, agent: Any, stage: dict) -> None:
         """Set stage-specific knowledge on the agent.
 
@@ -1438,8 +1439,6 @@ class BuildSession:
             return {}
 
         # Parse the response into per-stage contexts
-        import re
-
         result: dict[int, str] = {}
         parts = re.split(r"\n(?=## Stage \d+)", content)
         for part in parts:
@@ -1476,7 +1475,9 @@ class BuildSession:
         architecture: str,
         templates: list,
     ) -> tuple[Any | None, str]:
-        """Build the task prompt for a stage and select the appropriate agent.
+        """Build the task prompt for a stage.
+
+        Agent selection is delegated to :meth:`_select_agent`.
 
         Returns ``(agent, task_prompt)`` or ``(None, "")`` when no
         suitable agent is available.
@@ -1485,16 +1486,7 @@ class BuildSession:
         stage_name = stage["name"]
         services = stage.get("services", [])
 
-        # Select agent based on category
-        if category in ("infra", "data", "integration"):
-            agent = self._iac_agents.get(self._iac_tool)
-        elif category in ("app", "schema", "cicd", "external"):
-            agent = self._dev_agent
-        elif category == "docs":
-            agent = self._doc_agent
-        else:
-            agent = self._iac_agents.get(self._iac_tool) or self._dev_agent
-
+        agent = self._select_agent(stage)
         if not agent:
             return None, ""
 
@@ -1997,6 +1989,8 @@ class BuildSession:
         if not self._qa_agent:
             return
 
+        from azext_prototype.debug_log import log_flow as _dbg
+
         stage_num = stage["stage"]
         orchestrator = AgentOrchestrator(self._registry, self._context)
 
@@ -2035,8 +2029,6 @@ class BuildSession:
 
             qa_content = qa_result.content if qa_result else ""
 
-            from azext_prototype.debug_log import log_flow as _dbg
-
             _dbg(
                 "build_session.qa",
                 f"Stage {stage_num} QA review (attempt {attempt})",
@@ -2069,46 +2061,40 @@ class BuildSession:
             # 6. Remediate — re-invoke IaC agent with focused context + governance + knowledge
             _print(f"       Stage {stage_num}: QA found issues — remediating (attempt {attempt + 1})...")
 
-            # Apply governor brief + stage knowledge BEFORE building the task
             agent = self._select_agent(stage)
             if not agent:
                 return
-            self._apply_governor_brief(agent, stage["name"], stage.get("services", []))
-            self._apply_stage_knowledge(agent, stage)
 
             # Use condensed stage context (cached from one-time condensation)
             cached_contexts = self._build_state._state.get("stage_contexts", {})
             focused = cached_contexts.get(str(stage_num), "")
-            agent, task = self._build_stage_task(stage, focused, templates)
 
-            # Escalating governance severity per attempt
-            if attempt == 0:
-                severity = "You MUST address ALL of them"
-            elif attempt == 1:
-                severity = (
-                    "CRITICAL: The previous generation VIOLATED governance policies. "
-                    "You MUST comply with every rule in the MANDATORY GOVERNANCE RULES section"
+            with self._agent_build_context(agent, stage):
+                _, task = self._build_stage_task(stage, focused, templates)
+
+                # Escalating governance severity per attempt
+                if attempt == 0:
+                    severity = "You MUST address ALL of them"
+                elif attempt == 1:
+                    severity = (
+                        "CRITICAL: The previous generation VIOLATED governance policies. "
+                        "You MUST comply with every rule in the MANDATORY GOVERNANCE RULES section"
+                    )
+                else:
+                    severity = (
+                        "FINAL ATTEMPT: Previous generations repeatedly violated governance. "
+                        "This build WILL BE REJECTED if any MUST rule is violated. "
+                        "Comply with EVERY governance rule or the build fails permanently"
+                    )
+
+                task += (
+                    f"\n\n## QA Review Findings ({severity})\n"
+                    "The QA engineer found the following issues:\n\n"
+                    f"{qa_content}\n"
                 )
-            else:
-                severity = (
-                    "FINAL ATTEMPT: Previous generations repeatedly violated governance. "
-                    "This build WILL BE REJECTED if any MUST rule is violated. "
-                    "Comply with EVERY governance rule or the build fails permanently"
-                )
 
-            task += (
-                f"\n\n## QA Review Findings ({severity})\n"
-                "The QA engineer found the following issues:\n\n"
-                f"{qa_content}\n"
-            )
-
-            saved_standards = agent._include_standards
-            agent._include_standards = False
-            with self._maybe_spinner(f"Remediating Stage {stage_num} (attempt {attempt + 1})...", use_styled):
-                response = agent.execute(self._context, task)
-
-            agent.set_knowledge_override("")
-            agent._include_standards = saved_standards
+                with self._maybe_spinner(f"Remediating Stage {stage_num} (attempt {attempt + 1})...", use_styled):
+                    response = agent.execute(self._context, task)
 
             if response:
                 self._token_tracker.record(response)

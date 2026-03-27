@@ -225,13 +225,19 @@ class TokenTracker:
     # Internal
     # ------------------------------------------------------------------
 
-    def mark_copilot(self) -> None:
-        """Mark this tracker as tracking a Copilot session.
+    @staticmethod
+    def _lookup_model(model_name: str, table: dict) -> object | None:
+        """Look up *model_name* in *table* using exact-then-substring matching.
 
-        Called by the Copilot provider so PRU computation is enabled.
-        Non-Copilot providers never call this, so PRUs stay at 0.
+        Returns the matched value or ``None`` if no match is found.
         """
-        self._is_copilot = True
+        model_lower = model_name.lower()
+        if model_lower in table:
+            return table[model_lower]
+        for key, value in table.items():
+            if key in model_lower:
+                return value
+        return None
 
     def _compute_pru(self, model: str) -> float:
         """Compute PRUs for one API request based on the model multiplier.
@@ -240,18 +246,9 @@ class TokenTracker:
         """
         if not self._is_copilot or not model:
             return 0.0
-
-        model_lower = model.lower()
-
-        # Exact match
-        if model_lower in _PRU_MULTIPLIERS:
-            return _PRU_MULTIPLIERS[model_lower]
-
-        # Substring match (e.g. "claude-sonnet-4.5-2025-04" matches "claude-sonnet-4.5")
-        for key, multiplier in _PRU_MULTIPLIERS.items():
-            if key in model_lower:
-                return multiplier
-
+        result = self._lookup_model(model, _PRU_MULTIPLIERS)
+        if result is not None:
+            return result  # type: ignore[return-value]
         # Unknown model on Copilot — assume 1 PRU (standard rate)
         return 1.0
 
@@ -259,16 +256,5 @@ class TokenTracker:
         """Look up the context window for the current model."""
         if not self._model:
             return None
-
-        model_lower = self._model.lower()
-
-        # Exact match first
-        if model_lower in _CONTEXT_WINDOWS:
-            return _CONTEXT_WINDOWS[model_lower]
-
-        # Substring match (e.g. "gpt-4o-2024-05-13" matches "gpt-4o")
-        for key, window in _CONTEXT_WINDOWS.items():
-            if key in model_lower:
-                return window
-
-        return None
+        result = self._lookup_model(self._model, _CONTEXT_WINDOWS)
+        return result  # type: ignore[return-value]

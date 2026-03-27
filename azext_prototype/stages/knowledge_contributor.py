@@ -131,6 +131,14 @@ def format_contribution_body(finding: dict) -> str:
 # ======================================================================
 
 
+def _run_gh_issue_create(title: str, body: str, repo: str, labels: list[str]) -> subprocess.CompletedProcess:
+    """Run ``gh issue create`` with the given labels."""
+    cmd = ["gh", "issue", "create", "--title", title, "--body", body, "--repo", repo]
+    for label in labels:
+        cmd.extend(["--label", label])
+    return subprocess.run(cmd, capture_output=True, text=True, check=False)
+
+
 def submit_contribution(
     finding: dict,
     repo: str = _DEFAULT_REPO,
@@ -167,42 +175,15 @@ def submit_contribution(
 
     from azext_prototype.debug_log import log_flow
 
-    cmd = [
-        "gh",
-        "issue",
-        "create",
-        "--title",
-        title,
-        "--body",
-        body,
-        "--repo",
-        repo,
-    ]
-    for label in labels:
-        cmd.extend(["--label", label])
-
     log_flow("knowledge_contributor.submit", "Creating issue", title=title, repo=repo, labels=labels)
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        result = _run_gh_issue_create(title, body, repo, labels)
         if result.returncode != 0:
             error = result.stderr.strip() or result.stdout.strip()
             log_flow("knowledge_contributor.submit", "Failed with labels, retrying with fallback", error=error)
 
             # Retry with fallback labels — service label might not exist
-            fallback_labels = ["knowledge-contribution", "new-service"]
-            cmd_fallback = [
-                "gh", "issue", "create",
-                "--title", title, "--body", body, "--repo", repo,
-            ]
-            for label in fallback_labels:
-                cmd_fallback.extend(["--label", label])
-
-            result = subprocess.run(cmd_fallback, capture_output=True, text=True, check=False)
+            result = _run_gh_issue_create(title, body, repo, ["knowledge-contribution", "new-service"])
             if result.returncode != 0:
                 error = result.stderr.strip() or result.stdout.strip()
                 log_flow("knowledge_contributor.submit", "Fallback also failed", error=error)

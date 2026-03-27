@@ -2841,3 +2841,288 @@ class TestTopicAtExchange:
         ds = DiscoveryState(str(tmp_path))
         ds.load()
         assert ds.topic_at_exchange(1) is None
+
+
+# ======================================================================
+# _chat_lightweight edge cases
+# ======================================================================
+
+
+class TestChatLightweight:
+    """Tests for _chat_lightweight — minimal AI call for classification tasks."""
+
+    def test_empty_content(self, mock_agent_context, mock_registry):
+        """Empty string content should still work."""
+        mock_agent_context.ai_provider.chat.return_value = _make_response("[NO_NEW_TOPICS]")
+        session = DiscoverySession(mock_agent_context, mock_registry)
+
+        result = session._chat_lightweight("")
+        assert result == "[NO_NEW_TOPICS]"
+
+        # Verify it used a minimal system prompt (not the full governance payload)
+        call_args = mock_agent_context.ai_provider.chat.call_args
+        messages = call_args[0][0]
+        system_msgs = [m for m in messages if m.role == "system"]
+        assert len(system_msgs) == 1
+        assert len(system_msgs[0].content) < 200  # Lightweight — not 69KB
+
+    def test_does_not_add_to_messages(self, mock_agent_context, mock_registry):
+        """_chat_lightweight is ephemeral — should NOT add to self._messages."""
+        mock_agent_context.ai_provider.chat.return_value = _make_response("analysis result")
+        session = DiscoverySession(mock_agent_context, mock_registry)
+
+        initial_count = len(session._messages)
+        session._chat_lightweight("classify this")
+        assert len(session._messages) == initial_count
+
+    def test_records_tokens(self, mock_agent_context, mock_registry):
+        """Token usage from lightweight calls should be tracked."""
+        mock_agent_context.ai_provider.chat.return_value = _make_response("result")
+        session = DiscoverySession(mock_agent_context, mock_registry)
+
+        session._chat_lightweight("test prompt")
+        # TokenTracker.record was called (uses AIResponse)
+        assert session._token_tracker._turn_count >= 1
+
+    def test_uses_low_temperature(self, mock_agent_context, mock_registry):
+        """Lightweight calls use temperature=0.3 for determinism."""
+        mock_agent_context.ai_provider.chat.return_value = _make_response("ok")
+        session = DiscoverySession(mock_agent_context, mock_registry)
+
+        session._chat_lightweight("test")
+        call_kwargs = mock_agent_context.ai_provider.chat.call_args[1]
+        assert call_kwargs.get("temperature") == 0.3
+
+
+# ======================================================================
+# _handle_incremental_context edge cases
+# ======================================================================
+
+
+class TestHandleIncrementalContext:
+    """Tests for _handle_incremental_context — re-entry topic detection."""
+
+    def test_returns_false_no_topics_no_seed_context(
+        self, mock_agent_context, mock_registry,
+    ):
+        """When AI says [NO_NEW_TOPICS] and no seed_context, returns False."""
+        mock_agent_context.ai_provider.chat.return_value = _make_response("[NO_NEW_TOPICS]")
+        session = DiscoverySession(mock_agent_context, mock_registry)
+
+        result = session._handle_incremental_context(
+            seed_context="",
+            artifacts="some artifact text",
+            artifact_images=None,
+            _print=lambda x: None,
+            use_styled=False,
+            status_fn=None,
+        )
+        assert result is False
+
+    def test_returns_false_no_topics_with_seed_context(
+        self, mock_agent_context, mock_registry,
+    ):
+        """When AI says [NO_NEW_TOPICS] with seed_context, records decision."""
+        mock_agent_context.ai_provider.chat.return_value = _make_response("[NO_NEW_TOPICS]")
+        session = DiscoverySession(mock_agent_context, mock_registry)
+
+        printed = []
+        result = session._handle_incremental_context(
+            seed_context="Change app name to Contoso",
+            artifacts="",
+            artifact_images=None,
+            _print=printed.append,
+            use_styled=False,
+            status_fn=None,
+        )
+        assert result is False
+        # Seed context should be recorded as a confirmed decision
+        decisions = session._discovery_state.state["decisions"]
+        assert "Change app name to Contoso" in decisions
+        assert any("Context recorded" in p for p in printed)
+
+    def test_returns_true_when_new_topics_found(
+        self, mock_agent_context, mock_registry,
+    ):
+        """When AI returns new sections, topics are appended and returns True."""
+        new_topics_response = (
+            "## Authentication Strategy\n"
+            "1. What identity provider?\n"
+            "2. SSO required?\n\n"
+            "## Data Residency\n"
+            "1. Which region?\n"
+            "2. Compliance needs?\n"
+        )
+        mock_agent_context.ai_provider.chat.return_value = _make_response(new_topics_response)
+        session = DiscoverySession(mock_agent_context, mock_registry)
+
+        result = session._handle_incremental_context(
+            seed_context="Add GDPR compliance",
+            artifacts="",
+            artifact_images=None,
+            _print=lambda x: None,
+            use_styled=False,
+            status_fn=None,
+        )
+        assert result is True
+        # Topics should be appended to discovery state
+        assert session._discovery_state.has_items
+
+    def test_no_parseable_sections_records_decision(
+        self, mock_agent_context, mock_registry,
+    ):
+        """When AI response has no parseable sections, seed_context is saved as decision."""
+        mock_agent_context.ai_provider.chat.return_value = _make_response(
+            "The new information is already covered by existing topics."
+        )
+        session = DiscoverySession(mock_agent_context, mock_registry)
+
+        result = session._handle_incremental_context(
+            seed_context="Use Redis for caching",
+            artifacts="",
+            artifact_images=None,
+            _print=lambda x: None,
+            use_styled=False,
+            status_fn=None,
+        )
+        assert result is False
+        decisions = session._discovery_state.state["decisions"]
+        assert "Use Redis for caching" in decisions
+
+
+# ======================================================================
+# add_confirmed_decision deduplication
+# ======================================================================
+
+
+class TestAddConfirmedDecisionDedup:
+    """Test that add_confirmed_decision deduplicates."""
+
+    def test_same_decision_not_duplicated(self, tmp_path):
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+
+        ds.add_confirmed_decision("Use Redis for caching")
+        ds.add_confirmed_decision("Use Redis for caching")
+        ds.add_confirmed_decision("Use Redis for caching")
+
+        assert ds.state["decisions"].count("Use Redis for caching") == 1
+
+    def test_different_decisions_both_stored(self, tmp_path):
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+
+        ds.add_confirmed_decision("Use Redis")
+        ds.add_confirmed_decision("Use PostgreSQL")
+
+        assert "Use Redis" in ds.state["decisions"]
+        assert "Use PostgreSQL" in ds.state["decisions"]
+        assert len(ds.state["decisions"]) == 2
+
+    def test_empty_string_not_stored(self, tmp_path):
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+
+        ds.add_confirmed_decision("")
+        assert len(ds.state["decisions"]) == 0
+
+
+# ======================================================================
+# topic_at_exchange — overlapping exchanges
+# ======================================================================
+
+
+class TestTopicAtExchangeOverlapping:
+    """Test topic_at_exchange with overlapping and edge case exchange ranges."""
+
+    def test_overlapping_exchange_numbers(self, tmp_path):
+        """When multiple topics have the same answer_exchange, first by sort wins."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, TrackedItem
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_items([
+            TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=2),
+            TrackedItem(heading="Data", detail="Q?", kind="topic", status="answered", answer_exchange=2),
+            TrackedItem(heading="Scale", detail="Q?", kind="topic", status="answered", answer_exchange=5),
+        ])
+
+        # Exchange 2 maps to the first answered topic with answer_exchange >= 2
+        result = ds.topic_at_exchange(2)
+        assert result in ("Auth", "Data")  # Either is valid — both have exchange 2
+
+    def test_exchange_between_topics(self, tmp_path):
+        """Exchange number between two answer_exchanges maps to the later topic."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, TrackedItem
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_items([
+            TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=2),
+            TrackedItem(heading="Data", detail="Q?", kind="topic", status="answered", answer_exchange=5),
+        ])
+
+        # Exchange 3 is after Auth (2) but before Data (5) → Data
+        assert ds.topic_at_exchange(3) == "Data"
+
+    def test_exchange_zero(self, tmp_path):
+        """Exchange 0 should return the first topic."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, TrackedItem
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_items([
+            TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=2),
+        ])
+
+        assert ds.topic_at_exchange(0) == "Auth"
+
+    def test_exchange_beyond_all_returns_none(self, tmp_path):
+        """Exchange after all answer_exchanges returns None (free-form)."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, TrackedItem
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_items([
+            TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=2),
+            TrackedItem(heading="Data", detail="Q?", kind="topic", status="answered", answer_exchange=5),
+        ])
+
+        assert ds.topic_at_exchange(10) is None
+
+    def test_single_topic_covers_all_earlier_exchanges(self, tmp_path):
+        """A single answered topic covers all exchanges up to its answer_exchange."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, TrackedItem
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_items([
+            TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=5),
+        ])
+
+        assert ds.topic_at_exchange(1) == "Auth"
+        assert ds.topic_at_exchange(3) == "Auth"
+        assert ds.topic_at_exchange(5) == "Auth"
+        assert ds.topic_at_exchange(6) is None
+
+    def test_mixed_answered_and_pending(self, tmp_path):
+        """Pending topics (no answer_exchange) don't appear in results."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, TrackedItem
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.set_items([
+            TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=2),
+            TrackedItem(heading="Pending Topic", detail="Q?", kind="topic", status="pending", answer_exchange=None),
+            TrackedItem(heading="Data", detail="Q?", kind="topic", status="answered", answer_exchange=5),
+        ])
+
+        assert ds.topic_at_exchange(1) == "Auth"
+        assert ds.topic_at_exchange(3) == "Data"
+        assert ds.topic_at_exchange(6) is None

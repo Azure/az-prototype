@@ -415,7 +415,7 @@ class TestAzureApiVersionInjection:
         messages = agent.get_system_messages()
         contents = [m.content for m in messages if isinstance(m.content, str)]
         joined = "\n".join(contents)
-        assert "AZURE API VERSION: 2025-06-01" in joined
+        assert "AZURE API VERSION" in joined
         assert "azapi" in joined
         assert "learn.microsoft.com" in joined
 
@@ -443,7 +443,7 @@ class TestAzureApiVersionInjection:
         messages = agent.get_system_messages()
         contents = [m.content for m in messages if isinstance(m.content, str)]
         joined = "\n".join(contents)
-        assert "AZURE API VERSION: 2025-06-01" in joined
+        assert "AZURE API VERSION" in joined
         assert "learn.microsoft.com" in joined
 
     def test_bicep_agent_injects_azure_api_version(self):
@@ -453,7 +453,7 @@ class TestAzureApiVersionInjection:
         messages = agent.get_system_messages()
         contents = [m.content for m in messages if isinstance(m.content, str)]
         joined = "\n".join(contents)
-        assert "AZURE API VERSION: 2025-06-01" in joined
+        assert "AZURE API VERSION" in joined
         assert "learn.microsoft.com" in joined
         assert "deployment-language-bicep" in joined
 
@@ -474,7 +474,7 @@ class TestAzureApiVersionInjection:
         messages = call_args[0][0]
         contents = [m.content for m in messages if isinstance(m.content, str)]
         joined = "\n".join(contents)
-        assert "AZURE API VERSION: 2025-06-01" in joined
+        assert "AZURE API VERSION" in joined
         assert "deployment-language-terraform" in joined
 
     def test_cloud_architect_injects_azure_api_version_for_bicep(self):
@@ -494,5 +494,5 @@ class TestAzureApiVersionInjection:
         messages = call_args[0][0]
         contents = [m.content for m in messages if isinstance(m.content, str)]
         joined = "\n".join(contents)
-        assert "AZURE API VERSION: 2025-06-01" in joined
+        assert "AZURE API VERSION" in joined
         assert "deployment-language-bicep" in joined

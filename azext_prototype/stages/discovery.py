@@ -338,12 +338,7 @@ class DiscoverySession:
         self._exchange_count += 1
         with self._maybe_spinner("Analyzing files...", use_styled, status_fn=self._status_fn):
             response = self._chat(content)
-        self._discovery_state.update_from_exchange(f"[Read files from {args}]", response, self._exchange_count)
-        self._extract_items_from_response(response)
-        clean = self._clean(response)
-        self._show_content(clean, use_styled, _print)
-        self._update_token_status()
-        self._emit_sections(clean)
+        self._process_response(f"[Read files from {args}]", response, use_styled, _print)
 
     # ------------------------------------------------------------------ #
     # Section-at-a-time gating
@@ -952,16 +947,7 @@ class DiscoverySession:
             with self._maybe_spinner("Thinking...", use_styled, status_fn=status_fn):
                 response = self._chat(user_input)
 
-            # Update discovery state after each exchange
-            self._discovery_state.update_from_exchange(user_input, response, self._exchange_count)
-
-            # Extract any open/confirmed items from the response
-            self._extract_items_from_response(response)
-
-            clean = self._clean(response)
-            self._show_content(clean, use_styled, _print)
-            self._update_token_status()
-            self._emit_sections(clean)
+            self._process_response(user_input, response, use_styled, _print)
 
             # Agent signalled convergence
             if _READY_MARKER in response:
@@ -984,12 +970,7 @@ class DiscoverySession:
                 self._exchange_count += 1
                 with self._maybe_spinner("Thinking...", use_styled, status_fn=status_fn):
                     response = self._chat(more)
-                self._discovery_state.update_from_exchange(more, response, self._exchange_count)
-                self._extract_items_from_response(response)
-                clean_more = self._clean(response)
-                self._show_content(clean_more, use_styled, _print)
-                self._update_token_status()
-                self._emit_sections(clean_more)
+                self._process_response(more, response, use_styled, _print)
 
         # ---- Produce the final summary ----
         with self._maybe_spinner("Generating requirements summary...", use_styled, status_fn=status_fn):
@@ -1534,6 +1515,25 @@ class DiscoverySession:
     # ------------------------------------------------------------------ #
     # Internal — helpers
     # ------------------------------------------------------------------ #
+
+    def _process_response(
+        self,
+        user_input: str,
+        response: str,
+        use_styled: bool,
+        _print: Callable,
+    ) -> str:
+        """Common post-response pipeline: persist, extract items, display, and emit sections.
+
+        Returns the cleaned response text.
+        """
+        self._discovery_state.update_from_exchange(user_input, response, self._exchange_count)
+        self._extract_items_from_response(response)
+        clean = self._clean(response)
+        self._show_content(clean, use_styled, _print)
+        self._update_token_status()
+        self._emit_sections(clean)
+        return clean
 
     def _emit_sections(self, response: str) -> None:
         """Notify section_fn callback with any headings found in *response*."""

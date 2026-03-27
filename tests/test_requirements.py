@@ -339,13 +339,13 @@ class TestDependencyVersions:
     """get_dependency_version() — lookup, case-insensitive, missing."""
 
     def test_azure_api_version_constant(self):
-        assert _AZURE_API_VERSION == "2025-06-01"
+        assert _AZURE_API_VERSION == "2024-03-01"
 
     def test_get_dependency_version_found(self):
-        assert get_dependency_version("azure_api") == "2025-06-01"
+        assert get_dependency_version("azure_api") == "2024-03-01"
 
     def test_get_dependency_version_case_insensitive(self):
-        assert get_dependency_version("Azure_API") == "2025-06-01"
+        assert get_dependency_version("Azure_API") == "2024-03-01"
 
     def test_get_dependency_version_missing(self):
         assert get_dependency_version("nonexistent") is None

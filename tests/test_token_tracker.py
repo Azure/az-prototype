@@ -463,6 +463,12 @@ class TestBuildSessionTokenTracking:
         )
 
         mock_provider = MagicMock()
+        # Configure chat() to return proper AIResponse (used by condensation + generation)
+        mock_provider.chat.return_value = AIResponse(
+            content="## Stage 1: Foundation\nBasic infrastructure.",
+            model="gpt-4o",
+            usage={"prompt_tokens": 500, "completion_tokens": 200},
+        )
         context = AgentContext(
             project_config={"project": {"name": "test", "iac_tool": "terraform"}},
             project_dir=str(tmp_path),
