@@ -573,7 +573,7 @@ class TestFormatBrief:
 
         result = _format_brief(rules)
         # Should appear only once (deduplicated by first 50 chars)
-        lines = [l for l in result.splitlines() if "managed identity" in l.lower()]
+        lines = [ln for ln in result.splitlines() if "managed identity" in ln.lower()]
         assert len(lines) == 1
 
     def test_format_brief_caps_at_eight_directives(self):
@@ -586,7 +586,7 @@ class TestFormatBrief:
 
         result = _format_brief(rules)
         # Count numbered directives (lines starting with "N. ")
-        numbered = [l for l in result.splitlines() if l.strip() and l.strip()[0].isdigit() and ". " in l]
+        numbered = [ln for ln in result.splitlines() if ln.strip() and ln.strip()[0].isdigit() and ". " in ln]
         assert len(numbered) <= 8
 
     def test_format_brief_includes_correct_patterns(self):

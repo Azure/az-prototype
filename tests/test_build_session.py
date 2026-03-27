@@ -1295,6 +1295,520 @@ class TestBuildStageIntegration:
         bs2.load()
         assert bs2.format_stage_status()  # Should produce output
 
+
+# ======================================================================
+# _agent_build_context tests
+# ======================================================================
+
+class TestAgentBuildContext:
+    """Tests for the _agent_build_context context manager."""
+
+    def test_agent_build_context_sets_and_restores_standards(self, build_context, build_registry, mock_tf_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        # Mock the agent's attributes and methods
+        mock_tf_agent._include_standards = True
+        mock_tf_agent._governor_brief = ""
+        mock_tf_agent.set_knowledge_override = MagicMock()
+        mock_tf_agent.set_governor_brief = MagicMock()
+
+        stage = {"name": "Foundation", "services": [{"name": "key-vault"}]}
+
+        with patch.object(session, "_apply_governor_brief"), \
+             patch.object(session, "_apply_stage_knowledge"):
+            with session._agent_build_context(mock_tf_agent, stage):
+                # Inside the context, standards should be disabled
+                assert mock_tf_agent._include_standards is False
+
+        # After exiting, standards should be restored
+        assert mock_tf_agent._include_standards is True
+
+    def test_agent_build_context_clears_knowledge_on_exit(self, build_context, build_registry, mock_tf_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        mock_tf_agent._include_standards = True
+        mock_tf_agent.set_knowledge_override = MagicMock()
+        mock_tf_agent.set_governor_brief = MagicMock()
+
+        stage = {"name": "Foundation", "services": []}
+
+        with patch.object(session, "_apply_governor_brief"), \
+             patch.object(session, "_apply_stage_knowledge"):
+            with session._agent_build_context(mock_tf_agent, stage):
+                pass
+
+        mock_tf_agent.set_knowledge_override.assert_called_with("")
+
+    def test_agent_build_context_calls_governor_and_knowledge(self, build_context, build_registry, mock_tf_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        mock_tf_agent._include_standards = False
+        mock_tf_agent.set_knowledge_override = MagicMock()
+        mock_tf_agent.set_governor_brief = MagicMock()
+
+        stage = {"name": "Data", "services": [{"name": "sql-server"}]}
+
+        with patch.object(session, "_apply_governor_brief") as mock_gov, \
+             patch.object(session, "_apply_stage_knowledge") as mock_know:
+            with session._agent_build_context(mock_tf_agent, stage):
+                pass
+
+            mock_gov.assert_called_once_with(mock_tf_agent, "Data", [{"name": "sql-server"}])
+            mock_know.assert_called_once_with(mock_tf_agent, stage)
+
+    def test_agent_build_context_restores_on_exception(self, build_context, build_registry, mock_tf_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        mock_tf_agent._include_standards = True
+        mock_tf_agent.set_knowledge_override = MagicMock()
+
+        stage = {"name": "Foundation", "services": []}
+
+        with patch.object(session, "_apply_governor_brief"), \
+             patch.object(session, "_apply_stage_knowledge"):
+            try:
+                with session._agent_build_context(mock_tf_agent, stage):
+                    raise ValueError("test error")
+            except ValueError:
+                pass
+
+        # Standards should still be restored despite the exception
+        assert mock_tf_agent._include_standards is True
+        mock_tf_agent.set_knowledge_override.assert_called_with("")
+
+
+# ======================================================================
+# _apply_stage_knowledge tests
+# ======================================================================
+
+class TestApplyStageKnowledge:
+    """Tests for _apply_stage_knowledge with different knowledge scenarios."""
+
+    def test_apply_stage_knowledge_with_services(self, build_context, build_registry, mock_tf_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_tf_agent.set_knowledge_override = MagicMock()
+
+        stage = {"services": [{"name": "key-vault"}, {"name": "sql-server"}]}
+
+        with patch("azext_prototype.stages.build_session.KnowledgeLoader", create=True) as MockLoader:
+            mock_loader = MockLoader.return_value
+            mock_loader.compose_context.return_value = "Key vault knowledge\nSQL knowledge"
+            # Patch the import inside the method
+            with patch.dict("sys.modules", {"azext_prototype.knowledge": MagicMock(KnowledgeLoader=MockLoader)}):
+                session._apply_stage_knowledge(mock_tf_agent, stage)
+
+        mock_tf_agent.set_knowledge_override.assert_called_once()
+        call_arg = mock_tf_agent.set_knowledge_override.call_args[0][0]
+        assert "Key vault knowledge" in call_arg
+
+    def test_apply_stage_knowledge_empty_services(self, build_context, build_registry, mock_tf_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_tf_agent.set_knowledge_override = MagicMock()
+
+        stage = {"services": []}
+
+        with patch("azext_prototype.stages.build_session.KnowledgeLoader", create=True) as MockLoader:
+            mock_loader = MockLoader.return_value
+            mock_loader.compose_context.return_value = ""
+            with patch.dict("sys.modules", {"azext_prototype.knowledge": MagicMock(KnowledgeLoader=MockLoader)}):
+                session._apply_stage_knowledge(mock_tf_agent, stage)
+
+        # Empty knowledge should not call set_knowledge_override
+        mock_tf_agent.set_knowledge_override.assert_not_called()
+
+    def test_apply_stage_knowledge_truncates_large_knowledge(self, build_context, build_registry, mock_tf_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_tf_agent.set_knowledge_override = MagicMock()
+
+        stage = {"services": [{"name": "key-vault"}]}
+        large_knowledge = "x" * 15000  # > 12000 threshold
+
+        with patch("azext_prototype.stages.build_session.KnowledgeLoader", create=True) as MockLoader:
+            mock_loader = MockLoader.return_value
+            mock_loader.compose_context.return_value = large_knowledge
+            with patch.dict("sys.modules", {"azext_prototype.knowledge": MagicMock(KnowledgeLoader=MockLoader)}):
+                session._apply_stage_knowledge(mock_tf_agent, stage)
+
+        call_arg = mock_tf_agent.set_knowledge_override.call_args[0][0]
+        assert len(call_arg) < 15000
+        assert "truncated" in call_arg.lower()
+
+    def test_apply_stage_knowledge_handles_import_error(self, build_context, build_registry, mock_tf_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_tf_agent.set_knowledge_override = MagicMock()
+
+        stage = {"services": [{"name": "key-vault"}]}
+
+        # Force an import error — the method should silently pass
+        with patch.dict("sys.modules", {"azext_prototype.knowledge": None}):
+            session._apply_stage_knowledge(mock_tf_agent, stage)
+
+        # Should not raise and should not call set_knowledge_override
+        mock_tf_agent.set_knowledge_override.assert_not_called()
+
+
+# ======================================================================
+# _condense_architecture tests
+# ======================================================================
+
+class TestCondenseArchitecture:
+    """Tests for _condense_architecture — cached, empty, unparseable responses."""
+
+    def test_condense_returns_cached_contexts(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        stages = [
+            {"stage": 1, "name": "Foundation", "category": "infra", "services": []},
+            {"stage": 2, "name": "Data", "category": "data", "services": []},
+        ]
+
+        # Pre-populate cache in build_state
+        session._build_state._state["stage_contexts"] = {
+            "1": "## Stage 1: Foundation\nContext for stage 1",
+            "2": "## Stage 2: Data\nContext for stage 2",
+        }
+
+        result = session._condense_architecture("full architecture", stages, use_styled=False)
+
+        assert result[1] == "## Stage 1: Foundation\nContext for stage 1"
+        assert result[2] == "## Stage 2: Data\nContext for stage 2"
+        # AI provider should not be called when cache is available
+        build_context.ai_provider.chat.assert_not_called()
+
+    def test_condense_returns_empty_when_no_ai_provider(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        session._context = AgentContext(
+            project_config=build_context.project_config,
+            project_dir=build_context.project_dir,
+            ai_provider=None,
+        )
+
+        stages = [{"stage": 1, "name": "Foundation", "category": "infra", "services": []}]
+
+        result = session._condense_architecture("architecture", stages, use_styled=False)
+
+        assert result == {}
+
+    def test_condense_parses_stage_sections(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        stages = [
+            {"stage": 1, "name": "Foundation", "category": "infra", "services": []},
+            {"stage": 2, "name": "Data", "category": "data", "services": []},
+        ]
+
+        ai_response = AIResponse(
+            content=(
+                "## Stage 1: Foundation\n"
+                "Sets up resource group and managed identity.\n\n"
+                "## Stage 2: Data\n"
+                "Provisions SQL database with private endpoint."
+            ),
+            model="gpt-4o",
+            usage={"prompt_tokens": 100, "completion_tokens": 200, "total_tokens": 300},
+        )
+        build_context.ai_provider.chat.return_value = ai_response
+
+        result = session._condense_architecture("architecture text", stages, use_styled=False)
+
+        assert 1 in result
+        assert 2 in result
+        assert "Foundation" in result[1]
+        assert "SQL database" in result[2]
+
+    def test_condense_empty_response_returns_empty(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        stages = [{"stage": 1, "name": "Foundation", "category": "infra", "services": []}]
+
+        # AI returns empty content
+        build_context.ai_provider.chat.return_value = AIResponse(
+            content="", model="gpt-4o", usage={},
+        )
+
+        result = session._condense_architecture("architecture", stages, use_styled=False)
+
+        assert result == {}
+
+    def test_condense_unparseable_response_returns_empty(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        stages = [{"stage": 1, "name": "Foundation", "category": "infra", "services": []}]
+
+        # AI returns content without any "## Stage N" headers
+        build_context.ai_provider.chat.return_value = AIResponse(
+            content="Here is some context without stage headers.",
+            model="gpt-4o",
+            usage={},
+        )
+
+        result = session._condense_architecture("architecture", stages, use_styled=False)
+
+        # No stage headers means parsing returns empty dict
+        assert result == {}
+
+    def test_condense_exception_returns_empty(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        stages = [{"stage": 1, "name": "Foundation", "category": "infra", "services": []}]
+
+        build_context.ai_provider.chat.side_effect = Exception("API error")
+
+        result = session._condense_architecture("architecture", stages, use_styled=False)
+
+        assert result == {}
+
+    def test_condense_caches_result_in_build_state(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        stages = [
+            {"stage": 1, "name": "Foundation", "category": "infra", "services": []},
+        ]
+
+        ai_response = AIResponse(
+            content="## Stage 1: Foundation\nContext here.",
+            model="gpt-4o",
+            usage={"prompt_tokens": 50, "completion_tokens": 50, "total_tokens": 100},
+        )
+        build_context.ai_provider.chat.return_value = ai_response
+
+        session._condense_architecture("arch", stages, use_styled=False)
+
+        # Verify the result was cached in build_state
+        cached = session._build_state._state.get("stage_contexts", {})
+        assert "1" in cached
+        assert "Foundation" in cached["1"]
+
+
+# ======================================================================
+# _select_agent tests
+# ======================================================================
+
+class TestSelectAgent:
+    """Tests for _select_agent category-to-agent mapping."""
+
+    def test_select_agent_infra(self, build_context, build_registry, mock_tf_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        agent = session._select_agent({"category": "infra"})
+        assert agent is mock_tf_agent
+
+    def test_select_agent_data(self, build_context, build_registry, mock_tf_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        agent = session._select_agent({"category": "data"})
+        assert agent is mock_tf_agent
+
+    def test_select_agent_integration(self, build_context, build_registry, mock_tf_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        agent = session._select_agent({"category": "integration"})
+        assert agent is mock_tf_agent
+
+    def test_select_agent_app(self, build_context, build_registry, mock_dev_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        agent = session._select_agent({"category": "app"})
+        assert agent is mock_dev_agent
+
+    def test_select_agent_schema(self, build_context, build_registry, mock_dev_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        agent = session._select_agent({"category": "schema"})
+        assert agent is mock_dev_agent
+
+    def test_select_agent_cicd(self, build_context, build_registry, mock_dev_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        agent = session._select_agent({"category": "cicd"})
+        assert agent is mock_dev_agent
+
+    def test_select_agent_external(self, build_context, build_registry, mock_dev_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        agent = session._select_agent({"category": "external"})
+        assert agent is mock_dev_agent
+
+    def test_select_agent_docs(self, build_context, build_registry, mock_doc_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        agent = session._select_agent({"category": "docs"})
+        assert agent is mock_doc_agent
+
+    def test_select_agent_unknown_falls_back_to_iac(self, build_context, build_registry, mock_tf_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        agent = session._select_agent({"category": "unknown_category"})
+        # Falls back to iac_agents[iac_tool] or dev_agent
+        assert agent is mock_tf_agent
+
+    def test_select_agent_missing_category_defaults_to_infra(self, build_context, build_registry, mock_tf_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        agent = session._select_agent({})
+        # category defaults to "infra"
+        assert agent is mock_tf_agent
+
+    def test_select_agent_no_agent_returns_none(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        session._doc_agent = None
+        agent = session._select_agent({"category": "docs"})
+        assert agent is None
+
+
+# ======================================================================
+# _build_stage_task governor brief tests
+# ======================================================================
+
+class TestBuildStageTaskGovernorBrief:
+    """Tests that _build_stage_task incorporates governor brief into task string."""
+
+    def test_governor_brief_included_in_task(self, build_context, build_registry, mock_tf_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        # Simulate a governor brief being set on the agent
+        mock_tf_agent._governor_brief = "MUST use managed identity for all services"
+
+        stage = {
+            "stage": 1,
+            "name": "Foundation",
+            "category": "infra",
+            "services": [{"name": "key-vault", "computed_name": "zd-kv-dev", "resource_type": "Microsoft.KeyVault/vaults", "sku": "standard"}],
+            "dir": "concept/infra/terraform/stage-1-foundation",
+        }
+
+        agent, task = session._build_stage_task(stage, "sample architecture", [])
+
+        assert agent is mock_tf_agent
+        assert "MANDATORY GOVERNANCE RULES" in task
+        assert "managed identity" in task
+
+    def test_no_governor_brief_no_governance_section(self, build_context, build_registry, mock_tf_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        mock_tf_agent._governor_brief = ""
+
+        stage = {
+            "stage": 1,
+            "name": "Foundation",
+            "category": "infra",
+            "services": [],
+            "dir": "concept/infra/terraform/stage-1-foundation",
+        }
+
+        agent, task = session._build_stage_task(stage, "sample architecture", [])
+
+        assert "MANDATORY GOVERNANCE RULES" not in task
+
+    def test_build_stage_task_no_agent_returns_none(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        session._doc_agent = None
+
+        stage = {
+            "stage": 1,
+            "name": "Docs",
+            "category": "docs",
+            "services": [],
+            "dir": "concept/docs",
+        }
+
+        agent, task = session._build_stage_task(stage, "architecture", [])
+
+        assert agent is None
+        assert task == ""
+
+    def test_build_stage_task_includes_services(self, build_context, build_registry, mock_tf_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_tf_agent._governor_brief = ""
+
+        stage = {
+            "stage": 1,
+            "name": "Foundation",
+            "category": "infra",
+            "services": [
+                {"name": "key-vault", "computed_name": "zd-kv-dev", "resource_type": "Microsoft.KeyVault/vaults", "sku": "standard"},
+                {"name": "managed-identity", "computed_name": "zd-id-dev", "resource_type": "Microsoft.ManagedIdentity/userAssignedIdentities", "sku": ""},
+            ],
+            "dir": "concept/infra/terraform/stage-1-foundation",
+        }
+
+        _, task = session._build_stage_task(stage, "architecture", [])
+
+        assert "zd-kv-dev" in task
+        assert "zd-id-dev" in task
+        assert "Microsoft.KeyVault/vaults" in task
+
+    def test_build_stage_task_terraform_file_structure(self, build_context, build_registry, mock_tf_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_tf_agent._governor_brief = ""
+
+        stage = {
+            "stage": 1,
+            "name": "Foundation",
+            "category": "infra",
+            "services": [],
+            "dir": "concept/infra/terraform/stage-1-foundation",
+        }
+
+        _, task = session._build_stage_task(stage, "architecture", [])
+
+        assert "Terraform File Structure" in task
+        assert "providers.tf" in task
+        assert "main.tf" in task
+        assert "variables.tf" in task
+
     def test_build_stage_reset_flag(self, project_with_design, sample_config):
         from azext_prototype.stages.build_state import BuildState
 
@@ -2152,3 +2666,1039 @@ class TestStableIds:
         ])
         ids = [s["id"] for s in bs.state["deployment_stages"]]
         assert "api-layer" in ids
+
+
+# ======================================================================
+# _get_app_scaffolding_requirements tests
+# ======================================================================
+
+class TestGetAppScaffoldingRequirements:
+    """Tests for _get_app_scaffolding_requirements static method."""
+
+    def test_infra_category_returns_empty(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        result = BuildSession._get_app_scaffolding_requirements({"category": "infra", "services": []})
+        assert result == ""
+
+    def test_data_category_returns_empty(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        result = BuildSession._get_app_scaffolding_requirements({"category": "data", "services": []})
+        assert result == ""
+
+    def test_docs_category_returns_empty(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        result = BuildSession._get_app_scaffolding_requirements({"category": "docs", "services": []})
+        assert result == ""
+
+    def test_functions_detected_by_resource_type(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        stage = {
+            "category": "app",
+            "services": [{"name": "api", "resource_type": "Microsoft.Web/functionapps"}],
+        }
+        result = BuildSession._get_app_scaffolding_requirements(stage)
+        assert "host.json" in result
+        assert ".csproj" in result
+
+    def test_functions_detected_by_name(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        stage = {
+            "category": "app",
+            "services": [{"name": "function-app", "resource_type": ""}],
+        }
+        result = BuildSession._get_app_scaffolding_requirements(stage)
+        assert "host.json" in result
+
+    def test_webapp_detected_by_resource_type(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        stage = {
+            "category": "app",
+            "services": [{"name": "api", "resource_type": "Microsoft.Web/sites"}],
+        }
+        result = BuildSession._get_app_scaffolding_requirements(stage)
+        assert "Dockerfile" in result
+        assert "appsettings.json" in result
+
+    def test_webapp_detected_by_name(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        stage = {
+            "category": "app",
+            "services": [{"name": "container-app-api", "resource_type": ""}],
+        }
+        result = BuildSession._get_app_scaffolding_requirements(stage)
+        assert "Dockerfile" in result
+
+    def test_generic_app_fallback(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        stage = {
+            "category": "app",
+            "services": [{"name": "worker", "resource_type": ""}],
+        }
+        result = BuildSession._get_app_scaffolding_requirements(stage)
+        assert "Required Project Files" in result
+        assert "Entry point" in result
+
+    def test_schema_category_triggers_scaffolding(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        stage = {
+            "category": "schema",
+            "services": [{"name": "db-migration", "resource_type": ""}],
+        }
+        result = BuildSession._get_app_scaffolding_requirements(stage)
+        assert "Required Project Files" in result
+
+    def test_external_category_triggers_scaffolding(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        stage = {
+            "category": "external",
+            "services": [{"name": "stripe-integration", "resource_type": ""}],
+        }
+        result = BuildSession._get_app_scaffolding_requirements(stage)
+        assert "Required Project Files" in result
+
+
+# ======================================================================
+# _write_stage_files tests
+# ======================================================================
+
+class TestWriteStageFiles:
+    """Tests for _write_stage_files edge cases."""
+
+    def test_empty_content_returns_empty(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        stage = {"dir": "concept/infra/terraform/stage-1-foundation"}
+
+        result = session._write_stage_files(stage, "")
+        assert result == []
+
+    def test_no_file_blocks_returns_empty(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        stage = {"dir": "concept/infra/terraform/stage-1-foundation"}
+
+        result = session._write_stage_files(stage, "This is just text with no code blocks.")
+        assert result == []
+
+    def test_writes_files_and_returns_paths(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        stage = {"dir": "concept/infra/terraform/stage-1-foundation"}
+
+        content = "```main.tf\n# terraform code\n```\n\n```variables.tf\nvariable \"name\" {}\n```"
+        result = session._write_stage_files(stage, content)
+
+        assert len(result) == 2
+        # Files should exist on disk
+        project_root = Path(build_context.project_dir)
+        for rel_path in result:
+            assert (project_root / rel_path).exists()
+
+    def test_strips_stage_dir_prefix_from_filenames(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        stage_dir = "concept/infra/terraform/stage-1-foundation"
+        stage = {"dir": stage_dir}
+
+        # AI sometimes includes full path in filename
+        content = f"```{stage_dir}/main.tf\n# code\n```"
+        result = session._write_stage_files(stage, content)
+
+        assert len(result) == 1
+        # Should NOT create nested duplicate path
+        assert result[0] == f"{stage_dir}/main.tf"
+
+    def test_blocks_versions_tf_for_terraform(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        session._iac_tool = "terraform"
+        stage = {"dir": "concept/infra/terraform/stage-1"}
+
+        content = "```main.tf\n# main code\n```\n\n```versions.tf\n# should be blocked\n```"
+        result = session._write_stage_files(stage, content)
+
+        filenames = [Path(p).name for p in result]
+        assert "main.tf" in filenames
+        assert "versions.tf" not in filenames
+
+    def test_allows_versions_tf_for_bicep(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        session._iac_tool = "bicep"
+        stage = {"dir": "concept/infra/bicep/stage-1"}
+
+        content = "```main.bicep\n# main code\n```\n\n```versions.tf\n# allowed for bicep\n```"
+        result = session._write_stage_files(stage, content)
+
+        filenames = [Path(p).name for p in result]
+        assert "main.bicep" in filenames
+        assert "versions.tf" in filenames
+
+
+# ======================================================================
+# _handle_describe tests
+# ======================================================================
+
+class TestHandleDescribe:
+    """Tests for /describe slash command."""
+
+    def test_describe_valid_stage(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        session._build_state.set_deployment_plan([
+            {"stage": 1, "name": "Foundation", "category": "infra",
+             "services": [
+                 {"name": "key-vault", "computed_name": "zd-kv-dev",
+                  "resource_type": "Microsoft.KeyVault/vaults", "sku": "standard"},
+             ],
+             "status": "generated", "dir": "concept/infra/terraform/stage-1",
+             "files": ["main.tf", "variables.tf"]},
+        ])
+
+        printed = []
+        session._handle_describe("1", lambda m: printed.append(m))
+        output = "\n".join(printed)
+
+        assert "Foundation" in output
+        assert "infra" in output
+        assert "zd-kv-dev" in output
+        assert "Microsoft.KeyVault/vaults" in output
+        assert "standard" in output
+        assert "main.tf" in output
+
+    def test_describe_stage_not_found(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        session._build_state.set_deployment_plan([
+            {"stage": 1, "name": "Foundation", "category": "infra",
+             "services": [], "status": "pending", "dir": "", "files": []},
+        ])
+
+        printed = []
+        session._handle_describe("99", lambda m: printed.append(m))
+        output = "\n".join(printed)
+
+        assert "not found" in output.lower()
+
+    def test_describe_no_arg(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        printed = []
+        session._handle_describe("", lambda m: printed.append(m))
+        output = "\n".join(printed)
+
+        assert "Usage" in output
+
+    def test_describe_non_numeric(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        printed = []
+        session._handle_describe("abc", lambda m: printed.append(m))
+        output = "\n".join(printed)
+
+        assert "Usage" in output
+
+
+# ======================================================================
+# _clean_removed_stage_files tests
+# ======================================================================
+
+class TestCleanRemovedStageFiles:
+    """Tests for _clean_removed_stage_files."""
+
+    def test_removes_existing_directory(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        # Create the directory with a file
+        stage_dir = Path(build_context.project_dir) / "concept" / "infra" / "terraform" / "stage-2-data"
+        stage_dir.mkdir(parents=True, exist_ok=True)
+        (stage_dir / "main.tf").write_text("# data stage", encoding="utf-8")
+        assert stage_dir.exists()
+
+        stages = [
+            {"stage": 2, "dir": "concept/infra/terraform/stage-2-data"},
+        ]
+        session._clean_removed_stage_files([2], stages)
+
+        assert not stage_dir.exists()
+
+    def test_ignores_nonexistent_directory(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        stages = [
+            {"stage": 2, "dir": "concept/infra/terraform/stage-2-nonexistent"},
+        ]
+        # Should not raise
+        session._clean_removed_stage_files([2], stages)
+
+    def test_ignores_stage_not_in_removed_list(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        stage_dir = Path(build_context.project_dir) / "concept" / "infra" / "terraform" / "stage-1-foundation"
+        stage_dir.mkdir(parents=True, exist_ok=True)
+        (stage_dir / "main.tf").write_text("# keep this", encoding="utf-8")
+
+        stages = [
+            {"stage": 1, "dir": "concept/infra/terraform/stage-1-foundation"},
+            {"stage": 2, "dir": "concept/infra/terraform/stage-2-data"},
+        ]
+        # Only remove stage 2, not stage 1
+        session._clean_removed_stage_files([2], stages)
+
+        assert stage_dir.exists()
+
+
+# ======================================================================
+# _fix_stage_dirs tests
+# ======================================================================
+
+class TestFixStageDirs:
+    """Tests for _fix_stage_dirs after stage renumbering."""
+
+    def test_renumbers_stage_dir_paths(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        session._build_state._state["deployment_stages"] = [
+            {"stage": 1, "name": "A", "dir": "concept/infra/terraform/stage-1-foundation",
+             "category": "infra", "services": [], "status": "generated", "files": []},
+            {"stage": 2, "name": "B", "dir": "concept/infra/terraform/stage-4-data",
+             "category": "data", "services": [], "status": "pending", "files": []},
+        ]
+
+        session._fix_stage_dirs()
+
+        stages = session._build_state._state["deployment_stages"]
+        assert stages[0]["dir"] == "concept/infra/terraform/stage-1-foundation"
+        assert stages[1]["dir"] == "concept/infra/terraform/stage-2-data"
+
+    def test_skips_empty_dirs(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        session._build_state._state["deployment_stages"] = [
+            {"stage": 1, "name": "A", "dir": "",
+             "category": "infra", "services": [], "status": "pending", "files": []},
+        ]
+
+        # Should not raise
+        session._fix_stage_dirs()
+
+        assert session._build_state._state["deployment_stages"][0]["dir"] == ""
+
+
+# ======================================================================
+# _build_stage_task bicep branch tests
+# ======================================================================
+
+class TestBuildStageTaskBicep:
+    """Tests for _build_stage_task with bicep IaC tool."""
+
+    def test_bicep_category_infra(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        # Create a registry that has a bicep agent
+        mock_bicep_agent = MagicMock()
+        mock_bicep_agent.name = "bicep-agent"
+        mock_bicep_agent._governor_brief = ""
+
+        def find_by_cap(cap):
+            if cap == AgentCapability.BICEP:
+                return [mock_bicep_agent]
+            if cap == AgentCapability.TERRAFORM:
+                return []
+            return []
+
+        registry = MagicMock()
+        registry.find_by_capability.side_effect = find_by_cap
+
+        # Override iac_tool in config
+        config_path = Path(build_context.project_dir) / "prototype.yaml"
+        import yaml
+        with open(config_path) as f:
+            cfg = yaml.safe_load(f)
+        cfg["project"]["iac_tool"] = "bicep"
+        with open(config_path, "w") as f:
+            yaml.dump(cfg, f)
+
+        session = BuildSession(build_context, registry)
+
+        stage = {
+            "stage": 1,
+            "name": "Foundation",
+            "category": "infra",
+            "services": [{"name": "key-vault", "computed_name": "zd-kv-dev", "resource_type": "Microsoft.KeyVault/vaults", "sku": "standard"}],
+            "dir": "concept/infra/bicep/stage-1-foundation",
+        }
+
+        agent, task = session._build_stage_task(stage, "architecture", [])
+
+        assert agent is mock_bicep_agent
+        assert "consistent deployment naming (Bicep)" in task
+        assert "Terraform File Structure" not in task
+
+    def test_app_stage_includes_scaffolding(self, build_context, build_registry, mock_dev_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_dev_agent._governor_brief = ""
+
+        stage = {
+            "stage": 2,
+            "name": "API",
+            "category": "app",
+            "services": [{"name": "container-app-api", "resource_type": "Microsoft.App/containerApps", "computed_name": "api-1", "sku": ""}],
+            "dir": "concept/apps/stage-2-api",
+        }
+
+        _, task = session._build_stage_task(stage, "architecture", [])
+
+        assert "Required Project Files" in task
+        assert "Dockerfile" in task
+
+
+# ======================================================================
+# _collect_stage_file_content edge case tests
+# ======================================================================
+
+class TestCollectStageFileContentEdgeCases:
+    """Additional tests for _collect_stage_file_content."""
+
+    def test_unreadable_file(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        stage = {"files": ["nonexistent/file.tf"]}
+        result = session._collect_stage_file_content(stage)
+
+        assert "could not read file" in result
+
+    def test_large_file_truncated(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        # Create a large file
+        file_path = Path(build_context.project_dir) / "big.tf"
+        file_path.write_text("x" * 10000, encoding="utf-8")
+
+        stage = {"files": ["big.tf"]}
+        result = session._collect_stage_file_content(stage)
+
+        assert "truncated" in result
+
+    def test_size_cap_stops_reading(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        # Create several files
+        for i in range(10):
+            f = Path(build_context.project_dir) / f"file{i}.tf"
+            f.write_text("x" * 5000, encoding="utf-8")
+
+        stage = {"files": [f"file{i}.tf" for i in range(10)]}
+        result = session._collect_stage_file_content(stage, max_bytes=10000)
+
+        assert "omitted" in result
+
+    def test_no_files_returns_empty(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        stage = {"files": []}
+        result = session._collect_stage_file_content(stage)
+        assert result == ""
+
+
+# ======================================================================
+# _collect_generated_file_content tests
+# ======================================================================
+
+class TestCollectGeneratedFileContent:
+    """Tests for _collect_generated_file_content."""
+
+    def test_collects_from_generated_stages(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        # Create a file
+        stage_dir = Path(build_context.project_dir) / "concept" / "infra" / "terraform" / "stage-1"
+        stage_dir.mkdir(parents=True, exist_ok=True)
+        (stage_dir / "main.tf").write_text("# tf code", encoding="utf-8")
+
+        session._build_state.set_deployment_plan([
+            {"stage": 1, "name": "Foundation", "category": "infra",
+             "services": [], "status": "generated",
+             "dir": "concept/infra/terraform/stage-1",
+             "files": ["concept/infra/terraform/stage-1/main.tf"]},
+        ])
+
+        result = session._collect_generated_file_content()
+        assert "main.tf" in result
+        assert "tf code" in result
+
+    def test_empty_when_no_generated_stages(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        session._build_state.set_deployment_plan([
+            {"stage": 1, "name": "Foundation", "category": "infra",
+             "services": [], "status": "pending", "dir": "", "files": []},
+        ])
+
+        result = session._collect_generated_file_content()
+        assert result == ""
+
+
+# ======================================================================
+# Naming strategy fallback tests
+# ======================================================================
+
+class TestNamingStrategyFallback:
+    """Tests for the naming strategy fallback in __init__."""
+
+    def test_naming_fallback_on_invalid_config(self, project_with_design, sample_config):
+        """When naming config is invalid, should fall back to simple strategy."""
+        from azext_prototype.stages.build_session import BuildSession
+
+        # Corrupt the naming config
+        sample_config["naming"]["strategy"] = "nonexistent-strategy"
+
+        provider = MagicMock()
+        provider.provider_name = "github-models"
+        provider.chat.return_value = _make_response()
+
+        context = AgentContext(
+            project_config=sample_config,
+            project_dir=str(project_with_design),
+            ai_provider=provider,
+        )
+
+        registry = MagicMock()
+        registry.find_by_capability.return_value = []
+
+        # Should not raise — falls back to simple strategy
+        session = BuildSession(context, registry)
+        assert session._naming is not None
+
+
+# ======================================================================
+# _identify_stages_via_architect edge cases
+# ======================================================================
+
+class TestIdentifyStagesViaArchitect:
+    """Tests for _identify_stages_via_architect edge cases."""
+
+    def test_empty_deployment_stages_returns_empty(self, build_context, build_registry, mock_architect_agent_for_build):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        # No deployment stages set
+        session._build_state._state["deployment_stages"] = []
+
+        result = session._identify_stages_via_architect("fix the key vault")
+        assert result == []
+
+    def test_parse_stage_numbers_json_error(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        # Invalid JSON within brackets
+        result = BuildSession._parse_stage_numbers("[1, 2, invalid]")
+        assert result == []
+
+    def test_parse_stage_numbers_no_match(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        result = BuildSession._parse_stage_numbers("no numbers here at all")
+        assert result == []
+
+
+# ======================================================================
+# _identify_stages_regex edge cases
+# ======================================================================
+
+class TestIdentifyStagesRegex:
+    """Tests for _identify_stages_regex fallback paths."""
+
+    def test_regex_last_resort_all_generated(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        session._build_state.set_deployment_plan([
+            {"stage": 1, "name": "Foundation", "category": "infra",
+             "services": [{"name": "key-vault"}], "status": "generated", "dir": "", "files": []},
+            {"stage": 2, "name": "Data", "category": "data",
+             "services": [{"name": "cosmos-db"}], "status": "generated", "dir": "", "files": []},
+            {"stage": 3, "name": "Pending", "category": "app",
+             "services": [], "status": "pending", "dir": "", "files": []},
+        ])
+
+        # Feedback that doesn't match any stage name, service, or number
+        result = session._identify_stages_regex("completely unrelated feedback about something else entirely")
+        # Last resort: returns all generated stages
+        assert result == [1, 2]
+
+    def test_regex_matches_stage_name(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        session._build_state.set_deployment_plan([
+            {"stage": 1, "name": "Foundation", "category": "infra",
+             "services": [], "status": "generated", "dir": "", "files": []},
+            {"stage": 2, "name": "Data", "category": "data",
+             "services": [], "status": "generated", "dir": "", "files": []},
+        ])
+
+        result = session._identify_stages_regex("The foundation stage needs more resources")
+        assert result == [1]
+
+
+# ======================================================================
+# _run_stage_qa edge cases
+# ======================================================================
+
+class TestRunStageQAEdgeCases:
+    """Tests for _run_stage_qa early returns."""
+
+    def test_no_qa_agent_skips(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        session._qa_agent = None
+
+        stage = {"stage": 1, "name": "Foundation", "category": "infra",
+                 "services": [], "status": "generated", "dir": "", "files": []}
+
+        # Should not raise
+        session._run_stage_qa(stage, "arch", [], False, lambda m: None)
+
+    def test_no_file_content_skips(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        stage = {"stage": 1, "name": "Foundation", "category": "infra",
+                 "services": [], "status": "generated", "dir": "", "files": []}
+
+        # No files means no QA review needed
+        session._run_stage_qa(stage, "arch", [], False, lambda m: None)
+
+
+# ======================================================================
+# _maybe_spinner tests
+# ======================================================================
+
+class TestMaybeSpinner:
+    """Tests for _maybe_spinner context manager."""
+
+    def test_plain_mode_just_yields(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        executed = False
+        with session._maybe_spinner("Processing...", use_styled=False):
+            executed = True
+        assert executed
+
+    def test_status_fn_mode(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        calls = []
+        session = BuildSession(build_context, build_registry, status_fn=lambda msg, kind: calls.append((msg, kind)))
+
+        with session._maybe_spinner("Building...", use_styled=False):
+            pass
+
+        # Should have called status_fn with "start" and "end"
+        assert any(k == "start" for _, k in calls)
+        assert any(k == "end" for _, k in calls)
+
+    def test_status_fn_mode_with_exception(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        calls = []
+        session = BuildSession(build_context, build_registry, status_fn=lambda msg, kind: calls.append((msg, kind)))
+
+        try:
+            with session._maybe_spinner("Building...", use_styled=False):
+                raise ValueError("test")
+        except ValueError:
+            pass
+
+        # Even on exception, "end" should be called (finally block)
+        assert any(k == "end" for _, k in calls)
+
+
+# ======================================================================
+# _apply_governor_brief tests
+# ======================================================================
+
+class TestApplyGovernorBrief:
+    """Tests for _apply_governor_brief."""
+
+    def test_sets_brief_on_agent(self, build_context, build_registry, mock_tf_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_tf_agent.set_governor_brief = MagicMock()
+
+        with patch("azext_prototype.governance.governor.brief", return_value="MUST use managed identity"):
+            session._apply_governor_brief(mock_tf_agent, "Foundation", [{"name": "key-vault"}])
+
+        mock_tf_agent.set_governor_brief.assert_called_once_with("MUST use managed identity")
+
+    def test_empty_brief_not_set(self, build_context, build_registry, mock_tf_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_tf_agent.set_governor_brief = MagicMock()
+
+        with patch("azext_prototype.governance.governor.brief", return_value=""):
+            session._apply_governor_brief(mock_tf_agent, "Foundation", [])
+
+        mock_tf_agent.set_governor_brief.assert_not_called()
+
+    def test_exception_silently_caught(self, build_context, build_registry, mock_tf_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_tf_agent.set_governor_brief = MagicMock()
+
+        with patch("azext_prototype.governance.governor.brief", side_effect=Exception("boom")):
+            # Should not raise
+            session._apply_governor_brief(mock_tf_agent, "Foundation", [])
+
+        mock_tf_agent.set_governor_brief.assert_not_called()
+
+
+# ======================================================================
+# TestBuildSessionRefactored — targeted coverage for refactored helpers
+# ======================================================================
+
+
+class TestBuildSessionRefactored:
+    """Additional coverage for _agent_build_context, _select_agent,
+    _apply_stage_knowledge, and _condense_architecture.
+
+    Complements the existing per-class tests to ensure all code paths are
+    exercised.
+    """
+
+    # ------------------------------------------------------------------ #
+    # _agent_build_context
+    # ------------------------------------------------------------------ #
+
+    def test_agent_build_context_disables_standards_and_restores(
+        self, build_context, build_registry, mock_tf_agent
+    ):
+        """Context manager must disable standards inside and restore on exit."""
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_tf_agent._include_standards = True
+        mock_tf_agent.set_knowledge_override = MagicMock()
+        mock_tf_agent.set_governor_brief = MagicMock()
+
+        stage = {"name": "Foundation", "services": []}
+
+        with patch.object(session, "_apply_governor_brief"), \
+             patch.object(session, "_apply_stage_knowledge"):
+            with session._agent_build_context(mock_tf_agent, stage):
+                assert mock_tf_agent._include_standards is False
+
+        assert mock_tf_agent._include_standards is True
+
+    def test_agent_build_context_calls_apply_governor_brief(
+        self, build_context, build_registry, mock_tf_agent
+    ):
+        """_apply_governor_brief should be called with correct args."""
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_tf_agent._include_standards = False
+        mock_tf_agent.set_knowledge_override = MagicMock()
+        mock_tf_agent.set_governor_brief = MagicMock()
+
+        stage = {"name": "Data Layer", "services": [{"name": "cosmos-db"}]}
+
+        with patch.object(session, "_apply_governor_brief") as mock_gov, \
+             patch.object(session, "_apply_stage_knowledge"):
+            with session._agent_build_context(mock_tf_agent, stage):
+                pass
+
+        mock_gov.assert_called_once_with(
+            mock_tf_agent, "Data Layer", [{"name": "cosmos-db"}]
+        )
+
+    def test_agent_build_context_calls_apply_stage_knowledge(
+        self, build_context, build_registry, mock_tf_agent
+    ):
+        """_apply_stage_knowledge should be called with agent and stage dict."""
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_tf_agent._include_standards = False
+        mock_tf_agent.set_knowledge_override = MagicMock()
+
+        stage = {"name": "App", "services": []}
+
+        with patch.object(session, "_apply_governor_brief"), \
+             patch.object(session, "_apply_stage_knowledge") as mock_know:
+            with session._agent_build_context(mock_tf_agent, stage):
+                pass
+
+        mock_know.assert_called_once_with(mock_tf_agent, stage)
+
+    def test_agent_build_context_clears_knowledge_override_on_exit(
+        self, build_context, build_registry, mock_tf_agent
+    ):
+        """set_knowledge_override('') must be called in the finally block."""
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_tf_agent._include_standards = False
+        mock_tf_agent.set_knowledge_override = MagicMock()
+
+        stage = {"name": "Docs", "services": []}
+
+        with patch.object(session, "_apply_governor_brief"), \
+             patch.object(session, "_apply_stage_knowledge"):
+            with session._agent_build_context(mock_tf_agent, stage):
+                pass
+
+        mock_tf_agent.set_knowledge_override.assert_called_with("")
+
+    def test_agent_build_context_restores_on_exception(
+        self, build_context, build_registry, mock_tf_agent
+    ):
+        """Standards flag and knowledge override are restored even if code raises."""
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_tf_agent._include_standards = True
+        mock_tf_agent.set_knowledge_override = MagicMock()
+
+        stage = {"name": "Foundation", "services": []}
+
+        with patch.object(session, "_apply_governor_brief"), \
+             patch.object(session, "_apply_stage_knowledge"):
+            try:
+                with session._agent_build_context(mock_tf_agent, stage):
+                    raise RuntimeError("simulated failure")
+            except RuntimeError:
+                pass
+
+        assert mock_tf_agent._include_standards is True
+        mock_tf_agent.set_knowledge_override.assert_called_with("")
+
+    # ------------------------------------------------------------------ #
+    # _select_agent
+    # ------------------------------------------------------------------ #
+
+    def test_select_agent_infra_category(self, build_context, build_registry, mock_tf_agent):
+        """Infra category should resolve to the IaC (terraform) agent."""
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        agent = session._select_agent({"category": "infra"})
+        assert agent is mock_tf_agent
+
+    def test_select_agent_app_category(self, build_context, build_registry, mock_dev_agent):
+        """App category should resolve to the developer agent."""
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        agent = session._select_agent({"category": "app"})
+        assert agent is mock_dev_agent
+
+    def test_select_agent_docs_category(self, build_context, build_registry, mock_doc_agent):
+        """Docs category should resolve to the doc agent."""
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        agent = session._select_agent({"category": "docs"})
+        assert agent is mock_doc_agent
+
+    def test_select_agent_unknown_falls_back_to_iac(
+        self, build_context, build_registry, mock_tf_agent
+    ):
+        """Unknown category falls back to IaC agent, then dev agent."""
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        agent = session._select_agent({"category": "foobar"})
+        assert agent is mock_tf_agent
+
+    def test_select_agent_unknown_falls_back_to_dev_when_no_iac(
+        self, build_context, build_registry, mock_dev_agent
+    ):
+        """When no IaC agent exists, unknown category falls back to dev agent."""
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        session._iac_agents = {}
+        agent = session._select_agent({"category": "foobar"})
+        assert agent is mock_dev_agent
+
+    # ------------------------------------------------------------------ #
+    # _apply_stage_knowledge
+    # ------------------------------------------------------------------ #
+
+    def test_apply_stage_knowledge_passes_svc_names_to_loader(
+        self, build_context, build_registry, mock_tf_agent
+    ):
+        """Service names are extracted from stage and passed to KnowledgeLoader."""
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_tf_agent.set_knowledge_override = MagicMock()
+
+        stage = {"services": [{"name": "key-vault"}, {"name": "sql-server"}]}
+
+        mock_loader = MagicMock()
+        mock_loader.compose_context.return_value = "knowledge text"
+        mock_knowledge_module = MagicMock()
+        mock_knowledge_module.KnowledgeLoader.return_value = mock_loader
+
+        with patch.dict("sys.modules", {"azext_prototype.knowledge": mock_knowledge_module}):
+            session._apply_stage_knowledge(mock_tf_agent, stage)
+
+        call_kwargs = mock_loader.compose_context.call_args[1]
+        assert "key-vault" in call_kwargs["services"]
+        assert "sql-server" in call_kwargs["services"]
+
+    def test_apply_stage_knowledge_swallows_exceptions(
+        self, build_context, build_registry, mock_tf_agent
+    ):
+        """Import or runtime errors must not propagate — generation must proceed."""
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_tf_agent.set_knowledge_override = MagicMock()
+
+        stage = {"services": [{"name": "key-vault"}]}
+
+        with patch.dict("sys.modules", {"azext_prototype.knowledge": None}):
+            # Should not raise
+            session._apply_stage_knowledge(mock_tf_agent, stage)
+
+        mock_tf_agent.set_knowledge_override.assert_not_called()
+
+    # ------------------------------------------------------------------ #
+    # _condense_architecture
+    # ------------------------------------------------------------------ #
+
+    def test_condense_architecture_returns_cached_contexts(
+        self, build_context, build_registry
+    ):
+        """When stage_contexts cache is fully populated, no AI call should happen."""
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+
+        stages = [
+            {"stage": 1, "name": "Foundation", "category": "infra", "services": []},
+            {"stage": 2, "name": "Data", "category": "data", "services": []},
+        ]
+        session._build_state._state["stage_contexts"] = {
+            "1": "## Stage 1: Foundation\nContext for stage 1",
+            "2": "## Stage 2: Data\nContext for stage 2",
+        }
+
+        result = session._condense_architecture("arch", stages, use_styled=False)
+
+        assert result[1] == "## Stage 1: Foundation\nContext for stage 1"
+        assert result[2] == "## Stage 2: Data\nContext for stage 2"
+        build_context.ai_provider.chat.assert_not_called()
+
+    def test_condense_architecture_empty_response_returns_empty_dict(
+        self, build_context, build_registry
+    ):
+        """Empty string response from AI provider yields empty mapping."""
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        stages = [
+            {"stage": 1, "name": "Foundation", "category": "infra", "services": []},
+        ]
+
+        build_context.ai_provider.chat.return_value = _make_response("")
+        result = session._condense_architecture("arch", stages, use_styled=False)
+
+        assert result == {}
+
+    def test_condense_architecture_no_ai_provider_returns_empty_dict(
+        self, build_context, build_registry
+    ):
+        """No AI provider means condensation can't run — return empty dict."""
+        from azext_prototype.stages.build_session import BuildSession
+
+        build_context.ai_provider = None
+        session = BuildSession(build_context, build_registry)
+        stages = [
+            {"stage": 1, "name": "Foundation", "category": "infra", "services": []},
+        ]
+
+        result = session._condense_architecture("arch", stages, use_styled=False)
+
+        assert result == {}
+
+    def test_condense_architecture_parses_stage_contexts_from_response(
+        self, build_context, build_registry
+    ):
+        """AI response with per-stage headings should be parsed into a mapping."""
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        stages = [
+            {"stage": 1, "name": "Foundation", "category": "infra", "services": []},
+            {"stage": 2, "name": "Data", "category": "data", "services": []},
+        ]
+
+        ai_content = (
+            "## Stage 1: Foundation\n"
+            "Builds resource group and managed identity.\n\n"
+            "## Stage 2: Data\n"
+            "Deploys Cosmos DB account.\n"
+        )
+        build_context.ai_provider.chat.return_value = _make_response(ai_content)
+
+        result = session._condense_architecture("architecture text", stages, use_styled=False)
+
+        assert 1 in result
+        assert 2 in result
+        assert "Foundation" in result[1]
+        assert "Data" in result[2]
