@@ -16,6 +16,11 @@ patterns:
       - "managed identity"
       - "secret_ref"
       - "secretref"
+    correct_patterns:
+      - "secret_ref"
+      - "secretRef"
+      - "# Use Key Vault references with managed identity"
+      - 'keyVaultUrl'
     warning_message: "Secrets in environment variables detected — use Key Vault references with managed identity instead."
 
   - search_patterns:
@@ -24,4 +29,9 @@ patterns:
     safe_patterns:
       - "managed identity"
       - "acrpull"
+    correct_patterns:
+      - "admin_user_enabled = false"
+      - 'adminUserEnabled = false'
+      - '"AcrPull"'
+      - "# Use managed identity with AcrPull role assignment"
     warning_message: "Container registry admin credentials detected — use managed identity with AcrPull role assignment."

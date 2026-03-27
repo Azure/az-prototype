@@ -14,16 +14,29 @@ patterns:
       - "tls1_0"
       - "tls1_1"
     safe_patterns: []
+    correct_patterns:
+      - 'min_tls_version = "1.2"'
+      - 'minimum_tls_version = "1.2"'
+      - 'minimalTlsVersion = "1.2"'
+      - 'minimumTlsVersion = "TLS1_2"'
     warning_message: "Outdated TLS version detected — enforce minimum TLS 1.2 for all connections."
 
   - search_patterns:
       - "https_only = false"
       - "https_required = false"
     safe_patterns: []
+    correct_patterns:
+      - "https_only = true"
+      - 'httpsOnly = true'
     warning_message: "HTTPS enforcement disabled — set https_only = true to redirect all HTTP to HTTPS."
 
   - search_patterns:
       - "ssl_enforcement_enabled = false"
       - "ssl_minimal_tls_version_enforced = \"tldisabled\""
     safe_patterns: []
+    correct_patterns:
+      - "ssl_enforcement_enabled = true"
+      - 'sslEnforcement = "Enabled"'
+      - 'ssl_minimal_tls_version_enforced = "TLS1_2"'
+      - 'minimalTlsVersion = "TLS1_2"'
     warning_message: "SSL enforcement disabled — enable SSL enforcement with TLS 1.2 minimum."

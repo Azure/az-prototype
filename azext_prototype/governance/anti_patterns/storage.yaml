@@ -14,6 +14,10 @@ patterns:
     safe_patterns:
       - "do not use account-level keys"
       - "disable shared key"
+    correct_patterns:
+      - "shared_access_key_enabled = false"
+      - 'allowSharedKeyAccess = false'
+      - "# Use Microsoft Entra RBAC with managed identity"
     warning_message: "Account-level key access detected — use Microsoft Entra RBAC with managed identity instead."
 
   - search_patterns:
@@ -21,4 +25,8 @@ patterns:
       - "public_access = \"blob\""
       - "public_access = \"container\""
     safe_patterns: []
+    correct_patterns:
+      - "allow_blob_public_access = false"
+      - 'allowBlobPublicAccess = false'
+      - 'public_access = "none"'
     warning_message: "Public blob access enabled — disable public access and use SAS tokens or managed identity."

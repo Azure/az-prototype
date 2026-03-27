@@ -17,6 +17,13 @@ patterns:
       - "production"
       - "high availability"
       - "performance requirement"
+    correct_patterns:
+      - 'sku_name = "B1"'
+      - 'sku_name = "S1"'
+      - 'name = "Basic"'
+      - 'name = "Standard"'
+      - 'tier = "Basic"'
+      - 'tier = "Standard"'
     warning_message: "Premium SKU detected — consider Standard or Basic tier for POC workloads to reduce cost."
 
   - search_patterns:
@@ -26,6 +33,10 @@ patterns:
       - "production"
       - "always-on"
       - "high availability"
+    correct_patterns:
+      - "min_replicas = 0"
+      - "minimum_instance_count = 0"
+      - "minReplicas = 0"
     warning_message: "Minimum instances set to 1 — consider 0 for dev/test to avoid idle costs."
 
   - search_patterns:
@@ -34,4 +45,7 @@ patterns:
     safe_patterns:
       - "production"
       - "cost analysis"
+    correct_patterns:
+      - "# Use pay-as-you-go pricing for POC workloads"
+      - 'capacityReservationLevel = 0'
     warning_message: "Reserved capacity in POC — reserved instances lock in commitment; use pay-as-you-go for prototypes."

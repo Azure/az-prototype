@@ -54,6 +54,7 @@ class AntiPatternCheck:
     domain: str
     search_patterns: list[str] = field(default_factory=list)
     safe_patterns: list[str] = field(default_factory=list)
+    correct_patterns: list[str] = field(default_factory=list)
     warning_message: str = ""
 
 
@@ -94,11 +95,13 @@ def load(directory: Path | None = None) -> list[AntiPatternCheck]:
             message = entry.get("warning_message", "")
             if not search or not message:
                 continue
+            correct = entry.get("correct_patterns", [])
             checks.append(
                 AntiPatternCheck(
                     domain=domain,
                     search_patterns=[s.lower() for s in search],
                     safe_patterns=[s.lower() for s in safe],
+                    correct_patterns=correct,  # Preserve original case for brief display
                     warning_message=message,
                 )
             )

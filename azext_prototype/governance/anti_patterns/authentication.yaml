@@ -15,6 +15,10 @@ patterns:
       - "do not use sql authentication"
       - "avoid sql authentication"
       - "entra authentication"
+    correct_patterns:
+      - 'azureADOnlyAuthentication = true'
+      - "azuread_authentication_only = true"
+      - "# Use Microsoft Entra authentication with managed identity"
     warning_message: "SQL authentication with username/password detected — use Microsoft Entra (Azure AD) authentication with managed identity."
 
   - search_patterns:
@@ -25,6 +29,10 @@ patterns:
       - "do not use access policies"
       - "avoid access policies"
       - "rbac_authorization"
+    correct_patterns:
+      - "enable_rbac_authorization = true"
+      - 'enableRbacAuthorization = true'
+      - "azurerm_role_assignment"
     warning_message: "Key Vault access policies detected — use enable_rbac_authorization = true with role assignments instead."
 
   - search_patterns:
@@ -35,4 +43,10 @@ patterns:
       - "narrowest scope"
       - "least privilege"
       - "specific role"
+    correct_patterns:
+      - '"Reader"'
+      - '"Storage Blob Data Contributor"'
+      - '"Key Vault Secrets User"'
+      - '"Cosmos DB Account Reader Role"'
+      - "# Use the most specific built-in role at the narrowest scope"
     warning_message: "Broad role assignment detected (Owner/Contributor) — use the most specific built-in role at the narrowest scope."

@@ -15,6 +15,11 @@ patterns:
       - "public_network_access_enabled = false"
       - "publicnetworkaccess = \"disabled\""
       - "public_network_access_enabled = var."
+    correct_patterns:
+      - 'publicNetworkAccess = "Disabled"'
+      - "public_network_access_enabled = false"
+      - 'publicNetworkAccessForIngestion = "Disabled"'
+      - 'publicNetworkAccessForQuery = "Disabled"'
     warning_message: "Public network access is enabled — disable public access and use private endpoints or service endpoints."
 
   - search_patterns:

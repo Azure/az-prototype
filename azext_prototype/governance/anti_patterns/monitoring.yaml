@@ -10,6 +10,9 @@ patterns:
       - "retention_in_days = 0"
       - "retention_days = 0"
     safe_patterns: []
+    correct_patterns:
+      - "retention_in_days = 30"
+      - "retentionInDays = 30"
     warning_message: "Log retention set to 0 days — configure at least 30 days for compliance and incident investigation."
 
   - search_patterns:
@@ -17,4 +20,9 @@ patterns:
       - "logs_enabled = false"
       - "metrics_enabled = false"
     safe_patterns: []
+    correct_patterns:
+      - "logs_enabled = true"
+      - "metrics_enabled = true"
+      - 'enabled = true'
+      - "# Enable diagnostic settings for all PaaS resources"
     warning_message: "Diagnostic logs or metrics disabled — enable logging for all PaaS resources."

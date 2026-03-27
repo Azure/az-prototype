@@ -26,6 +26,10 @@ patterns:
       - "appinsights_connection_string"
       - "application_insights_connection_string"
       - "appinsights_connectionstring"
+    correct_patterns:
+      - "# Use managed identity via DefaultAzureCredential"
+      - "azurerm_user_assigned_identity"
+      - 'Microsoft.ManagedIdentity/userAssignedIdentities'
     warning_message: "Possible credential/secret in output — use managed identity instead of connection strings or keys."
 
   - search_patterns:
@@ -33,6 +37,10 @@ patterns:
       - "admin_username"
       - "admin_password"
     safe_patterns: []
+    correct_patterns:
+      - "admin_enabled = false"
+      - 'adminUserEnabled = false'
+      - "# Use managed identity with RBAC role assignment"
     warning_message: "Admin credentials detected — use managed identity or RBAC-based authentication instead."
 
   - search_patterns:
@@ -44,6 +52,10 @@ patterns:
       - "avoid hardcod"
       - "never hardcode"
       - "don't hardcode"
+    correct_patterns:
+      - "# Externalize secrets to Key Vault or use managed identity"
+      - "azurerm_key_vault_secret"
+      - 'Microsoft.KeyVault/vaults/secrets'
     warning_message: "Possible hard-coded value detected — externalize secrets to Key Vault or use managed identity."
 
   - search_patterns:
@@ -51,6 +63,10 @@ patterns:
       - "transparent_data_encryption = false"
       - "encryption_at_rest = false"
     safe_patterns: []
+    correct_patterns:
+      - "transparent_data_encryption = true"
+      - "encryption_at_rest = true"
+      - 'transparentDataEncryption = "Enabled"'
     warning_message: "Encryption at rest appears disabled — leave default encryption enabled on all data services."
 
   - search_patterns:
@@ -66,6 +82,11 @@ patterns:
     safe_patterns:
       - "deprecated"
       - "do not use"
+    correct_patterns:
+      - "# Remove sensitive outputs — use managed identity for service-to-service auth"
+      - 'output "resource_id"'
+      - 'output "resource_name"'
+      - 'output "principal_id"'
     warning_message: "Sensitive value exposed as Terraform output — remove this output entirely. Use managed identity instead of keys."
 
   - search_patterns:
@@ -73,4 +94,6 @@ patterns:
       - "DEPRECATED: Use managed identity"
       - "WARNING: Do not use"
     safe_patterns: []
+    correct_patterns:
+      - "# Remove this output entirely — do not emit sensitive values"
     warning_message: "Output marked as 'do not use' should be removed entirely, not left with a warning. Omit sensitive outputs."
