@@ -482,11 +482,13 @@ class BuildSession:
                     source_agent=agent.name,
                     source_stage="build",
                 )
-            finally:
-                # Restore agent settings
+                # Restore agent settings and skip to next stage
                 agent._knowledge_role, agent._knowledge_tools, agent._knowledge_languages = saved_knowledge
                 agent._include_standards = saved_standards
                 continue
+            # Restore agent settings on success path
+            agent._knowledge_role, agent._knowledge_tools, agent._knowledge_languages = saved_knowledge
+            agent._include_standards = saved_standards
 
             if response:
                 self._token_tracker.record(response)
