@@ -447,26 +447,16 @@ class BuildSession:
             # Use condensed per-stage context (from one-time condensation call)
             focused_context = stage_contexts.get(stage_num, "")
 
-            # Apply governor brief BEFORE building the task so the
-            # ## MANDATORY GOVERNANCE RULES section is injected into the
-            # task string (near the end where the model pays most attention).
+            # Apply governor brief + stage-specific knowledge BEFORE building
+            # the task so the ## MANDATORY GOVERNANCE RULES section is injected.
             agent = self._select_agent(stage)
             if not agent:
                 _print(f"       Skipped (no agent for category '{stage.get('category', '')}')")
                 continue
             self._apply_governor_brief(agent, stage_name, services)
+            self._apply_stage_knowledge(agent, stage)
 
             agent, task = self._build_stage_task(stage, focused_context, templates)
-
-            # Temporarily disable knowledge/standards to keep the prompt lean
-            # (~14KB vs 83KB). The condensed context + governor brief have
-            # everything the model needs.
-            saved_knowledge = (agent._knowledge_role, agent._knowledge_tools, agent._knowledge_languages)
-            saved_standards = agent._include_standards
-            agent._knowledge_role = ""
-            agent._knowledge_tools = []
-            agent._knowledge_languages = []
-            agent._include_standards = False
 
             try:
                 with self._maybe_spinner(f"Building Stage {stage_num}: {stage_name}...", use_styled):
@@ -486,13 +476,11 @@ class BuildSession:
                     source_agent=agent.name,
                     source_stage="build",
                 )
-                # Restore agent settings and skip to next stage
-                agent._knowledge_role, agent._knowledge_tools, agent._knowledge_languages = saved_knowledge
-                agent._include_standards = saved_standards
+                # Clear override and skip to next stage
+                agent.set_knowledge_override("")
                 continue
-            # Restore agent settings on success path
-            agent._knowledge_role, agent._knowledge_tools, agent._knowledge_languages = saved_knowledge
-            agent._include_standards = saved_standards
+            # Clear override on success path
+            agent.set_knowledge_override("")
 
             if response:
                 self._token_tracker.record(response)
@@ -1330,6 +1318,30 @@ class BuildSession:
     # Internal — governor integration
     # ------------------------------------------------------------------ #
 
+    def _apply_stage_knowledge(self, agent: Any, stage: dict) -> None:
+        """Set stage-specific knowledge on the agent.
+
+        Composes knowledge for ONLY this stage's services + the IaC tool,
+        keeping the prompt focused instead of loading the full 38KB generic
+        knowledge dump.
+        """
+        try:
+            from azext_prototype.knowledge import KnowledgeLoader
+
+            svc_names = [s.get("name", "") for s in stage.get("services", []) if s.get("name")]
+            loader = KnowledgeLoader()
+            knowledge = loader.compose_context(
+                services=svc_names,
+                tool=self._iac_tool,
+                role="infrastructure",
+                include_constraints=True,
+                mode="poc",
+            )
+            if knowledge:
+                agent.set_knowledge_override(knowledge)
+        except Exception:
+            pass  # Never let knowledge errors block generation
+
     def _apply_governor_brief(self, agent: Any, stage_name: str, services: list[dict]) -> None:
         """Set a governor policy brief on the agent before generation.
 
@@ -2028,18 +2040,22 @@ class BuildSession:
                     _print(f"       Remaining: {qa_content[:200]}")
                 return
 
-            # 6. Remediate — re-invoke IaC agent with focused context + governance
+            # 6. Remediate — re-invoke IaC agent with focused context + governance + knowledge
             _print(f"       Stage {stage_num}: QA found issues — remediating (attempt {attempt + 1})...")
+
+            # Apply governor brief + stage knowledge BEFORE building the task
+            agent = self._select_agent(stage)
+            if not agent:
+                return
+            self._apply_governor_brief(agent, stage["name"], stage.get("services", []))
+            self._apply_stage_knowledge(agent, stage)
 
             # Use condensed stage context (cached from one-time condensation)
             cached_contexts = self._build_state._state.get("stage_contexts", {})
             focused = cached_contexts.get(str(stage_num), "")
             agent, task = self._build_stage_task(stage, focused, templates)
-            if not agent:
-                return
 
             # Escalating governance severity per attempt
-            self._apply_governor_brief(agent, stage["name"], stage.get("services", []))
             if attempt == 0:
                 severity = "You MUST address ALL of them"
             elif attempt == 1:
@@ -2062,6 +2078,8 @@ class BuildSession:
 
             with self._maybe_spinner(f"Remediating Stage {stage_num} (attempt {attempt + 1})...", use_styled):
                 response = agent.execute(self._context, task)
+
+            agent.set_knowledge_override("")  # Clear override
 
             if response:
                 self._token_tracker.record(response)

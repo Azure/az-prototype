@@ -43,7 +43,7 @@ _TERRAFORM_VERSION = ">=1.14.0"
 # Dependency versions — not CLI-validated, used as reference by agents
 # ======================================================================
 
-_AZURE_API_VERSION = "2025-06-01"
+_AZURE_API_VERSION = "2024-03-01"
 _AZAPI_PROVIDER_VERSION = "2.8.0"
 
 # Registry of dependency versions for programmatic lookup.

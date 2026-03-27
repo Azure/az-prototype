@@ -65,10 +65,14 @@ class TerraformAgent(BaseAgent):
                 AIMessage(
                     role="system",
                     content=(
-                        f"AZURE API VERSION: {api_ver}\n\n"
+                        f"AZURE API VERSIONS:\n\n"
                         f"You MUST use the azapi provider (azure/azapi). Every Azure resource "
                         f"is declared as `azapi_resource` with the ARM resource type in the `type` "
-                        f"property, appended with @{api_ver}.\n\n"
+                        f"property, appended with the correct API version for that SPECIFIC resource type.\n\n"
+                        f"Use the LATEST STABLE API version for each resource type. Default: {api_ver}\n"
+                        f"If you are unsure of the correct API version for a resource type, use:\n"
+                        f"  [SEARCH: azure arm api version for <resource_type>]\n"
+                        f"to look up the correct version from Microsoft Learn.\n\n"
                         f"Example:\n"
                         f'  resource "azapi_resource" "storage" {{\n'
                         f'    type      = "Microsoft.Storage/storageAccounts@{api_ver}"\n'
@@ -83,14 +87,8 @@ class TerraformAgent(BaseAgent):
                         f"  }}\n\n"
                         f"Reference documentation URL pattern:\n"
                         f"  https://learn.microsoft.com/en-us/azure/templates/"
-                        f"<resource_provider>/{api_ver}/<resource_type>"
-                        f"?pivots=deployment-language-terraform\n"
-                        f"Example: Microsoft.Storage/storageAccounts →\n"
-                        f"  https://learn.microsoft.com/en-us/azure/templates/"
-                        f"microsoft.storage/{api_ver}/storageaccounts"
-                        f"?pivots=deployment-language-terraform\n\n"
-                        f"If uncertain about any property, emit:\n"
-                        f"  [SEARCH: azure arm template <resource_type> {api_ver} properties]"
+                        f"<resource_provider>/<api_version>/<resource_type>"
+                        f"?pivots=deployment-language-terraform"
                         f"{provider_pin}"
                     ),
                 )

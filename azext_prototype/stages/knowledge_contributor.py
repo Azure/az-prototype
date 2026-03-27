@@ -165,6 +165,8 @@ def submit_contribution(
     type_label = type_label_map.get(contribution_type, "pitfall")
     labels.append(type_label)
 
+    from azext_prototype.debug_log import log_flow
+
     cmd = [
         "gh",
         "issue",
@@ -179,7 +181,7 @@ def submit_contribution(
     for label in labels:
         cmd.extend(["--label", label])
 
-    logger.info("Creating knowledge contribution issue: %s", title)
+    log_flow("knowledge_contributor.submit", "Creating issue", title=title, repo=repo, labels=labels)
     try:
         result = subprocess.run(
             cmd,
@@ -189,11 +191,26 @@ def submit_contribution(
         )
         if result.returncode != 0:
             error = result.stderr.strip() or result.stdout.strip()
-            logger.error("gh issue create failed: %s", error)
-            return {"error": error}
+            log_flow("knowledge_contributor.submit", "Failed with labels, retrying with fallback", error=error)
+
+            # Retry with fallback labels — service label might not exist
+            fallback_labels = ["knowledge-contribution", "new-service"]
+            cmd_fallback = [
+                "gh", "issue", "create",
+                "--title", title, "--body", body, "--repo", repo,
+            ]
+            for label in fallback_labels:
+                cmd_fallback.extend(["--label", label])
+
+            result = subprocess.run(cmd_fallback, capture_output=True, text=True, check=False)
+            if result.returncode != 0:
+                error = result.stderr.strip() or result.stdout.strip()
+                log_flow("knowledge_contributor.submit", "Fallback also failed", error=error)
+                return {"error": error}
 
         url = result.stdout.strip()
         number = url.rstrip("/").rsplit("/", 1)[-1] if url else ""
+        log_flow("knowledge_contributor.submit", "Issue created", url=url, number=number)
         return {"url": url, "number": number}
 
     except FileNotFoundError:
@@ -251,15 +268,23 @@ def submit_if_gap(
     Returns the submission result dict or ``None`` if no gap or on error.
     """
     try:
+        from azext_prototype.debug_log import log_flow
+
         if not check_knowledge_gap(finding, loader):
+            log_flow("knowledge_contributor.submit_if_gap", "No gap detected, skipping", service=finding.get("service"))
             return None
 
+        log_flow("knowledge_contributor.submit_if_gap", "Gap detected, submitting", service=finding.get("service"))
         result = submit_contribution(finding, repo=repo)
 
         if result.get("url") and print_fn:
             print_fn(f"  Knowledge contribution submitted: {result['url']}")
+        elif result.get("error"):
+            log_flow("knowledge_contributor.submit_if_gap", "Submission failed", error=result["error"])
 
         return result
-    except Exception:
-        logger.debug("Knowledge contribution failed silently", exc_info=True)
+    except Exception as exc:
+        from azext_prototype.debug_log import log_error
+
+        log_error("knowledge_contributor.submit_if_gap", exc)
         return None

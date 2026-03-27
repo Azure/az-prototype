@@ -322,13 +322,24 @@ class BaseAgent:
         except Exception:  # pragma: no cover — never let standards break the agent
             return ""
 
+    def set_knowledge_override(self, text: str) -> None:
+        """Set stage-specific knowledge to replace the generic composition.
+
+        When set, ``_get_knowledge_text()`` returns this text instead of
+        composing from ``_knowledge_role`` / ``_knowledge_tools``.
+        Call with an empty string to revert to default composition.
+        """
+        self._knowledge_override = text
+
     def _get_knowledge_text(self) -> str:
         """Return composed knowledge context for system messages.
 
-        Uses ``_knowledge_role``, ``_knowledge_tools``, and
-        ``_knowledge_languages`` to compose context from the knowledge
-        directory via :class:`KnowledgeLoader`.
+        If a knowledge override has been set via ``set_knowledge_override()``,
+        returns that instead of composing from role/tool/language declarations.
         """
+        override = getattr(self, "_knowledge_override", "")
+        if override:
+            return override
         try:
             from azext_prototype.knowledge import KnowledgeLoader
 
