@@ -11,7 +11,6 @@ from azext_prototype.agents.orchestrator import (
 from azext_prototype.agents.registry import AgentRegistry
 from azext_prototype.ai.provider import AIResponse
 
-
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
@@ -24,18 +23,14 @@ def _make_agent(name: str, capabilities=None, response_text="done"):
     agent.description = f"{name} agent"
     agent.capabilities = capabilities or []
     agent.can_handle = MagicMock(return_value=0.5)
-    agent.execute = MagicMock(
-        return_value=AIResponse(content=response_text, model="test", usage={})
-    )
+    agent.execute = MagicMock(return_value=AIResponse(content=response_text, model="test", usage={}))
     return agent
 
 
 def _make_context(plan_text="1. [alpha] Do the thing"):
     """Create an AgentContext with a mock AI provider."""
     provider = MagicMock()
-    provider.chat = MagicMock(
-        return_value=AIResponse(content=plan_text, model="test", usage={})
-    )
+    provider.chat = MagicMock(return_value=AIResponse(content=plan_text, model="test", usage={}))
     return AgentContext(
         project_config={},
         project_dir="/tmp/test",

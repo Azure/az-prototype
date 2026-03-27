@@ -366,7 +366,7 @@ class DeploySession:
                 confirmation = self._prompt.simple_prompt("> ")
             else:
                 try:
-                    confirmation = _input("> ", allow_empty=True).strip()
+                    confirmation = _input("> ", allow_empty=True).strip()  # type: ignore[call-arg]
                 except TypeError:
                     confirmation = _input("> ").strip()
         except (EOFError, KeyboardInterrupt):

@@ -13,20 +13,21 @@ from azext_prototype.templates.registry import (
     TemplateService,
 )
 
-
 # ------------------------------------------------------------------ #
 # Helpers
 # ------------------------------------------------------------------ #
 
 BUILTIN_DIR = Path(__file__).resolve().parent.parent / "azext_prototype" / "templates" / "workloads"
 
-EXPECTED_BUILTIN_NAMES = sorted([
-    "ai-app",
-    "data-pipeline",
-    "microservices",
-    "serverless-api",
-    "web-app",
-])
+EXPECTED_BUILTIN_NAMES = sorted(
+    [
+        "ai-app",
+        "data-pipeline",
+        "microservices",
+        "serverless-api",
+        "web-app",
+    ]
+)
 
 
 def _write_template(dest: Path, data: dict) -> Path:
@@ -68,6 +69,7 @@ def _minimal_template(**overrides) -> dict:
 # TemplateService dataclass
 # ================================================================== #
 
+
 class TestTemplateService:
     """Tests for the TemplateService dataclass."""
 
@@ -103,6 +105,7 @@ class TestTemplateService:
 # ================================================================== #
 # ProjectTemplate dataclass
 # ================================================================== #
+
 
 class TestProjectTemplate:
     """Tests for the ProjectTemplate dataclass."""
@@ -165,6 +168,7 @@ class TestProjectTemplate:
 # TemplateRegistry — loading
 # ================================================================== #
 
+
 class TestRegistryLoading:
     """Tests for template loading from YAML files."""
 
@@ -181,12 +185,14 @@ class TestRegistryLoading:
         for n in ("alpha", "beta", "gamma"):
             _write_template(
                 tmp_path / f"{n}.template.yaml",
-                _minimal_template(metadata={
-                    "name": n,
-                    "display_name": n.title(),
-                    "description": f"{n} template",
-                    "category": "web-app",
-                }),
+                _minimal_template(
+                    metadata={
+                        "name": n,
+                        "display_name": n.title(),
+                        "description": f"{n} template",
+                        "category": "web-app",
+                    }
+                ),
             )
         reg = TemplateRegistry()
         reg.load([tmp_path])
@@ -239,17 +245,25 @@ class TestRegistryLoading:
         d2 = tmp_path / "custom"
         _write_template(
             d1 / "a.template.yaml",
-            _minimal_template(metadata={
-                "name": "a", "display_name": "A",
-                "description": "A", "category": "web-app",
-            }),
+            _minimal_template(
+                metadata={
+                    "name": "a",
+                    "display_name": "A",
+                    "description": "A",
+                    "category": "web-app",
+                }
+            ),
         )
         _write_template(
             d2 / "b.template.yaml",
-            _minimal_template(metadata={
-                "name": "b", "display_name": "B",
-                "description": "B", "category": "data-pipeline",
-            }),
+            _minimal_template(
+                metadata={
+                    "name": "b",
+                    "display_name": "B",
+                    "description": "B",
+                    "category": "data-pipeline",
+                }
+            ),
         )
         reg = TemplateRegistry()
         reg.load([d1, d2])
@@ -265,17 +279,25 @@ class TestRegistryLoading:
     def test_last_write_wins_on_name_collision(self, tmp_path):
         _write_template(
             tmp_path / "a.template.yaml",
-            _minimal_template(metadata={
-                "name": "same", "display_name": "First",
-                "description": "First", "category": "web-app",
-            }),
+            _minimal_template(
+                metadata={
+                    "name": "same",
+                    "display_name": "First",
+                    "description": "First",
+                    "category": "web-app",
+                }
+            ),
         )
         _write_template(
             tmp_path / "b.template.yaml",
-            _minimal_template(metadata={
-                "name": "same", "display_name": "Second",
-                "description": "Second", "category": "web-app",
-            }),
+            _minimal_template(
+                metadata={
+                    "name": "same",
+                    "display_name": "Second",
+                    "description": "Second",
+                    "category": "web-app",
+                }
+            ),
         )
         reg = TemplateRegistry()
         reg.load([tmp_path])
@@ -297,6 +319,7 @@ class TestRegistryLoading:
 # ================================================================== #
 # TemplateRegistry — get / list
 # ================================================================== #
+
 
 class TestRegistryAccess:
     """Tests for get/list operations."""
@@ -348,15 +371,17 @@ class TestRegistryAccess:
 # Template parsing — field extraction
 # ================================================================== #
 
+
 class TestTemplateParsing:
     """Tests for correct field extraction from YAML."""
 
     def test_services_parsed(self, tmp_path):
-        data = _minimal_template(services=[
-            {"name": "api", "type": "container-apps", "tier": "consumption",
-             "config": {"ingress": "internal"}},
-            {"name": "db", "type": "sql-database"},
-        ])
+        data = _minimal_template(
+            services=[
+                {"name": "api", "type": "container-apps", "tier": "consumption", "config": {"ingress": "internal"}},
+                {"name": "db", "type": "sql-database"},
+            ]
+        )
         _write_template(tmp_path / "t.template.yaml", data)
         reg = TemplateRegistry()
         reg.load([tmp_path])
@@ -368,10 +393,12 @@ class TestTemplateParsing:
         assert t.services[1].tier == ""
 
     def test_iac_defaults_parsed(self, tmp_path):
-        data = _minimal_template(iac_defaults={
-            "resource_group_name": "rg-test-{env}",
-            "tags": {"managed_by": "test"},
-        })
+        data = _minimal_template(
+            iac_defaults={
+                "resource_group_name": "rg-test-{env}",
+                "tags": {"managed_by": "test"},
+            }
+        )
         _write_template(tmp_path / "t.template.yaml", data)
         reg = TemplateRegistry()
         reg.load([tmp_path])
@@ -453,6 +480,7 @@ class TestTemplateParsing:
 # Built-in templates — integrity checks
 # ================================================================== #
 
+
 class TestBuiltinTemplates:
     """Verify all shipped templates parse correctly and meet standards."""
 
@@ -502,10 +530,7 @@ class TestBuiltinTemplates:
         """All templates must use managed identity on at least one service."""
         t = self.reg.get(name)
         assert t is not None
-        has_identity = any(
-            "identity" in svc.config or svc.type == "managed-identity"
-            for svc in t.services
-        )
+        has_identity = any("identity" in svc.config or svc.type == "managed-identity" for svc in t.services)
         assert has_identity, f"Template '{name}' lacks managed identity"
 
     @pytest.mark.parametrize("name", EXPECTED_BUILTIN_NAMES)
@@ -530,6 +555,7 @@ class TestBuiltinTemplates:
 # ================================================================== #
 # Specific built-in template checks
 # ================================================================== #
+
 
 class TestWebAppTemplate:
     def test_services(self):
@@ -639,19 +665,18 @@ class TestServerlessApiTemplate:
 # Schema file existence
 # ================================================================== #
 
+
 class TestTemplateSchema:
     """Verify the JSON schema file exists and is valid JSON."""
 
-    SCHEMA_PATH = (
-        Path(__file__).resolve().parent.parent
-        / "azext_prototype" / "templates" / "template.schema.json"
-    )
+    SCHEMA_PATH = Path(__file__).resolve().parent.parent / "azext_prototype" / "templates" / "template.schema.json"
 
     def test_schema_file_exists(self):
         assert self.SCHEMA_PATH.exists()
 
     def test_schema_is_valid_json(self):
         import json
+
         data = json.loads(self.SCHEMA_PATH.read_text(encoding="utf-8"))
         assert data.get("title") == "Project Template"
         assert "metadata" in data.get("properties", {})
@@ -661,6 +686,4 @@ class TestTemplateSchema:
         """Built-in templates should reference template.schema.json."""
         for path in sorted(BUILTIN_DIR.rglob("*.template.yaml")):
             text = path.read_text(encoding="utf-8")
-            assert "template.schema.json" in text, (
-                f"{path.name} missing schema reference"
-            )
+            assert "template.schema.json" in text, f"{path.name} missing schema reference"

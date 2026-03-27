@@ -19,8 +19,7 @@ from azext_prototype.agents.base import (
     BaseAgent,
 )
 from azext_prototype.agents.registry import AgentRegistry
-from azext_prototype.ai.provider import AIMessage, AIResponse
-
+from azext_prototype.ai.provider import AIResponse
 
 # ======================================================================
 # Fixtures
@@ -70,7 +69,9 @@ class TestSecurityReviewerAgent:
     """Test the security-reviewer built-in agent."""
 
     def test_instantiation(self):
-        from azext_prototype.agents.builtin.security_reviewer import SecurityReviewerAgent
+        from azext_prototype.agents.builtin.security_reviewer import (
+            SecurityReviewerAgent,
+        )
 
         agent = SecurityReviewerAgent()
         assert agent.name == "security-reviewer"
@@ -78,46 +79,60 @@ class TestSecurityReviewerAgent:
         assert AgentCapability.ANALYZE in agent.capabilities
 
     def test_temperature(self):
-        from azext_prototype.agents.builtin.security_reviewer import SecurityReviewerAgent
+        from azext_prototype.agents.builtin.security_reviewer import (
+            SecurityReviewerAgent,
+        )
 
         agent = SecurityReviewerAgent()
         assert agent._temperature == 0.1
 
     def test_knowledge_role(self):
-        from azext_prototype.agents.builtin.security_reviewer import SecurityReviewerAgent
+        from azext_prototype.agents.builtin.security_reviewer import (
+            SecurityReviewerAgent,
+        )
 
         agent = SecurityReviewerAgent()
         assert agent._knowledge_role == "security-reviewer"
 
     def test_include_templates_false(self):
-        from azext_prototype.agents.builtin.security_reviewer import SecurityReviewerAgent
+        from azext_prototype.agents.builtin.security_reviewer import (
+            SecurityReviewerAgent,
+        )
 
         agent = SecurityReviewerAgent()
         assert agent._include_templates is False
 
     def test_keywords_cover_security_topics(self):
-        from azext_prototype.agents.builtin.security_reviewer import SecurityReviewerAgent
+        from azext_prototype.agents.builtin.security_reviewer import (
+            SecurityReviewerAgent,
+        )
 
         agent = SecurityReviewerAgent()
         for kw in ["security", "rbac", "encryption", "secret", "firewall"]:
             assert kw in agent._keywords
 
     def test_can_handle_security_task(self):
-        from azext_prototype.agents.builtin.security_reviewer import SecurityReviewerAgent
+        from azext_prototype.agents.builtin.security_reviewer import (
+            SecurityReviewerAgent,
+        )
 
         agent = SecurityReviewerAgent()
         score = agent.can_handle("Review the security of the terraform code")
         assert score > 0.3
 
     def test_can_handle_unrelated_task(self):
-        from azext_prototype.agents.builtin.security_reviewer import SecurityReviewerAgent
+        from azext_prototype.agents.builtin.security_reviewer import (
+            SecurityReviewerAgent,
+        )
 
         agent = SecurityReviewerAgent()
         score = agent.can_handle("Generate a backlog of user stories")
         assert score <= 0.5
 
     def test_execute_basic(self, mock_context):
-        from azext_prototype.agents.builtin.security_reviewer import SecurityReviewerAgent
+        from azext_prototype.agents.builtin.security_reviewer import (
+            SecurityReviewerAgent,
+        )
 
         agent = SecurityReviewerAgent()
         with patch.object(agent, "_get_governance_text", return_value=""):
@@ -132,7 +147,9 @@ class TestSecurityReviewerAgent:
         assert any("IaC Tool: terraform" in m.content for m in messages if isinstance(m.content, str))
 
     def test_execute_with_architecture_artifact(self, mock_context):
-        from azext_prototype.agents.builtin.security_reviewer import SecurityReviewerAgent
+        from azext_prototype.agents.builtin.security_reviewer import (
+            SecurityReviewerAgent,
+        )
 
         mock_context.add_artifact("architecture", "App Service + Cosmos DB + Key Vault")
         agent = SecurityReviewerAgent()
@@ -145,7 +162,9 @@ class TestSecurityReviewerAgent:
         assert len(arch_messages) == 1
 
     def test_contract(self):
-        from azext_prototype.agents.builtin.security_reviewer import SecurityReviewerAgent
+        from azext_prototype.agents.builtin.security_reviewer import (
+            SecurityReviewerAgent,
+        )
 
         agent = SecurityReviewerAgent()
         contract = agent.get_contract()
@@ -254,10 +273,17 @@ class TestNewAgentsInRegistry:
 
     def test_all_builtin_agents_registered(self, populated_registry):
         expected = [
-            "cloud-architect", "terraform-agent", "bicep-agent",
-            "app-developer", "doc-agent", "qa-engineer",
-            "biz-analyst", "cost-analyst", "project-manager",
-            "security-reviewer", "monitoring-agent",
+            "cloud-architect",
+            "terraform-agent",
+            "bicep-agent",
+            "app-developer",
+            "doc-agent",
+            "qa-engineer",
+            "biz-analyst",
+            "cost-analyst",
+            "project-manager",
+            "security-reviewer",
+            "monitoring-agent",
         ]
         for name in expected:
             assert name in populated_registry, f"Built-in agent '{name}' not registered"
@@ -334,7 +360,8 @@ class TestAgentContract:
 
     def test_to_dict_without_contract(self):
         agent = BaseAgent(
-            name="test", description="test",
+            name="test",
+            description="test",
             capabilities=[AgentCapability.DEVELOP],
         )
         d = agent.to_dict()
@@ -342,7 +369,8 @@ class TestAgentContract:
 
     def test_to_dict_with_contract(self):
         agent = BaseAgent(
-            name="test", description="test",
+            name="test",
+            description="test",
             capabilities=[AgentCapability.DEVELOP],
         )
         agent._contract = AgentContract(
@@ -363,9 +391,7 @@ class TestAllAgentContracts:
     def test_all_agents_have_contracts(self, populated_registry):
         for agent in populated_registry.list_all():
             contract = agent.get_contract()
-            assert isinstance(contract, AgentContract), (
-                f"Agent '{agent.name}' does not return an AgentContract"
-            )
+            assert isinstance(contract, AgentContract), f"Agent '{agent.name}' does not return an AgentContract"
 
     def test_architect_contract(self, populated_registry):
         agent = populated_registry.get("cloud-architect")
@@ -433,7 +459,11 @@ class TestOrchestratorContractValidation:
     """Test AgentOrchestrator.check_contracts()."""
 
     def test_no_warnings_when_artifacts_available(self, populated_registry, mock_context):
-        from azext_prototype.agents.orchestrator import AgentOrchestrator, AgentTask, TeamPlan
+        from azext_prototype.agents.orchestrator import (
+            AgentOrchestrator,
+            AgentTask,
+            TeamPlan,
+        )
 
         mock_context.add_artifact("requirements", "some requirements")
         orch = AgentOrchestrator(populated_registry, mock_context)
@@ -445,7 +475,11 @@ class TestOrchestratorContractValidation:
         assert len(warnings) == 0
 
     def test_warnings_for_missing_inputs(self, populated_registry, mock_context):
-        from azext_prototype.agents.orchestrator import AgentOrchestrator, AgentTask, TeamPlan
+        from azext_prototype.agents.orchestrator import (
+            AgentOrchestrator,
+            AgentTask,
+            TeamPlan,
+        )
 
         orch = AgentOrchestrator(populated_registry, mock_context)
         plan = TeamPlan(
@@ -457,7 +491,11 @@ class TestOrchestratorContractValidation:
         assert any("requirements" in w for w in warnings)
 
     def test_chain_satisfies_downstream(self, populated_registry, mock_context):
-        from azext_prototype.agents.orchestrator import AgentOrchestrator, AgentTask, TeamPlan
+        from azext_prototype.agents.orchestrator import (
+            AgentOrchestrator,
+            AgentTask,
+            TeamPlan,
+        )
 
         orch = AgentOrchestrator(populated_registry, mock_context)
         plan = TeamPlan(
@@ -475,7 +513,11 @@ class TestOrchestratorContractValidation:
         assert len(warnings) == 0
 
     def test_unassigned_tasks_skipped(self, populated_registry, mock_context):
-        from azext_prototype.agents.orchestrator import AgentOrchestrator, AgentTask, TeamPlan
+        from azext_prototype.agents.orchestrator import (
+            AgentOrchestrator,
+            AgentTask,
+            TeamPlan,
+        )
 
         orch = AgentOrchestrator(populated_registry, mock_context)
         plan = TeamPlan(
@@ -530,7 +572,11 @@ class TestParallelExecution:
         return reg
 
     def test_parallel_independent_tasks(self, mock_context):
-        from azext_prototype.agents.orchestrator import AgentOrchestrator, AgentTask, TeamPlan
+        from azext_prototype.agents.orchestrator import (
+            AgentOrchestrator,
+            AgentTask,
+            TeamPlan,
+        )
 
         a1 = self._make_agent("agent-a", outputs=["out_a"], delay=0.05)
         a2 = self._make_agent("agent-b", outputs=["out_b"], delay=0.05)
@@ -556,7 +602,11 @@ class TestParallelExecution:
         assert elapsed < 0.15
 
     def test_sequential_dependent_tasks(self, mock_context):
-        from azext_prototype.agents.orchestrator import AgentOrchestrator, AgentTask, TeamPlan
+        from azext_prototype.agents.orchestrator import (
+            AgentOrchestrator,
+            AgentTask,
+            TeamPlan,
+        )
 
         a1 = self._make_agent("producer", outputs=["artifact_x"])
         a2 = self._make_agent("consumer", inputs=["artifact_x"])
@@ -575,14 +625,8 @@ class TestParallelExecution:
         assert results[1].status == "completed"
 
         # Producer must execute before consumer (due to dependency)
-        producer_idx = next(
-            i for i, e in enumerate(orch.execution_log)
-            if e.get("agent") == "producer"
-        )
-        consumer_idx = next(
-            i for i, e in enumerate(orch.execution_log)
-            if e.get("agent") == "consumer"
-        )
+        producer_idx = next(i for i, e in enumerate(orch.execution_log) if e.get("agent") == "producer")
+        consumer_idx = next(i for i, e in enumerate(orch.execution_log) if e.get("agent") == "consumer")
         assert producer_idx < consumer_idx
 
     def test_empty_plan(self, mock_context):
@@ -595,7 +639,11 @@ class TestParallelExecution:
         assert results == []
 
     def test_single_task(self, mock_context):
-        from azext_prototype.agents.orchestrator import AgentOrchestrator, AgentTask, TeamPlan
+        from azext_prototype.agents.orchestrator import (
+            AgentOrchestrator,
+            AgentTask,
+            TeamPlan,
+        )
 
         a1 = self._make_agent("solo", outputs=["result"])
         registry = self._make_registry([a1])
@@ -610,7 +658,11 @@ class TestParallelExecution:
         assert results[0].status == "completed"
 
     def test_failed_task_in_parallel(self, mock_context):
-        from azext_prototype.agents.orchestrator import AgentOrchestrator, AgentTask, TeamPlan
+        from azext_prototype.agents.orchestrator import (
+            AgentOrchestrator,
+            AgentTask,
+            TeamPlan,
+        )
 
         a1 = self._make_agent("good", outputs=["out_a"])
         a2 = self._make_agent("bad", outputs=["out_b"])
@@ -633,7 +685,11 @@ class TestParallelExecution:
 
     def test_three_stage_pipeline(self, mock_context):
         """A -> B -> C dependency chain executes in order."""
-        from azext_prototype.agents.orchestrator import AgentOrchestrator, AgentTask, TeamPlan
+        from azext_prototype.agents.orchestrator import (
+            AgentOrchestrator,
+            AgentTask,
+            TeamPlan,
+        )
 
         a = self._make_agent("stage-a", outputs=["data_a"])
         b = self._make_agent("stage-b", inputs=["data_a"], outputs=["data_b"])
@@ -654,7 +710,11 @@ class TestParallelExecution:
 
     def test_diamond_dependency(self, mock_context):
         """A -> B, A -> C, B+C -> D."""
-        from azext_prototype.agents.orchestrator import AgentOrchestrator, AgentTask, TeamPlan
+        from azext_prototype.agents.orchestrator import (
+            AgentOrchestrator,
+            AgentTask,
+            TeamPlan,
+        )
 
         a = self._make_agent("root", outputs=["data_root"])
         b = self._make_agent("left", inputs=["data_root"], outputs=["data_left"])

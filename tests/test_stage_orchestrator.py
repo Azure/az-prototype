@@ -16,7 +16,6 @@ from azext_prototype.ui.stage_orchestrator import StageOrchestrator, detect_stag
 from azext_prototype.ui.task_model import TaskStatus
 from azext_prototype.ui.tui_adapter import ShutdownRequested
 
-
 # -------------------------------------------------------------------- #
 # detect_stage()
 # -------------------------------------------------------------------- #
@@ -134,9 +133,7 @@ class TestStageOrchestratorInit:
         assert orch._app is app
 
     def test_stage_kwargs_default_empty(self, tmp_project):
-        orch = StageOrchestrator(
-            app=_make_app(), adapter=_make_adapter(), project_dir=str(tmp_project)
-        )
+        orch = StageOrchestrator(app=_make_app(), adapter=_make_adapter(), project_dir=str(tmp_project))
         assert orch._stage_kwargs == {}
 
     def test_stage_kwargs_stored(self, tmp_project):
@@ -277,9 +274,7 @@ class TestStageOrchestratorRun:
         state_dir = tmp_project / ".prototype" / "state"
         (state_dir / "discovery.yaml").write_text("project:\n  summary: test\n")
 
-        orch, adapter, app = _make_orchestrator(
-            tmp_project, stage_kwargs={"iac_tool": "terraform"}
-        )
+        orch, adapter, app = _make_orchestrator(tmp_project, stage_kwargs={"iac_tool": "terraform"})
         adapter.input_fn.return_value = "quit"
 
         with patch.object(orch, "_run_design") as mock_design:
@@ -292,9 +287,7 @@ class TestStageOrchestratorRun:
         (state_dir / "discovery.yaml").write_text("project:\n  summary: test\n")
         (state_dir / "build.yaml").write_text("iac_tool: terraform\n")
 
-        orch, adapter, app = _make_orchestrator(
-            tmp_project, stage_kwargs={"iac_tool": "terraform"}
-        )
+        orch, adapter, app = _make_orchestrator(tmp_project, stage_kwargs={"iac_tool": "terraform"})
         adapter.input_fn.return_value = "quit"
 
         with patch.object(orch, "_run_build") as mock_build:
@@ -308,9 +301,7 @@ class TestStageOrchestratorRun:
         (state_dir / "build.yaml").write_text("iac_tool: terraform\n")
         (state_dir / "deploy.yaml").write_text("iac_tool: terraform\n")
 
-        orch, adapter, app = _make_orchestrator(
-            tmp_project, stage_kwargs={"subscription": "sub-123"}
-        )
+        orch, adapter, app = _make_orchestrator(tmp_project, stage_kwargs={"subscription": "sub-123"})
         adapter.input_fn.return_value = "quit"
 
         with patch.object(orch, "_run_deploy") as mock_deploy:
@@ -319,14 +310,12 @@ class TestStageOrchestratorRun:
 
     def test_run_no_auto_run_without_start_stage(self, tmp_project):
         """stage_kwargs alone (no start_stage) should NOT auto-run."""
-        orch, adapter, app = _make_orchestrator(
-            tmp_project, stage_kwargs={"iac_tool": "terraform"}
-        )
+        orch, adapter, app = _make_orchestrator(tmp_project, stage_kwargs={"iac_tool": "terraform"})
         adapter.input_fn.return_value = "quit"
 
-        with patch.object(orch, "_run_design") as mock_d, \
-             patch.object(orch, "_run_build") as mock_b, \
-             patch.object(orch, "_run_deploy") as mock_dep:
+        with patch.object(orch, "_run_design") as mock_d, patch.object(orch, "_run_build") as mock_b, patch.object(
+            orch, "_run_deploy"
+        ) as mock_dep:
             orch.run()
             mock_d.assert_not_called()
             mock_b.assert_not_called()
@@ -354,8 +343,7 @@ class TestStageOrchestratorRun:
         # detected == "design", start_stage == "design" -> current == detected
         # The IN_PROGRESS call from line 108 should NOT happen
         in_progress_calls = [
-            c for c in adapter.update_task.call_args_list
-            if c == call("design", TaskStatus.IN_PROGRESS)
+            c for c in adapter.update_task.call_args_list if c == call("design", TaskStatus.IN_PROGRESS)
         ]
         # It should only get COMPLETED from _populate_from_state, not IN_PROGRESS
         assert len(in_progress_calls) == 0
@@ -420,10 +408,7 @@ class TestPopulateFromState:
 
         orch._populate_from_state("init")
 
-        completed_calls = [
-            c for c in adapter.update_task.call_args_list
-            if c[0][1] == TaskStatus.COMPLETED
-        ]
+        completed_calls = [c for c in adapter.update_task.call_args_list if c[0][1] == TaskStatus.COMPLETED]
         assert len(completed_calls) == 0
 
 
@@ -455,9 +440,7 @@ class TestPopulateDesignSubtasks:
         orch, adapter, _ = _make_orchestrator(tmp_project)
         orch._populate_design_subtasks()
 
-        adapter.add_task.assert_any_call(
-            "design", "design-confirmed", "Confirmed requirements (2)"
-        )
+        adapter.add_task.assert_any_call("design", "design-confirmed", "Confirmed requirements (2)")
         adapter.update_task.assert_any_call("design-confirmed", TaskStatus.COMPLETED)
 
     def test_with_open_items(self, tmp_project):
@@ -472,9 +455,7 @@ class TestPopulateDesignSubtasks:
         orch, adapter, _ = _make_orchestrator(tmp_project)
         orch._populate_design_subtasks()
 
-        adapter.add_task.assert_any_call(
-            "design", "design-open", "Open items (1)"
-        )
+        adapter.add_task.assert_any_call("design", "design-open", "Open items (1)")
         adapter.update_task.assert_any_call("design-open", TaskStatus.PENDING)
 
     def test_with_architecture_output(self, tmp_project):
@@ -487,9 +468,7 @@ class TestPopulateDesignSubtasks:
         orch, adapter, _ = _make_orchestrator(tmp_project)
         orch._populate_design_subtasks()
 
-        adapter.add_task.assert_any_call(
-            "design", "design-arch", "Architecture document"
-        )
+        adapter.add_task.assert_any_call("design", "design-arch", "Architecture document")
         adapter.update_task.assert_any_call("design-arch", TaskStatus.COMPLETED)
 
     def test_no_confirmed_no_open_no_subtasks(self, tmp_project):
@@ -519,9 +498,7 @@ class TestPopulateDesignSubtasks:
         orch, adapter, _ = _make_orchestrator(tmp_project)
         orch._populate_design_subtasks()
 
-        adapter.add_task.assert_any_call(
-            "design", "design-confirmed", "Confirmed requirements (1)"
-        )
+        adapter.add_task.assert_any_call("design", "design-confirmed", "Confirmed requirements (1)")
 
     def test_exception_does_not_propagate(self, tmp_project):
         """Errors loading state should be caught (not propagate)."""
@@ -791,9 +768,7 @@ class TestGetProjectSummary:
 
     def test_from_design_json(self, project_with_config):
         state_dir = project_with_config / ".prototype" / "state"
-        (state_dir / "design.json").write_text(
-            json.dumps({"architecture": "Build a web portal. It uses React."})
-        )
+        (state_dir / "design.json").write_text(json.dumps({"architecture": "Build a web portal. It uses React."}))
         orch, _, _ = _make_orchestrator(project_with_config)
         result = orch._get_project_summary()
         assert result == "Build a web portal."
@@ -952,8 +927,9 @@ class TestRunDesign:
         mock_stage = MagicMock()
         mock_stage.execute.return_value = {"status": "success"}
 
-        with patch.object(orch, "_prepare") as mock_prep, \
-             patch("azext_prototype.stages.design_stage.DesignStage", return_value=mock_stage):
+        with patch.object(orch, "_prepare") as mock_prep, patch(
+            "azext_prototype.stages.design_stage.DesignStage", return_value=mock_stage
+        ):
             mock_prep.return_value = (str(project_with_config), MagicMock(), MagicMock(), MagicMock())
 
             orch._run_design()
@@ -972,8 +948,9 @@ class TestRunDesign:
         mock_stage = MagicMock()
         mock_stage.execute.return_value = {"status": "success"}
 
-        with patch.object(orch, "_prepare") as mock_prep, \
-             patch("azext_prototype.stages.design_stage.DesignStage", return_value=mock_stage):
+        with patch.object(orch, "_prepare") as mock_prep, patch(
+            "azext_prototype.stages.design_stage.DesignStage", return_value=mock_stage
+        ):
             mock_prep.return_value = (str(project_with_config), MagicMock(), MagicMock(), MagicMock())
 
             orch._run_design()
@@ -987,8 +964,9 @@ class TestRunDesign:
         mock_stage = MagicMock()
         mock_stage.execute.return_value = {"status": "cancelled"}
 
-        with patch.object(orch, "_prepare") as mock_prep, \
-             patch("azext_prototype.stages.design_stage.DesignStage", return_value=mock_stage):
+        with patch.object(orch, "_prepare") as mock_prep, patch(
+            "azext_prototype.stages.design_stage.DesignStage", return_value=mock_stage
+        ):
             mock_prep.return_value = (str(project_with_config), MagicMock(), MagicMock(), MagicMock())
 
             with pytest.raises(ShutdownRequested):
@@ -1021,8 +999,9 @@ class TestRunDesign:
         mock_stage = MagicMock()
         mock_stage.execute.return_value = {"status": "success"}
 
-        with patch.object(orch, "_prepare") as mock_prep, \
-             patch("azext_prototype.stages.design_stage.DesignStage", return_value=mock_stage):
+        with patch.object(orch, "_prepare") as mock_prep, patch(
+            "azext_prototype.stages.design_stage.DesignStage", return_value=mock_stage
+        ):
             mock_prep.return_value = (str(project_with_config), MagicMock(), MagicMock(), MagicMock())
 
             orch._run_design()
@@ -1036,8 +1015,9 @@ class TestRunDesign:
         mock_stage = MagicMock()
         mock_stage.execute.return_value = {"status": "success"}
 
-        with patch.object(orch, "_prepare") as mock_prep, \
-             patch("azext_prototype.stages.design_stage.DesignStage", return_value=mock_stage):
+        with patch.object(orch, "_prepare") as mock_prep, patch(
+            "azext_prototype.stages.design_stage.DesignStage", return_value=mock_stage
+        ):
             mock_prep.return_value = (str(project_with_config), MagicMock(), MagicMock(), MagicMock())
 
             orch._run_design()
@@ -1050,8 +1030,9 @@ class TestRunDesign:
         mock_stage = MagicMock()
         mock_stage.execute.return_value = {"status": "success"}
 
-        with patch.object(orch, "_prepare") as mock_prep, \
-             patch("azext_prototype.stages.design_stage.DesignStage", return_value=mock_stage):
+        with patch.object(orch, "_prepare") as mock_prep, patch(
+            "azext_prototype.stages.design_stage.DesignStage", return_value=mock_stage
+        ):
             mock_prep.return_value = (str(project_with_config), MagicMock(), MagicMock(), MagicMock())
 
             orch._run_design(iac_tool="terraform")
@@ -1065,8 +1046,9 @@ class TestRunDesign:
         mock_stage = MagicMock()
         mock_stage.execute.side_effect = ShutdownRequested()
 
-        with patch.object(orch, "_prepare") as mock_prep, \
-             patch("azext_prototype.stages.design_stage.DesignStage", return_value=mock_stage):
+        with patch.object(orch, "_prepare") as mock_prep, patch(
+            "azext_prototype.stages.design_stage.DesignStage", return_value=mock_stage
+        ):
             mock_prep.return_value = (str(project_with_config), MagicMock(), MagicMock(), MagicMock())
 
             with pytest.raises(ShutdownRequested):
@@ -1085,8 +1067,9 @@ class TestRunBuild:
         mock_stage = MagicMock()
         mock_stage.execute.return_value = {"status": "success"}
 
-        with patch.object(orch, "_prepare") as mock_prep, \
-             patch("azext_prototype.stages.build_stage.BuildStage", return_value=mock_stage):
+        with patch.object(orch, "_prepare") as mock_prep, patch(
+            "azext_prototype.stages.build_stage.BuildStage", return_value=mock_stage
+        ):
             mock_prep.return_value = (str(project_with_config), MagicMock(), MagicMock(), MagicMock())
 
             orch._run_build()
@@ -1099,8 +1082,9 @@ class TestRunBuild:
         mock_stage = MagicMock()
         mock_stage.execute.return_value = {"status": "success"}
 
-        with patch.object(orch, "_prepare") as mock_prep, \
-             patch("azext_prototype.stages.build_stage.BuildStage", return_value=mock_stage):
+        with patch.object(orch, "_prepare") as mock_prep, patch(
+            "azext_prototype.stages.build_stage.BuildStage", return_value=mock_stage
+        ):
             mock_prep.return_value = (str(project_with_config), MagicMock(), MagicMock(), MagicMock())
 
             orch._run_build()
@@ -1135,8 +1119,9 @@ class TestRunBuild:
         mock_stage = MagicMock()
         mock_stage.execute.return_value = {"status": "success"}
 
-        with patch.object(orch, "_prepare") as mock_prep, \
-             patch("azext_prototype.stages.build_stage.BuildStage", return_value=mock_stage):
+        with patch.object(orch, "_prepare") as mock_prep, patch(
+            "azext_prototype.stages.build_stage.BuildStage", return_value=mock_stage
+        ):
             mock_prep.return_value = (str(project_with_config), MagicMock(), MagicMock(), MagicMock())
 
             orch._run_build()
@@ -1157,8 +1142,9 @@ class TestRunBuild:
 
         mock_stage.execute.side_effect = capture_section_fn
 
-        with patch.object(orch, "_prepare") as mock_prep, \
-             patch("azext_prototype.stages.build_stage.BuildStage", return_value=mock_stage):
+        with patch.object(orch, "_prepare") as mock_prep, patch(
+            "azext_prototype.stages.build_stage.BuildStage", return_value=mock_stage
+        ):
             mock_prep.return_value = (str(project_with_config), MagicMock(), MagicMock(), MagicMock())
 
             orch._run_build()
@@ -1182,8 +1168,9 @@ class TestRunBuild:
 
         mock_stage.execute.side_effect = capture_update_fn
 
-        with patch.object(orch, "_prepare") as mock_prep, \
-             patch("azext_prototype.stages.build_stage.BuildStage", return_value=mock_stage):
+        with patch.object(orch, "_prepare") as mock_prep, patch(
+            "azext_prototype.stages.build_stage.BuildStage", return_value=mock_stage
+        ):
             mock_prep.return_value = (str(project_with_config), MagicMock(), MagicMock(), MagicMock())
 
             orch._run_build()
@@ -1198,8 +1185,9 @@ class TestRunBuild:
         mock_stage = MagicMock()
         mock_stage.execute.return_value = {"status": "success"}
 
-        with patch.object(orch, "_prepare") as mock_prep, \
-             patch("azext_prototype.stages.build_stage.BuildStage", return_value=mock_stage):
+        with patch.object(orch, "_prepare") as mock_prep, patch(
+            "azext_prototype.stages.build_stage.BuildStage", return_value=mock_stage
+        ):
             mock_prep.return_value = (str(project_with_config), MagicMock(), MagicMock(), MagicMock())
 
             orch._run_build(iac_tool="bicep")
@@ -1213,8 +1201,9 @@ class TestRunBuild:
         mock_stage = MagicMock()
         mock_stage.execute.side_effect = ShutdownRequested()
 
-        with patch.object(orch, "_prepare") as mock_prep, \
-             patch("azext_prototype.stages.build_stage.BuildStage", return_value=mock_stage):
+        with patch.object(orch, "_prepare") as mock_prep, patch(
+            "azext_prototype.stages.build_stage.BuildStage", return_value=mock_stage
+        ):
             mock_prep.return_value = (str(project_with_config), MagicMock(), MagicMock(), MagicMock())
 
             with pytest.raises(ShutdownRequested):
@@ -1233,8 +1222,9 @@ class TestRunDeploy:
         mock_stage = MagicMock()
         mock_stage.execute.return_value = {"status": "success"}
 
-        with patch.object(orch, "_prepare") as mock_prep, \
-             patch("azext_prototype.stages.deploy_stage.DeployStage", return_value=mock_stage):
+        with patch.object(orch, "_prepare") as mock_prep, patch(
+            "azext_prototype.stages.deploy_stage.DeployStage", return_value=mock_stage
+        ):
             mock_prep.return_value = (str(project_with_config), MagicMock(), MagicMock(), MagicMock())
 
             orch._run_deploy()
@@ -1247,8 +1237,9 @@ class TestRunDeploy:
         mock_stage = MagicMock()
         mock_stage.execute.return_value = {"status": "success"}
 
-        with patch.object(orch, "_prepare") as mock_prep, \
-             patch("azext_prototype.stages.deploy_stage.DeployStage", return_value=mock_stage):
+        with patch.object(orch, "_prepare") as mock_prep, patch(
+            "azext_prototype.stages.deploy_stage.DeployStage", return_value=mock_stage
+        ):
             mock_prep.return_value = (str(project_with_config), MagicMock(), MagicMock(), MagicMock())
 
             orch._run_deploy()
@@ -1283,8 +1274,9 @@ class TestRunDeploy:
         mock_stage = MagicMock()
         mock_stage.execute.return_value = {"status": "success"}
 
-        with patch.object(orch, "_prepare") as mock_prep, \
-             patch("azext_prototype.stages.deploy_stage.DeployStage", return_value=mock_stage):
+        with patch.object(orch, "_prepare") as mock_prep, patch(
+            "azext_prototype.stages.deploy_stage.DeployStage", return_value=mock_stage
+        ):
             mock_prep.return_value = (str(project_with_config), MagicMock(), MagicMock(), MagicMock())
 
             orch._run_deploy()
@@ -1297,8 +1289,9 @@ class TestRunDeploy:
         mock_stage = MagicMock()
         mock_stage.execute.return_value = {"status": "success"}
 
-        with patch.object(orch, "_prepare") as mock_prep, \
-             patch("azext_prototype.stages.deploy_stage.DeployStage", return_value=mock_stage):
+        with patch.object(orch, "_prepare") as mock_prep, patch(
+            "azext_prototype.stages.deploy_stage.DeployStage", return_value=mock_stage
+        ):
             mock_prep.return_value = (str(project_with_config), MagicMock(), MagicMock(), MagicMock())
 
             orch._run_deploy(subscription="sub-123")
@@ -1312,8 +1305,9 @@ class TestRunDeploy:
         mock_stage = MagicMock()
         mock_stage.execute.side_effect = ShutdownRequested()
 
-        with patch.object(orch, "_prepare") as mock_prep, \
-             patch("azext_prototype.stages.deploy_stage.DeployStage", return_value=mock_stage):
+        with patch.object(orch, "_prepare") as mock_prep, patch(
+            "azext_prototype.stages.deploy_stage.DeployStage", return_value=mock_stage
+        ):
             mock_prep.return_value = (str(project_with_config), MagicMock(), MagicMock(), MagicMock())
 
             with pytest.raises(ShutdownRequested):
@@ -1326,8 +1320,9 @@ class TestRunDeploy:
         mock_stage = MagicMock()
         mock_stage.execute.return_value = {"status": "success"}
 
-        with patch.object(orch, "_prepare") as mock_prep, \
-             patch("azext_prototype.stages.deploy_stage.DeployStage", return_value=mock_stage):
+        with patch.object(orch, "_prepare") as mock_prep, patch(
+            "azext_prototype.stages.deploy_stage.DeployStage", return_value=mock_stage
+        ):
             mock_prep.return_value = (str(project_with_config), MagicMock(), MagicMock(), MagicMock())
 
             orch._run_deploy()

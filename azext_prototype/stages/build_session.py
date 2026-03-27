@@ -376,7 +376,7 @@ class BuildSession:
                 else:
                     # allow_empty=True so pressing Enter proceeds without text
                     try:
-                        confirmation = _input("> ", allow_empty=True).strip()
+                        confirmation = _input("> ", allow_empty=True).strip()  # type: ignore[call-arg]
                     except TypeError:
                         # Fallback for callables that don't accept allow_empty
                         confirmation = _input("> ").strip()

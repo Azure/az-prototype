@@ -2,15 +2,13 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from azext_prototype.ai.provider import AIResponse
-from azext_prototype.ai.token_tracker import TokenTracker, _CONTEXT_WINDOWS
-
+from azext_prototype.ai.token_tracker import _CONTEXT_WINDOWS, TokenTracker
 
 # -------------------------------------------------------------------- #
 # TokenTracker — unit tests
 # -------------------------------------------------------------------- #
+
 
 class TestTokenTrackerBasics:
     """Core record/accumulate behaviour."""
@@ -26,7 +24,8 @@ class TestTokenTrackerBasics:
     def test_record_single_turn(self):
         t = TokenTracker()
         resp = AIResponse(
-            content="hello", model="gpt-4o",
+            content="hello",
+            model="gpt-4o",
             usage={"prompt_tokens": 100, "completion_tokens": 50},
         )
         t.record(resp)
@@ -40,7 +39,8 @@ class TestTokenTrackerBasics:
         t = TokenTracker()
         for i in range(3):
             resp = AIResponse(
-                content=f"turn {i}", model="gpt-4o",
+                content=f"turn {i}",
+                model="gpt-4o",
                 usage={"prompt_tokens": 100, "completion_tokens": 50},
             )
             t.record(resp)
@@ -95,10 +95,13 @@ class TestTokenTrackerBudget:
 
     def test_budget_known_model_exact(self):
         t = TokenTracker()
-        t.record(AIResponse(
-            content="x", model="gpt-4o",
-            usage={"prompt_tokens": 64000, "completion_tokens": 100},
-        ))
+        t.record(
+            AIResponse(
+                content="x",
+                model="gpt-4o",
+                usage={"prompt_tokens": 64000, "completion_tokens": 100},
+            )
+        )
         pct = t.budget_pct
         assert pct is not None
         assert abs(pct - 50.0) < 0.1  # 64000 / 128000 = 50%
@@ -106,37 +109,49 @@ class TestTokenTrackerBudget:
     def test_budget_known_model_substring(self):
         """Model names with date suffixes should still match."""
         t = TokenTracker()
-        t.record(AIResponse(
-            content="x", model="gpt-4o-2024-05-13",
-            usage={"prompt_tokens": 12800, "completion_tokens": 0},
-        ))
+        t.record(
+            AIResponse(
+                content="x",
+                model="gpt-4o-2024-05-13",
+                usage={"prompt_tokens": 12800, "completion_tokens": 0},
+            )
+        )
         pct = t.budget_pct
         assert pct is not None
         assert abs(pct - 10.0) < 0.1
 
     def test_budget_unknown_model(self):
         t = TokenTracker()
-        t.record(AIResponse(
-            content="x", model="my-custom-model",
-            usage={"prompt_tokens": 500, "completion_tokens": 50},
-        ))
+        t.record(
+            AIResponse(
+                content="x",
+                model="my-custom-model",
+                usage={"prompt_tokens": 500, "completion_tokens": 50},
+            )
+        )
         assert t.budget_pct is None
 
     def test_budget_zero_prompt_tokens(self):
         t = TokenTracker()
-        t.record(AIResponse(
-            content="x", model="gpt-4o",
-            usage={"prompt_tokens": 0, "completion_tokens": 50},
-        ))
+        t.record(
+            AIResponse(
+                content="x",
+                model="gpt-4o",
+                usage={"prompt_tokens": 0, "completion_tokens": 50},
+            )
+        )
         assert t.budget_pct is None
 
     def test_budget_accumulates_across_turns(self):
         t = TokenTracker()
         for _ in range(4):
-            t.record(AIResponse(
-                content="x", model="gpt-4o",
-                usage={"prompt_tokens": 16000, "completion_tokens": 100},
-            ))
+            t.record(
+                AIResponse(
+                    content="x",
+                    model="gpt-4o",
+                    usage={"prompt_tokens": 16000, "completion_tokens": 100},
+                )
+            )
         pct = t.budget_pct
         assert pct is not None
         assert abs(pct - 50.0) < 0.1  # 64000 / 128000 = 50%
@@ -151,10 +166,13 @@ class TestTokenTrackerFormat:
 
     def test_format_without_budget(self):
         t = TokenTracker()
-        t.record(AIResponse(
-            content="x", model="unknown-model",
-            usage={"prompt_tokens": 1000, "completion_tokens": 847},
-        ))
+        t.record(
+            AIResponse(
+                content="x",
+                model="unknown-model",
+                usage={"prompt_tokens": 1000, "completion_tokens": 847},
+            )
+        )
         status = t.format_status()
         assert "1,847 tokens this turn" in status
         assert "1,847 session" in status
@@ -162,10 +180,13 @@ class TestTokenTrackerFormat:
 
     def test_format_with_budget(self):
         t = TokenTracker()
-        t.record(AIResponse(
-            content="x", model="gpt-4o",
-            usage={"prompt_tokens": 79360, "completion_tokens": 640},
-        ))
+        t.record(
+            AIResponse(
+                content="x",
+                model="gpt-4o",
+                usage={"prompt_tokens": 79360, "completion_tokens": 640},
+            )
+        )
         status = t.format_status()
         assert "80,000 tokens this turn" in status
         assert "80,000 session" in status
@@ -173,14 +194,20 @@ class TestTokenTrackerFormat:
 
     def test_format_multi_turn(self):
         t = TokenTracker()
-        t.record(AIResponse(
-            content="a", model="gpt-4o",
-            usage={"prompt_tokens": 5000, "completion_tokens": 340},
-        ))
-        t.record(AIResponse(
-            content="b", model="gpt-4o",
-            usage={"prompt_tokens": 7000, "completion_tokens": 500},
-        ))
+        t.record(
+            AIResponse(
+                content="a",
+                model="gpt-4o",
+                usage={"prompt_tokens": 5000, "completion_tokens": 340},
+            )
+        )
+        t.record(
+            AIResponse(
+                content="b",
+                model="gpt-4o",
+                usage={"prompt_tokens": 7000, "completion_tokens": 500},
+            )
+        )
         status = t.format_status()
         # this_turn = 7500, session = 12840
         assert "7,500 tokens this turn" in status
@@ -188,10 +215,13 @@ class TestTokenTrackerFormat:
 
     def test_format_uses_middle_dot(self):
         t = TokenTracker()
-        t.record(AIResponse(
-            content="x", model="unknown",
-            usage={"prompt_tokens": 10, "completion_tokens": 5},
-        ))
+        t.record(
+            AIResponse(
+                content="x",
+                model="unknown",
+                usage={"prompt_tokens": 10, "completion_tokens": 5},
+            )
+        )
         assert "\u00b7" in t.format_status()
 
 
@@ -200,10 +230,13 @@ class TestTokenTrackerToDict:
 
     def test_to_dict_structure(self):
         t = TokenTracker()
-        t.record(AIResponse(
-            content="x", model="gpt-4o",
-            usage={"prompt_tokens": 100, "completion_tokens": 50},
-        ))
+        t.record(
+            AIResponse(
+                content="x",
+                model="gpt-4o",
+                usage={"prompt_tokens": 100, "completion_tokens": 50},
+            )
+        )
         d = t.to_dict()
         assert d["this_turn"]["prompt"] == 100
         assert d["this_turn"]["completion"] == 50
@@ -222,10 +255,13 @@ class TestContextWindowLookup:
 
     def test_gpt4_small_window(self):
         t = TokenTracker()
-        t.record(AIResponse(
-            content="x", model="gpt-4",
-            usage={"prompt_tokens": 4096, "completion_tokens": 0},
-        ))
+        t.record(
+            AIResponse(
+                content="x",
+                model="gpt-4",
+                usage={"prompt_tokens": 4096, "completion_tokens": 0},
+            )
+        )
         pct = t.budget_pct
         assert pct is not None
         assert abs(pct - 50.0) < 0.1  # 4096 / 8192 = 50%
@@ -233,10 +269,13 @@ class TestContextWindowLookup:
     def test_claude_model_exact(self):
         """Claude models should have known context windows."""
         t = TokenTracker()
-        t.record(AIResponse(
-            content="x", model="claude-sonnet-4",
-            usage={"prompt_tokens": 100_000, "completion_tokens": 0},
-        ))
+        t.record(
+            AIResponse(
+                content="x",
+                model="claude-sonnet-4",
+                usage={"prompt_tokens": 100_000, "completion_tokens": 0},
+            )
+        )
         pct = t.budget_pct
         assert pct is not None
         assert abs(pct - 50.0) < 0.1  # 100000 / 200000 = 50%
@@ -244,10 +283,13 @@ class TestContextWindowLookup:
     def test_claude_model_substring(self):
         """Claude model names with suffixes should match via substring."""
         t = TokenTracker()
-        t.record(AIResponse(
-            content="x", model="claude-sonnet-4-20250514",
-            usage={"prompt_tokens": 50_000, "completion_tokens": 0},
-        ))
+        t.record(
+            AIResponse(
+                content="x",
+                model="claude-sonnet-4-20250514",
+                usage={"prompt_tokens": 50_000, "completion_tokens": 0},
+            )
+        )
         pct = t.budget_pct
         assert pct is not None
         assert abs(pct - 25.0) < 0.1  # 50000 / 200000 = 25%
@@ -255,10 +297,13 @@ class TestContextWindowLookup:
     def test_gemini_model(self):
         """Gemini models should have known context windows."""
         t = TokenTracker()
-        t.record(AIResponse(
-            content="x", model="gemini-2.0-flash",
-            usage={"prompt_tokens": 524_288, "completion_tokens": 0},
-        ))
+        t.record(
+            AIResponse(
+                content="x",
+                model="gemini-2.0-flash",
+                usage={"prompt_tokens": 524_288, "completion_tokens": 0},
+            )
+        )
         pct = t.budget_pct
         assert pct is not None
         assert abs(pct - 50.0) < 0.1  # 524288 / 1048576 = 50%
@@ -267,6 +312,7 @@ class TestContextWindowLookup:
 # -------------------------------------------------------------------- #
 # Console.print_token_status — unit tests
 # -------------------------------------------------------------------- #
+
 
 class TestConsoleTokenStatus:
     """Console.print_token_status renders right-justified muted text."""
@@ -297,6 +343,7 @@ class TestConsoleTokenStatus:
 # DiscoveryPrompt — combined status line
 # -------------------------------------------------------------------- #
 
+
 class TestDiscoveryPromptCombinedStatus:
     """Prompt shows open items in the bordered area; token status is shown
     above the border via ``print_token_status()`` — not inside the prompt."""
@@ -307,8 +354,9 @@ class TestDiscoveryPromptCombinedStatus:
         c = Console()
         prompt = DiscoveryPrompt(c)
 
-        with patch.object(prompt._session, "prompt", return_value="test"), \
-             patch.object(c._console, "print") as mock_print:
+        with patch.object(prompt._session, "prompt", return_value="test"), patch.object(
+            c._console, "print"
+        ) as mock_print:
             prompt.prompt(
                 "> ",
                 open_count=3,
@@ -328,8 +376,9 @@ class TestDiscoveryPromptCombinedStatus:
         c = Console()
         prompt = DiscoveryPrompt(c)
 
-        with patch.object(prompt._session, "prompt", return_value="test"), \
-             patch.object(c._console, "print") as mock_print:
+        with patch.object(prompt._session, "prompt", return_value="test"), patch.object(
+            c._console, "print"
+        ) as mock_print:
             prompt.prompt("> ", open_count=3, status_text="")
             calls = [str(call) for call in mock_print.call_args_list]
             open_calls = [c for c in calls if "Open items: 3" in c]
@@ -341,8 +390,9 @@ class TestDiscoveryPromptCombinedStatus:
         c = Console()
         prompt = DiscoveryPrompt(c)
 
-        with patch.object(prompt._session, "prompt", return_value="test"), \
-             patch.object(c._console, "print") as mock_print:
+        with patch.object(prompt._session, "prompt", return_value="test"), patch.object(
+            c._console, "print"
+        ) as mock_print:
             prompt.prompt("> ", open_count=0, status_text="")
             calls = [str(call) for call in mock_print.call_args_list]
             status_calls = [c for c in calls if "Open items" in c]
@@ -352,6 +402,7 @@ class TestDiscoveryPromptCombinedStatus:
 # -------------------------------------------------------------------- #
 # DiscoverySession — token tracking integration
 # -------------------------------------------------------------------- #
+
 
 class TestDiscoverySessionTokenTracking:
     """DiscoverySession records token usage and displays status."""
@@ -369,7 +420,8 @@ class TestDiscoverySessionTokenTracking:
 
         mock_provider = MagicMock()
         mock_provider.chat.return_value = AIResponse(
-            content=ai_content, model="gpt-4o",
+            content=ai_content,
+            model="gpt-4o",
             usage={"prompt_tokens": 500, "completion_tokens": 200, "total_tokens": 700},
         )
 
@@ -381,10 +433,12 @@ class TestDiscoverySessionTokenTracking:
 
         registry = MagicMock(spec=AgentRegistry)
         from azext_prototype.agents.base import AgentCapability
+
         def find_by(cap):
             if cap == AgentCapability.BIZ_ANALYSIS:
                 return [mock_agent]
             return []
+
         registry.find_by_capability.side_effect = find_by
 
         session = DiscoverySession(context, registry)
@@ -398,7 +452,7 @@ class TestDiscoverySessionTokenTracking:
     def test_chat_records_usage(self, tmp_path):
         session, _ = self._make_session(tmp_path)
         outputs = []
-        result = session.run(
+        session.run(
             seed_context="Build a web app",
             input_fn=lambda p: "done",
             print_fn=lambda m: outputs.append(m),
@@ -411,12 +465,13 @@ class TestDiscoverySessionTokenTracking:
         """In styled mode, print_token_status is called after AI responses."""
         session, _ = self._make_session(tmp_path)
 
-        with patch.object(session._console, "print_token_status") as mock_status, \
-             patch.object(session._console, "print_agent_response"), \
-             patch.object(session._console, "print"), \
-             patch.object(session._console, "print_info"), \
-             patch.object(session._prompt, "prompt", return_value="done"), \
-             patch.object(session._console, "spinner", return_value=MagicMock(__enter__=MagicMock(), __exit__=MagicMock())):
+        with patch.object(session._console, "print_token_status") as mock_status, patch.object(
+            session._console, "print_agent_response"
+        ), patch.object(session._console, "print"), patch.object(session._console, "print_info"), patch.object(
+            session._prompt, "prompt", return_value="done"
+        ), patch.object(
+            session._console, "spinner", return_value=MagicMock(__enter__=MagicMock(), __exit__=MagicMock())
+        ):
             session.run(seed_context="Build a web app")
             assert mock_status.call_count >= 1
 
@@ -437,6 +492,7 @@ class TestDiscoverySessionTokenTracking:
 # BuildSession — token tracking integration
 # -------------------------------------------------------------------- #
 
+
 class TestBuildSessionTokenTracking:
     """BuildSession records token usage across agent.execute() calls."""
 
@@ -449,7 +505,11 @@ class TestBuildSessionTokenTracking:
         mock_architect = MagicMock()
         mock_architect.name = "cloud-architect"
         mock_architect.execute.return_value = AIResponse(
-            content='{"stages": [{"stage": 1, "name": "Foundation", "category": "infra", "dir": "concept/infra/terraform/stage-1", "services": [], "status": "pending", "files": []}]}',
+            content=(
+                '{"stages": [{"stage": 1, "name": "Foundation", "category": "infra",'
+                ' "dir": "concept/infra/terraform/stage-1", "services": [],'
+                ' "status": "pending", "files": []}]}'
+            ),
             model="gpt-4o",
             usage={"prompt_tokens": 1000, "completion_tokens": 500},
         )
@@ -457,7 +517,7 @@ class TestBuildSessionTokenTracking:
         mock_iac = MagicMock()
         mock_iac.name = "terraform-agent"
         mock_iac.execute.return_value = AIResponse(
-            content="# main.tf\nresource \"azurerm_resource_group\" \"rg\" {}",
+            content='# main.tf\nresource "azurerm_resource_group" "rg" {}',
             model="gpt-4o",
             usage={"prompt_tokens": 800, "completion_tokens": 300},
         )
@@ -477,20 +537,27 @@ class TestBuildSessionTokenTracking:
 
         # Write minimal config
         import yaml
+
         config_path = tmp_path / "prototype.yaml"
-        config_path.write_text(yaml.dump({
-            "project": {"name": "test", "iac_tool": "terraform", "location": "eastus", "environment": "dev"},
-            "naming": {"strategy": "simple"},
-            "ai": {"provider": "github-models"},
-        }))
+        config_path.write_text(
+            yaml.dump(
+                {
+                    "project": {"name": "test", "iac_tool": "terraform", "location": "eastus", "environment": "dev"},
+                    "naming": {"strategy": "simple"},
+                    "ai": {"provider": "github-models"},
+                }
+            )
+        )
 
         registry = MagicMock(spec=AgentRegistry)
+
         def find_by(cap):
             if cap == AgentCapability.ARCHITECT:
                 return [mock_architect]
             if cap == AgentCapability.TERRAFORM:
                 return [mock_iac]
             return []
+
         registry.find_by_capability.side_effect = find_by
 
         session = BuildSession(context, registry)
@@ -504,7 +571,7 @@ class TestBuildSessionTokenTracking:
     def test_tracks_deployment_plan_derivation(self, tmp_path):
         session = self._make_session(tmp_path)
         outputs = []
-        result = session.run(
+        session.run(
             design={"architecture": "Build a web app with App Service"},
             input_fn=lambda p: "done",
             print_fn=lambda m: outputs.append(m),
@@ -517,6 +584,7 @@ class TestBuildSessionTokenTracking:
 # -------------------------------------------------------------------- #
 # DeploySession — token tracking integration
 # -------------------------------------------------------------------- #
+
 
 class TestDeploySessionTokenTracking:
     """DeploySession has a token tracker."""
@@ -532,11 +600,16 @@ class TestDeploySessionTokenTracking:
             ai_provider=MagicMock(),
         )
         import yaml
-        (tmp_path / "prototype.yaml").write_text(yaml.dump({
-            "project": {"name": "test", "iac_tool": "terraform", "location": "eastus"},
-            "naming": {"strategy": "simple"},
-            "ai": {"provider": "github-models"},
-        }))
+
+        (tmp_path / "prototype.yaml").write_text(
+            yaml.dump(
+                {
+                    "project": {"name": "test", "iac_tool": "terraform", "location": "eastus"},
+                    "naming": {"strategy": "simple"},
+                    "ai": {"provider": "github-models"},
+                }
+            )
+        )
 
         registry = MagicMock(spec=AgentRegistry)
         registry.find_by_capability.return_value = []
@@ -549,6 +622,7 @@ class TestDeploySessionTokenTracking:
 # -------------------------------------------------------------------- #
 # BacklogSession — token tracking integration
 # -------------------------------------------------------------------- #
+
 
 class TestBacklogSessionTokenTracking:
     """BacklogSession records token usage from AI calls."""
@@ -564,7 +638,8 @@ class TestBacklogSessionTokenTracking:
 
         mock_provider = MagicMock()
         mock_provider.chat.return_value = AIResponse(
-            content=items_response, model="gpt-4o",
+            content=items_response,
+            model="gpt-4o",
             usage={"prompt_tokens": 2000, "completion_tokens": 1000, "total_tokens": 3000},
         )
 
@@ -575,16 +650,19 @@ class TestBacklogSessionTokenTracking:
         )
 
         registry = MagicMock(spec=AgentRegistry)
+
         def find_by(cap):
             if cap == AgentCapability.BACKLOG_GENERATION:
                 return [mock_agent]
             return []
+
         registry.find_by_capability.side_effect = find_by
 
         session = BacklogSession(context, registry)
         # Override mock AFTER session creation (conftest pattern)
         mock_provider.chat.return_value = AIResponse(
-            content=items_response, model="gpt-4o",
+            content=items_response,
+            model="gpt-4o",
             usage={"prompt_tokens": 2000, "completion_tokens": 1000, "total_tokens": 3000},
         )
         return session, mock_provider
@@ -595,10 +673,13 @@ class TestBacklogSessionTokenTracking:
         assert isinstance(session._token_tracker, TokenTracker)
 
     def test_tracks_generation(self, tmp_path):
-        items = '[{"epic": "Core", "title": "Test", "description": "desc", "acceptance_criteria": [], "tasks": [], "effort": "S"}]'
+        items = (
+            '[{"epic": "Core", "title": "Test", "description": "desc",'
+            ' "acceptance_criteria": [], "tasks": [], "effort": "S"}]'
+        )
         session, provider = self._make_session(tmp_path, items_response=items)
         outputs = []
-        result = session.run(
+        session.run(
             design_context="Build a web app",
             input_fn=lambda p: "done",
             print_fn=lambda m: outputs.append(m),

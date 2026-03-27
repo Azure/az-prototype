@@ -10,10 +10,10 @@ import yaml
 from azext_prototype.ai.provider import AIResponse
 from azext_prototype.config import DEFAULT_CONFIG
 
-
 # ------------------------------------------------------------------
 # Global: prevent real telemetry HTTP calls during tests
 # ------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def _no_telemetry_network():
@@ -232,8 +232,8 @@ def mock_agent_context(project_with_config, mock_ai_provider, sample_config):
 @pytest.fixture
 def populated_registry():
     """Create an agent registry with all built-in agents registered."""
-    from azext_prototype.agents.registry import AgentRegistry
     from azext_prototype.agents.builtin import register_all_builtin
+    from azext_prototype.agents.registry import AgentRegistry
 
     registry = AgentRegistry()
     register_all_builtin(registry)

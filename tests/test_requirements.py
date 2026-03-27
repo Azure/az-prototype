@@ -5,18 +5,17 @@ All subprocess and shutil.which calls are mocked — no real tool invocations.
 """
 
 import subprocess
-import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from azext_prototype.requirements import (
+    _AZAPI_PROVIDER_VERSION,
+    _AZURE_API_VERSION,
     DEPENDENCY_VERSIONS,
     TOOL_REQUIREMENTS,
     CheckResult,
     ToolRequirement,
-    _AZAPI_PROVIDER_VERSION,
-    _AZURE_API_VERSION,
     check_all,
     check_all_or_fail,
     check_constraint,
@@ -25,7 +24,6 @@ from azext_prototype.requirements import (
     get_requirement,
     parse_version,
 )
-
 
 # ======================================================================
 # TestParseVersion
@@ -227,11 +225,14 @@ class TestCheckAll:
     @patch("azext_prototype.requirements.check_tool")
     def test_skips_terraform_when_bicep(self, mock_check):
         mock_check.return_value = CheckResult(
-            name="x", status="pass", installed_version="1.0.0",
-            required=">=1.0.0", message="ok",
+            name="x",
+            status="pass",
+            installed_version="1.0.0",
+            required=">=1.0.0",
+            message="ok",
         )
         results = check_all(iac_tool="bicep")
-        names = [r.name for r in results]
+        names = [r.name for r in results]  # noqa: F841
         tf_result = [r for r in results if r.name == "Terraform"][0]
         assert tf_result.status == "skip"
 
@@ -239,9 +240,13 @@ class TestCheckAll:
     def test_includes_terraform_when_terraform(self, mock_check):
         def _side_effect(req):
             return CheckResult(
-                name=req.name, status="pass", installed_version="1.6.0",
-                required=req.constraint, message="ok",
+                name=req.name,
+                status="pass",
+                installed_version="1.6.0",
+                required=req.constraint,
+                message="ok",
             )
+
         mock_check.side_effect = _side_effect
         results = check_all(iac_tool="terraform")
         tf_results = [r for r in results if r.name == "Terraform"]
@@ -252,8 +257,11 @@ class TestCheckAll:
     @patch("azext_prototype.requirements.check_tool")
     def test_skips_terraform_when_no_iac(self, mock_check):
         mock_check.return_value = CheckResult(
-            name="x", status="pass", installed_version="1.0.0",
-            required=">=1.0.0", message="ok",
+            name="x",
+            status="pass",
+            installed_version="1.0.0",
+            required=">=1.0.0",
+            message="ok",
         )
         results = check_all(iac_tool=None)
         tf_result = [r for r in results if r.name == "Terraform"][0]
@@ -262,8 +270,11 @@ class TestCheckAll:
     @patch("azext_prototype.requirements.check_tool")
     def test_returns_all_requirements(self, mock_check):
         mock_check.return_value = CheckResult(
-            name="x", status="pass", installed_version="1.0.0",
-            required=">=1.0.0", message="ok",
+            name="x",
+            status="pass",
+            installed_version="1.0.0",
+            required=">=1.0.0",
+            message="ok",
         )
         results = check_all(iac_tool="terraform")
         assert len(results) == len(TOOL_REQUIREMENTS)
@@ -272,8 +283,11 @@ class TestCheckAll:
     def test_check_all_or_fail_raises(self, mock_check):
         """check_all_or_fail raises RuntimeError on failures."""
         mock_check.return_value = CheckResult(
-            name="BadTool", status="fail", installed_version="0.1.0",
-            required=">=1.0.0", message="BadTool 0.1.0 does not satisfy >=1.0.0",
+            name="BadTool",
+            status="fail",
+            installed_version="0.1.0",
+            required=">=1.0.0",
+            message="BadTool 0.1.0 does not satisfy >=1.0.0",
             install_hint="https://example.com",
         )
         with pytest.raises(RuntimeError, match="Tool requirements not met"):
@@ -312,12 +326,11 @@ class TestToolRegistry:
 
     def test_all_patterns_compile(self):
         import re
+
         for req in TOOL_REQUIREMENTS:
             if req.version_pattern:
                 pat = re.compile(req.version_pattern)
-                assert "version" in pat.groupindex, (
-                    f"{req.name} pattern missing named group 'version'"
-                )
+                assert "version" in pat.groupindex, f"{req.name} pattern missing named group 'version'"
 
     def test_all_constraints_parseable(self):
         for req in TOOL_REQUIREMENTS:

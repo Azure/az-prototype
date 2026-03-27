@@ -14,25 +14,20 @@ from azext_prototype.templates.validate import (
     _evaluate_check,
     _load_template_checks,
     _resolve_severity,
-    main as validate_main,
+)
+from azext_prototype.templates.validate import main as validate_main
+from azext_prototype.templates.validate import (
     validate_template_compliance,
     validate_template_directory,
 )
-
 
 # ------------------------------------------------------------------ #
 # Helpers
 # ------------------------------------------------------------------ #
 
-BUILTIN_DIR = (
-    Path(__file__).resolve().parent.parent
-    / "azext_prototype" / "templates" / "workloads"
-)
+BUILTIN_DIR = Path(__file__).resolve().parent.parent / "azext_prototype" / "templates" / "workloads"
 
-BUILTIN_POLICY_DIR = (
-    Path(__file__).resolve().parent.parent
-    / "azext_prototype" / "governance" / "policies"
-)
+BUILTIN_POLICY_DIR = Path(__file__).resolve().parent.parent / "azext_prototype" / "governance" / "policies"
 
 
 def _write_yaml(dest: Path, data: dict | list | str) -> Path:
@@ -143,19 +138,24 @@ def _custom_policy(rule_id: str, **tc_overrides) -> dict:
 # ComplianceViolation dataclass
 # ================================================================== #
 
+
 class TestComplianceViolation:
     def test_str_format(self):
         v = ComplianceViolation(
-            template="web-app", rule_id="MI-001",
-            severity="error", message="missing identity",
+            template="web-app",
+            rule_id="MI-001",
+            severity="error",
+            message="missing identity",
         )
         assert "[ERROR] web-app: MI-001" in str(v)
         assert "missing identity" in str(v)
 
     def test_warning_format(self):
         v = ComplianceViolation(
-            template="t", rule_id="INT-003",
-            severity="warning", message="should be internal",
+            template="t",
+            rule_id="INT-003",
+            severity="warning",
+            message="should be internal",
         )
         assert "[WARNING]" in str(v)
 
@@ -168,6 +168,7 @@ class TestComplianceViolation:
 # ================================================================== #
 # Utility functions
 # ================================================================== #
+
 
 class TestAsListHelper:
     def test_list_passthrough(self):
@@ -207,6 +208,7 @@ class TestResolveSeverity:
 # _load_template_checks
 # ================================================================== #
 
+
 class TestLoadTemplateChecks:
     def test_loads_from_builtin_policies(self):
         checks = _load_template_checks([BUILTIN_POLICY_DIR])
@@ -244,53 +246,63 @@ class TestLoadTemplateChecks:
 # _evaluate_check — core engine
 # ================================================================== #
 
+
 class TestEvaluateCheck:
     def test_require_config_pass(self):
-        tc = {"scope": ["container-apps"], "require_config": ["identity"],
-              "error_message": "missing {config_key}"}
+        tc = {"scope": ["container-apps"], "require_config": ["identity"], "error_message": "missing {config_key}"}
         services = [{"name": "api", "type": "container-apps", "config": {"identity": "system"}}]
         vs = _evaluate_check("MI-001", "error", tc, "tmpl", services, ["container-apps"])
         assert vs == []
 
     def test_require_config_fail(self):
-        tc = {"scope": ["container-apps"], "require_config": ["identity"],
-              "error_message": "missing {config_key}"}
+        tc = {"scope": ["container-apps"], "require_config": ["identity"], "error_message": "missing {config_key}"}
         services = [{"name": "api", "type": "container-apps", "config": {}}]
         vs = _evaluate_check("MI-001", "error", tc, "tmpl", services, ["container-apps"])
         assert len(vs) == 1
         assert vs[0].rule_id == "MI-001"
 
     def test_require_config_value_pass(self):
-        tc = {"scope": ["container-apps"], "require_config_value": {"ingress": "internal"},
-              "error_message": "wrong ingress"}
+        tc = {
+            "scope": ["container-apps"],
+            "require_config_value": {"ingress": "internal"},
+            "error_message": "wrong ingress",
+        }
         services = [{"name": "api", "type": "container-apps", "config": {"ingress": "internal"}}]
         vs = _evaluate_check("INT-003", "warning", tc, "tmpl", services, ["container-apps"])
         assert vs == []
 
     def test_require_config_value_fail(self):
-        tc = {"scope": ["container-apps"], "require_config_value": {"ingress": "internal"},
-              "error_message": "wrong ingress"}
+        tc = {
+            "scope": ["container-apps"],
+            "require_config_value": {"ingress": "internal"},
+            "error_message": "wrong ingress",
+        }
         services = [{"name": "api", "type": "container-apps", "config": {"ingress": "external"}}]
         vs = _evaluate_check("INT-003", "warning", tc, "tmpl", services, ["container-apps"])
         assert len(vs) == 1
 
     def test_reject_config_value_pass(self):
-        tc = {"scope": ["cosmos-db"], "reject_config_value": {"consistency": "strong"},
-              "error_message": "bad consistency"}
+        tc = {
+            "scope": ["cosmos-db"],
+            "reject_config_value": {"consistency": "strong"},
+            "error_message": "bad consistency",
+        }
         services = [{"name": "db", "type": "cosmos-db", "config": {"consistency": "session"}}]
         vs = _evaluate_check("CDB-002", "warning", tc, "tmpl", services, ["cosmos-db"])
         assert vs == []
 
     def test_reject_config_value_fail(self):
-        tc = {"scope": ["cosmos-db"], "reject_config_value": {"consistency": "strong"},
-              "error_message": "bad consistency"}
+        tc = {
+            "scope": ["cosmos-db"],
+            "reject_config_value": {"consistency": "strong"},
+            "error_message": "bad consistency",
+        }
         services = [{"name": "db", "type": "cosmos-db", "config": {"consistency": "strong"}}]
         vs = _evaluate_check("CDB-002", "warning", tc, "tmpl", services, ["cosmos-db"])
         assert len(vs) == 1
 
     def test_reject_config_value_case_insensitive(self):
-        tc = {"scope": ["cosmos-db"], "reject_config_value": {"consistency": "strong"},
-              "error_message": "bad"}
+        tc = {"scope": ["cosmos-db"], "reject_config_value": {"consistency": "strong"}, "error_message": "bad"}
         services = [{"name": "db", "type": "cosmos-db", "config": {"consistency": "Strong"}}]
         vs = _evaluate_check("CDB-002", "warning", tc, "tmpl", services, ["cosmos-db"])
         assert len(vs) == 1
@@ -307,24 +319,30 @@ class TestEvaluateCheck:
         assert vs[0].rule_id == "NET-002"
 
     def test_when_services_present_gates(self):
-        tc = {"scope": ["container-apps"], "require_config_value": {"ingress": "internal"},
-              "when_services_present": ["api-management"], "error_message": "bad ingress"}
+        tc = {
+            "scope": ["container-apps"],
+            "require_config_value": {"ingress": "internal"},
+            "when_services_present": ["api-management"],
+            "error_message": "bad ingress",
+        }
         services = [{"name": "api", "type": "container-apps", "config": {"ingress": "external"}}]
         vs = _evaluate_check("INT-003", "warning", tc, "tmpl", services, ["container-apps"])
         # api-management NOT present, so check is skipped
         assert vs == []
 
     def test_when_services_present_allows(self):
-        tc = {"scope": ["container-apps"], "require_config_value": {"ingress": "internal"},
-              "when_services_present": ["api-management"], "error_message": "bad ingress"}
+        tc = {
+            "scope": ["container-apps"],
+            "require_config_value": {"ingress": "internal"},
+            "when_services_present": ["api-management"],
+            "error_message": "bad ingress",
+        }
         services = [{"name": "api", "type": "container-apps", "config": {"ingress": "external"}}]
-        vs = _evaluate_check("INT-003", "warning", tc, "tmpl", services,
-                             ["container-apps", "api-management"])
+        vs = _evaluate_check("INT-003", "warning", tc, "tmpl", services, ["container-apps", "api-management"])
         assert len(vs) == 1
 
     def test_scope_filters_service_types(self):
-        tc = {"scope": ["container-apps"], "require_config": ["identity"],
-              "error_message": "missing identity"}
+        tc = {"scope": ["container-apps"], "require_config": ["identity"], "error_message": "missing identity"}
         services = [
             {"name": "api", "type": "container-apps", "config": {"identity": "system"}},
             {"name": "kv", "type": "key-vault", "config": {}},
@@ -333,22 +351,23 @@ class TestEvaluateCheck:
         assert vs == []  # key-vault not in scope
 
     def test_non_dict_services_skipped(self):
-        tc = {"scope": ["container-apps"], "require_config": ["identity"],
-              "error_message": "missing"}
+        tc = {"scope": ["container-apps"], "require_config": ["identity"], "error_message": "missing"}
         services = ["not-a-dict", {"name": "api", "type": "container-apps", "config": {"identity": "sys"}}]
         vs = _evaluate_check("MI-001", "error", tc, "tmpl", services, ["container-apps"])
         assert vs == []
 
     def test_missing_config_treated_as_empty(self):
-        tc = {"scope": ["container-apps"], "require_config": ["identity"],
-              "error_message": "missing {config_key}"}
+        tc = {"scope": ["container-apps"], "require_config": ["identity"], "error_message": "missing {config_key}"}
         services = [{"name": "api", "type": "container-apps"}]  # no 'config' key
         vs = _evaluate_check("MI-001", "error", tc, "tmpl", services, ["container-apps"])
         assert len(vs) == 1
 
     def test_error_message_placeholders(self):
-        tc = {"scope": ["container-apps"], "require_config": ["identity"],
-              "error_message": "Service '{service_name}' ({service_type}) missing {config_key}"}
+        tc = {
+            "scope": ["container-apps"],
+            "require_config": ["identity"],
+            "error_message": "Service '{service_name}' ({service_type}) missing {config_key}",
+        }
         services = [{"name": "api", "type": "container-apps", "config": {}}]
         vs = _evaluate_check("MI-001", "error", tc, "tmpl", services, ["container-apps"])
         assert "api" in vs[0].message
@@ -359,6 +378,7 @@ class TestEvaluateCheck:
 # ================================================================== #
 # CA-001, CA-002 — Container Apps checks
 # ================================================================== #
+
 
 class TestContainerAppsChecks:
     """CA-001 — managed identity on container-apps/container-registry.
@@ -372,26 +392,37 @@ class TestContainerAppsChecks:
         assert any(v.rule_id == "CA-001" and "api" in v.message for v in vs)
 
     def test_container_registry_needs_identity(self, tmp_path):
-        data = _compliant_template(services=[
-            {"name": "api", "type": "container-apps", "config": {"identity": "system-assigned"}},
-            {"name": "acr", "type": "container-registry", "config": {}},
-            {"name": "net", "type": "virtual-network", "config": {}},
-        ])
+        data = _compliant_template(
+            services=[
+                {"name": "api", "type": "container-apps", "config": {"identity": "system-assigned"}},
+                {"name": "acr", "type": "container-registry", "config": {}},
+                {"name": "net", "type": "virtual-network", "config": {}},
+            ]
+        )
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
         assert any(v.rule_id == "CA-001" and "acr" in v.message for v in vs)
 
     def test_container_registry_with_identity_passes(self, tmp_path):
-        data = _compliant_template(services=[
-            {"name": "api", "type": "container-apps", "config": {"identity": "system-assigned"}},
-            {"name": "gw", "type": "api-management", "config": {"identity": "system-assigned", "caching": True}},
-            {"name": "acr", "type": "container-registry", "config": {"identity": "user-assigned"}},
-            {"name": "secrets", "type": "key-vault", "config": {
-                "rbac_authorization": True, "soft_delete": True,
-                "purge_protection": True, "private_endpoint": True, "diagnostics": True,
-            }},
-            {"name": "net", "type": "virtual-network", "config": {}},
-        ])
+        data = _compliant_template(
+            services=[
+                {"name": "api", "type": "container-apps", "config": {"identity": "system-assigned"}},
+                {"name": "gw", "type": "api-management", "config": {"identity": "system-assigned", "caching": True}},
+                {"name": "acr", "type": "container-registry", "config": {"identity": "user-assigned"}},
+                {
+                    "name": "secrets",
+                    "type": "key-vault",
+                    "config": {
+                        "rbac_authorization": True,
+                        "soft_delete": True,
+                        "purge_protection": True,
+                        "private_endpoint": True,
+                        "diagnostics": True,
+                    },
+                },
+                {"name": "net", "type": "virtual-network", "config": {}},
+            ]
+        )
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
         assert not any(v.rule_id == "CA-001" for v in vs)
@@ -411,13 +442,22 @@ class TestContainerAppsChecks:
 
     def test_no_container_apps_skips_ca002(self, tmp_path):
         """CA-002 only fires when container-apps are present."""
-        data = _compliant_template(services=[
-            {"name": "fn", "type": "functions", "config": {"identity": "system-assigned"}},
-            {"name": "kv", "type": "key-vault", "config": {
-                "rbac_authorization": True, "soft_delete": True,
-                "purge_protection": True, "private_endpoint": True, "diagnostics": True,
-            }},
-        ])
+        data = _compliant_template(
+            services=[
+                {"name": "fn", "type": "functions", "config": {"identity": "system-assigned"}},
+                {
+                    "name": "kv",
+                    "type": "key-vault",
+                    "config": {
+                        "rbac_authorization": True,
+                        "soft_delete": True,
+                        "purge_protection": True,
+                        "private_endpoint": True,
+                        "diagnostics": True,
+                    },
+                },
+            ]
+        )
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
         assert not any(v.rule_id == "CA-002" for v in vs)
@@ -434,6 +474,7 @@ class TestContainerAppsChecks:
 # MI-001 — managed identity checks (via built-in policies)
 # ================================================================== #
 
+
 class TestManagedIdentityCheck:
     def test_container_apps_needs_identity(self, tmp_path):
         data = _compliant_template()
@@ -443,10 +484,12 @@ class TestManagedIdentityCheck:
         assert any(v.rule_id == "MI-001" for v in vs)
 
     def test_functions_needs_identity(self, tmp_path):
-        data = _compliant_template(services=[
-            {"name": "fn", "type": "functions", "config": {"runtime": "python"}},
-            {"name": "net", "type": "virtual-network", "config": {}},
-        ])
+        data = _compliant_template(
+            services=[
+                {"name": "fn", "type": "functions", "config": {"runtime": "python"}},
+                {"name": "net", "type": "virtual-network", "config": {}},
+            ]
+        )
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
         assert any(v.rule_id == "MI-001" and "fn" in v.message for v in vs)
@@ -468,12 +511,14 @@ class TestManagedIdentityCheck:
 
     def test_infra_services_skip_identity(self, tmp_path):
         """virtual-network, log-analytics, event-grid are NOT in MI-001 scope."""
-        data = _compliant_template(services=[
-            {"name": "api", "type": "container-apps", "config": {"identity": "system-assigned"}},
-            {"name": "logs", "type": "log-analytics", "config": {}},
-            {"name": "events", "type": "event-grid", "config": {}},
-            {"name": "net", "type": "virtual-network", "config": {}},
-        ])
+        data = _compliant_template(
+            services=[
+                {"name": "api", "type": "container-apps", "config": {"identity": "system-assigned"}},
+                {"name": "logs", "type": "log-analytics", "config": {}},
+                {"name": "events", "type": "event-grid", "config": {}},
+                {"name": "net", "type": "virtual-network", "config": {}},
+            ]
+        )
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
         mi_violations = [v for v in vs if v.rule_id == "MI-001"]
@@ -484,6 +529,7 @@ class TestManagedIdentityCheck:
 # NET-001 — private endpoint checks
 # ================================================================== #
 
+
 class TestPrivateEndpointCheck:
     def test_key_vault_needs_private_endpoint(self, tmp_path):
         data = _compliant_template()
@@ -493,30 +539,40 @@ class TestPrivateEndpointCheck:
         assert any(v.rule_id == "NET-001" for v in vs)
 
     def test_sql_needs_private_endpoint(self, tmp_path):
-        data = _compliant_template(services=[
-            {"name": "api", "type": "container-apps", "config": {"identity": "system-assigned"}},
-            {"name": "db", "type": "sql-database", "config": {"entra_auth_only": True, "tde_enabled": True, "threat_protection": True}},
-            {"name": "net", "type": "virtual-network", "config": {}},
-        ])
+        data = _compliant_template(
+            services=[
+                {"name": "api", "type": "container-apps", "config": {"identity": "system-assigned"}},
+                {
+                    "name": "db",
+                    "type": "sql-database",
+                    "config": {"entra_auth_only": True, "tde_enabled": True, "threat_protection": True},
+                },
+                {"name": "net", "type": "virtual-network", "config": {}},
+            ]
+        )
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
         assert any(v.rule_id == "NET-001" and "db" in v.message for v in vs)
 
     def test_cosmos_needs_private_endpoint(self, tmp_path):
-        data = _compliant_template(services=[
-            {"name": "api", "type": "container-apps", "config": {"identity": "system-assigned"}},
-            {"name": "store", "type": "cosmos-db", "config": {"entra_rbac": True, "local_auth_disabled": True}},
-            {"name": "net", "type": "virtual-network", "config": {}},
-        ])
+        data = _compliant_template(
+            services=[
+                {"name": "api", "type": "container-apps", "config": {"identity": "system-assigned"}},
+                {"name": "store", "type": "cosmos-db", "config": {"entra_rbac": True, "local_auth_disabled": True}},
+                {"name": "net", "type": "virtual-network", "config": {}},
+            ]
+        )
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
         assert any(v.rule_id == "NET-001" and "store" in v.message for v in vs)
 
     def test_storage_needs_private_endpoint(self, tmp_path):
-        data = _compliant_template(services=[
-            {"name": "blob", "type": "storage", "config": {}},
-            {"name": "net", "type": "virtual-network", "config": {}},
-        ])
+        data = _compliant_template(
+            services=[
+                {"name": "blob", "type": "storage", "config": {}},
+                {"name": "net", "type": "virtual-network", "config": {}},
+            ]
+        )
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
         assert any(v.rule_id == "NET-001" and "blob" in v.message for v in vs)
@@ -531,6 +587,7 @@ class TestPrivateEndpointCheck:
 # ================================================================== #
 # NET-002 — VNET presence check
 # ================================================================== #
+
 
 class TestVnetPresenceCheck:
     def test_missing_vnet(self, tmp_path):
@@ -550,6 +607,7 @@ class TestVnetPresenceCheck:
 # ================================================================== #
 # KV-001, KV-002, KV-004, KV-005 — Key Vault checks
 # ================================================================== #
+
 
 class TestKeyVaultChecks:
     def test_missing_soft_delete(self, tmp_path):
@@ -599,18 +657,23 @@ class TestKeyVaultChecks:
 # SQL-001, SQL-002, SQL-003 — SQL Database checks
 # ================================================================== #
 
+
 class TestSqlDatabaseChecks:
     def _sql_template(self, **config_overrides):
         base_config = {
-            "entra_auth_only": True, "tde_enabled": True,
-            "threat_protection": True, "private_endpoint": True,
+            "entra_auth_only": True,
+            "tde_enabled": True,
+            "threat_protection": True,
+            "private_endpoint": True,
         }
         base_config.update(config_overrides)
-        return _compliant_template(services=[
-            {"name": "api", "type": "container-apps", "config": {"identity": "system-assigned"}},
-            {"name": "db", "type": "sql-database", "config": base_config},
-            {"name": "net", "type": "virtual-network", "config": {}},
-        ])
+        return _compliant_template(
+            services=[
+                {"name": "api", "type": "container-apps", "config": {"identity": "system-assigned"}},
+                {"name": "db", "type": "sql-database", "config": base_config},
+                {"name": "net", "type": "virtual-network", "config": {}},
+            ]
+        )
 
     def test_missing_entra_auth(self, tmp_path):
         data = self._sql_template(entra_auth_only=False)
@@ -642,19 +705,25 @@ class TestSqlDatabaseChecks:
 # CDB-001..004 — Cosmos DB checks
 # ================================================================== #
 
+
 class TestCosmosDbChecks:
     def _cosmos_template(self, **config_overrides):
         base_config = {
-            "entra_rbac": True, "local_auth_disabled": True,
-            "consistency": "session", "private_endpoint": True,
-            "autoscale": True, "partition_key": "/id",
+            "entra_rbac": True,
+            "local_auth_disabled": True,
+            "consistency": "session",
+            "private_endpoint": True,
+            "autoscale": True,
+            "partition_key": "/id",
         }
         base_config.update(config_overrides)
-        return _compliant_template(services=[
-            {"name": "api", "type": "container-apps", "config": {"identity": "system-assigned"}},
-            {"name": "store", "type": "cosmos-db", "config": base_config},
-            {"name": "net", "type": "virtual-network", "config": {}},
-        ])
+        return _compliant_template(
+            services=[
+                {"name": "api", "type": "container-apps", "config": {"identity": "system-assigned"}},
+                {"name": "store", "type": "cosmos-db", "config": base_config},
+                {"name": "net", "type": "virtual-network", "config": {}},
+            ]
+        )
 
     def test_missing_entra_rbac(self, tmp_path):
         data = self._cosmos_template(entra_rbac=False)
@@ -719,6 +788,7 @@ class TestCosmosDbChecks:
 # INT-001..004 — APIM integration checks
 # ================================================================== #
 
+
 class TestApimIntegrationChecks:
     def test_container_apps_needs_internal_ingress_with_apim(self, tmp_path):
         data = _compliant_template()
@@ -735,19 +805,27 @@ class TestApimIntegrationChecks:
 
     def test_no_apim_skips_int_check(self, tmp_path):
         """Without APIM, ingress mode doesn't matter for INT-003."""
-        data = _compliant_template(services=[
-            {"name": "api", "type": "container-apps", "config": {"identity": "system-assigned", "ingress": "external"}},
-            {"name": "net", "type": "virtual-network", "config": {}},
-        ])
+        data = _compliant_template(
+            services=[
+                {
+                    "name": "api",
+                    "type": "container-apps",
+                    "config": {"identity": "system-assigned", "ingress": "external"},
+                },
+                {"name": "net", "type": "virtual-network", "config": {}},
+            ]
+        )
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
         assert not any(v.rule_id == "INT-003" for v in vs)
 
     def test_container_apps_without_apim_warns(self, tmp_path):
-        data = _compliant_template(services=[
-            {"name": "api", "type": "container-apps", "config": {"identity": "system-assigned"}},
-            {"name": "net", "type": "virtual-network", "config": {}},
-        ])
+        data = _compliant_template(
+            services=[
+                {"name": "api", "type": "container-apps", "config": {"identity": "system-assigned"}},
+                {"name": "net", "type": "virtual-network", "config": {}},
+            ]
+        )
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
         assert any(v.rule_id == "INT-001" for v in vs)
@@ -767,10 +845,12 @@ class TestApimIntegrationChecks:
 
     def test_no_container_apps_skips_int002(self, tmp_path):
         """INT-002 only fires when container-apps are present."""
-        data = _compliant_template(services=[
-            {"name": "gw", "type": "api-management", "config": {}},
-            {"name": "net", "type": "virtual-network", "config": {}},
-        ])
+        data = _compliant_template(
+            services=[
+                {"name": "gw", "type": "api-management", "config": {}},
+                {"name": "net", "type": "virtual-network", "config": {}},
+            ]
+        )
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
         assert not any(v.rule_id == "INT-002" for v in vs)
@@ -790,10 +870,12 @@ class TestApimIntegrationChecks:
 
     def test_no_container_apps_skips_int004(self, tmp_path):
         """INT-004 only fires when container-apps are present."""
-        data = _compliant_template(services=[
-            {"name": "gw", "type": "api-management", "config": {}},
-            {"name": "net", "type": "virtual-network", "config": {}},
-        ])
+        data = _compliant_template(
+            services=[
+                {"name": "gw", "type": "api-management", "config": {}},
+                {"name": "net", "type": "virtual-network", "config": {}},
+            ]
+        )
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
         assert not any(v.rule_id == "INT-004" for v in vs)
@@ -809,6 +891,7 @@ class TestApimIntegrationChecks:
 # ================================================================== #
 # Edge cases — parse errors, non-YAML, etc.
 # ================================================================== #
+
 
 class TestEdgeCases:
     def test_invalid_yaml(self, tmp_path):
@@ -847,10 +930,12 @@ class TestEdgeCases:
 
     def test_missing_config_key(self, tmp_path):
         """Service with no 'config' key should still be checked."""
-        data = _compliant_template(services=[
-            {"name": "api", "type": "container-apps"},
-            {"name": "net", "type": "virtual-network"},
-        ])
+        data = _compliant_template(
+            services=[
+                {"name": "api", "type": "container-apps"},
+                {"name": "net", "type": "virtual-network"},
+            ]
+        )
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
         assert any(v.rule_id == "MI-001" for v in vs)
@@ -865,6 +950,7 @@ class TestEdgeCases:
 # ================================================================== #
 # Custom policy dirs — the dynamic engine
 # ================================================================== #
+
 
 class TestCustomPolicyDirs:
     """Demonstrate that new policies are automatically enforced."""
@@ -921,9 +1007,14 @@ class TestCustomPolicyDirs:
         pol_dir = tmp_path / "policies"
         policy = {
             "metadata": {"name": "guidance", "category": "general", "services": ["any"]},
-            "rules": [{"id": "G-001", "severity": "required",
-                        "description": "Think before you code",
-                        "applies_to": ["cloud-architect"]}],
+            "rules": [
+                {
+                    "id": "G-001",
+                    "severity": "required",
+                    "description": "Think before you code",
+                    "applies_to": ["cloud-architect"],
+                }
+            ],
         }
         _write_policy(pol_dir / "guidance.policy.yaml", policy)
         tmpl = {"metadata": {"name": "test"}, "services": []}
@@ -953,6 +1044,7 @@ class TestCustomPolicyDirs:
 # Directory validation
 # ================================================================== #
 
+
 class TestDirectoryValidation:
     def test_empty_directory(self, tmp_path):
         vs = validate_template_directory(tmp_path)
@@ -980,15 +1072,23 @@ class TestDirectoryValidation:
     def test_custom_policy_dirs_applied(self, tmp_path):
         """Directory validation can use custom policy dirs."""
         pol_dir = tmp_path / "policies"
-        _write_policy(pol_dir / "x.policy.yaml", _custom_policy(
-            "X-001", scope=["my-svc"], require_config=["foo"],
-            error_message="missing {config_key}",
-        ))
+        _write_policy(
+            pol_dir / "x.policy.yaml",
+            _custom_policy(
+                "X-001",
+                scope=["my-svc"],
+                require_config=["foo"],
+                error_message="missing {config_key}",
+            ),
+        )
         tmpl_dir = tmp_path / "templates"
-        _write_template(tmpl_dir / "t.template.yaml", {
-            "metadata": {"name": "x"},
-            "services": [{"name": "s", "type": "my-svc", "config": {}}],
-        })
+        _write_template(
+            tmpl_dir / "t.template.yaml",
+            {
+                "metadata": {"name": "x"},
+                "services": [{"name": "s", "type": "my-svc", "config": {}}],
+            },
+        )
         vs = validate_template_directory(tmpl_dir, policy_dirs=[pol_dir])
         assert any(v.rule_id == "X-001" for v in vs)
 
@@ -996,6 +1096,7 @@ class TestDirectoryValidation:
 # ================================================================== #
 # Built-in templates — all must pass
 # ================================================================== #
+
 
 class TestBuiltinCompliance:
     """All shipped workload templates must comply with all policies."""
@@ -1007,9 +1108,16 @@ class TestBuiltinCompliance:
             msgs = "\n".join(str(v) for v in errors)
             pytest.fail(f"Built-in templates have compliance errors:\n{msgs}")
 
-    @pytest.mark.parametrize("name", [
-        "web-app", "data-pipeline", "ai-app", "microservices", "serverless-api",
-    ])
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "web-app",
+            "data-pipeline",
+            "ai-app",
+            "microservices",
+            "serverless-api",
+        ],
+    )
     def test_individual_builtin_compliant(self, name):
         path = BUILTIN_DIR / f"{name}.template.yaml"
         assert path.exists(), f"Missing built-in template: {name}"
@@ -1023,6 +1131,7 @@ class TestBuiltinCompliance:
 # ================================================================== #
 # CLI — main()
 # ================================================================== #
+
 
 class TestCli:
     def test_default_validates_builtins(self):
@@ -1086,6 +1195,7 @@ class TestCli:
 # ================================================================== #
 # Fully compliant template produces zero violations
 # ================================================================== #
+
 
 class TestFullCompliance:
     def test_compliant_template_clean(self, tmp_path):

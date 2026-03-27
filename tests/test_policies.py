@@ -20,10 +20,10 @@ from azext_prototype.governance.policies import (
 from azext_prototype.governance.policies.loader import get_policy_engine
 from azext_prototype.governance.policies.validate import main as validate_main
 
-
 # ------------------------------------------------------------------ #
 # Helpers
 # ------------------------------------------------------------------ #
+
 
 def _write_policy(dest: Path, data: dict) -> Path:
     """Write a policy dict as YAML to *dest* and return the path."""
@@ -233,9 +233,7 @@ class TestValidatePolicyFile:
         assert any("applies_to must be a list" in e.message for e in errors)
 
     def test_empty_applies_to_is_warning(self, tmp_path: Path) -> None:
-        data = _minimal_policy(
-            rules=[{"id": "E-001", "severity": "required", "description": "a", "applies_to": []}]
-        )
+        data = _minimal_policy(rules=[{"id": "E-001", "severity": "required", "description": "a", "applies_to": []}])
         f = _write_policy(tmp_path / "empty-at.policy.yaml", data)
         errors = validate_policy_file(f)
         warnings = [e for e in errors if e.severity == "warning"]
@@ -467,9 +465,7 @@ class TestPolicyEngine:
         # _parse_policy returns None when metadata is not a dict
         assert engine.list_policies() == []
 
-    def test_resolve_by_agent(
-        self, policy_dir: Path, sample_policy_file: Path
-    ) -> None:
+    def test_resolve_by_agent(self, policy_dir: Path, sample_policy_file: Path) -> None:
         engine = PolicyEngine()
         engine.load([policy_dir])
         policies = engine.resolve("cloud-architect")
@@ -479,9 +475,7 @@ class TestPolicyEngine:
         assert "T-002" in rule_ids
         assert "T-003" not in rule_ids  # app-developer only
 
-    def test_resolve_by_agent_and_service(
-        self, policy_dir: Path, sample_policy_file: Path
-    ) -> None:
+    def test_resolve_by_agent_and_service(self, policy_dir: Path, sample_policy_file: Path) -> None:
         engine = PolicyEngine()
         engine.load([policy_dir])
         policies = engine.resolve("terraform", services=["container-apps"])
@@ -489,26 +483,20 @@ class TestPolicyEngine:
         rule_ids = [r.id for r in policies[0].rules]
         assert "T-001" in rule_ids
 
-    def test_resolve_no_service_match(
-        self, policy_dir: Path, sample_policy_file: Path
-    ) -> None:
+    def test_resolve_no_service_match(self, policy_dir: Path, sample_policy_file: Path) -> None:
         engine = PolicyEngine()
         engine.load([policy_dir])
         policies = engine.resolve("terraform", services=["redis"])
         assert len(policies) == 0
 
-    def test_resolve_severity_filter_required(
-        self, policy_dir: Path, sample_policy_file: Path
-    ) -> None:
+    def test_resolve_severity_filter_required(self, policy_dir: Path, sample_policy_file: Path) -> None:
         engine = PolicyEngine()
         engine.load([policy_dir])
         policies = engine.resolve("cloud-architect", severity="required")
         assert len(policies) == 1
         assert all(r.severity == "required" for r in policies[0].rules)
 
-    def test_resolve_severity_filter_recommended(
-        self, policy_dir: Path, sample_policy_file: Path
-    ) -> None:
+    def test_resolve_severity_filter_recommended(self, policy_dir: Path, sample_policy_file: Path) -> None:
         engine = PolicyEngine()
         engine.load([policy_dir])
         policies = engine.resolve("cloud-architect", severity="recommended")
@@ -530,9 +518,7 @@ class TestPolicyEngine:
         result = engine.format_for_prompt("unknown-agent")
         assert result == ""
 
-    def test_format_for_prompt_content(
-        self, policy_dir: Path, sample_policy_file: Path
-    ) -> None:
+    def test_format_for_prompt_content(self, policy_dir: Path, sample_policy_file: Path) -> None:
         engine = PolicyEngine()
         engine.load([policy_dir])
         result = engine.format_for_prompt("cloud-architect")
@@ -543,26 +529,20 @@ class TestPolicyEngine:
         assert "DO NOT" in result
         assert "Patterns to follow" in result
 
-    def test_format_includes_patterns(
-        self, policy_dir: Path, sample_policy_file: Path
-    ) -> None:
+    def test_format_includes_patterns(self, policy_dir: Path, sample_policy_file: Path) -> None:
         engine = PolicyEngine()
         engine.load([policy_dir])
         result = engine.format_for_prompt("cloud-architect")
         assert "Identity pattern" in result
 
-    def test_format_includes_rationale(
-        self, policy_dir: Path, sample_policy_file: Path
-    ) -> None:
+    def test_format_includes_rationale(self, policy_dir: Path, sample_policy_file: Path) -> None:
         engine = PolicyEngine()
         engine.load([policy_dir])
         result = engine.format_for_prompt("cloud-architect")
         assert "Rationale:" in result
         assert "Security best practice" in result
 
-    def test_format_includes_instead(
-        self, policy_dir: Path, sample_policy_file: Path
-    ) -> None:
+    def test_format_includes_instead(self, policy_dir: Path, sample_policy_file: Path) -> None:
         engine = PolicyEngine()
         engine.load([policy_dir])
         result = engine.format_for_prompt("cloud-architect")
@@ -703,9 +683,11 @@ class TestBuiltinPolicies:
         for policy in engine.list_policies():
             for rule in policy.rules:
                 assert rule.id, f"Rule in {policy.name} missing id"
-                assert rule.severity in ("required", "recommended", "optional"), (
-                    f"{policy.name}/{rule.id} has invalid severity: {rule.severity}"
-                )
+                assert rule.severity in (
+                    "required",
+                    "recommended",
+                    "optional",
+                ), f"{policy.name}/{rule.id} has invalid severity: {rule.severity}"
                 assert rule.description, f"{policy.name}/{rule.id} missing description"
 
     def test_all_rules_have_applies_to(self) -> None:
@@ -713,17 +695,13 @@ class TestBuiltinPolicies:
         for policy in engine.list_policies():
             for rule in policy.rules:
                 assert isinstance(rule.applies_to, list)
-                assert len(rule.applies_to) > 0, (
-                    f"{policy.name}/{rule.id} has empty applies_to"
-                )
+                assert len(rule.applies_to) > 0, f"{policy.name}/{rule.id} has empty applies_to"
 
     def test_no_duplicate_rule_ids_within_policy(self) -> None:
         engine = get_policy_engine()
         for policy in engine.list_policies():
             ids = [r.id for r in policy.rules]
-            assert len(ids) == len(set(ids)), (
-                f"{policy.name} has duplicate rule ids: {ids}"
-            )
+            assert len(ids) == len(set(ids)), f"{policy.name} has duplicate rule ids: {ids}"
 
     def test_builtin_policies_pass_strict_validation(self) -> None:
         """All built-in .policy.yaml files must pass strict validation."""

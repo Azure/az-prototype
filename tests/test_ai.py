@@ -1,18 +1,18 @@
 """Tests for azext_prototype.ai — factory, providers, validation."""
 
-import pytest
 from unittest.mock import MagicMock, patch
 
+import pytest
 from knack.util import CLIError
 
+from azext_prototype.ai.azure_openai import AzureOpenAIProvider
 from azext_prototype.ai.factory import (
     ALLOWED_PROVIDERS,
     BLOCKED_PROVIDERS,
     create_ai_provider,
 )
-from azext_prototype.ai.provider import AIMessage, AIResponse
 from azext_prototype.ai.github_models import GitHubModelsProvider
-from azext_prototype.ai.azure_openai import AzureOpenAIProvider
+from azext_prototype.ai.provider import AIMessage, AIResponse
 
 
 class TestAIProviderFactory:
@@ -85,9 +85,7 @@ class TestModelProviderValidation:
             create_ai_provider(sample_config)
 
     @patch("azext_prototype.ai.copilot_provider.CopilotProvider")
-    def test_claude_on_copilot_succeeds(
-        self, mock_provider_cls, sample_config
-    ):
+    def test_claude_on_copilot_succeeds(self, mock_provider_cls, sample_config):
         sample_config["ai"]["provider"] = "copilot"
         sample_config["ai"]["model"] = "claude-sonnet-4.5"
         mock_provider_cls.return_value = MagicMock()
@@ -154,6 +152,7 @@ class TestAzureOpenAIEndpointValidation:
 
     def test_valid_endpoint_pattern(self):
         import re
+
         pattern = re.compile(r"^https://[a-z0-9-]+\.openai\.azure\.com/?$")
         valid = [
             "https://my-resource.openai.azure.com/",
@@ -166,6 +165,7 @@ class TestAzureOpenAIEndpointValidation:
 
     def test_invalid_endpoint_pattern(self):
         import re
+
         pattern = re.compile(r"^https://[a-z0-9-]+\.openai\.azure\.com/?$")
         invalid = [
             "https://api.openai.com/v1",

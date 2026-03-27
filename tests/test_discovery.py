@@ -2,26 +2,26 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from azext_prototype.agents.base import AgentCapability, AgentContext
 from azext_prototype.ai.provider import AIMessage, AIResponse
 from azext_prototype.stages.discovery import (
-    DiscoverySession,
+    _DONE_WORDS,
+    _QUIT_WORDS,
+    _READY_MARKER,
     DiscoveryResult,
-    Section,
+    DiscoverySession,
     extract_section_headers,
     parse_sections,
-    _READY_MARKER,
-    _QUIT_WORDS,
-    _DONE_WORDS,
 )
-
 
 # ======================================================================
 # Fixtures
 # ======================================================================
+
 
 @pytest.fixture
 def mock_biz_agent():
@@ -84,6 +84,7 @@ def _make_response(content: str) -> AIResponse:
 # DiscoveryResult
 # ======================================================================
 
+
 class TestDiscoveryResult:
     def test_basic_creation(self):
         result = DiscoveryResult(
@@ -111,11 +112,15 @@ class TestDiscoveryResult:
 # DiscoverySession — basic conversation flow
 # ======================================================================
 
+
 class TestBasicConversationFlow:
     """The core contract: user and agent exchange messages naturally."""
 
     def test_bare_invocation_agent_speaks_first(
-        self, mock_agent_context, mock_registry, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
     ):
         """With no context, the agent gets a generic opening and starts talking."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -139,7 +144,10 @@ class TestBasicConversationFlow:
         assert mock_agent_context.ai_provider.chat.call_count == 3
 
     def test_with_context_agent_analyzes_and_follows_up(
-        self, mock_agent_context, mock_registry, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
     ):
         """When --context is provided, it becomes the opening message."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -167,7 +175,10 @@ class TestBasicConversationFlow:
         assert "inventory management" in user_msgs[0].content.lower()
 
     def test_with_artifacts_and_context(
-        self, mock_agent_context, mock_registry, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
     ):
         """Both artifacts AND context form a combined opening message."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -194,7 +205,10 @@ class TestBasicConversationFlow:
         assert "CRUD" in user_msgs[0].content or "requirement documents" in user_msgs[0].content.lower()
 
     def test_with_only_artifacts(
-        self, mock_agent_context, mock_registry, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
     ):
         """Artifacts alone — opening says 'I have documents for you'."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -209,10 +223,7 @@ class TestBasicConversationFlow:
             print_fn=lambda x: None,
         )
 
-        first_user_msg = [
-            m for m in mock_agent_context.ai_provider.chat.call_args_list[0][0][0]
-            if m.role == "user"
-        ][0]
+        first_user_msg = [m for m in mock_agent_context.ai_provider.chat.call_args_list[0][0][0] if m.role == "user"][0]
         assert "requirement documents" in first_user_msg.content.lower()
 
 
@@ -220,11 +231,15 @@ class TestBasicConversationFlow:
 # Multi-turn message history
 # ======================================================================
 
+
 class TestMultiTurnHistory:
     """The key architectural requirement: full conversation history on every call."""
 
     def test_history_grows_with_each_exchange(
-        self, mock_agent_context, mock_registry, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
     ):
         """Each AI call includes the full conversation history."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -252,16 +267,17 @@ class TestMultiTurnHistory:
         user_count_per_call = []
         for c in calls:
             messages = c[0][0]
-            user_count_per_call.append(
-                sum(1 for m in messages if m.role == "user")
-            )
+            user_count_per_call.append(sum(1 for m in messages if m.role == "user"))
 
         # History should grow monotonically
         assert user_count_per_call == sorted(user_count_per_call)
         assert user_count_per_call[-1] > user_count_per_call[0]
 
     def test_no_meta_prompt_injection(
-        self, mock_agent_context, mock_registry, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
     ):
         """User text goes to the AI unmodified — no wrapping or injection."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -288,6 +304,7 @@ class TestMultiTurnHistory:
 # ======================================================================
 # Session ending
 # ======================================================================
+
 
 class TestSessionEnding:
     def test_quit_cancels(self, mock_agent_context, mock_registry, mock_biz_agent):
@@ -385,9 +402,13 @@ class TestSessionEnding:
 # Agent-driven convergence via [READY] marker
 # ======================================================================
 
+
 class TestConvergence:
     def test_ready_marker_triggers_confirmation(
-        self, mock_agent_context, mock_registry, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
     ):
         """When agent includes [READY], user is prompted to confirm."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -397,10 +418,12 @@ class TestConvergence:
         ]
 
         session = DiscoverySession(mock_agent_context, mock_registry)
-        inputs = iter([
-            "A simple REST API for orders",
-            "",  # Enter to accept after [READY]
-        ])
+        inputs = iter(
+            [
+                "A simple REST API for orders",
+                "",  # Enter to accept after [READY]
+            ]
+        )
 
         result = session.run(
             input_fn=lambda _: next(inputs),
@@ -412,7 +435,10 @@ class TestConvergence:
         assert not result.cancelled
 
     def test_ready_marker_stripped_from_display(
-        self, mock_agent_context, mock_registry, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
     ):
         """The [READY] marker is never shown to the user."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -434,7 +460,10 @@ class TestConvergence:
         assert _READY_MARKER not in all_output
 
     def test_user_can_continue_after_ready(
-        self, mock_agent_context, mock_registry, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
     ):
         """User can keep typing after agent signals [READY]."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -445,11 +474,13 @@ class TestConvergence:
         ]
 
         session = DiscoverySession(mock_agent_context, mock_registry)
-        inputs = iter([
-            "A web app",
-            "Actually, also add Redis caching",  # continues after READY
-            "done",
-        ])
+        inputs = iter(
+            [
+                "A web app",
+                "Actually, also add Redis caching",  # continues after READY
+                "done",
+            ]
+        )
 
         result = session.run(
             input_fn=lambda _: next(inputs),
@@ -463,6 +494,7 @@ class TestConvergence:
 # ======================================================================
 # No biz-analyst fallback
 # ======================================================================
+
 
 class TestNoBizAnalystFallback:
     def test_falls_back_to_input(self, mock_agent_context):
@@ -483,9 +515,13 @@ class TestNoBizAnalystFallback:
 # Summary production
 # ======================================================================
 
+
 class TestSummaryProduction:
     def test_summary_requested_at_end(
-        self, mock_agent_context, mock_registry, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
     ):
         """After conversation, a summary call is made."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -505,7 +541,10 @@ class TestSummaryProduction:
         assert "orders" in result.requirements.lower() or "Orders" in result.requirements
 
     def test_no_summary_when_zero_exchanges(
-        self, mock_agent_context, mock_registry, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
     ):
         """If user immediately types 'done', a summary is still produced
         because the opening exchange counts."""
@@ -530,9 +569,13 @@ class TestSummaryProduction:
 # Policy override extraction from summary
 # ======================================================================
 
+
 class TestPolicyOverrideExtraction:
     def test_extracts_overrides_from_summary(
-        self, mock_agent_context, mock_registry, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
     ):
         """If the summary contains a 'Policy Overrides' section, parse it."""
         summary_text = (
@@ -565,7 +608,10 @@ class TestPolicyOverrideExtraction:
         assert "network-isolation" in names
 
     def test_no_overrides_when_section_absent(
-        self, mock_agent_context, mock_registry, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
     ):
         """No Policy Overrides heading → empty list."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -589,11 +635,15 @@ class TestPolicyOverrideExtraction:
 # Integration with DesignStage
 # ======================================================================
 
+
 class TestDesignStageDiscoveryIntegration:
     """Test that DesignStage.execute() uses the DiscoverySession."""
 
     def test_design_stage_uses_discovery(
-        self, project_with_config, mock_agent_context, populated_registry,
+        self,
+        project_with_config,
+        mock_agent_context,
+        populated_registry,
     ):
         from azext_prototype.stages.design_stage import DesignStage
 
@@ -601,9 +651,7 @@ class TestDesignStageDiscoveryIntegration:
         stage.get_guards = lambda: []
 
         mock_agent_context.project_dir = str(project_with_config)
-        mock_agent_context.ai_provider.chat.return_value = _make_response(
-            "Tell me more about your project."
-        )
+        mock_agent_context.ai_provider.chat.return_value = _make_response("Tell me more about your project.")
 
         inputs = iter(["Build a REST API", "PostgreSQL, 50 users", "done"])
         result = stage.execute(
@@ -617,7 +665,10 @@ class TestDesignStageDiscoveryIntegration:
         assert result["status"] == "success"
 
     def test_cancelled_discovery_cancels_design(
-        self, project_with_config, mock_agent_context, populated_registry,
+        self,
+        project_with_config,
+        mock_agent_context,
+        populated_registry,
     ):
         from azext_prototype.stages.design_stage import DesignStage
 
@@ -625,9 +676,7 @@ class TestDesignStageDiscoveryIntegration:
         stage.get_guards = lambda: []
 
         mock_agent_context.project_dir = str(project_with_config)
-        mock_agent_context.ai_provider.chat.return_value = _make_response(
-            "Tell me about your project."
-        )
+        mock_agent_context.ai_provider.chat.return_value = _make_response("Tell me about your project.")
 
         result = stage.execute(
             mock_agent_context,
@@ -639,36 +688,38 @@ class TestDesignStageDiscoveryIntegration:
         assert result["status"] == "cancelled"
 
     def test_design_stage_persists_policy_overrides(
-        self, project_with_config, mock_agent_context, populated_registry,
+        self,
+        project_with_config,
+        mock_agent_context,
+        populated_registry,
     ):
         """Policy overrides from discovery are persisted in design state."""
         import json as _json
+
         from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
         stage.get_guards = lambda: []
 
         mock_agent_context.project_dir = str(project_with_config)
-        mock_agent_context.ai_provider.chat.return_value = _make_response(
-            "Architecture design with overrides."
-        )
+        mock_agent_context.ai_provider.chat.return_value = _make_response("Architecture design with overrides.")
 
         mock_result = DiscoveryResult(
             requirements="Build an API with connection strings (overridden)",
             conversation=[],
-            policy_overrides=[{
-                "rule_id": "managed-identity",
-                "policy_name": "managed-identity",
-                "description": "Legacy compat",
-                "recommendation": "",
-                "user_text": "Legacy compat",
-            }],
+            policy_overrides=[
+                {
+                    "rule_id": "managed-identity",
+                    "policy_name": "managed-identity",
+                    "description": "Legacy compat",
+                    "recommendation": "",
+                    "user_text": "Legacy compat",
+                }
+            ],
             exchange_count=3,
         )
 
-        with patch(
-            "azext_prototype.stages.design_stage.DiscoverySession"
-        ) as MockDS:
+        with patch("azext_prototype.stages.design_stage.DiscoverySession") as MockDS:
             MockDS.return_value.run.return_value = mock_result
 
             result = stage.execute(
@@ -689,6 +740,7 @@ class TestDesignStageDiscoveryIntegration:
 # _clean helper
 # ======================================================================
 
+
 class TestCleanHelper:
     def test_strips_ready_marker(self):
         assert DiscoverySession._clean(f"Hello {_READY_MARKER}") == "Hello"
@@ -700,6 +752,7 @@ class TestCleanHelper:
 # ======================================================================
 # _extract_overrides helper
 # ======================================================================
+
 
 class TestExtractOverrides:
     def test_parses_bullet_list(self):
@@ -718,10 +771,7 @@ class TestExtractOverrides:
         assert DiscoverySession._extract_overrides("## Summary\nJust a summary.") == []
 
     def test_handles_bold_names(self):
-        text = (
-            "## Policy Overrides\n"
-            "- **MI-001**: User needs connection strings\n"
-        )
+        text = "## Policy Overrides\n" "- **MI-001**: User needs connection strings\n"
         overrides = DiscoverySession._extract_overrides(text)
         assert len(overrides) == 1
         assert overrides[0]["policy_name"] == "MI-001"
@@ -731,9 +781,13 @@ class TestExtractOverrides:
 # /summary slash command
 # ======================================================================
 
+
 class TestSummaryCommand:
     def test_summary_triggers_ai_call(
-        self, mock_agent_context, mock_registry, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
     ):
         """/summary should call the AI for a mid-session summary."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -756,7 +810,10 @@ class TestSummaryCommand:
         assert result.exchange_count == 1
 
     def test_summary_does_not_increment_exchange_count(
-        self, mock_agent_context, mock_registry, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
     ):
         """/summary is a meta-command — exchange count stays the same."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -782,9 +839,13 @@ class TestSummaryCommand:
 # /restart slash command
 # ======================================================================
 
+
 class TestRestartCommand:
     def test_restart_clears_state_and_resets(
-        self, mock_agent_context, mock_registry, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
     ):
         """/restart should reset state and re-send the opening."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -808,7 +869,10 @@ class TestRestartCommand:
         assert len(session._messages) > 0
 
     def test_restart_clears_conversation_history(
-        self, mock_agent_context, mock_registry, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
     ):
         """/restart should clear the in-memory message list."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -837,9 +901,13 @@ class TestRestartCommand:
 # /why slash command
 # ======================================================================
 
+
 class TestWhyCommand:
     def test_why_no_argument_shows_usage(
-        self, mock_agent_context, mock_registry, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
     ):
         """/why with no argument should show usage hint, not crash."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -860,7 +928,10 @@ class TestWhyCommand:
         assert "Usage" in combined or "/why" in combined
 
     def test_why_with_matching_query(
-        self, mock_agent_context, mock_registry, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
     ):
         """/why should find exchanges mentioning the queried topic."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -882,7 +953,10 @@ class TestWhyCommand:
         assert "Exchange" in combined
 
     def test_why_no_matches(
-        self, mock_agent_context, mock_registry, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
     ):
         """/why with no matching history should show 'no exchanges found'."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -982,13 +1056,11 @@ class TestMultiModalOpening:
 
     def test_run_passes_images_to_opening(self, mock_agent_context, mock_registry):
         """The run() method passes artifact_images to _build_opening."""
-        mock_agent_context.ai_provider.chat.return_value = _make_response(
-            f"Got your images! {_READY_MARKER}"
-        )
+        mock_agent_context.ai_provider.chat.return_value = _make_response(f"Got your images! {_READY_MARKER}")
         session = DiscoverySession(mock_agent_context, mock_registry, console=MagicMock())
         images = [{"filename": "x.png", "data": "abc", "mime": "image/png"}]
 
-        result = session.run(
+        result = session.run(  # noqa: F841
             seed_context="test",
             artifact_images=images,
             input_fn=lambda _: "done",
@@ -1049,7 +1121,9 @@ class TestJointDiscovery:
     """Test that both biz-analyst and cloud-architect contribute to discovery."""
 
     def test_architect_context_injected_into_chat(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """System messages should include architect constraints."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -1072,7 +1146,9 @@ class TestJointDiscovery:
         assert "Managed Identity" in combined
 
     def test_architect_constraints_in_system_messages(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """Architect's constraints should appear in system messages."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -1093,7 +1169,9 @@ class TestJointDiscovery:
         assert "Well-Architected Framework" in system_content
 
     def test_single_ai_call_per_turn(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """Joint discovery still uses a single AI call per turn."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -1113,7 +1191,9 @@ class TestJointDiscovery:
         assert mock_agent_context.ai_provider.chat.call_count == 3
 
     def test_no_architect_still_works(
-        self, mock_agent_context, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_biz_agent,
     ):
         """Discovery works when no architect agent is available."""
         registry = MagicMock()
@@ -1143,7 +1223,9 @@ class TestJointDiscovery:
         assert "Architectural Guidance" not in system_content
 
     def test_build_architect_context_returns_empty_when_none(
-        self, mock_agent_context, mock_biz_agent,
+        self,
+        mock_agent_context,
+        mock_biz_agent,
     ):
         """_build_architect_context returns '' when no architect agent."""
         registry = MagicMock()
@@ -1163,7 +1245,9 @@ class TestUpdatedSummaryFormat:
     """Test that the summary prompt requests the exact heading format."""
 
     def test_summary_prompt_mentions_required_headings(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """The summary prompt should mention the exact headings to use."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -1190,7 +1274,9 @@ class TestUpdatedSummaryFormat:
         assert "In Scope" in summary_prompt
 
     def test_summary_prompt_asks_for_no_skipped_sections(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """The summary prompt should instruct not to skip sections."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -1223,13 +1309,11 @@ class TestNaturalLanguageIntentDiscovery:
         """'what are the open items' should trigger the /open display."""
         # Use return_value — any call returns a valid response (no headings
         # to avoid triggering section-at-a-time gating)
-        mock_agent_context.ai_provider.chat.return_value = _make_response(
-            "Tell me about your project."
-        )
+        mock_agent_context.ai_provider.chat.return_value = _make_response("Tell me about your project.")
         session = DiscoverySession(mock_agent_context, mock_registry)
         output = []
         inputs = iter(["what are the open items", "done"])
-        result = session.run(
+        session.run(
             input_fn=lambda _: next(inputs),
             print_fn=output.append,
         )
@@ -1238,13 +1322,11 @@ class TestNaturalLanguageIntentDiscovery:
 
     def test_nl_status(self, mock_agent_context, mock_registry):
         """'where do we stand' should trigger the /status display."""
-        mock_agent_context.ai_provider.chat.return_value = _make_response(
-            "Tell me about your project."
-        )
+        mock_agent_context.ai_provider.chat.return_value = _make_response("Tell me about your project.")
         session = DiscoverySession(mock_agent_context, mock_registry)
         output = []
         inputs = iter(["where do we stand", "done"])
-        result = session.run(
+        session.run(
             input_fn=lambda _: next(inputs),
             print_fn=output.append,
         )
@@ -1254,6 +1336,7 @@ class TestNaturalLanguageIntentDiscovery:
 # ======================================================================
 # extract_section_headers
 # ======================================================================
+
 
 class TestExtractSectionHeaders:
     """Unit tests for extract_section_headers()."""
@@ -1276,12 +1359,7 @@ class TestExtractSectionHeaders:
         assert result == [("Overview", 2), ("Architecture", 2)]
 
     def test_skips_structural_headings(self):
-        text = (
-            "## Project Context\nText\n"
-            "## Summary\nText\n"
-            "## Policy Overrides\nText\n"
-            "## Next Steps\nText\n"
-        )
+        text = "## Project Context\nText\n" "## Summary\nText\n" "## Policy Overrides\nText\n" "## Next Steps\nText\n"
         result = extract_section_headers(text)
         assert result == [("Project Context", 2)]
 
@@ -1341,26 +1419,14 @@ class TestExtractSectionHeaders:
 
     def test_bold_and_markdown_headings_merged(self):
         """Both ## headings and **bold headings** should be found with levels."""
-        text = (
-            "## Architecture Overview\n"
-            "Details here.\n"
-            "\n"
-            "**Security Considerations**\n"
-            "More details."
-        )
+        text = "## Architecture Overview\n" "Details here.\n" "\n" "**Security Considerations**\n" "More details."
         result = extract_section_headers(text)
         assert ("Architecture Overview", 2) in result
         assert ("Security Considerations", 2) in result
 
     def test_bold_headings_deduped(self):
         """Duplicate headings (same text in both formats) should appear once."""
-        text = (
-            "## Security\n"
-            "Details.\n"
-            "\n"
-            "**Security**\n"
-            "More details."
-        )
+        text = "## Security\n" "Details.\n" "\n" "**Security**\n" "More details."
         result = extract_section_headers(text)
         texts = [h[0] for h in result]
         assert texts.count("Security") == 1
@@ -1394,14 +1460,7 @@ class TestExtractSectionHeaders:
 
     def test_position_ordering(self):
         """Headers should be sorted by their position in the response."""
-        text = (
-            "**First Bold**\n"
-            "Text\n"
-            "## Second Markdown\n"
-            "Text\n"
-            "**Third Bold**\n"
-            "Text"
-        )
+        text = "**First Bold**\n" "Text\n" "## Second Markdown\n" "Text\n" "**Third Bold**\n" "Text"
         result = extract_section_headers(text)
         assert result == [("First Bold", 2), ("Second Markdown", 2), ("Third Bold", 2)]
 
@@ -1410,11 +1469,14 @@ class TestExtractSectionHeaders:
 # section_fn callback integration
 # ======================================================================
 
+
 class TestSectionFnCallback:
     """Verify that section_fn is called with extracted headers during a session."""
 
     def test_section_fn_receives_headers(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """section_fn should be called upfront with all headers from the AI response."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -1435,7 +1497,7 @@ class TestSectionFnCallback:
             captured_headers.extend(headers)
 
         # "done" exits from the section loop immediately
-        result = session.run(
+        session.run(
             input_fn=lambda _: "done",
             print_fn=lambda x: None,
             section_fn=_section_fn,
@@ -1446,7 +1508,9 @@ class TestSectionFnCallback:
         assert "Data & Content" in texts
 
     def test_section_fn_not_called_when_none(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """When section_fn is None, no error should occur."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -1467,11 +1531,14 @@ class TestSectionFnCallback:
 # response_fn callback integration
 # ======================================================================
 
+
 class TestResponseFnCallback:
     """Verify that response_fn is called with agent responses during a session."""
 
     def test_response_fn_receives_agent_responses(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """response_fn should be called with cleaned agent responses."""
         # Use a response without ## headings so it takes the non-sectioned path
@@ -1488,7 +1555,7 @@ class TestResponseFnCallback:
             captured.append(content)
 
         inputs = iter(["A REST API", "done"])
-        result = session.run(
+        session.run(
             input_fn=lambda _: next(inputs),
             print_fn=lambda x: None,
             response_fn=_response_fn,
@@ -1500,7 +1567,9 @@ class TestResponseFnCallback:
         assert "API" in captured[1]
 
     def test_response_fn_not_called_when_none(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """When response_fn is None, print_fn should be used instead."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -1511,7 +1580,7 @@ class TestResponseFnCallback:
         session = DiscoverySession(mock_agent_context, mock_registry)
         printed = []
 
-        result = session.run(
+        session.run(
             input_fn=lambda _: "done",
             print_fn=lambda x: printed.append(x),
         )
@@ -1520,7 +1589,9 @@ class TestResponseFnCallback:
         assert any("building" in p.lower() for p in printed if isinstance(p, str))
 
     def test_response_fn_takes_precedence_over_print_fn(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """response_fn should be used instead of print_fn for agent responses."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -1532,7 +1603,7 @@ class TestResponseFnCallback:
         printed = []
         response_captured = []
 
-        result = session.run(
+        session.run(
             input_fn=lambda _: "done",
             print_fn=lambda x: printed.append(x),
             response_fn=lambda x: response_captured.append(x),
@@ -1548,6 +1619,7 @@ class TestResponseFnCallback:
 # ======================================================================
 # parse_sections()
 # ======================================================================
+
 
 class TestParseSections:
     """Verify section parsing from AI responses."""
@@ -1618,10 +1690,7 @@ class TestParseSections:
 
     def test_subsections_folded_into_parent(self):
         """Level-3 subsections are folded into their parent level-2 section."""
-        text = (
-            "## Main Topic\nOverview.\n\n"
-            "### Sub-topic\nDetail."
-        )
+        text = "## Main Topic\nOverview.\n\n" "### Sub-topic\nDetail."
         _, sections = parse_sections(text)
         assert len(sections) == 1
         assert sections[0].heading == "Main Topic"
@@ -1653,10 +1722,7 @@ class TestParseSections:
         assert sections == []
 
     def test_duplicate_headings_deduped(self):
-        text = (
-            "## Authentication\nFirst mention.\n\n"
-            "## Authentication\nSecond mention."
-        )
+        text = "## Authentication\nFirst mention.\n\n" "## Authentication\nSecond mention."
         _, sections = parse_sections(text)
         assert len(sections) == 1
 
@@ -1664,6 +1730,7 @@ class TestParseSections:
 # ======================================================================
 # Section completion via AI "Yes" gate
 # ======================================================================
+
 
 class TestSectionDoneDetection:
     """Verify section completion detection via AI 'Yes' gate.
@@ -1683,11 +1750,14 @@ class TestSectionDoneDetection:
 # Section-at-a-time flow integration
 # ======================================================================
 
+
 class TestSectionAtATimeFlow:
     """Verify sections are shown one at a time with follow-ups."""
 
     def test_sections_shown_one_at_a_time(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """Each section should be shown individually, collecting user input."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -1709,11 +1779,13 @@ class TestSectionAtATimeFlow:
 
         session = DiscoverySession(mock_agent_context, mock_registry)
         printed = []
-        inputs = iter([
-            "We use Entra ID",     # Answer for section 1
-            "SQL Database",         # Answer for section 2
-            "done",                 # Exit free-form loop
-        ])
+        inputs = iter(
+            [
+                "We use Entra ID",  # Answer for section 1
+                "SQL Database",  # Answer for section 2
+                "done",  # Exit free-form loop
+            ]
+        )
 
         result = session.run(
             input_fn=lambda _: next(inputs),
@@ -1726,14 +1798,13 @@ class TestSectionAtATimeFlow:
         assert "Data Layer" in printed_text
 
     def test_skip_advances_to_next_section(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """Typing 'skip' should advance to the next section."""
         mock_agent_context.ai_provider.chat.side_effect = [
-            _make_response(
-                "## Auth\nHow do users sign in?\n\n"
-                "## Data\nWhat database?"
-            ),
+            _make_response("## Auth\nHow do users sign in?\n\n" "## Data\nWhat database?"),
             # Follow-up for data section
             _make_response("Yes"),
             # Summary
@@ -1741,11 +1812,13 @@ class TestSectionAtATimeFlow:
         ]
 
         session = DiscoverySession(mock_agent_context, mock_registry)
-        inputs = iter([
-            "skip",        # Skip auth section
-            "Cosmos DB",   # Answer data section
-            "done",        # Exit free-form
-        ])
+        inputs = iter(
+            [
+                "skip",  # Skip auth section
+                "Cosmos DB",  # Answer data section
+                "done",  # Exit free-form
+            ]
+        )
 
         result = session.run(
             input_fn=lambda _: next(inputs),
@@ -1754,14 +1827,13 @@ class TestSectionAtATimeFlow:
         assert not result.cancelled
 
     def test_done_exits_section_loop(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """Typing 'done' during section loop should jump to summary."""
         mock_agent_context.ai_provider.chat.side_effect = [
-            _make_response(
-                "## Auth\nHow do users sign in?\n\n"
-                "## Data\nWhat database?"
-            ),
+            _make_response("## Auth\nHow do users sign in?\n\n" "## Data\nWhat database?"),
             # Summary produced after "done"
             _make_response("## Summary\nFinal summary."),
         ]
@@ -1775,14 +1847,13 @@ class TestSectionAtATimeFlow:
         assert result.requirements  # Should have summary
 
     def test_quit_cancels_from_section_loop(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """Typing 'quit' during section loop should cancel the session."""
         mock_agent_context.ai_provider.chat.side_effect = [
-            _make_response(
-                "## Auth\nHow do users sign in?\n\n"
-                "## Data\nWhat database?"
-            ),
+            _make_response("## Auth\nHow do users sign in?\n\n" "## Data\nWhat database?"),
         ]
 
         session = DiscoverySession(mock_agent_context, mock_registry)
@@ -1793,7 +1864,9 @@ class TestSectionAtATimeFlow:
         assert result.cancelled
 
     def test_follow_ups_iterate_within_section(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """Multiple follow-ups within a section should work."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -1807,11 +1880,13 @@ class TestSectionAtATimeFlow:
         ]
 
         session = DiscoverySession(mock_agent_context, mock_registry)
-        inputs = iter([
-            "Entra ID for users",          # First answer
-            "Managed identity for services",  # Second answer
-            "done",                          # Exit free-form
-        ])
+        inputs = iter(
+            [
+                "Entra ID for users",  # First answer
+                "Managed identity for services",  # Second answer
+                "done",  # Exit free-form
+            ]
+        )
 
         result = session.run(
             input_fn=lambda _: next(inputs),
@@ -1821,7 +1896,9 @@ class TestSectionAtATimeFlow:
         assert result.exchange_count >= 3  # opening + 2 follow-ups
 
     def test_update_task_fn_called(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """update_task_fn should be called with in_progress and completed."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -1837,7 +1914,7 @@ class TestSectionAtATimeFlow:
             task_updates.append((tid, status))
 
         inputs = iter(["Entra ID", "done"])
-        result = session.run(
+        session.run(
             input_fn=lambda _: next(inputs),
             print_fn=lambda x: None,
             update_task_fn=_update_task_fn,
@@ -1848,7 +1925,9 @@ class TestSectionAtATimeFlow:
         assert ("design-section-auth", "completed") in task_updates
 
     def test_no_sections_fallback(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """When no sections are found, should display full response."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -1869,7 +1948,9 @@ class TestSectionAtATimeFlow:
         assert "Tell me what you want to build" in printed_text
 
     def test_yes_gate_not_displayed(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """AI 'Yes' confirmation should not be printed to the user."""
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -1882,7 +1963,7 @@ class TestSectionAtATimeFlow:
         printed = []
 
         inputs = iter(["Entra ID", "continue"])
-        result = session.run(
+        session.run(
             input_fn=lambda _: next(inputs),
             print_fn=lambda x: printed.append(x),
         )
@@ -1901,7 +1982,11 @@ class TestTopicPersistence:
     """Topics are established once, persisted, and immutable across re-runs."""
 
     def test_topics_persisted_on_first_run(
-        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
+        tmp_path,
     ):
         """First run with sections should persist topics to discovery state."""
         from azext_prototype.stages.discovery_state import DiscoveryState
@@ -1929,7 +2014,11 @@ class TestTopicPersistence:
         assert topics[1].heading == "Data"
 
     def test_topics_marked_answered_on_confirm(
-        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
+        tmp_path,
     ):
         """AI 'Yes' confirmation marks topic as answered."""
         from azext_prototype.stages.discovery_state import DiscoveryState
@@ -1956,7 +2045,11 @@ class TestTopicPersistence:
         assert topics[1].status == "answered"
 
     def test_topic_marked_skipped(
-        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
+        tmp_path,
     ):
         """Skipping a section marks the topic as skipped."""
         from azext_prototype.stages.discovery_state import DiscoveryState
@@ -1981,13 +2074,19 @@ class TestTopicPersistence:
         assert topics[1].status == "answered"
 
     def test_topics_remain_pending_on_quit(
-        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
+        tmp_path,
     ):
         """Quitting mid-session leaves remaining topics as pending."""
         from azext_prototype.stages.discovery_state import DiscoveryState
 
         mock_agent_context.ai_provider.chat.side_effect = [
-            _make_response("## Auth\nHow do users sign in?\n## Data\nWhat database?\n## Networking\nPublic or private?"),
+            _make_response(
+                "## Auth\nHow do users sign in?\n## Data\nWhat database?\n## Networking\nPublic or private?"
+            ),
             _make_response("Yes"),  # Auth confirmed
         ]
 
@@ -2011,7 +2110,11 @@ class TestTopicReentry:
     """Re-entry resumes at the first unanswered topic."""
 
     def test_reentry_resumes_at_first_pending(
-        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
+        tmp_path,
     ):
         """Re-run with existing topics resumes at first pending topic."""
         from azext_prototype.stages.discovery_state import DiscoveryState, Topic
@@ -2019,10 +2122,24 @@ class TestTopicReentry:
         # Pre-populate state with topics (Auth answered, Data pending)
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_topics([
-            Topic(heading="Auth", detail="## Auth\nHow do users sign in?", kind="topic", status="answered", answer_exchange=2),
-            Topic(heading="Data", detail="## Data\nWhat database?", kind="topic", status="pending", answer_exchange=None),
-        ])
+        ds.set_topics(
+            [
+                Topic(
+                    heading="Auth",
+                    detail="## Auth\nHow do users sign in?",
+                    kind="topic",
+                    status="answered",
+                    answer_exchange=2,
+                ),
+                Topic(
+                    heading="Data",
+                    detail="## Data\nWhat database?",
+                    kind="topic",
+                    status="pending",
+                    answer_exchange=None,
+                ),
+            ]
+        )
         ds.state["_metadata"]["exchange_count"] = 2
         ds.save()
 
@@ -2048,18 +2165,24 @@ class TestTopicReentry:
         assert topics[1].status == "answered"  # Data now answered
 
     def test_reentry_shows_progress_message(
-        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
+        tmp_path,
     ):
         """Re-entry should show a progress message."""
         from azext_prototype.stages.discovery_state import DiscoveryState, Topic
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_topics([
-            Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="answered", answer_exchange=1),
-            Topic(heading="Data", detail="## Data\nWhat?", kind="topic", status="pending", answer_exchange=None),
-            Topic(heading="Net", detail="## Net\nPublic?", kind="topic", status="pending", answer_exchange=None),
-        ])
+        ds.set_topics(
+            [
+                Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="answered", answer_exchange=1),
+                Topic(heading="Data", detail="## Data\nWhat?", kind="topic", status="pending", answer_exchange=None),
+                Topic(heading="Net", detail="## Net\nPublic?", kind="topic", status="pending", answer_exchange=None),
+            ]
+        )
         ds.save()
 
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -2082,17 +2205,23 @@ class TestTopicReentry:
         assert "1/3 topics covered" in combined
 
     def test_reentry_all_topics_done_falls_through(
-        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
+        tmp_path,
     ):
         """If all topics are done on re-entry, fall through to free-form loop."""
         from azext_prototype.stages.discovery_state import DiscoveryState, Topic
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_topics([
-            Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="answered", answer_exchange=1),
-            Topic(heading="Data", detail="## Data\nWhat?", kind="topic", status="answered", answer_exchange=2),
-        ])
+        ds.set_topics(
+            [
+                Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="answered", answer_exchange=1),
+                Topic(heading="Data", detail="## Data\nWhat?", kind="topic", status="answered", answer_exchange=2),
+            ]
+        )
         ds.save()
 
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -2110,7 +2239,11 @@ class TestTopicReentry:
         assert not result.cancelled
 
     def test_reentry_does_not_resend_full_history(
-        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
+        tmp_path,
     ):
         """Re-entry seeds messages with compact summary, not full history."""
         from azext_prototype.stages.discovery_state import DiscoveryState, Topic
@@ -2118,19 +2251,23 @@ class TestTopicReentry:
         ds = DiscoveryState(str(tmp_path))
         ds.load()
         ds.state["project"]["summary"] = "An inventory API"
-        ds.set_topics([
-            Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="answered", answer_exchange=1),
-            Topic(heading="Data", detail="## Data\nWhat?", kind="topic", status="pending", answer_exchange=None),
-        ])
+        ds.set_topics(
+            [
+                Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="answered", answer_exchange=1),
+                Topic(heading="Data", detail="## Data\nWhat?", kind="topic", status="pending", answer_exchange=None),
+            ]
+        )
         ds.state["_metadata"]["exchange_count"] = 3
         # Add large conversation history
         for i in range(20):
-            ds.state["conversation_history"].append({
-                "exchange": i + 1,
-                "timestamp": "2026-01-01T00:00:00",
-                "user": f"Long user message {i}" * 50,
-                "assistant": f"Long assistant response {i}" * 50,
-            })
+            ds.state["conversation_history"].append(
+                {
+                    "exchange": i + 1,
+                    "timestamp": "2026-01-01T00:00:00",
+                    "user": f"Long user message {i}" * 50,
+                    "assistant": f"Long assistant response {i}" * 50,
+                }
+            )
         ds.save()
 
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -2155,16 +2292,22 @@ class TestTopicReentry:
         assert len(user_msgs) <= 5
 
     def test_reentry_restores_exchange_count(
-        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
+        tmp_path,
     ):
         """Re-entry restores exchange count from metadata."""
         from azext_prototype.stages.discovery_state import DiscoveryState, Topic
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_topics([
-            Topic(heading="Data", detail="## Data\nWhat?", kind="topic", status="pending", answer_exchange=None),
-        ])
+        ds.set_topics(
+            [
+                Topic(heading="Data", detail="## Data\nWhat?", kind="topic", status="pending", answer_exchange=None),
+            ]
+        )
         ds.state["_metadata"]["exchange_count"] = 5
         ds.save()
 
@@ -2190,17 +2333,23 @@ class TestIncrementalTopics:
     """New artifacts can add topics but not replace existing ones."""
 
     def test_new_artifacts_add_topics(
-        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
+        tmp_path,
     ):
         """Re-entry with new artifacts should add new topics."""
         from azext_prototype.stages.discovery_state import DiscoveryState, Topic
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_topics([
-            Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="answered", answer_exchange=1),
-            Topic(heading="Data", detail="## Data\nWhat?", kind="topic", status="answered", answer_exchange=2),
-        ])
+        ds.set_topics(
+            [
+                Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="answered", answer_exchange=1),
+                Topic(heading="Data", detail="## Data\nWhat?", kind="topic", status="answered", answer_exchange=2),
+            ]
+        )
         ds.save()
 
         # AI identifies a new topic from the new artifact
@@ -2225,16 +2374,22 @@ class TestIncrementalTopics:
         assert topics[2].heading == "Caching"
 
     def test_no_new_topics_marker(
-        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
+        tmp_path,
     ):
         """AI returns [NO_NEW_TOPICS] when artifacts don't warrant new topics."""
         from azext_prototype.stages.discovery_state import DiscoveryState, Topic
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_topics([
-            Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="answered", answer_exchange=1),
-        ])
+        ds.set_topics(
+            [
+                Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="answered", answer_exchange=1),
+            ]
+        )
         ds.save()
 
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -2257,21 +2412,37 @@ class TestIncrementalTopics:
         assert ds2.topics[0].heading == "Auth"
 
     def test_duplicate_headings_deduplicated(
-        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
+        tmp_path,
     ):
         """append_topics should not add duplicates (case-insensitive)."""
         from azext_prototype.stages.discovery_state import DiscoveryState, Topic
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_topics([
-            Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="answered", answer_exchange=1),
-        ])
+        ds.set_topics(
+            [
+                Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="answered", answer_exchange=1),
+            ]
+        )
 
-        ds.append_topics([
-            Topic(heading="auth", detail="## auth\nDuplicate?", kind="topic", status="pending", answer_exchange=None),
-            Topic(heading="Caching", detail="## Caching\nNew topic", kind="topic", status="pending", answer_exchange=None),
-        ])
+        ds.append_topics(
+            [
+                Topic(
+                    heading="auth", detail="## auth\nDuplicate?", kind="topic", status="pending", answer_exchange=None
+                ),
+                Topic(
+                    heading="Caching",
+                    detail="## Caching\nNew topic",
+                    kind="topic",
+                    status="pending",
+                    answer_exchange=None,
+                ),
+            ]
+        )
 
         topics = ds.topics
         assert len(topics) == 2  # Auth (original) + Caching (new)
@@ -2320,11 +2491,13 @@ class TestTopicStateHelpers:
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_topics([
-            Topic(heading="A", detail="Q", kind="topic", status="answered", answer_exchange=1),
-            Topic(heading="B", detail="Q", kind="topic", status="skipped", answer_exchange=None),
-            Topic(heading="C", detail="Q", kind="topic", status="pending", answer_exchange=None),
-        ])
+        ds.set_topics(
+            [
+                Topic(heading="A", detail="Q", kind="topic", status="answered", answer_exchange=1),
+                Topic(heading="B", detail="Q", kind="topic", status="skipped", answer_exchange=None),
+                Topic(heading="C", detail="Q", kind="topic", status="pending", answer_exchange=None),
+            ]
+        )
         assert ds.first_pending_topic_index() == 2
 
     def test_first_pending_topic_index_none_when_all_done(self, tmp_path):
@@ -2332,9 +2505,11 @@ class TestTopicStateHelpers:
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_topics([
-            Topic(heading="A", detail="Q", kind="topic", status="answered", answer_exchange=1),
-        ])
+        ds.set_topics(
+            [
+                Topic(heading="A", detail="Q", kind="topic", status="answered", answer_exchange=1),
+            ]
+        )
         assert ds.first_pending_topic_index() is None
 
     def test_mark_topic(self, tmp_path):
@@ -2342,9 +2517,11 @@ class TestTopicStateHelpers:
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_topics([
-            Topic(heading="Auth", detail="Q", kind="topic", status="pending", answer_exchange=None),
-        ])
+        ds.set_topics(
+            [
+                Topic(heading="Auth", detail="Q", kind="topic", status="pending", answer_exchange=None),
+            ]
+        )
         ds.mark_topic("Auth", "answered", 5)
         topics = ds.topics
         assert topics[0].status == "answered"
@@ -2353,6 +2530,7 @@ class TestTopicStateHelpers:
     def test_backward_compat_old_yaml_without_items(self, tmp_path):
         """Old discovery.yaml without items key should get items: [] via deep_merge."""
         import yaml
+
         from azext_prototype.stages.discovery_state import DiscoveryState
 
         # Write a YAML file without items key (no topics/open_items/confirmed_items either)
@@ -2386,6 +2564,7 @@ class TestLegacyMigration:
     def test_migrate_old_topics(self, tmp_path):
         """Legacy topics field is migrated into unified items."""
         import yaml
+
         from azext_prototype.stages.discovery_state import DiscoveryState
 
         state_dir = tmp_path / ".prototype" / "state"
@@ -2427,6 +2606,7 @@ class TestLegacyMigration:
     def test_migrate_old_open_and_confirmed_items(self, tmp_path):
         """Legacy open_items and confirmed_items migrate as decisions."""
         import yaml
+
         from azext_prototype.stages.discovery_state import DiscoveryState
 
         state_dir = tmp_path / ".prototype" / "state"
@@ -2465,6 +2645,7 @@ class TestLegacyMigration:
     def test_migrate_combined_topics_and_items(self, tmp_path):
         """Legacy state with both topics AND open_items merges correctly."""
         import yaml
+
         from azext_prototype.stages.discovery_state import DiscoveryState
 
         state_dir = tmp_path / ".prototype" / "state"
@@ -2508,11 +2689,13 @@ class TestUnifiedStatusCommands:
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_items([
-            Topic(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=1),
-            Topic(heading="Data", detail="Q?", kind="topic", status="pending", answer_exchange=None),
-            Topic(heading="Net", detail="Q?", kind="topic", status="pending", answer_exchange=None),
-        ])
+        ds.set_items(
+            [
+                Topic(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=1),
+                Topic(heading="Data", detail="Q?", kind="topic", status="pending", answer_exchange=None),
+                Topic(heading="Net", detail="Q?", kind="topic", status="pending", answer_exchange=None),
+            ]
+        )
 
         assert ds.open_count == 2
         assert ds.confirmed_count == 1
@@ -2526,10 +2709,12 @@ class TestUnifiedStatusCommands:
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_items([
-            Topic(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=1),
-            Topic(heading="Data", detail="Q?", kind="topic", status="pending", answer_exchange=None),
-        ])
+        ds.set_items(
+            [
+                Topic(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=1),
+                Topic(heading="Data", detail="Q?", kind="topic", status="pending", answer_exchange=None),
+            ]
+        )
 
         text = ds.format_open_items()
         assert "Data" in text
@@ -2542,10 +2727,12 @@ class TestUnifiedStatusCommands:
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_items([
-            Topic(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=1),
-            Topic(heading="Data", detail="Q?", kind="topic", status="pending", answer_exchange=None),
-        ])
+        ds.set_items(
+            [
+                Topic(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=1),
+                Topic(heading="Data", detail="Q?", kind="topic", status="pending", answer_exchange=None),
+            ]
+        )
 
         text = ds.format_confirmed_items()
         assert "Auth" in text
@@ -2568,10 +2755,18 @@ class TestUnifiedStatusCommands:
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_items([
-            TrackedItem(heading="Auth", detail="Q?", kind="topic", status="pending", answer_exchange=None),
-            TrackedItem(heading="Which region?", detail="Which region?", kind="decision", status="pending", answer_exchange=None),
-        ])
+        ds.set_items(
+            [
+                TrackedItem(heading="Auth", detail="Q?", kind="topic", status="pending", answer_exchange=None),
+                TrackedItem(
+                    heading="Which region?",
+                    detail="Which region?",
+                    kind="decision",
+                    status="pending",
+                    answer_exchange=None,
+                ),
+            ]
+        )
 
         text = ds.format_open_items()
         assert "Topics:" in text
@@ -2666,6 +2861,7 @@ class TestArtifactInventoryState:
     def test_legacy_state_without_inventory_loads(self, tmp_path):
         """Old discovery.yaml without inventory keys loads cleanly via _deep_merge."""
         import yaml
+
         from azext_prototype.stages.discovery_state import DiscoveryState
 
         state_dir = tmp_path / ".prototype" / "state"
@@ -2698,34 +2894,47 @@ class TestSectionLoopSlashCommands:
     """Verify that slash commands do NOT consume inner loop iterations."""
 
     def test_slash_commands_do_not_advance_topic(
-        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
+        tmp_path,
     ):
         """Issuing 5+ slash commands should NOT mark a topic as answered."""
         from azext_prototype.stages.discovery_state import DiscoveryState, Topic
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_topics([
-            Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="pending", answer_exchange=None),
-            Topic(heading="Data", detail="## Data\nWhat?", kind="topic", status="pending", answer_exchange=None),
-        ])
+        ds.set_topics(
+            [
+                Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="pending", answer_exchange=None),
+                Topic(heading="Data", detail="## Data\nWhat?", kind="topic", status="pending", answer_exchange=None),
+            ]
+        )
         ds.save()
 
         # AI identifies no new topics (re-entry), then confirms section after real answer
         mock_agent_context.ai_provider.chat.side_effect = [
-            _make_response("Yes"),   # Auth confirmed after real answer
-            _make_response("Yes"),   # Data confirmed after real answer
+            _make_response("Yes"),  # Auth confirmed after real answer
+            _make_response("Yes"),  # Data confirmed after real answer
             _make_response("## Summary\nDone."),
         ]
 
         ds2 = DiscoveryState(str(tmp_path))
         # 6 slash commands first (more than old limit of 5), then a real answer, then done
-        inputs = iter([
-            "/status", "/open", "/confirmed", "/status", "/open", "/confirmed",
-            "Use Azure AD B2C",  # Real answer for Auth
-            "Use Cosmos DB",     # Real answer for Data
-            "done",
-        ])
+        inputs = iter(
+            [
+                "/status",
+                "/open",
+                "/confirmed",
+                "/status",
+                "/open",
+                "/confirmed",
+                "Use Azure AD B2C",  # Real answer for Auth
+                "Use Cosmos DB",  # Real answer for Data
+                "done",
+            ]
+        )
 
         session = DiscoverySession(mock_agent_context, mock_registry, discovery_state=ds2)
         session.run(
@@ -2741,16 +2950,22 @@ class TestSectionLoopSlashCommands:
         assert topics[1].status == "answered"
 
     def test_empty_input_does_not_advance_topic(
-        self, mock_agent_context, mock_registry, mock_biz_agent, tmp_path,
+        self,
+        mock_agent_context,
+        mock_registry,
+        mock_biz_agent,
+        tmp_path,
     ):
         """Pressing Enter 5+ times should NOT mark a topic as answered."""
         from azext_prototype.stages.discovery_state import DiscoveryState, Topic
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_topics([
-            Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="pending", answer_exchange=None),
-        ])
+        ds.set_topics(
+            [
+                Topic(heading="Auth", detail="## Auth\nHow?", kind="topic", status="pending", answer_exchange=None),
+            ]
+        )
         ds.save()
 
         mock_agent_context.ai_provider.chat.side_effect = [
@@ -2812,11 +3027,13 @@ class TestTopicAtExchange:
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_items([
-            TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=2),
-            TrackedItem(heading="Data", detail="Q?", kind="topic", status="answered", answer_exchange=4),
-            TrackedItem(heading="Scale", detail="Q?", kind="topic", status="pending", answer_exchange=None),
-        ])
+        ds.set_items(
+            [
+                TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=2),
+                TrackedItem(heading="Data", detail="Q?", kind="topic", status="answered", answer_exchange=4),
+                TrackedItem(heading="Scale", detail="Q?", kind="topic", status="pending", answer_exchange=None),
+            ]
+        )
 
         assert ds.topic_at_exchange(1) == "Auth"
         assert ds.topic_at_exchange(2) == "Auth"
@@ -2829,9 +3046,11 @@ class TestTopicAtExchange:
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_items([
-            TrackedItem(heading="Auth", detail="Q?", kind="topic", status="pending", answer_exchange=None),
-        ])
+        ds.set_items(
+            [
+                TrackedItem(heading="Auth", detail="Q?", kind="topic", status="pending", answer_exchange=None),
+            ]
+        )
 
         assert ds.topic_at_exchange(1) is None
 
@@ -2903,7 +3122,9 @@ class TestHandleIncrementalContext:
     """Tests for _handle_incremental_context — re-entry topic detection."""
 
     def test_returns_false_no_topics_no_seed_context(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """When AI says [NO_NEW_TOPICS] and no seed_context, returns False."""
         mock_agent_context.ai_provider.chat.return_value = _make_response("[NO_NEW_TOPICS]")
@@ -2920,7 +3141,9 @@ class TestHandleIncrementalContext:
         assert result is False
 
     def test_returns_false_no_topics_with_seed_context(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """When AI says [NO_NEW_TOPICS] with seed_context, records decision."""
         mock_agent_context.ai_provider.chat.return_value = _make_response("[NO_NEW_TOPICS]")
@@ -2942,7 +3165,9 @@ class TestHandleIncrementalContext:
         assert any("Context recorded" in p for p in printed)
 
     def test_returns_true_when_new_topics_found(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """When AI returns new sections, topics are appended and returns True."""
         new_topics_response = (
@@ -2969,7 +3194,9 @@ class TestHandleIncrementalContext:
         assert session._discovery_state.has_items
 
     def test_no_parseable_sections_records_decision(
-        self, mock_agent_context, mock_registry,
+        self,
+        mock_agent_context,
+        mock_registry,
     ):
         """When AI response has no parseable sections, seed_context is saved as decision."""
         mock_agent_context.ai_provider.chat.return_value = _make_response(
@@ -3047,11 +3274,13 @@ class TestTopicAtExchangeOverlapping:
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_items([
-            TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=2),
-            TrackedItem(heading="Data", detail="Q?", kind="topic", status="answered", answer_exchange=2),
-            TrackedItem(heading="Scale", detail="Q?", kind="topic", status="answered", answer_exchange=5),
-        ])
+        ds.set_items(
+            [
+                TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=2),
+                TrackedItem(heading="Data", detail="Q?", kind="topic", status="answered", answer_exchange=2),
+                TrackedItem(heading="Scale", detail="Q?", kind="topic", status="answered", answer_exchange=5),
+            ]
+        )
 
         # Exchange 2 maps to the first answered topic with answer_exchange >= 2
         result = ds.topic_at_exchange(2)
@@ -3063,10 +3292,12 @@ class TestTopicAtExchangeOverlapping:
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_items([
-            TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=2),
-            TrackedItem(heading="Data", detail="Q?", kind="topic", status="answered", answer_exchange=5),
-        ])
+        ds.set_items(
+            [
+                TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=2),
+                TrackedItem(heading="Data", detail="Q?", kind="topic", status="answered", answer_exchange=5),
+            ]
+        )
 
         # Exchange 3 is after Auth (2) but before Data (5) → Data
         assert ds.topic_at_exchange(3) == "Data"
@@ -3077,9 +3308,11 @@ class TestTopicAtExchangeOverlapping:
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_items([
-            TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=2),
-        ])
+        ds.set_items(
+            [
+                TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=2),
+            ]
+        )
 
         assert ds.topic_at_exchange(0) == "Auth"
 
@@ -3089,10 +3322,12 @@ class TestTopicAtExchangeOverlapping:
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_items([
-            TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=2),
-            TrackedItem(heading="Data", detail="Q?", kind="topic", status="answered", answer_exchange=5),
-        ])
+        ds.set_items(
+            [
+                TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=2),
+                TrackedItem(heading="Data", detail="Q?", kind="topic", status="answered", answer_exchange=5),
+            ]
+        )
 
         assert ds.topic_at_exchange(10) is None
 
@@ -3102,9 +3337,11 @@ class TestTopicAtExchangeOverlapping:
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_items([
-            TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=5),
-        ])
+        ds.set_items(
+            [
+                TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=5),
+            ]
+        )
 
         assert ds.topic_at_exchange(1) == "Auth"
         assert ds.topic_at_exchange(3) == "Auth"
@@ -3117,11 +3354,13 @@ class TestTopicAtExchangeOverlapping:
 
         ds = DiscoveryState(str(tmp_path))
         ds.load()
-        ds.set_items([
-            TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=2),
-            TrackedItem(heading="Pending Topic", detail="Q?", kind="topic", status="pending", answer_exchange=None),
-            TrackedItem(heading="Data", detail="Q?", kind="topic", status="answered", answer_exchange=5),
-        ])
+        ds.set_items(
+            [
+                TrackedItem(heading="Auth", detail="Q?", kind="topic", status="answered", answer_exchange=2),
+                TrackedItem(heading="Pending Topic", detail="Q?", kind="topic", status="pending", answer_exchange=None),
+                TrackedItem(heading="Data", detail="Q?", kind="topic", status="answered", answer_exchange=5),
+            ]
+        )
 
         assert ds.topic_at_exchange(1) == "Auth"
         assert ds.topic_at_exchange(3) == "Data"

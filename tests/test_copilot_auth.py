@@ -9,7 +9,6 @@ from knack.util import CLIError
 
 from azext_prototype.ai import copilot_auth
 
-
 # ======================================================================
 # _get_copilot_cli_config_dir
 # ======================================================================
@@ -27,6 +26,7 @@ class TestGetCopilotCliConfigDir:
     @patch("pathlib.Path.home", return_value=Path("/mock/home"))
     def test_falls_back_to_home_copilot(self, _mock_home):
         import os
+
         os.environ.pop("XDG_CONFIG_HOME", None)
         result = copilot_auth._get_copilot_cli_config_dir()
         assert result == Path("/mock/home") / ".copilot"
@@ -62,6 +62,7 @@ class TestGetCopilotConfigDir:
     @patch.dict("os.environ", {"HOME": "/home/testuser"})
     def test_linux_default(self, _mock_sys):
         import os
+
         os.environ.pop("XDG_CONFIG_HOME", None)
         result = copilot_auth._get_copilot_config_dir()
         assert "github-copilot" in str(result)
@@ -119,12 +120,8 @@ class TestReadOAuthToken:
     @patch("azext_prototype.ai.copilot_auth._get_copilot_config_dir")
     def test_hosts_json_preferred_over_apps(self, mock_dir, tmp_path):
         mock_dir.return_value = tmp_path
-        (tmp_path / "hosts.json").write_text(
-            json.dumps({"github.com": {"oauth_token": "ghu_hosts"}})
-        )
-        (tmp_path / "apps.json").write_text(
-            json.dumps({"github.com": {"oauth_token": "ghu_apps"}})
-        )
+        (tmp_path / "hosts.json").write_text(json.dumps({"github.com": {"oauth_token": "ghu_hosts"}}))
+        (tmp_path / "apps.json").write_text(json.dumps({"github.com": {"oauth_token": "ghu_apps"}}))
         assert copilot_auth._read_oauth_token() == "ghu_hosts"
 
     @patch("azext_prototype.ai.copilot_auth._get_copilot_config_dir")
@@ -194,6 +191,7 @@ class TestResolveToken:
     @patch("azext_prototype.ai.copilot_auth._read_keychain_token", return_value="keychain_token")
     def test_gh_token_second(self, _mock_keychain):
         import os
+
         os.environ.pop("COPILOT_GITHUB_TOKEN", None)
         token, source = copilot_auth._resolve_token()
         assert token == "ght_second"
@@ -205,6 +203,7 @@ class TestResolveToken:
     @patch("azext_prototype.ai.copilot_auth._read_gh_token", return_value="ghp_cli")
     def test_keychain_before_legacy(self, _gh, _legacy, _kc):
         import os
+
         os.environ.pop("COPILOT_GITHUB_TOKEN", None)
         os.environ.pop("GH_TOKEN", None)
         token, source = copilot_auth._resolve_token()
@@ -217,6 +216,7 @@ class TestResolveToken:
     @patch("azext_prototype.ai.copilot_auth._read_gh_token", return_value="ghp_cli")
     def test_legacy_before_gh_cli(self, _gh, _legacy, _kc):
         import os
+
         os.environ.pop("COPILOT_GITHUB_TOKEN", None)
         os.environ.pop("GH_TOKEN", None)
         token, source = copilot_auth._resolve_token()
@@ -229,6 +229,7 @@ class TestResolveToken:
     @patch("azext_prototype.ai.copilot_auth._read_gh_token", return_value="ghp_cli")
     def test_gh_cli_before_github_token_env(self, _gh, _legacy, _kc):
         import os
+
         os.environ.pop("COPILOT_GITHUB_TOKEN", None)
         os.environ.pop("GH_TOKEN", None)
         os.environ.pop("GITHUB_TOKEN", None)
@@ -242,6 +243,7 @@ class TestResolveToken:
     @patch("azext_prototype.ai.copilot_auth._read_gh_token", return_value=None)
     def test_github_token_lowest(self, _gh, _legacy, _kc):
         import os
+
         os.environ.pop("COPILOT_GITHUB_TOKEN", None)
         os.environ.pop("GH_TOKEN", None)
         token, source = copilot_auth._resolve_token()
@@ -254,6 +256,7 @@ class TestResolveToken:
     @patch("azext_prototype.ai.copilot_auth._read_gh_token", return_value=None)
     def test_returns_none_when_nothing(self, _gh, _legacy, _kc):
         import os
+
         os.environ.pop("COPILOT_GITHUB_TOKEN", None)
         os.environ.pop("GH_TOKEN", None)
         os.environ.pop("GITHUB_TOKEN", None)

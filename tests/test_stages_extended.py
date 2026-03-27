@@ -1,6 +1,5 @@
 """Tests for deploy_stage.py, build_stage.py, and init_stage.py — full coverage."""
 
-import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -8,7 +7,6 @@ from knack.util import CLIError
 
 from azext_prototype.ai.provider import AIResponse
 from azext_prototype.stages.build_session import BuildResult
-
 
 # ======================================================================
 # DeployStage
@@ -20,6 +18,7 @@ class TestDeployStageExecution:
 
     def _make_stage(self):
         from azext_prototype.stages.deploy_stage import DeployStage
+
         return DeployStage()
 
     def test_deploy_guards(self):
@@ -33,23 +32,27 @@ class TestDeployStageExecution:
     @patch("subprocess.run")
     def test_check_az_login_true(self, mock_run):
         from azext_prototype.stages.deploy_helpers import check_az_login
+
         mock_run.return_value = MagicMock(returncode=0)
         assert check_az_login() is True
 
     @patch("subprocess.run")
     def test_check_az_login_false(self, mock_run):
         from azext_prototype.stages.deploy_helpers import check_az_login
+
         mock_run.return_value = MagicMock(returncode=1)
         assert check_az_login() is False
 
     @patch("subprocess.run", side_effect=FileNotFoundError)
     def test_check_az_login_not_installed(self, mock_run):
         from azext_prototype.stages.deploy_helpers import check_az_login
+
         assert check_az_login() is False
 
     @patch("subprocess.run")
     def test_get_current_subscription(self, mock_run):
         from azext_prototype.stages.deploy_helpers import get_current_subscription
+
         mock_run.return_value = MagicMock(returncode=0, stdout="abc-123\n")
         result = get_current_subscription()
         assert result == "abc-123"
@@ -57,11 +60,13 @@ class TestDeployStageExecution:
     @patch("subprocess.run", side_effect=FileNotFoundError)
     def test_get_current_subscription_not_installed(self, mock_run):
         from azext_prototype.stages.deploy_helpers import get_current_subscription
+
         assert get_current_subscription() == ""
 
     @patch("subprocess.run")
     def test_deploy_terraform_success(self, mock_run, tmp_path):
         from azext_prototype.stages.deploy_helpers import deploy_terraform
+
         infra_dir = tmp_path / "tf"
         infra_dir.mkdir()
         mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
@@ -72,6 +77,7 @@ class TestDeployStageExecution:
     @patch("subprocess.run")
     def test_deploy_terraform_failure(self, mock_run, tmp_path):
         from azext_prototype.stages.deploy_helpers import deploy_terraform
+
         infra_dir = tmp_path / "tf"
         infra_dir.mkdir()
         mock_run.return_value = MagicMock(returncode=1, stderr="init failed", stdout="")
@@ -82,6 +88,7 @@ class TestDeployStageExecution:
     @patch("subprocess.run")
     def test_deploy_bicep_failure(self, mock_run, tmp_path):
         from azext_prototype.stages.deploy_helpers import deploy_bicep
+
         (tmp_path / "main.bicep").write_text("resource x 'y' = {}", encoding="utf-8")
         mock_run.return_value = MagicMock(returncode=1, stderr="Deployment failed", stdout="")
 
@@ -90,6 +97,7 @@ class TestDeployStageExecution:
 
     def test_deploy_app_stage_with_deploy_script(self, tmp_path):
         from azext_prototype.stages.deploy_helpers import deploy_app_stage
+
         app_dir = tmp_path / "app"
         app_dir.mkdir()
         (app_dir / "deploy.sh").write_text("echo deployed", encoding="utf-8")
@@ -101,6 +109,7 @@ class TestDeployStageExecution:
 
     def test_deploy_app_stage_sub_apps(self, tmp_path):
         from azext_prototype.stages.deploy_helpers import deploy_app_stage
+
         stage_dir = tmp_path / "stage"
         stage_dir.mkdir()
         backend = stage_dir / "backend"
@@ -115,6 +124,7 @@ class TestDeployStageExecution:
 
     def test_deploy_app_stage_no_scripts(self, tmp_path):
         from azext_prototype.stages.deploy_helpers import deploy_app_stage
+
         empty_dir = tmp_path / "empty"
         empty_dir.mkdir()
         result = deploy_app_stage(empty_dir, "sub-123", "my-rg")
@@ -123,6 +133,7 @@ class TestDeployStageExecution:
     @patch("subprocess.run")
     def test_whatif_bicep_no_files(self, mock_run, tmp_path):
         from azext_prototype.stages.deploy_helpers import whatif_bicep
+
         empty_dir = tmp_path / "empty"
         empty_dir.mkdir()
         result = whatif_bicep(empty_dir, "sub-123", "my-rg")
@@ -131,12 +142,14 @@ class TestDeployStageExecution:
     @patch("subprocess.run")
     def test_whatif_bicep_no_rg_skips(self, mock_run, tmp_path):
         from azext_prototype.stages.deploy_helpers import whatif_bicep
+
         (tmp_path / "main.bicep").write_text("resource x 'y' = {}", encoding="utf-8")
         result = whatif_bicep(tmp_path, "sub-123", "")
         assert result["status"] == "skipped"
 
     def test_get_deploy_location_main_params(self, tmp_path):
         from azext_prototype.stages.deploy_helpers import get_deploy_location
+
         (tmp_path / "main.parameters.json").write_text(
             '{"parameters": {"location": {"value": "northeurope"}}}', encoding="utf-8"
         )
@@ -145,9 +158,8 @@ class TestDeployStageExecution:
 
     def test_get_deploy_location_string_value(self, tmp_path):
         from azext_prototype.stages.deploy_helpers import get_deploy_location
-        (tmp_path / "parameters.json").write_text(
-            '{"location": "uksouth"}', encoding="utf-8"
-        )
+
+        (tmp_path / "parameters.json").write_text('{"location": "uksouth"}', encoding="utf-8")
         result = get_deploy_location(tmp_path)
         assert result == "uksouth"
 
@@ -158,7 +170,8 @@ class TestDeployStageExecution:
         mock_agent_context.project_dir = str(project_with_build)
 
         result = stage.execute(
-            mock_agent_context, populated_registry,
+            mock_agent_context,
+            populated_registry,
             status=True,
         )
         assert result["status"] == "status_displayed"
@@ -170,7 +183,8 @@ class TestDeployStageExecution:
         mock_agent_context.project_dir = str(project_with_build)
 
         result = stage.execute(
-            mock_agent_context, populated_registry,
+            mock_agent_context,
+            populated_registry,
             reset=True,
         )
         assert result["status"] == "reset"
@@ -186,6 +200,7 @@ class TestBuildStageExecution:
 
     def _make_stage(self):
         from azext_prototype.stages.build_stage import BuildStage
+
         return BuildStage()
 
     def test_build_guards(self):
@@ -218,13 +233,9 @@ class TestBuildStageExecution:
         stage = self._make_stage()
         stage.get_guards = lambda: []
         mock_agent_context.project_dir = str(project_with_design)
-        mock_agent_context.ai_provider.chat.return_value = AIResponse(
-            content="Generated code", model="gpt-4o"
-        )
+        mock_agent_context.ai_provider.chat.return_value = AIResponse(content="Generated code", model="gpt-4o")
 
-        result = stage.execute(
-            mock_agent_context, populated_registry, scope="docs", dry_run=True
-        )
+        result = stage.execute(mock_agent_context, populated_registry, scope="docs", dry_run=True)
         assert result["status"] == "dry-run"
 
     def test_execute_all_scopes_dry_run(self, project_with_design, mock_agent_context, populated_registry):
@@ -232,9 +243,7 @@ class TestBuildStageExecution:
         stage.get_guards = lambda: []
         mock_agent_context.project_dir = str(project_with_design)
 
-        result = stage.execute(
-            mock_agent_context, populated_registry, scope="all", dry_run=True
-        )
+        result = stage.execute(mock_agent_context, populated_registry, scope="all", dry_run=True)
         assert result["status"] == "dry-run"
         assert result["scope"] == "all"
 
@@ -256,9 +265,7 @@ class TestBuildStageExecution:
         )
         mock_session_cls.return_value.run.return_value = mock_result
 
-        result = stage.execute(
-            mock_agent_context, populated_registry, scope="all", dry_run=False
-        )
+        result = stage.execute(mock_agent_context, populated_registry, scope="all", dry_run=False)
         assert result["status"] == "success"
         assert result["scope"] == "all"
         assert result["files_generated"] == ["main.tf"]
@@ -275,6 +282,7 @@ class TestInitStageExecution:
 
     def _make_stage(self):
         from azext_prototype.stages.init_stage import InitStage
+
         return InitStage()
 
     def test_init_guards(self):
@@ -344,9 +352,13 @@ class TestInitStageExecution:
 
         out = tmp_path / "test-proj"
         result = stage.execute(
-            ctx, registry,
-            name="test-proj", location="westus2", iac_tool="bicep",
-            ai_provider="github-models", output_dir=str(out),
+            ctx,
+            registry,
+            name="test-proj",
+            location="westus2",
+            iac_tool="bicep",
+            ai_provider="github-models",
+            output_dir=str(out),
         )
         assert result["status"] == "success"
         assert (out / "prototype.yaml").exists()
@@ -373,8 +385,11 @@ class TestInitStageExecution:
         registry = AgentRegistry()
 
         result = stage.execute(
-            ctx, registry,
-            name="lic-test", location="eastus", ai_provider="github-models",
+            ctx,
+            registry,
+            name="lic-test",
+            location="eastus",
+            ai_provider="github-models",
             output_dir=str(tmp_path / "lic-test"),
         )
         assert result["status"] == "success"
@@ -405,8 +420,11 @@ class TestInitStageExecution:
 
         with pytest.raises(CLIError, match="region is required"):
             stage.execute(
-                ctx, registry,
-                name="test-proj", location=None, output_dir=str(tmp_path / "test-proj"),
+                ctx,
+                registry,
+                name="test-proj",
+                location=None,
+                output_dir=str(tmp_path / "test-proj"),
             )
 
     def test_execute_azure_openai_skips_auth(self, tmp_path):
@@ -421,8 +439,11 @@ class TestInitStageExecution:
         registry = AgentRegistry()
 
         result = stage.execute(
-            ctx, registry,
-            name="aoai-test", location="eastus", ai_provider="azure-openai",
+            ctx,
+            registry,
+            name="aoai-test",
+            location="eastus",
+            ai_provider="azure-openai",
             output_dir=str(tmp_path / "aoai-test"),
         )
         assert result["status"] == "success"
@@ -443,9 +464,13 @@ class TestInitStageExecution:
 
         out = tmp_path / "env-test"
         stage.execute(
-            ctx, registry,
-            name="env-test", location="westus2", ai_provider="azure-openai",
-            environment="prod", output_dir=str(out),
+            ctx,
+            registry,
+            name="env-test",
+            location="westus2",
+            ai_provider="azure-openai",
+            environment="prod",
+            output_dir=str(out),
         )
         config = ProjectConfig(str(out))
         config.load()
@@ -467,9 +492,13 @@ class TestInitStageExecution:
 
         out = tmp_path / "model-test"
         stage.execute(
-            ctx, registry,
-            name="model-test", location="eastus", ai_provider="azure-openai",
-            model="gpt-4o-mini", output_dir=str(out),
+            ctx,
+            registry,
+            name="model-test",
+            location="eastus",
+            ai_provider="azure-openai",
+            model="gpt-4o-mini",
+            output_dir=str(out),
         )
         config = ProjectConfig(str(out))
         config.load()
@@ -493,8 +522,11 @@ class TestInitStageExecution:
 
         with patch("builtins.input", return_value="n"):
             result = stage.execute(
-                ctx, registry,
-                name="idem-test", location="eastus", ai_provider="azure-openai",
+                ctx,
+                registry,
+                name="idem-test",
+                location="eastus",
+                ai_provider="azure-openai",
                 output_dir=str(proj),
             )
         assert result["status"] == "cancelled"
@@ -513,8 +545,11 @@ class TestInitStageExecution:
 
         out = tmp_path / "complete-test"
         stage.execute(
-            ctx, registry,
-            name="complete-test", location="eastus", ai_provider="azure-openai",
+            ctx,
+            registry,
+            name="complete-test",
+            location="eastus",
+            ai_provider="azure-openai",
             output_dir=str(out),
         )
         config = ProjectConfig(str(out))

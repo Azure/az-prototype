@@ -12,8 +12,7 @@ from unittest.mock import patch
 import pytest
 
 from azext_prototype.ui.app import PrototypeApp
-from azext_prototype.ui.widgets.prompt_input import PromptInput, _PROMPT_PREFIX
-
+from azext_prototype.ui.widgets.prompt_input import _PROMPT_PREFIX, PromptInput
 
 # -------------------------------------------------------------------- #
 # Submitted message
@@ -181,7 +180,8 @@ class TestSubmit:
             prompt.text = "> hello world"
             messages = []
             with patch.object(
-                prompt, "post_message",
+                prompt,
+                "post_message",
                 side_effect=lambda msg: messages.append(msg),
             ):
                 prompt._submit()
@@ -215,7 +215,8 @@ class TestSubmit:
             prompt.text = "> "
             messages = []
             with patch.object(
-                prompt, "post_message",
+                prompt,
+                "post_message",
                 side_effect=lambda msg: messages.append(msg),
             ):
                 prompt._submit()
@@ -234,7 +235,8 @@ class TestSubmit:
             prompt.text = "> "
             messages = []
             with patch.object(
-                prompt, "post_message",
+                prompt,
+                "post_message",
                 side_effect=lambda msg: messages.append(msg),
             ):
                 prompt._submit()
@@ -254,7 +256,8 @@ class TestSubmit:
             prompt.text = ">    "
             messages = []
             with patch.object(
-                prompt, "post_message",
+                prompt,
+                "post_message",
                 side_effect=lambda msg: messages.append(msg),
             ):
                 prompt._submit()
@@ -273,7 +276,8 @@ class TestSubmit:
             prompt.text = "no prefix here"
             messages = []
             with patch.object(
-                prompt, "post_message",
+                prompt,
+                "post_message",
                 side_effect=lambda msg: messages.append(msg),
             ):
                 prompt._submit()
@@ -293,7 +297,8 @@ class TestSubmit:
             prompt.text = ">   padded   "
             messages = []
             with patch.object(
-                prompt, "post_message",
+                prompt,
+                "post_message",
                 side_effect=lambda msg: messages.append(msg),
             ):
                 prompt._submit()
@@ -313,7 +318,8 @@ class TestSubmit:
             prompt.text = "> line one\nline two"
             messages = []
             with patch.object(
-                prompt, "post_message",
+                prompt,
+                "post_message",
                 side_effect=lambda msg: messages.append(msg),
             ):
                 prompt._submit()
@@ -336,10 +342,7 @@ class TestSubmit:
                 prompt._submit()
                 # Only non-Submitted messages (Changed, SelectionChanged) may fire,
                 # but no Submitted message should be posted
-                submitted_calls = [
-                    c for c in mock_post.call_args_list
-                    if isinstance(c[0][0], PromptInput.Submitted)
-                ]
+                submitted_calls = [c for c in mock_post.call_args_list if isinstance(c[0][0], PromptInput.Submitted)]
                 assert len(submitted_calls) == 0
             # Text should remain unchanged (no reset since nothing was submitted)
             assert prompt.text == "> "

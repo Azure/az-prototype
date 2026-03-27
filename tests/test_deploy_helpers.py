@@ -1,7 +1,6 @@
 """Tests for azext_prototype.stages.deploy_helpers."""
 
 import json
-import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -23,14 +22,16 @@ class TestDeploymentOutputCapture:
         capture = DeploymentOutputCapture(str(tmp_project))
 
         # Simulate Bicep outputs
-        bicep_output = json.dumps({
-            "properties": {
-                "outputs": {
-                    "resource_group_name": {"type": "string", "value": "zd-rg-api-dev-eus"},
-                    "storage_account_name": {"type": "string", "value": "stzddatadeveus"},
+        bicep_output = json.dumps(
+            {
+                "properties": {
+                    "outputs": {
+                        "resource_group_name": {"type": "string", "value": "zd-rg-api-dev-eus"},
+                        "storage_account_name": {"type": "string", "value": "stzddatadeveus"},
+                    }
                 }
             }
-        })
+        )
         capture.capture_bicep(bicep_output)
 
         assert capture.get("resource_group_name") == "zd-rg-api-dev-eus"
@@ -40,14 +41,16 @@ class TestDeploymentOutputCapture:
     def test_to_env_vars(self, tmp_project):
         capture = DeploymentOutputCapture(str(tmp_project))
 
-        bicep_output = json.dumps({
-            "properties": {
-                "outputs": {
-                    "resource_group_name": {"type": "string", "value": "rg-test"},
-                    "app_url": {"type": "string", "value": "https://myapp.azurewebsites.net"},
+        bicep_output = json.dumps(
+            {
+                "properties": {
+                    "outputs": {
+                        "resource_group_name": {"type": "string", "value": "rg-test"},
+                        "app_url": {"type": "string", "value": "https://myapp.azurewebsites.net"},
+                    }
                 }
             }
-        })
+        )
         capture.capture_bicep(bicep_output)
 
         env_vars = capture.to_env_vars()
@@ -258,10 +261,9 @@ class TestDeployEnvPassing:
         test_env = build_deploy_env("sub-123", "tenant-456")
 
         # Create a mock bicep file
-        with patch.object(Path, "exists", return_value=True), \
-             patch.object(Path, "glob", return_value=[]), \
-             patch("azext_prototype.stages.deploy_helpers.find_bicep_params", return_value=None), \
-             patch("azext_prototype.stages.deploy_helpers.is_subscription_scoped", return_value=False):
+        with patch.object(Path, "exists", return_value=True), patch.object(Path, "glob", return_value=[]), patch(
+            "azext_prototype.stages.deploy_helpers.find_bicep_params", return_value=None
+        ), patch("azext_prototype.stages.deploy_helpers.is_subscription_scoped", return_value=False):
             deploy_bicep(infra_dir, "sub-123", "my-rg", env=test_env)
 
         # Verify --tenant was added to the command
@@ -356,10 +358,9 @@ class TestDeployEnvPassing:
         mock_run.return_value = MagicMock(returncode=0, stdout="What-if output", stderr="")
         test_env = build_deploy_env("sub-123", "tenant-789")
 
-        with patch.object(Path, "exists", return_value=True), \
-             patch.object(Path, "glob", return_value=[]), \
-             patch("azext_prototype.stages.deploy_helpers.find_bicep_params", return_value=None), \
-             patch("azext_prototype.stages.deploy_helpers.is_subscription_scoped", return_value=False):
+        with patch.object(Path, "exists", return_value=True), patch.object(Path, "glob", return_value=[]), patch(
+            "azext_prototype.stages.deploy_helpers.find_bicep_params", return_value=None
+        ), patch("azext_prototype.stages.deploy_helpers.is_subscription_scoped", return_value=False):
             whatif_bicep(Path("/tmp/fake"), "sub-123", "my-rg", env=test_env)
 
         cmd = mock_run.call_args[0][0]
@@ -461,9 +462,7 @@ class TestResolveStageSecrets:
         assert len(stored) == 64
 
     def test_multiple_secrets(self, tmp_path, tmp_project):
-        (tmp_path / "main.tf").write_text(
-            'variable "graph_client_secret" {}\nvariable "admin_password" {}\n'
-        )
+        (tmp_path / "main.tf").write_text('variable "graph_client_secret" {}\nvariable "admin_password" {}\n')
         config = self._make_config(tmp_project)
 
         result = resolve_stage_secrets(tmp_path, config)

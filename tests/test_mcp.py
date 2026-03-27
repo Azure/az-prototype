@@ -1,10 +1,7 @@
 """Tests for MCP handler contract, registry, manager, and loader."""
 
-import json
-import os
 import threading
-from dataclasses import dataclass
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -15,10 +12,9 @@ from azext_prototype.mcp.base import (
     MCPToolDefinition,
     MCPToolResult,
 )
+from azext_prototype.mcp.loader import load_handlers_from_directory, load_mcp_handler
 from azext_prototype.mcp.manager import MCPManager
 from azext_prototype.mcp.registry import MCPRegistry
-from azext_prototype.mcp.loader import load_mcp_handler, load_handlers_from_directory
-
 
 # -------------------------------------------------------------------- #
 # Concrete test handler (in-process, no real MCP server)
@@ -301,11 +297,19 @@ class TestMCPHandler:
 
     def test_name_from_config(self):
         """When class doesn't set name, falls back to config name."""
+
         class NoNameHandler(MCPHandler):
-            def connect(self): pass
-            def list_tools(self): return []
-            def call_tool(self, name, args): return MCPToolResult(content="")
-            def disconnect(self): pass
+            def connect(self):
+                pass
+
+            def list_tools(self):
+                return []
+
+            def call_tool(self, name, args):
+                return MCPToolResult(content="")
+
+            def disconnect(self):
+                pass
 
         config = MCPHandlerConfig(name="from-config")
         handler = NoNameHandler(config)
@@ -492,12 +496,14 @@ class TestMCPManager:
                 self._connected = True
 
             def list_tools(self):
-                return [MCPToolDefinition(
-                    name="maybe",
-                    description="Sometimes fails",
-                    input_schema={},
-                    handler_name="sometimes",
-                )]
+                return [
+                    MCPToolDefinition(
+                        name="maybe",
+                        description="Sometimes fails",
+                        input_schema={},
+                        handler_name="sometimes",
+                    )
+                ]
 
             def call_tool(self, name, arguments):
                 self.call_count += 1
@@ -586,10 +592,12 @@ class TestMCPManager:
 
     def test_scoped_tools(self):
         registry = MCPRegistry()
-        build_handler = EchoHandler(MCPHandlerConfig(
-            name="build-only",
-            stages=["build"],
-        ))
+        build_handler = EchoHandler(
+            MCPHandlerConfig(
+                name="build-only",
+                stages=["build"],
+            )
+        )
         registry.register_builtin(build_handler)
         manager = MCPManager(registry)
 
@@ -813,12 +821,8 @@ class TestPackageExports:
     def test_imports(self):
         from azext_prototype.mcp import (
             MCPHandler,
-            MCPHandlerConfig,
             MCPManager,
-            MCPRegistry,
-            MCPToolCall,
-            MCPToolDefinition,
-            MCPToolResult,
         )
+
         assert MCPHandler is not None
         assert MCPManager is not None

@@ -12,12 +12,25 @@ import pytest
 
 from azext_prototype.ui.app import PrototypeApp
 from azext_prototype.ui.task_model import TaskStatus
-from azext_prototype.ui.tui_adapter import _strip_rich_markup, _RICH_TAG_RE
-
+from azext_prototype.ui.tui_adapter import _format_elapsed, _strip_rich_markup
 
 # -------------------------------------------------------------------- #
 # Unit tests (no Textual)
 # -------------------------------------------------------------------- #
+
+
+class TestFormatElapsed:
+    def test_under_60(self):
+        assert _format_elapsed(42.3) == "42s"
+
+    def test_exactly_60(self):
+        assert _format_elapsed(60.0) == "1m00s"
+
+    def test_over_60(self):
+        assert _format_elapsed(64.9) == "1m04s"
+
+    def test_large_value(self):
+        assert _format_elapsed(125.0) == "2m05s"
 
 
 class TestStripRichMarkup:
@@ -47,7 +60,7 @@ class TestStripRichMarkup:
 async def test_adapter_print_fn():
     """print_fn should route text to the ConsoleView."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         adapter = app.adapter
         # Simulate a worker thread calling print_fn
         done = threading.Event()
@@ -92,7 +105,7 @@ async def test_adapter_input_fn_and_submit():
 async def test_adapter_status_fn():
     """status_fn should update the info bar assist text."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         adapter = app.adapter
 
         done = threading.Event()
@@ -112,7 +125,7 @@ async def test_adapter_status_fn():
 async def test_adapter_token_status():
     """print_token_status should update the info bar status."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         adapter = app.adapter
         done = threading.Event()
 
@@ -275,16 +288,20 @@ async def test_adapter_section_fn_hierarchy():
 
         def _worker():
             # First call: a level-2 parent with level-3 children
-            adapter.section_fn([
-                ("Architecture", 2),
-                ("Compute", 3),
-                ("Networking", 3),
-            ])
+            adapter.section_fn(
+                [
+                    ("Architecture", 2),
+                    ("Compute", 3),
+                    ("Networking", 3),
+                ]
+            )
             # Second call: new level-2, then level-3 under it
-            adapter.section_fn([
-                ("Security", 2),
-                ("Authentication", 3),
-            ])
+            adapter.section_fn(
+                [
+                    ("Security", 2),
+                    ("Authentication", 3),
+                ]
+            )
             done.set()
 
         t = threading.Thread(target=_worker)
@@ -322,7 +339,7 @@ async def test_adapter_section_fn_hierarchy():
 async def test_adapter_print_fn_preserves_markup():
     """print_fn should detect and preserve Rich markup tags."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         adapter = app.adapter
         done = threading.Event()
 
@@ -347,7 +364,7 @@ async def test_adapter_print_fn_preserves_markup():
 async def test_adapter_response_fn_single_section():
     """response_fn with no headings should render without pagination."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         adapter = app.adapter
         done = threading.Event()
 
@@ -366,7 +383,7 @@ async def test_adapter_response_fn_single_section():
 async def test_adapter_on_prompt_submitted_empty_no_echo():
     """Empty submission (pagination) should not echo to console."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         adapter = app.adapter
         # Submit empty string (simulating "Enter to continue")
         adapter.on_prompt_submitted("")

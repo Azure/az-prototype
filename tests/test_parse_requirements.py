@@ -1,7 +1,5 @@
 """Tests for the heading-based _parse_requirements_to_learnings."""
 
-import pytest
-
 from azext_prototype.stages.design_stage import DesignStage
 
 
@@ -13,7 +11,9 @@ class TestParseRequirementsToLearnings:
 
     def _parse(self, text, design_state=None):
         return self.stage._parse_requirements_to_learnings(
-            text, [], design_state or {},
+            text,
+            [],
+            design_state or {},
         )
 
     def test_parses_all_sections(self):

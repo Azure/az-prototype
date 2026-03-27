@@ -10,10 +10,10 @@ import pytest
 
 import azext_prototype.debug_log as debug_log
 
-
 # ======================================================================
 # Helpers
 # ======================================================================
+
 
 @pytest.fixture(autouse=True)
 def _reset_debug_log_globals():

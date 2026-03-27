@@ -14,10 +14,10 @@ from knack.util import CLIError
 from azext_prototype.stages.discovery import DiscoveryResult
 from tests.conftest import make_ai_response
 
-
 # ======================================================================
 # Helpers
 # ======================================================================
+
 
 def _make_discovery_result(**overrides):
     """Quick factory for DiscoveryResult."""
@@ -51,9 +51,7 @@ class TestDesignStageArtifactsPath:
     """Cover lines 102-109 — artifacts_path handling in execute()."""
 
     @patch("azext_prototype.stages.design_stage.DiscoverySession")
-    def test_execute_with_artifacts_file(
-        self, MockDS, project_with_config, mock_agent_context, populated_registry
-    ):
+    def test_execute_with_artifacts_file(self, MockDS, project_with_config, mock_agent_context, populated_registry):
         """When artifacts= points to a file, the content is ingested."""
         from azext_prototype.stages.design_stage import DesignStage
 
@@ -120,8 +118,8 @@ class TestDesignStageNoArchitect:
 
     @patch("azext_prototype.stages.design_stage.DiscoverySession")
     def test_no_architect_agents_raises(self, MockDS, project_with_config, mock_agent_context):
-        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.agents.registry import AgentRegistry
+        from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
         stage.get_guards = lambda: []
@@ -145,9 +143,7 @@ class TestDesignStagePolicyOverrides:
     """Cover the policy_overrides persistence path."""
 
     @patch("azext_prototype.stages.design_stage.DiscoverySession")
-    def test_policy_overrides_stored(
-        self, MockDS, project_with_config, mock_agent_context, populated_registry
-    ):
+    def test_policy_overrides_stored(self, MockDS, project_with_config, mock_agent_context, populated_registry):
         from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
@@ -177,8 +173,8 @@ class TestDesignStageIaCReview:
     """Cover line 318 — _run_iac_review method."""
 
     def test_run_iac_review_with_terraform_agent(self, project_with_config, mock_agent_context, populated_registry):
-        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.config import ProjectConfig
+        from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
         config = ProjectConfig(str(project_with_config))
@@ -195,9 +191,9 @@ class TestDesignStageIaCReview:
         )
 
     def test_run_iac_review_no_iac_agents(self, project_with_config, mock_agent_context):
-        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.agents.registry import AgentRegistry
         from azext_prototype.config import ProjectConfig
+        from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
         config = ProjectConfig(str(project_with_config))
@@ -307,11 +303,13 @@ class TestDesignStageReadArtifacts:
 
     def test_read_artifacts_embedded_images(self, tmp_path):
         """Embedded images from documents are collected in result['images']."""
-        from azext_prototype.stages.design_stage import DesignStage
+        import io
+
         from docx import Document
         from docx.shared import Inches
         from PIL import Image as PILImage
-        import io
+
+        from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
         # Create a DOCX with an embedded image
@@ -333,8 +331,9 @@ class TestDesignStageReadArtifacts:
 
     def test_read_artifacts_document_extraction(self, tmp_path):
         """PDF/DOCX text is extracted and included in content."""
-        from azext_prototype.stages.design_stage import DesignStage
         from docx import Document
+
+        from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
         doc = Document()
@@ -362,6 +361,7 @@ class TestArtifactInventory:
 
     def test_compute_artifact_hashes_single_file(self, tmp_path):
         import hashlib
+
         from azext_prototype.stages.design_stage import DesignStage
 
         f = tmp_path / "spec.md"
@@ -374,6 +374,7 @@ class TestArtifactInventory:
 
     def test_compute_artifact_hashes_directory(self, tmp_path):
         import hashlib
+
         from azext_prototype.stages.design_stage import DesignStage
 
         f1 = tmp_path / "a.md"
@@ -449,6 +450,7 @@ class TestArtifactInventory:
     def test_unchanged_artifacts_skip_reading(self, tmp_path):
         """When all hashes match, no files should be read."""
         import hashlib
+
         from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.stages.discovery_state import DiscoveryState
 
@@ -480,6 +482,7 @@ class TestArtifactInventory:
     def test_changed_artifact_detected(self, tmp_path):
         """When a file changes, it appears in the delta set."""
         import hashlib
+
         from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.stages.discovery_state import DiscoveryState
 
@@ -502,6 +505,7 @@ class TestArtifactInventory:
     def test_new_artifact_detected(self, tmp_path):
         """A new file not in inventory appears in the new set."""
         import hashlib
+
         from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.stages.discovery_state import DiscoveryState
 
@@ -524,6 +528,7 @@ class TestArtifactInventory:
     def test_context_hash_unchanged_skips(self, tmp_path):
         """Same context string should produce matching hash."""
         import hashlib
+
         from azext_prototype.stages.discovery_state import DiscoveryState
 
         ctx = "Build a web app with authentication"
@@ -539,6 +544,7 @@ class TestArtifactInventory:
     def test_context_hash_changed_detected(self, tmp_path):
         """Different context string should produce non-matching hash."""
         import hashlib
+
         from azext_prototype.stages.discovery_state import DiscoveryState
 
         ds = DiscoveryState(str(tmp_path))
@@ -553,8 +559,8 @@ class TestDesignStageReadFile:
     """Cover _read_file — now returns ReadResult."""
 
     def test_read_file_success(self, tmp_path):
-        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.parsers.binary_reader import FileCategory
+        from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
         f = tmp_path / "test.txt"
@@ -574,8 +580,8 @@ class TestDesignStageReadFile:
         assert result.error is not None
 
     def test_read_file_image(self, tmp_path):
-        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.parsers.binary_reader import FileCategory
+        from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
         f = tmp_path / "photo.jpg"
@@ -585,9 +591,10 @@ class TestDesignStageReadFile:
         assert result.image_data is not None
 
     def test_read_file_document(self, tmp_path):
-        from azext_prototype.stages.design_stage import DesignStage
-        from azext_prototype.parsers.binary_reader import FileCategory
         from docx import Document
+
+        from azext_prototype.parsers.binary_reader import FileCategory
+        from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
         doc = Document()
@@ -676,10 +683,12 @@ class TestDesignStageResetDiscoveryState:
 
         # Create a discovery state file with existing topics
         ds = DiscoveryState(str(tmp_path))
-        ds.set_topics([
-            Topic(heading="Networking", detail="Q?", kind="topic", status="covered", answer_exchange=1),
-            Topic(heading="Security", detail="Q?", kind="topic", status="covered", answer_exchange=2),
-        ])
+        ds.set_topics(
+            [
+                Topic(heading="Networking", detail="Q?", kind="topic", status="covered", answer_exchange=1),
+                Topic(heading="Security", detail="Q?", kind="topic", status="covered", answer_exchange=2),
+            ]
+        )
         assert ds.exists
         assert ds.has_topics
 
@@ -701,9 +710,9 @@ class TestDesignStageResetDiscoveryState:
         from azext_prototype.stages.design_stage import DesignStage
 
         # Patch DiscoveryState in design_stage module to verify reset is called
-        with patch("azext_prototype.stages.design_stage.DiscoveryState") as MockDS, \
-             patch("azext_prototype.stages.design_stage.DiscoverySession") as MockSession, \
-             patch("azext_prototype.stages.design_stage.ProjectConfig"):
+        with patch("azext_prototype.stages.design_stage.DiscoveryState") as MockDS, patch(
+            "azext_prototype.stages.design_stage.DiscoverySession"
+        ) as MockSession, patch("azext_prototype.stages.design_stage.ProjectConfig"):
             mock_instance = MagicMock()
             mock_instance.exists = True
             MockDS.return_value = mock_instance
@@ -717,9 +726,9 @@ class TestDesignStageResetDiscoveryState:
             agent_context.project_dir = str(tmp_path)
             registry = MagicMock()
 
-            with patch.object(stage, "_load_design_state", return_value={"iteration": 0}), \
-                 patch.object(stage, "_save_design_state"), \
-                 patch.object(stage, "_write_architecture_docs"):
+            with patch.object(stage, "_load_design_state", return_value={"iteration": 0}), patch.object(
+                stage, "_save_design_state"
+            ), patch.object(stage, "_write_architecture_docs"):
                 try:
                     stage.execute(
                         agent_context,

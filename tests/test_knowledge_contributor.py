@@ -5,7 +5,6 @@ the fire-and-forget wrapper, and the CLI command ``az prototype knowledge
 contribute``.
 """
 
-import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -18,6 +17,7 @@ _CUSTOM_MODULE = "azext_prototype.custom"
 # ======================================================================
 # Helpers
 # ======================================================================
+
 
 def _make_finding(**overrides) -> dict:
     """Create a minimal finding dict with optional overrides."""
@@ -46,11 +46,14 @@ def _make_loader(service_content: str = "") -> MagicMock:
 # TestFormatContributionBody
 # ======================================================================
 
+
 class TestFormatContributionBody:
     """Tests for ``format_contribution_body()``."""
 
     def test_basic_format(self):
-        from azext_prototype.stages.knowledge_contributor import format_contribution_body
+        from azext_prototype.stages.knowledge_contributor import (
+            format_contribution_body,
+        )
 
         finding = _make_finding()
         body = format_contribution_body(finding)
@@ -68,7 +71,9 @@ class TestFormatContributionBody:
         assert "QA diagnosis" in body
 
     def test_missing_fields_defaults(self):
-        from azext_prototype.stages.knowledge_contributor import format_contribution_body
+        from azext_prototype.stages.knowledge_contributor import (
+            format_contribution_body,
+        )
 
         finding = {"service": "redis"}
         body = format_contribution_body(finding)
@@ -80,7 +85,9 @@ class TestFormatContributionBody:
         assert "No specific content provided" in body
 
     def test_empty_content(self):
-        from azext_prototype.stages.knowledge_contributor import format_contribution_body
+        from azext_prototype.stages.knowledge_contributor import (
+            format_contribution_body,
+        )
 
         finding = _make_finding(content="")
         body = format_contribution_body(finding)
@@ -92,11 +99,14 @@ class TestFormatContributionBody:
 # TestFormatContributionTitle
 # ======================================================================
 
+
 class TestFormatContributionTitle:
     """Tests for ``format_contribution_title()``."""
 
     def test_basic_title(self):
-        from azext_prototype.stages.knowledge_contributor import format_contribution_title
+        from azext_prototype.stages.knowledge_contributor import (
+            format_contribution_title,
+        )
 
         finding = _make_finding()
         title = format_contribution_title(finding)
@@ -105,7 +115,9 @@ class TestFormatContributionTitle:
         assert "RU throughput" in title
 
     def test_truncation_at_60(self):
-        from azext_prototype.stages.knowledge_contributor import format_contribution_title
+        from azext_prototype.stages.knowledge_contributor import (
+            format_contribution_title,
+        )
 
         long_context = "A" * 100
         finding = _make_finding(context=long_context)
@@ -117,7 +129,9 @@ class TestFormatContributionTitle:
         assert len(title) < 120
 
     def test_missing_service(self):
-        from azext_prototype.stages.knowledge_contributor import format_contribution_title
+        from azext_prototype.stages.knowledge_contributor import (
+            format_contribution_title,
+        )
 
         finding = _make_finding(service="")
         # Falls back to "unknown" since service key exists but is empty
@@ -128,7 +142,9 @@ class TestFormatContributionTitle:
         assert "[Knowledge] unknown:" in title
 
     def test_description_fallback(self):
-        from azext_prototype.stages.knowledge_contributor import format_contribution_title
+        from azext_prototype.stages.knowledge_contributor import (
+            format_contribution_title,
+        )
 
         finding = _make_finding(context="", description="fallback description")
         title = format_contribution_title(finding)
@@ -139,6 +155,7 @@ class TestFormatContributionTitle:
 # ======================================================================
 # TestCheckKnowledgeGap
 # ======================================================================
+
 
 class TestCheckKnowledgeGap:
     """Tests for ``check_knowledge_gap()``."""
@@ -206,14 +223,14 @@ class TestCheckKnowledgeGap:
 # TestSubmitContribution
 # ======================================================================
 
+
 class TestSubmitContribution:
     """Tests for ``submit_contribution()``."""
 
     def test_success(self):
         from azext_prototype.stages.knowledge_contributor import submit_contribution
 
-        with patch(f"{_BP_MODULE}.subprocess.run") as mock_auth, \
-             patch(f"{_KC_MODULE}.subprocess.run") as mock_create:
+        with patch(f"{_BP_MODULE}.subprocess.run") as mock_auth, patch(f"{_KC_MODULE}.subprocess.run") as mock_create:
             mock_auth.return_value = MagicMock(returncode=0)
             mock_create.return_value = MagicMock(
                 returncode=0,
@@ -238,8 +255,7 @@ class TestSubmitContribution:
     def test_create_fails(self):
         from azext_prototype.stages.knowledge_contributor import submit_contribution
 
-        with patch(f"{_BP_MODULE}.subprocess.run") as mock_auth, \
-             patch(f"{_KC_MODULE}.subprocess.run") as mock_create:
+        with patch(f"{_BP_MODULE}.subprocess.run") as mock_auth, patch(f"{_KC_MODULE}.subprocess.run") as mock_create:
             mock_auth.return_value = MagicMock(returncode=0)
             mock_create.return_value = MagicMock(
                 returncode=1,
@@ -253,8 +269,7 @@ class TestSubmitContribution:
     def test_labels_include_service_and_type(self):
         from azext_prototype.stages.knowledge_contributor import submit_contribution
 
-        with patch(f"{_BP_MODULE}.subprocess.run") as mock_auth, \
-             patch(f"{_KC_MODULE}.subprocess.run") as mock_create:
+        with patch(f"{_BP_MODULE}.subprocess.run") as mock_auth, patch(f"{_KC_MODULE}.subprocess.run") as mock_create:
             mock_auth.return_value = MagicMock(returncode=0)
             mock_create.return_value = MagicMock(
                 returncode=0,
@@ -275,8 +290,7 @@ class TestSubmitContribution:
     def test_custom_repo(self):
         from azext_prototype.stages.knowledge_contributor import submit_contribution
 
-        with patch(f"{_BP_MODULE}.subprocess.run") as mock_auth, \
-             patch(f"{_KC_MODULE}.subprocess.run") as mock_create:
+        with patch(f"{_BP_MODULE}.subprocess.run") as mock_auth, patch(f"{_KC_MODULE}.subprocess.run") as mock_create:
             mock_auth.return_value = MagicMock(returncode=0)
             mock_create.return_value = MagicMock(
                 returncode=0,
@@ -294,8 +308,9 @@ class TestSubmitContribution:
         from azext_prototype.stages.knowledge_contributor import submit_contribution
 
         # Mock check_gh_auth at its source (both modules share the subprocess object)
-        with patch(f"{_BP_MODULE}.check_gh_auth", return_value=True), \
-             patch(f"{_KC_MODULE}.subprocess.run") as mock_create:
+        with patch(f"{_BP_MODULE}.check_gh_auth", return_value=True), patch(
+            f"{_KC_MODULE}.subprocess.run"
+        ) as mock_create:
             mock_create.side_effect = FileNotFoundError
 
             result = submit_contribution(_make_finding())
@@ -306,6 +321,7 @@ class TestSubmitContribution:
 # ======================================================================
 # TestBuildFindingFromQa
 # ======================================================================
+
 
 class TestBuildFindingFromQa:
     """Tests for ``build_finding_from_qa()``."""
@@ -351,6 +367,7 @@ class TestBuildFindingFromQa:
 # TestSubmitIfGap
 # ======================================================================
 
+
 class TestSubmitIfGap:
     """Tests for ``submit_if_gap()``."""
 
@@ -360,8 +377,7 @@ class TestSubmitIfGap:
         loader = _make_loader("")  # no content = gap
         printed: list[str] = []
 
-        with patch(f"{_BP_MODULE}.subprocess.run") as mock_auth, \
-             patch(f"{_KC_MODULE}.subprocess.run") as mock_create:
+        with patch(f"{_BP_MODULE}.subprocess.run") as mock_auth, patch(f"{_KC_MODULE}.subprocess.run") as mock_create:
             mock_auth.return_value = MagicMock(returncode=0)
             mock_create.return_value = MagicMock(
                 returncode=0,
@@ -369,7 +385,8 @@ class TestSubmitIfGap:
             )
 
             result = submit_if_gap(
-                _make_finding(), loader,
+                _make_finding(),
+                loader,
                 print_fn=printed.append,
             )
 
@@ -414,8 +431,7 @@ class TestSubmitIfGap:
         loader = _make_loader("")  # gap
         printed: list[str] = []
 
-        with patch(f"{_BP_MODULE}.subprocess.run") as mock_auth, \
-             patch(f"{_KC_MODULE}.subprocess.run") as mock_create:
+        with patch(f"{_BP_MODULE}.subprocess.run") as mock_auth, patch(f"{_KC_MODULE}.subprocess.run") as mock_create:
             mock_auth.return_value = MagicMock(returncode=0)
             mock_create.return_value = MagicMock(
                 returncode=1,
@@ -423,8 +439,9 @@ class TestSubmitIfGap:
                 stdout="",
             )
 
-            result = submit_if_gap(
-                _make_finding(), loader,
+            submit_if_gap(
+                _make_finding(),
+                loader,
                 print_fn=printed.append,
             )
 
@@ -435,6 +452,7 @@ class TestSubmitIfGap:
 # ======================================================================
 # TestKnowledgeContributeCommand
 # ======================================================================
+
 
 class TestKnowledgeContributeCommand:
     """Tests for ``prototype_knowledge_contribute()`` CLI command."""
@@ -459,9 +477,9 @@ class TestKnowledgeContributeCommand:
         from azext_prototype.custom import prototype_knowledge_contribute
 
         cmd = MagicMock()
-        with patch(f"{_CUSTOM_MODULE}._get_project_dir", return_value=str(project_with_config)), \
-             patch(f"{_BP_MODULE}.subprocess.run") as mock_auth, \
-             patch(f"{_KC_MODULE}.subprocess.run") as mock_create:
+        with patch(f"{_CUSTOM_MODULE}._get_project_dir", return_value=str(project_with_config)), patch(
+            f"{_BP_MODULE}.subprocess.run"
+        ) as mock_auth, patch(f"{_KC_MODULE}.subprocess.run") as mock_create:
             mock_auth.return_value = MagicMock(returncode=0)
             mock_create.return_value = MagicMock(
                 returncode=0,
@@ -479,12 +497,14 @@ class TestKnowledgeContributeCommand:
         assert result["url"] == "https://github.com/Azure/az-prototype/issues/55"
 
     def test_gh_not_authed_raises(self, project_with_config):
-        from azext_prototype.custom import prototype_knowledge_contribute
         from knack.util import CLIError
 
+        from azext_prototype.custom import prototype_knowledge_contribute
+
         cmd = MagicMock()
-        with patch(f"{_CUSTOM_MODULE}._get_project_dir", return_value=str(project_with_config)), \
-             patch(f"{_BP_MODULE}.subprocess.run") as mock_auth:
+        with patch(f"{_CUSTOM_MODULE}._get_project_dir", return_value=str(project_with_config)), patch(
+            f"{_BP_MODULE}.subprocess.run"
+        ) as mock_auth:
             mock_auth.return_value = MagicMock(returncode=1)
 
             with pytest.raises(CLIError, match="not authenticated"):
@@ -516,8 +536,9 @@ class TestKnowledgeContributeCommand:
         assert result["status"] == "draft"
 
     def test_file_not_found_raises(self, project_with_config):
-        from azext_prototype.custom import prototype_knowledge_contribute
         from knack.util import CLIError
+
+        from azext_prototype.custom import prototype_knowledge_contribute
 
         cmd = MagicMock()
         with patch(f"{_CUSTOM_MODULE}._get_project_dir", return_value=str(project_with_config)):

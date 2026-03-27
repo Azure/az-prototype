@@ -4,7 +4,6 @@ from pathlib import Path
 
 from azext_prototype.parsers.file_extractor import parse_file_blocks, write_parsed_files
 
-
 # ======================================================================
 # parse_file_blocks
 # ======================================================================
@@ -14,94 +13,50 @@ class TestParseFileBlocks:
     """Unit tests for parse_file_blocks()."""
 
     def test_single_file_block(self):
-        content = (
-            "Here is the code:\n"
-            "```main.tf\n"
-            'resource "azurerm_resource_group" "rg" {}\n'
-            "```\n"
-        )
+        content = "Here is the code:\n" "```main.tf\n" 'resource "azurerm_resource_group" "rg" {}\n' "```\n"
         result = parse_file_blocks(content)
         assert result == {"main.tf": 'resource "azurerm_resource_group" "rg" {}'}
 
     def test_multiple_file_blocks(self):
-        content = (
-            "```main.tf\n"
-            "# main\n"
-            "```\n"
-            "\n"
-            "```variables.tf\n"
-            "# vars\n"
-            "```\n"
-        )
+        content = "```main.tf\n" "# main\n" "```\n" "\n" "```variables.tf\n" "# vars\n" "```\n"
         result = parse_file_blocks(content)
         assert result == {"main.tf": "# main", "variables.tf": "# vars"}
 
     def test_nested_directory_paths(self):
-        content = (
-            "```infra/modules/network.tf\n"
-            "# network\n"
-            "```\n"
-        )
+        content = "```infra/modules/network.tf\n" "# network\n" "```\n"
         result = parse_file_blocks(content)
         assert "infra/modules/network.tf" in result
 
     def test_language_prefix_stripped(self):
-        content = (
-            "```python:src/app.py\n"
-            "print('hello')\n"
-            "```\n"
-        )
+        content = "```python:src/app.py\n" "print('hello')\n" "```\n"
         result = parse_file_blocks(content)
         assert "src/app.py" in result
         assert result["src/app.py"] == "print('hello')"
 
     def test_hcl_language_prefix(self):
-        content = (
-            "```hcl:main.tf\n"
-            "resource {}\n"
-            "```\n"
-        )
+        content = "```hcl:main.tf\n" "resource {}\n" "```\n"
         result = parse_file_blocks(content)
         assert "main.tf" in result
 
     def test_no_file_blocks_returns_empty(self):
-        content = (
-            "This is just prose.\n"
-            "\n"
-            "No code blocks here.\n"
-        )
+        content = "This is just prose.\n" "\n" "No code blocks here.\n"
         result = parse_file_blocks(content)
         assert result == {}
 
     def test_code_block_without_filename_skipped(self):
-        content = (
-            "```python\n"
-            "print('hello')\n"
-            "```\n"
-        )
+        content = "```python\n" "print('hello')\n" "```\n"
         # "python" has no dot or slash, so it should be skipped
         result = parse_file_blocks(content)
         assert result == {}
 
     def test_unclosed_trailing_block(self):
-        content = (
-            "```output.json\n"
-            '{"key": "value"}\n'
-        )
+        content = "```output.json\n" '{"key": "value"}\n'
         result = parse_file_blocks(content)
         assert "output.json" in result
         assert result["output.json"].strip() == '{"key": "value"}'
 
     def test_multiline_content(self):
-        content = (
-            "```main.py\n"
-            "import os\n"
-            "import sys\n"
-            "\n"
-            "def main():\n"
-            "    pass\n"
-            "```\n"
-        )
+        content = "```main.py\n" "import os\n" "import sys\n" "\n" "def main():\n" "    pass\n" "```\n"
         result = parse_file_blocks(content)
         assert "main.py" in result
         lines = result["main.py"].split("\n")
@@ -126,11 +81,7 @@ class TestParseFileBlocks:
         assert list(result.keys()) == ["deploy.sh"]
 
     def test_four_backtick_fence(self):
-        content = (
-            "````main.tf\n"
-            "resource {}\n"
-            "````\n"
-        )
+        content = "````main.tf\n" "resource {}\n" "````\n"
         result = parse_file_blocks(content)
         assert "main.tf" in result
 
@@ -138,31 +89,17 @@ class TestParseFileBlocks:
         assert parse_file_blocks("") == {}
 
     def test_empty_file_block(self):
-        content = (
-            "```empty.txt\n"
-            "```\n"
-        )
+        content = "```empty.txt\n" "```\n"
         result = parse_file_blocks(content)
         assert result == {"empty.txt": ""}
 
     def test_whitespace_around_filename(self):
-        content = (
-            "```  main.tf  \n"
-            "resource {}\n"
-            "```\n"
-        )
+        content = "```  main.tf  \n" "resource {}\n" "```\n"
         result = parse_file_blocks(content)
         assert "main.tf" in result
 
     def test_consecutive_blocks_no_gap(self):
-        content = (
-            "```a.tf\n"
-            "aaa\n"
-            "```\n"
-            "```b.tf\n"
-            "bbb\n"
-            "```\n"
-        )
+        content = "```a.tf\n" "aaa\n" "```\n" "```b.tf\n" "bbb\n" "```\n"
         result = parse_file_blocks(content)
         assert result == {"a.tf": "aaa", "b.tf": "bbb"}
 
@@ -236,8 +173,8 @@ class TestParseAndWrite:
             "}\n"
             "```\n\n"
             "```outputs.tf\n"
-            "output \"rg_name\" {\n"
-            '  value = azurerm_resource_group.rg.name\n'
+            'output "rg_name" {\n'
+            "  value = azurerm_resource_group.rg.name\n"
             "}\n"
             "```\n"
         )

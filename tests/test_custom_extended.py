@@ -31,8 +31,7 @@ class TestBuildRegistry:
         agent_dir = project_with_config / ".prototype" / "agents"
         agent_dir.mkdir(parents=True, exist_ok=True)
         (agent_dir / "test-agent.yaml").write_text(
-            "name: test-agent\ndescription: A test\ncapabilities:\n  - develop\n"
-            "system_prompt: You are a test.\n",
+            "name: test-agent\ndescription: A test\ncapabilities:\n  - develop\n" "system_prompt: You are a test.\n",
             encoding="utf-8",
         )
 
@@ -101,8 +100,7 @@ class TestCheckRequirements:
 
         with patch("azext_prototype.requirements.check_all") as mock_check:
             mock_check.return_value = [
-                CheckResult(name="Python", status="pass", installed_version="3.12.0",
-                            required=">=3.9.0", message="ok"),
+                CheckResult(name="Python", status="pass", installed_version="3.12.0", required=">=3.9.0", message="ok"),
             ]
             # Should not raise
             _check_requirements("terraform")
@@ -113,9 +111,14 @@ class TestCheckRequirements:
 
         with patch("azext_prototype.requirements.check_all") as mock_check:
             mock_check.return_value = [
-                CheckResult(name="Terraform", status="missing", installed_version=None,
-                            required=">=1.14.0", message="Terraform is not installed",
-                            install_hint="https://developer.hashicorp.com/terraform/install"),
+                CheckResult(
+                    name="Terraform",
+                    status="missing",
+                    installed_version=None,
+                    required=">=1.14.0",
+                    message="Terraform is not installed",
+                    install_hint="https://developer.hashicorp.com/terraform/install",
+                ),
             ]
             with pytest.raises(CLIError, match="Tool requirements not met"):
                 _check_requirements("terraform")
@@ -126,10 +129,14 @@ class TestCheckRequirements:
 
         with patch("azext_prototype.requirements.check_all") as mock_check:
             mock_check.return_value = [
-                CheckResult(name="Azure CLI", status="fail", installed_version="2.40.0",
-                            required=">=2.50.0",
-                            message="Azure CLI 2.40.0 does not satisfy >=2.50.0",
-                            install_hint="https://learn.microsoft.com/cli/azure/install-azure-cli"),
+                CheckResult(
+                    name="Azure CLI",
+                    status="fail",
+                    installed_version="2.40.0",
+                    required=">=2.50.0",
+                    message="Azure CLI 2.40.0 does not satisfy >=2.50.0",
+                    install_hint="https://learn.microsoft.com/cli/azure/install-azure-cli",
+                ),
             ]
             with pytest.raises(CLIError, match="Azure CLI"):
                 _check_requirements(None)
@@ -140,9 +147,14 @@ class TestCheckRequirements:
 
         with patch("azext_prototype.requirements.check_all") as mock_check:
             mock_check.return_value = [
-                CheckResult(name="Terraform", status="missing", installed_version=None,
-                            required=">=1.14.0", message="Terraform is not installed",
-                            install_hint="https://developer.hashicorp.com/terraform/install"),
+                CheckResult(
+                    name="Terraform",
+                    status="missing",
+                    installed_version=None,
+                    required=">=1.14.0",
+                    message="Terraform is not installed",
+                    install_hint="https://developer.hashicorp.com/terraform/install",
+                ),
             ]
             with pytest.raises(CLIError, match="Install:.*hashicorp"):
                 _check_requirements("terraform")
@@ -157,9 +169,11 @@ class TestCheckRequirements:
             mock_check.assert_called_once()
 
     def test_init_calls_check_requirements(self, tmp_path):
-        with patch(f"{_MOD}._check_requirements") as mock_check, \
-             patch("azext_prototype.stages.init_stage.InitStage") as MockStage:
+        with patch(f"{_MOD}._check_requirements") as mock_check, patch(
+            "azext_prototype.stages.init_stage.InitStage"
+        ) as MockStage:
             from azext_prototype.custom import prototype_init
+
             mock_stage = MockStage.return_value
             mock_stage.can_run.return_value = (True, [])
             mock_stage.execute.return_value = {"status": "success"}
@@ -299,8 +313,11 @@ class TestPrototypeInit:
         cmd = MagicMock()
         with patch("builtins.input", return_value="n"):
             result = prototype_init(
-                cmd, name="existing-proj", location="eastus",
-                output_dir=str(proj_dir), ai_provider="azure-openai",
+                cmd,
+                name="existing-proj",
+                location="eastus",
+                output_dir=str(proj_dir),
+                ai_provider="azure-openai",
                 json_output=True,
             )
         assert result["status"] == "cancelled"
@@ -318,8 +335,11 @@ class TestPrototypeInit:
         cmd = MagicMock()
         with patch("builtins.input", return_value="y"):
             result = prototype_init(
-                cmd, name="reinit-proj", location="eastus",
-                output_dir=str(proj_dir), ai_provider="azure-openai",
+                cmd,
+                name="reinit-proj",
+                location="eastus",
+                output_dir=str(proj_dir),
+                ai_provider="azure-openai",
                 json_output=True,
             )
         assert result["status"] == "success"
@@ -328,15 +348,19 @@ class TestPrototypeInit:
     @patch(f"{_MOD}._check_guards")
     def test_init_environment_parameter(self, mock_guards, mock_check_req, tmp_path):
         """--environment should be stored in config."""
-        from azext_prototype.custom import prototype_init
         from azext_prototype.config import ProjectConfig
+        from azext_prototype.custom import prototype_init
 
         cmd = MagicMock()
         out = tmp_path / "env-proj"
         result = prototype_init(
-            cmd, name="env-proj", location="westus2",
-            output_dir=str(out), ai_provider="azure-openai",
-            environment="staging", json_output=True,
+            cmd,
+            name="env-proj",
+            location="westus2",
+            output_dir=str(out),
+            ai_provider="azure-openai",
+            environment="staging",
+            json_output=True,
         )
         assert result["status"] == "success"
         config = ProjectConfig(str(out))
@@ -349,15 +373,19 @@ class TestPrototypeInit:
     @patch(f"{_MOD}._check_guards")
     def test_init_model_parameter(self, mock_guards, mock_check_req, tmp_path):
         """--model should override the provider default."""
-        from azext_prototype.custom import prototype_init
         from azext_prototype.config import ProjectConfig
+        from azext_prototype.custom import prototype_init
 
         cmd = MagicMock()
         out = tmp_path / "model-proj"
         result = prototype_init(
-            cmd, name="model-proj", location="eastus",
-            output_dir=str(out), ai_provider="azure-openai",
-            model="gpt-4o-mini", json_output=True,
+            cmd,
+            name="model-proj",
+            location="eastus",
+            output_dir=str(out),
+            ai_provider="azure-openai",
+            model="gpt-4o-mini",
+            json_output=True,
         )
         assert result["status"] == "success"
         config = ProjectConfig(str(out))
@@ -368,14 +396,17 @@ class TestPrototypeInit:
     @patch(f"{_MOD}._check_guards")
     def test_init_default_model_per_provider(self, mock_guards, mock_check_req, tmp_path):
         """Without --model, the default should be provider-specific."""
-        from azext_prototype.custom import prototype_init
         from azext_prototype.config import ProjectConfig
+        from azext_prototype.custom import prototype_init
 
         cmd = MagicMock()
         out = tmp_path / "defmodel-proj"
         result = prototype_init(
-            cmd, name="defmodel-proj", location="eastus",
-            output_dir=str(out), ai_provider="azure-openai",
+            cmd,
+            name="defmodel-proj",
+            location="eastus",
+            output_dir=str(out),
+            ai_provider="azure-openai",
             json_output=True,
         )
         assert result["status"] == "success"
@@ -391,9 +422,13 @@ class TestPrototypeInit:
 
         cmd = MagicMock()
         prototype_init(
-            cmd, name="telem-proj", location="westeurope",
-            output_dir=str(tmp_path / "telem-proj"), ai_provider="azure-openai",
-            environment="staging", iac_tool="bicep",
+            cmd,
+            name="telem-proj",
+            location="westeurope",
+            output_dir=str(tmp_path / "telem-proj"),
+            ai_provider="azure-openai",
+            environment="staging",
+            iac_tool="bicep",
         )
 
         assert isinstance(cmd._telemetry_overrides, dict)
@@ -412,8 +447,11 @@ class TestPrototypeInit:
 
         cmd = MagicMock()
         prototype_init(
-            cmd, name="telem-model-proj", location="eastus",
-            output_dir=str(tmp_path / "telem-model-proj"), ai_provider="azure-openai",
+            cmd,
+            name="telem-model-proj",
+            location="eastus",
+            output_dir=str(tmp_path / "telem-model-proj"),
+            ai_provider="azure-openai",
             model="gpt-4o-mini",
         )
 
@@ -442,8 +480,8 @@ class TestPrototypeConfigGet:
                 prototype_config_get(cmd, key="nonexistent.key")
 
     def test_config_get_masks_secret(self, project_with_config):
-        from azext_prototype.custom import prototype_config_get
         from azext_prototype.config import ProjectConfig
+        from azext_prototype.custom import prototype_config_get
 
         # Set a secret value first
         config = ProjectConfig(str(project_with_config))
@@ -463,8 +501,8 @@ class TestPrototypeConfigShowMasking:
     """Test that config show masks secrets."""
 
     def test_config_show_masks_secret_values(self, project_with_config):
-        from azext_prototype.custom import prototype_config_show
         from azext_prototype.config import ProjectConfig
+        from azext_prototype.custom import prototype_config_show
 
         # Set a secret value
         config = ProjectConfig(str(project_with_config))
@@ -492,23 +530,26 @@ class TestPrototypeConfigShowMasking:
 class TestPrototypeConfigInit:
     """Test config init marks init complete."""
 
-    @patch("builtins.input", side_effect=[
-        "y",                # overwrite existing prototype.yaml
-        "my-project",       # project name
-        "eastus",           # location
-        "dev",              # environment
-        "terraform",        # iac tool
-        "1",                # naming strategy choice (microsoft-alz)
-        "myorg",            # org
-        "zd",               # zone_id (ALZ-specific)
-        "copilot",          # ai provider
-        "",                 # model (accept default)
-        "",                 # subscription
-        "",                 # resource group
-    ])
+    @patch(
+        "builtins.input",
+        side_effect=[
+            "y",  # overwrite existing prototype.yaml
+            "my-project",  # project name
+            "eastus",  # location
+            "dev",  # environment
+            "terraform",  # iac tool
+            "1",  # naming strategy choice (microsoft-alz)
+            "myorg",  # org
+            "zd",  # zone_id (ALZ-specific)
+            "copilot",  # ai provider
+            "",  # model (accept default)
+            "",  # subscription
+            "",  # resource group
+        ],
+    )
     def test_config_init_marks_init_complete(self, mock_input, project_with_config):
-        from azext_prototype.custom import prototype_config_init
         from azext_prototype.config import ProjectConfig
+        from azext_prototype.custom import prototype_config_init
 
         cmd = MagicMock()
         with patch(f"{_MOD}._get_project_dir", return_value=str(project_with_config)):
@@ -519,21 +560,24 @@ class TestPrototypeConfigInit:
         assert config.get("stages.init.completed") is True
         assert config.get("stages.init.timestamp") is not None
 
-    @patch("builtins.input", side_effect=[
-        "y",                # overwrite existing prototype.yaml
-        "telemetry-proj",   # project name
-        "westus2",          # location
-        "staging",          # environment
-        "bicep",            # iac tool
-        "2",                # naming strategy choice (microsoft-caf)
-        "myorg",            # org
-        "azure-openai",     # ai provider
-        "gpt-4o",           # model
-        "https://myres.openai.azure.com/",  # Azure OpenAI endpoint
-        "gpt-4o",           # deployment name
-        "",                 # subscription
-        "",                 # resource group
-    ])
+    @patch(
+        "builtins.input",
+        side_effect=[
+            "y",  # overwrite existing prototype.yaml
+            "telemetry-proj",  # project name
+            "westus2",  # location
+            "staging",  # environment
+            "bicep",  # iac tool
+            "2",  # naming strategy choice (microsoft-caf)
+            "myorg",  # org
+            "azure-openai",  # ai provider
+            "gpt-4o",  # model
+            "https://myres.openai.azure.com/",  # Azure OpenAI endpoint
+            "gpt-4o",  # deployment name
+            "",  # subscription
+            "",  # resource group
+        ],
+    )
     def test_config_init_sends_telemetry_overrides(self, mock_input, project_with_config):
         """After prompting, config init should set _telemetry_overrides on cmd."""
         from azext_prototype.custom import prototype_config_init
@@ -570,9 +614,11 @@ class TestPrototypeBuild:
     @patch(f"{_MOD}._get_project_dir")
     @patch("azext_prototype.ai.factory.create_ai_provider")
     @patch(f"{_MOD}._check_guards")
-    def test_build_calls_stage(self, mock_guards, mock_factory, mock_dir, mock_check_req, project_with_design, mock_ai_provider):
-        from azext_prototype.custom import prototype_build
+    def test_build_calls_stage(
+        self, mock_guards, mock_factory, mock_dir, mock_check_req, project_with_design, mock_ai_provider
+    ):
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.custom import prototype_build
 
         mock_dir.return_value = str(project_with_design)
         mock_factory.return_value = mock_ai_provider
@@ -623,9 +669,7 @@ class TestPrototypeDeployOutputs:
         # Write outputs file
         outputs_dir = project_with_build / ".prototype" / "state"
         outputs_dir.mkdir(parents=True, exist_ok=True)
-        (outputs_dir / "deploy_outputs.json").write_text(
-            json.dumps({"rg_name": "test-rg"}), encoding="utf-8"
-        )
+        (outputs_dir / "deploy_outputs.json").write_text(json.dumps({"rg_name": "test-rg"}), encoding="utf-8")
         cmd = MagicMock()
         result = prototype_deploy(cmd, outputs=True, json_output=True)
         # May return empty or dict depending on DeploymentOutputCapture impl
@@ -678,10 +722,11 @@ class TestPrototypeDeployGenerateScripts:
 
     @patch(f"{_MOD}._get_project_dir")
     def test_generate_scripts_no_apps_dir_raises(self, mock_dir, project_with_config):
-        from azext_prototype.custom import prototype_deploy
-
         # Remove apps dir if present
         import shutil
+
+        from azext_prototype.custom import prototype_deploy
+
         apps_dir = project_with_config / "concept" / "apps"
         if apps_dir.exists():
             shutil.rmtree(apps_dir)
@@ -745,15 +790,17 @@ class TestPrototypeAgentRemove:
 
     @patch(f"{_MOD}._get_project_dir")
     def test_remove_override_agent(self, mock_dir, project_with_config):
-        from azext_prototype.custom import prototype_agent_override, prototype_agent_remove
+        from azext_prototype.custom import (
+            prototype_agent_override,
+            prototype_agent_remove,
+        )
 
         mock_dir.return_value = str(project_with_config)
 
         # Create a real YAML file for the override
         override_file = project_with_config / "my_arch.yaml"
         override_file.write_text(
-            "name: cloud-architect\ndescription: Override\n"
-            "capabilities:\n  - architect\nsystem_prompt: Override.\n",
+            "name: cloud-architect\ndescription: Override\n" "capabilities:\n  - architect\nsystem_prompt: Override.\n",
             encoding="utf-8",
         )
 
@@ -793,8 +840,8 @@ class TestPrototypeAnalyzeError:
 
     @patch(f"{_MOD}._prepare_command")
     def test_analyze_inline_error(self, mock_prep, project_with_design, mock_ai_provider):
-        from azext_prototype.custom import prototype_analyze_error
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.custom import prototype_analyze_error
 
         mock_qa = MagicMock()
         mock_qa.name = "qa-engineer"
@@ -812,8 +859,8 @@ class TestPrototypeAnalyzeError:
 
     @patch(f"{_MOD}._prepare_command")
     def test_analyze_log_file(self, mock_prep, project_with_design, mock_ai_provider):
-        from azext_prototype.custom import prototype_analyze_error
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.custom import prototype_analyze_error
 
         mock_qa = MagicMock()
         mock_qa.name = "qa-engineer"
@@ -834,8 +881,8 @@ class TestPrototypeAnalyzeError:
 
     @patch(f"{_MOD}._prepare_command")
     def test_analyze_screenshot(self, mock_prep, project_with_design, mock_ai_provider):
-        from azext_prototype.custom import prototype_analyze_error
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.custom import prototype_analyze_error
 
         mock_qa = MagicMock()
         mock_qa.name = "qa-engineer"
@@ -860,8 +907,8 @@ class TestPrototypeAnalyzeCosts:
 
     @patch(f"{_MOD}._prepare_command")
     def test_analyze_costs(self, mock_prep, project_with_design, mock_ai_provider):
-        from azext_prototype.custom import prototype_analyze_costs
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.custom import prototype_analyze_costs
 
         mock_cost = MagicMock()
         mock_cost.name = "cost-analyst"
@@ -1006,17 +1053,27 @@ class TestPrototypeStatusExtended:
     def test_status_with_discovery_state(self, mock_dir, project_with_config):
         """Discovery state populates exchanges/confirmed/open."""
         import yaml
+
         from azext_prototype.custom import prototype_status
 
         state_dir = project_with_config / ".prototype" / "state"
         state_dir.mkdir(parents=True, exist_ok=True)
         state_file = state_dir / "discovery.yaml"
-        state_file.write_text(yaml.dump({
-            "open_items": ["item1"],
-            "confirmed_items": ["item2", "item3"],
-            "conversation_history": [],
-            "_metadata": {"exchange_count": 5, "created": "2026-01-01T00:00:00", "last_updated": "2026-01-01T01:00:00"},
-        }), encoding="utf-8")
+        state_file.write_text(
+            yaml.dump(
+                {
+                    "open_items": ["item1"],
+                    "confirmed_items": ["item2", "item3"],
+                    "conversation_history": [],
+                    "_metadata": {
+                        "exchange_count": 5,
+                        "created": "2026-01-01T00:00:00",
+                        "last_updated": "2026-01-01T01:00:00",
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
@@ -1048,19 +1105,31 @@ class TestPrototypeStatusExtended:
     def test_status_with_deploy_state(self, mock_dir, project_with_config):
         """Deploy state populates deployed/failed/rolled_back/outputs."""
         import yaml
+
         from azext_prototype.custom import prototype_status
 
         state_dir = project_with_config / ".prototype" / "state"
         state_dir.mkdir(parents=True, exist_ok=True)
         state_file = state_dir / "deploy.yaml"
-        state_file.write_text(yaml.dump({
-            "deployment_stages": [
-                {"stage": 1, "name": "Foundation", "deploy_status": "deployed", "services": []},
-                {"stage": 2, "name": "App", "deploy_status": "failed", "deploy_error": "timeout", "services": []},
-            ],
-            "captured_outputs": {"terraform": {"endpoint": "https://example.com"}},
-            "_metadata": {"created": "2026-01-01T00:00:00", "last_updated": "2026-01-01T01:00:00"},
-        }), encoding="utf-8")
+        state_file.write_text(
+            yaml.dump(
+                {
+                    "deployment_stages": [
+                        {"stage": 1, "name": "Foundation", "deploy_status": "deployed", "services": []},
+                        {
+                            "stage": 2,
+                            "name": "App",
+                            "deploy_status": "failed",
+                            "deploy_error": "timeout",
+                            "services": [],
+                        },
+                    ],
+                    "captured_outputs": {"terraform": {"endpoint": "https://example.com"}},
+                    "_metadata": {"created": "2026-01-01T00:00:00", "last_updated": "2026-01-01T01:00:00"},
+                }
+            ),
+            encoding="utf-8",
+        )
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
@@ -1099,18 +1168,24 @@ class TestPrototypeStatusExtended:
     def test_status_deployment_history(self, mock_dir, project_with_config):
         """Deployment history from ChangeTracker is included."""
         import json as json_mod
+
         from azext_prototype.custom import prototype_status
 
         # Create a manifest with deployment history
         manifest_dir = project_with_config / ".prototype" / "state"
         manifest_dir.mkdir(parents=True, exist_ok=True)
         manifest_path = manifest_dir / "change_manifest.json"
-        manifest_path.write_text(json_mod.dumps({
-            "files": {},
-            "deployments": [
-                {"scope": "all", "timestamp": "2026-01-15T10:00:00", "files_count": 12},
-            ],
-        }), encoding="utf-8")
+        manifest_path.write_text(
+            json_mod.dumps(
+                {
+                    "files": {},
+                    "deployments": [
+                        {"scope": "all", "timestamp": "2026-01-15T10:00:00", "files_count": 12},
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
@@ -1190,9 +1265,7 @@ class TestGenerateTemplates:
         config = _load_config(str(project_with_config))
         output_dir = project_with_config / "test_output"
 
-        generated = _generate_templates(
-            output_dir, str(project_with_config), config.to_dict(), "test"
-        )
+        generated = _generate_templates(output_dir, str(project_with_config), config.to_dict(), "test")
         assert len(generated) >= 1
         assert output_dir.is_dir()
 
@@ -1203,7 +1276,10 @@ class TestGenerateTemplates:
         output_dir = project_with_config / "speckit_output"
 
         _generate_templates(
-            output_dir, str(project_with_config), config.to_dict(), "speckit",
+            output_dir,
+            str(project_with_config),
+            config.to_dict(),
+            "speckit",
             include_manifest=True,
         )
         assert (output_dir / "manifest.json").exists()
@@ -1238,6 +1314,7 @@ class TestLoadDesignContextCascade:
     def test_design_json_takes_priority(self, project_with_design):
         """design.json takes priority over discovery.yaml when both exist."""
         import yaml as _yaml
+
         from azext_prototype.custom import _load_design_context
 
         # Add a discovery.yaml alongside the existing design.json
@@ -1288,7 +1365,6 @@ class TestAnalyzeCostsCache:
         return (str(project_dir), config, mock_registry, mock_context)
 
     def _make_registry_with_cost_agent(self):
-        from azext_prototype.agents.base import AgentCapability
         from tests.conftest import make_ai_response
 
         agent = MagicMock()
@@ -1322,6 +1398,7 @@ class TestAnalyzeCostsCache:
     def test_second_run_returns_cached(self, mock_prep, project_with_design):
         """Cached result returned without calling agent."""
         import yaml as _yaml
+
         from azext_prototype.custom import prototype_analyze_costs
 
         registry, agent = self._make_registry_with_cost_agent()
@@ -1330,8 +1407,9 @@ class TestAnalyzeCostsCache:
         mock_prep.return_value = self._make_mock_prep(project_with_design, registry, mock_ctx)
 
         # Pre-populate cache with matching hash
-        from azext_prototype.custom import _load_design_context
         import hashlib
+
+        from azext_prototype.custom import _load_design_context
 
         design_context = _load_design_context(str(project_with_design))
         context_hash = hashlib.sha256(design_context.encode("utf-8")).hexdigest()[:16]
@@ -1355,6 +1433,7 @@ class TestAnalyzeCostsCache:
     def test_refresh_bypasses_cache(self, mock_prep, project_with_design):
         """--refresh forces fresh analysis even when cache matches."""
         import yaml as _yaml
+
         from azext_prototype.custom import prototype_analyze_costs
 
         registry, agent = self._make_registry_with_cost_agent()
@@ -1363,8 +1442,9 @@ class TestAnalyzeCostsCache:
         mock_prep.return_value = self._make_mock_prep(project_with_design, registry, mock_ctx)
 
         # Pre-populate cache with matching hash
-        from azext_prototype.custom import _load_design_context
         import hashlib
+
+        from azext_prototype.custom import _load_design_context
 
         design_context = _load_design_context(str(project_with_design))
         context_hash = hashlib.sha256(design_context.encode("utf-8")).hexdigest()[:16]
@@ -1387,6 +1467,7 @@ class TestAnalyzeCostsCache:
     def test_cache_invalidated_on_design_change(self, mock_prep, project_with_design):
         """Different design context hash invalidates the cache."""
         import yaml as _yaml
+
         from azext_prototype.custom import prototype_analyze_costs
 
         registry, agent = self._make_registry_with_cost_agent()
@@ -1413,6 +1494,7 @@ class TestAnalyzeCostsCache:
     def test_cache_file_written_to_state_dir(self, mock_prep, project_with_design):
         """Cache is written to .prototype/state/cost_analysis.yaml."""
         import yaml as _yaml
+
         from azext_prototype.custom import prototype_analyze_costs
 
         registry, agent = self._make_registry_with_cost_agent()
@@ -1442,7 +1524,6 @@ class TestAnalyzeConsoleOutput:
     @patch(f"{_MOD}._prepare_command")
     @patch(f"{_MOD}.console", create=True)
     def test_analyze_error_uses_console(self, mock_console, mock_prep, project_with_design):
-        from azext_prototype.agents.base import AgentCapability
         from azext_prototype.custom import prototype_analyze_error
         from tests.conftest import make_ai_response
 
@@ -1484,9 +1565,10 @@ class TestAnalyzeConsoleOutput:
         # `console` variable re-exported in azext_prototype.ui.__init__
         # instead of the submodule (name collision on Python 3.10).
         import importlib
+
         _console_mod = importlib.import_module("azext_prototype.ui.console")
 
-        with patch.object(_console_mod, "console") as mock_console:
+        with patch.object(_console_mod, "console") as mock_console:  # noqa: F841
             result = prototype_analyze_error(cmd, input="some error", json_output=True)
 
         assert result["status"] == "analyzed"
@@ -1504,6 +1586,7 @@ class TestAnalyzeConsoleOutput:
         registry.find_by_capability.return_value = [agent]
 
         from azext_prototype.config import ProjectConfig
+
         config = ProjectConfig(str(project_with_design))
         config.load()
 
@@ -1569,7 +1652,7 @@ class TestDeploySubcommandConsole:
 
         cmd = MagicMock()
 
-        with patch("azext_prototype.stages.deploy_helpers.DeployScriptGenerator") as MockGen:
+        with patch("azext_prototype.stages.deploy_helpers.DeployScriptGenerator") as MockGen:  # noqa: F841
             result = prototype_deploy(cmd, generate_scripts=True, json_output=True)
 
         assert result["status"] == "generated"
@@ -1709,10 +1792,13 @@ class TestPrototypeAgentUpdate:
         prompt_file = project_with_config / "new_prompt.txt"
         prompt_file.write_text("You are an updated agent.", encoding="utf-8")
 
-        result = prototype_agent_update(cmd, name="prompt-update", system_prompt_file=str(prompt_file), json_output=True)
+        result = prototype_agent_update(
+            cmd, name="prompt-update", system_prompt_file=str(prompt_file), json_output=True
+        )
         assert result["status"] == "updated"
 
         import yaml as _yaml
+
         agent_file = project_with_config / ".prototype" / "agents" / "prompt-update.yaml"
         content = _yaml.safe_load(agent_file.read_text(encoding="utf-8"))
         assert content["system_prompt"] == "You are an updated agent."
@@ -1730,11 +1816,11 @@ class TestPrototypeAgentUpdate:
         # Mock interactive prompts: description, role, capabilities, constraints (empty), system prompt (empty=keep)
         inputs = [
             "Updated description",  # description
-            "architect",           # role
-            "architect",           # capabilities
-            "",                    # end constraints
-            "",                    # system prompt (keep existing - first empty line)
-            "",                    # examples (skip)
+            "architect",  # role
+            "architect",  # capabilities
+            "",  # end constraints
+            "",  # system prompt (keep existing - first empty line)
+            "",  # examples (skip)
         ]
         with patch("builtins.input", side_effect=inputs):
             result = prototype_agent_update(cmd, name="interactive-up", json_output=True)
@@ -1745,7 +1831,11 @@ class TestPrototypeAgentUpdate:
     @patch(f"{_MOD}._get_project_dir")
     def test_update_manifest_sync(self, mock_dir, project_with_config):
         """Manifest entry is updated after field update."""
-        from azext_prototype.custom import prototype_agent_add, prototype_agent_update, _load_config
+        from azext_prototype.custom import (
+            _load_config,
+            prototype_agent_add,
+            prototype_agent_update,
+        )
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
@@ -1802,8 +1892,8 @@ class TestPrototypeAgentTest:
 
     @patch(f"{_MOD}._prepare_command")
     def test_default_prompt(self, mock_prep, project_with_config, mock_ai_provider):
-        from azext_prototype.custom import prototype_agent_test
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.custom import prototype_agent_test
 
         mock_agent = MagicMock()
         mock_agent.name = "cloud-architect"
@@ -1828,8 +1918,8 @@ class TestPrototypeAgentTest:
 
     @patch(f"{_MOD}._prepare_command")
     def test_custom_prompt(self, mock_prep, project_with_config, mock_ai_provider):
-        from azext_prototype.custom import prototype_agent_test
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.custom import prototype_agent_test
 
         mock_agent = MagicMock()
         mock_agent.name = "cloud-architect"
@@ -1876,9 +1966,8 @@ class TestPrototypeAgentExport:
         assert result["name"] == "cloud-architect"
 
         import yaml as _yaml
-        exported = _yaml.safe_load(
-            (project_with_config / "exported.yaml").read_text(encoding="utf-8")
-        )
+
+        exported = _yaml.safe_load((project_with_config / "exported.yaml").read_text(encoding="utf-8"))
         assert exported["name"] == "cloud-architect"
         assert "capabilities" in exported
         assert "system_prompt" in exported
@@ -1901,6 +1990,7 @@ class TestPrototypeAgentExport:
     def test_export_default_path(self, mock_dir, project_with_config):
         """Default output path is ./{name}.yaml."""
         import os
+
         from azext_prototype.custom import prototype_agent_export
 
         mock_dir.return_value = str(project_with_config)
@@ -1919,8 +2009,8 @@ class TestPrototypeAgentExport:
     @patch(f"{_MOD}._get_project_dir")
     def test_export_loadable_by_loader(self, mock_dir, project_with_config):
         """Exported YAML is loadable by load_yaml_agent."""
-        from azext_prototype.custom import prototype_agent_export
         from azext_prototype.agents.loader import load_yaml_agent
+        from azext_prototype.custom import prototype_agent_export
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
@@ -1988,8 +2078,7 @@ class TestPrototypeAgentOverrideValidation:
 
         valid_yaml = project_with_config / "valid.yaml"
         valid_yaml.write_text(
-            "name: nonexistent-agent\ndescription: test\ncapabilities:\n  - develop\n"
-            "system_prompt: test\n",
+            "name: nonexistent-agent\ndescription: test\ncapabilities:\n  - develop\n" "system_prompt: test\n",
             encoding="utf-8",
         )
 
@@ -2024,14 +2113,14 @@ class TestPromptAgentDefinition:
 
         console = Console()
         inputs = [
-            "My agent description",     # description
-            "architect",                 # role
-            "architect,deploy",          # capabilities
-            "Must use PaaS only",        # constraint 1
-            "",                          # end constraints
-            "You are a custom agent.",   # system prompt line 1
-            "END",                       # end system prompt
-            "",                          # no examples
+            "My agent description",  # description
+            "architect",  # role
+            "architect,deploy",  # capabilities
+            "Must use PaaS only",  # constraint 1
+            "",  # end constraints
+            "You are a custom agent.",  # system prompt line 1
+            "END",  # end system prompt
+            "",  # no examples
         ]
         with patch("builtins.input", side_effect=inputs):
             result = _prompt_agent_definition(console, "test-agent")
@@ -2059,12 +2148,12 @@ class TestPromptAgentDefinition:
         }
         # All empty inputs → keep existing values
         inputs = [
-            "",   # description (keep)
-            "",   # role (keep)
-            "",   # capabilities (keep)
-            "",   # constraints (keep existing)
-            "",   # system prompt (keep existing)
-            "",   # examples (keep existing)
+            "",  # description (keep)
+            "",  # role (keep)
+            "",  # capabilities (keep)
+            "",  # constraints (keep existing)
+            "",  # system prompt (keep existing)
+            "",  # examples (keep existing)
         ]
         with patch("builtins.input", side_effect=inputs):
             result = _prompt_agent_definition(console, "test-agent", existing=existing)
@@ -2082,13 +2171,13 @@ class TestPromptAgentDefinition:
 
         console = Console()
         inputs = [
-            "desc",              # description
-            "role",              # role
+            "desc",  # description
+            "role",  # role
             "invalid_cap,architect",  # capabilities — one invalid
-            "",                  # end constraints
-            "prompt",            # system prompt
-            "END",               # end system prompt
-            "",                  # no examples
+            "",  # end constraints
+            "prompt",  # system prompt
+            "END",  # end system prompt
+            "",  # no examples
         ]
         with patch("builtins.input", side_effect=inputs):
             result = _prompt_agent_definition(console, "test-agent")

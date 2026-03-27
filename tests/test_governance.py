@@ -4,19 +4,20 @@ Tests the GovernanceContext bridge, BaseAgent governance integration,
 and post-response validation across all built-in agents.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
 
-from azext_prototype.agents.base import BaseAgent, AgentCapability, AgentContext
+import pytest
+
+from azext_prototype.agents.base import AgentCapability, AgentContext, BaseAgent
 from azext_prototype.agents.governance import GovernanceContext, reset_caches
 from azext_prototype.ai.provider import AIResponse
 from azext_prototype.governance.policies import PolicyEngine
 from azext_prototype.templates.registry import TemplateRegistry
 
-
 # ------------------------------------------------------------------ #
 # Fixtures
 # ------------------------------------------------------------------ #
+
 
 @pytest.fixture(autouse=True)
 def _clean_governance_caches():
@@ -51,7 +52,6 @@ def governance_ctx(policy_engine, template_registry):
     )
 
 
-
 @pytest.fixture
 def mock_agent_context(tmp_path, mock_ai_provider):
     """Minimal AgentContext for governance tests."""
@@ -65,6 +65,7 @@ def mock_agent_context(tmp_path, mock_ai_provider):
 # ------------------------------------------------------------------ #
 # GovernanceContext — unit tests
 # ------------------------------------------------------------------ #
+
 
 class TestGovernanceContext:
     """Test GovernanceContext formatting and validation."""
@@ -164,6 +165,7 @@ class TestGovernanceContext:
 # BaseAgent governance integration
 # ------------------------------------------------------------------ #
 
+
 class _GovernanceStub(BaseAgent):
     """Minimal agent for governance integration tests."""
 
@@ -257,6 +259,7 @@ class TestBaseAgentGovernanceIntegration:
 # Built-in agents — governance flag tests
 # ------------------------------------------------------------------ #
 
+
 class TestBuiltinAgentGovernanceFlags:
     """Verify that all built-in agents have correct governance flags set."""
 
@@ -281,9 +284,9 @@ class TestBuiltinAgentGovernanceFlags:
         module = importlib.import_module(module_path)
         cls = getattr(module, cls_name)
         agent = cls()
-        assert agent._include_templates is expected_include_templates, (
-            f"{cls_name}._include_templates should be {expected_include_templates}"
-        )
+        assert (
+            agent._include_templates is expected_include_templates
+        ), f"{cls_name}._include_templates should be {expected_include_templates}"
 
     @pytest.mark.parametrize(
         "agent_cls_path",
@@ -307,14 +310,13 @@ class TestBuiltinAgentGovernanceFlags:
         module = importlib.import_module(module_path)
         cls = getattr(module, cls_name)
         agent = cls()
-        assert agent._governance_aware is True, (
-            f"{cls_name} should have _governance_aware = True"
-        )
+        assert agent._governance_aware is True, f"{cls_name} should have _governance_aware = True"
 
 
 # ------------------------------------------------------------------ #
 # Built-in agents — system messages include governance
 # ------------------------------------------------------------------ #
+
 
 class TestBuiltinAgentSystemMessages:
     """Verify system messages include governance context."""
@@ -324,6 +326,7 @@ class TestBuiltinAgentSystemMessages:
         """Ensure real policies/templates are loaded in the singletons."""
         # Inject into module-level caches so agents pick them up
         import azext_prototype.agents.governance as gov_mod
+
         gov_mod._policy_engine = policy_engine
         gov_mod._template_registry = template_registry
 
@@ -349,19 +352,12 @@ class TestBuiltinAgentSystemMessages:
         messages = agent.get_system_messages()
         all_content = "\n".join(m.content for m in messages)
 
-        assert "Governance Policies" in all_content, (
-            f"{cls_name} system messages should include governance policies"
-        )
+        assert "Governance Policies" in all_content, f"{cls_name} system messages should include governance policies"
 
         if expects_templates:
-            assert "Workload Templates" in all_content, (
-                f"{cls_name} system messages should include templates"
-            )
+            assert "Workload Templates" in all_content, f"{cls_name} system messages should include templates"
         else:
-            assert "Workload Templates" not in all_content, (
-                f"{cls_name} system messages should NOT include templates"
-            )
-
+            assert "Workload Templates" not in all_content, f"{cls_name} system messages should NOT include templates"
 
     def test_biz_analyst_gets_architectural_policies(self):
         """Biz-analyst should receive architectural-level policies and
@@ -388,8 +384,7 @@ class TestBuiltinAgentSystemMessages:
         agent = BizAnalystAgent()
         # Recommending SQL auth with password is an anti-pattern
         warnings = agent.validate_response(
-            "We recommend using SQL authentication with username/password "
-            "for the database connection."
+            "We recommend using SQL authentication with username/password " "for the database connection."
         )
         assert len(warnings) > 0
 
@@ -398,12 +393,14 @@ class TestBuiltinAgentSystemMessages:
 # Multi-step agents — validate_response is called
 # ------------------------------------------------------------------ #
 
+
 class TestMultiStepAgentGovernance:
     """Test that agents with custom execute() also validate responses."""
 
     @pytest.fixture(autouse=True)
     def _setup_governance(self, policy_engine, template_registry):
         import azext_prototype.agents.governance as gov_mod
+
         gov_mod._policy_engine = policy_engine
         gov_mod._template_registry = template_registry
 
@@ -412,7 +409,9 @@ class TestMultiStepAgentGovernance:
         from azext_prototype.agents.builtin.cost_analyst import CostAnalystAgent
 
         mock_resp = MagicMock()
-        mock_resp.json.return_value = {"Items": [{"retailPrice": 0.10, "unitOfMeasure": "1 Hour", "meterName": "Standard", "currencyCode": "USD"}]}
+        mock_resp.json.return_value = {
+            "Items": [{"retailPrice": 0.10, "unitOfMeasure": "1 Hour", "meterName": "Standard", "currencyCode": "USD"}]
+        }
         mock_resp.raise_for_status = MagicMock()
         mock_get.return_value = mock_resp
 
@@ -440,7 +439,9 @@ class TestMultiStepAgentGovernance:
         from azext_prototype.agents.builtin.cost_analyst import CostAnalystAgent
 
         mock_resp = MagicMock()
-        mock_resp.json.return_value = {"Items": [{"retailPrice": 0.10, "unitOfMeasure": "1 Hour", "meterName": "Standard", "currencyCode": "USD"}]}
+        mock_resp.json.return_value = {
+            "Items": [{"retailPrice": 0.10, "unitOfMeasure": "1 Hour", "meterName": "Standard", "currencyCode": "USD"}]
+        }
         mock_resp.raise_for_status = MagicMock()
         mock_get.return_value = mock_resp
 
@@ -488,7 +489,7 @@ class TestMultiStepAgentGovernance:
         agent = CloudArchitectAgent()
 
         mock_agent_context.ai_provider.chat.return_value = AIResponse(
-            content='Use account_key for storage access',
+            content="Use account_key for storage access",
             model="test",
         )
 
@@ -500,12 +501,14 @@ class TestMultiStepAgentGovernance:
 # Credential detection patterns — exhaustive
 # ------------------------------------------------------------------ #
 
+
 class TestCredentialDetection:
     """Test all credential patterns are detected."""
 
     @pytest.fixture(autouse=True)
     def _setup_governance(self, policy_engine, template_registry):
         import azext_prototype.agents.governance as gov_mod
+
         gov_mod._policy_engine = policy_engine
         gov_mod._template_registry = template_registry
 
@@ -526,18 +529,16 @@ class TestCredentialDetection:
         ],
     )
     def test_credential_pattern_detected(self, pattern, governance_ctx):
-        warnings = governance_ctx.check_response_for_violations(
-            "cloud-architect", f"Use {pattern} for auth"
-        )
+        warnings = governance_ctx.check_response_for_violations("cloud-architect", f"Use {pattern} for auth")
         assert any(
-            "credential" in w.lower() or "secret" in w.lower() or "managed identity" in w.lower()
-            for w in warnings
+            "credential" in w.lower() or "secret" in w.lower() or "managed identity" in w.lower() for w in warnings
         ), f"Pattern '{pattern}' should be detected as credential"
 
 
 # ------------------------------------------------------------------ #
 # GovernanceContext — edge cases
 # ------------------------------------------------------------------ #
+
 
 class TestGovernanceEdgeCases:
     """Edge case tests for robustness."""
@@ -588,12 +589,14 @@ class TestGovernanceEdgeCases:
 # Standards integration — system messages include design standards
 # ------------------------------------------------------------------ #
 
+
 class TestBuiltinAgentStandardsFlags:
     """Verify that built-in agents have correct _include_standards flags."""
 
     @pytest.fixture(autouse=True)
     def _setup_governance(self, policy_engine, template_registry):
         import azext_prototype.agents.governance as gov_mod
+
         gov_mod._policy_engine = policy_engine
         gov_mod._template_registry = template_registry
 
@@ -620,9 +623,9 @@ class TestBuiltinAgentStandardsFlags:
         module = importlib.import_module(module_path)
         cls = getattr(module, cls_name)
         agent = cls()
-        assert agent._include_standards is expects_standards, (
-            f"{cls_name}._include_standards should be {expects_standards}"
-        )
+        assert (
+            agent._include_standards is expects_standards
+        ), f"{cls_name}._include_standards should be {expects_standards}"
 
     @pytest.mark.parametrize(
         "agent_cls_path",
@@ -644,9 +647,7 @@ class TestBuiltinAgentStandardsFlags:
 
         messages = agent.get_system_messages()
         all_content = "\n".join(m.content for m in messages)
-        assert "Design Standards" in all_content, (
-            f"{cls_name} system messages should include Design Standards"
-        )
+        assert "Design Standards" in all_content, f"{cls_name} system messages should include Design Standards"
 
     @pytest.mark.parametrize(
         "agent_cls_path",
@@ -669,9 +670,7 @@ class TestBuiltinAgentStandardsFlags:
 
         messages = agent.get_system_messages()
         all_content = "\n".join(m.content for m in messages)
-        assert "Design Standards" not in all_content, (
-            f"{cls_name} system messages should NOT include Design Standards"
-        )
+        assert "Design Standards" not in all_content, f"{cls_name} system messages should NOT include Design Standards"
 
     def test_terraform_agent_sees_tf_standards(self):
         """Terraform agent should see TF-001 module structure standard."""

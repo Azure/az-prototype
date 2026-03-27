@@ -12,18 +12,18 @@ Covers:
 
 from __future__ import annotations
 
-import time
-from unittest.mock import MagicMock, patch, PropertyMock
+import json
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from azext_prototype.ai.provider import AIMessage, AIResponse
+from azext_prototype.ai.provider import AIResponse
 from azext_prototype.knowledge.search_cache import SearchCache
-
 
 # ================================================================== #
 # Fixtures
 # ================================================================== #
+
 
 @pytest.fixture
 def cache():
@@ -53,6 +53,7 @@ def _mock_page_response(html):
 # Web Search — search_learn
 # ================================================================== #
 
+
 class TestSearchLearn:
     """Tests for search_learn()."""
 
@@ -60,10 +61,12 @@ class TestSearchLearn:
     def test_returns_results_for_valid_query(self, mock_get):
         from azext_prototype.knowledge.web_search import search_learn
 
-        mock_get.return_value = _mock_search_response([
-            {"title": "Cosmos DB Intro", "url": "https://learn.microsoft.com/cosmos-db", "description": "Overview"},
-            {"title": "Cosmos DB API", "url": "https://learn.microsoft.com/cosmos-api", "description": "API ref"},
-        ])
+        mock_get.return_value = _mock_search_response(
+            [
+                {"title": "Cosmos DB Intro", "url": "https://learn.microsoft.com/cosmos-db", "description": "Overview"},
+                {"title": "Cosmos DB API", "url": "https://learn.microsoft.com/cosmos-api", "description": "API ref"},
+            ]
+        )
 
         results = search_learn("cosmos db", max_results=3)
         assert len(results) == 2
@@ -96,8 +99,7 @@ class TestSearchLearn:
         from azext_prototype.knowledge.web_search import search_learn
 
         items = [
-            {"title": f"Result {i}", "url": f"https://learn.microsoft.com/{i}", "description": ""}
-            for i in range(10)
+            {"title": f"Result {i}", "url": f"https://learn.microsoft.com/{i}", "description": ""} for i in range(10)
         ]
         mock_get.return_value = _mock_search_response(items)
 
@@ -108,10 +110,12 @@ class TestSearchLearn:
     def test_skips_entries_without_url(self, mock_get):
         from azext_prototype.knowledge.web_search import search_learn
 
-        mock_get.return_value = _mock_search_response([
-            {"title": "No URL", "url": "", "description": "Missing URL"},
-            {"title": "Has URL", "url": "https://learn.microsoft.com/ok", "description": "OK"},
-        ])
+        mock_get.return_value = _mock_search_response(
+            [
+                {"title": "No URL", "url": "", "description": "Missing URL"},
+                {"title": "Has URL", "url": "https://learn.microsoft.com/ok", "description": "OK"},
+            ]
+        )
 
         results = search_learn("test")
         assert len(results) == 1
@@ -122,6 +126,7 @@ class TestSearchLearn:
 # Web Search — fetch_page_content
 # ================================================================== #
 
+
 class TestFetchPageContent:
     """Tests for fetch_page_content()."""
 
@@ -129,9 +134,7 @@ class TestFetchPageContent:
     def test_strips_html(self, mock_get):
         from azext_prototype.knowledge.web_search import fetch_page_content
 
-        mock_get.return_value = _mock_page_response(
-            "<html><body><h1>Title</h1><p>Hello world</p></body></html>"
-        )
+        mock_get.return_value = _mock_page_response("<html><body><h1>Title</h1><p>Hello world</p></body></html>")
 
         text = fetch_page_content("https://learn.microsoft.com/test")
         assert "Title" in text
@@ -179,6 +182,7 @@ class TestFetchPageContent:
 # Web Search — search_and_fetch + format_search_results
 # ================================================================== #
 
+
 class TestSearchAndFetch:
     """Tests for search_and_fetch() and format_search_results()."""
 
@@ -188,9 +192,11 @@ class TestSearchAndFetch:
 
         def side_effect(url, **kwargs):
             if "api/search" in url:
-                return _mock_search_response([
-                    {"title": "Doc 1", "url": "https://learn.microsoft.com/doc1", "description": "Desc"},
-                ])
+                return _mock_search_response(
+                    [
+                        {"title": "Doc 1", "url": "https://learn.microsoft.com/doc1", "description": "Desc"},
+                    ]
+                )
             return _mock_page_response("<p>Content of doc 1</p>")
 
         mock_get.side_effect = side_effect
@@ -213,12 +219,15 @@ class TestSearchAndFetch:
         from azext_prototype.knowledge.web_search import search_and_fetch
 
         call_count = [0]
+
         def side_effect(url, **kwargs):
             call_count[0] += 1
             if call_count[0] == 1:
-                return _mock_search_response([
-                    {"title": "Doc", "url": "https://learn.microsoft.com/doc", "description": ""},
-                ])
+                return _mock_search_response(
+                    [
+                        {"title": "Doc", "url": "https://learn.microsoft.com/doc", "description": ""},
+                    ]
+                )
             raise Exception("Fetch failed")
 
         mock_get.side_effect = side_effect
@@ -247,6 +256,7 @@ class TestSearchAndFetch:
 # ================================================================== #
 # Search Cache
 # ================================================================== #
+
 
 class TestSearchCache:
     """Tests for SearchCache."""
@@ -329,11 +339,13 @@ class TestSearchCache:
 # Marker Interception — BaseAgent._resolve_searches
 # ================================================================== #
 
+
 class TestMarkerInterception:
     """Tests for [SEARCH: ...] marker detection and resolution."""
 
     def _make_agent(self, enable_search=True):
         from azext_prototype.agents.base import BaseAgent
+
         agent = BaseAgent(
             name="test-agent",
             description="Test agent",
@@ -345,6 +357,7 @@ class TestMarkerInterception:
 
     def _make_context(self, first_content="first response", second_content="final response"):
         from azext_prototype.agents.base import AgentContext
+
         provider = MagicMock()
         provider.chat.side_effect = [
             AIResponse(
@@ -392,10 +405,7 @@ class TestMarkerInterception:
         mock_search.return_value = "Doc content"
 
         agent = self._make_agent()
-        content_with_markers = (
-            "Need [SEARCH: query1] and [SEARCH: query2] and "
-            "[SEARCH: query3] and [SEARCH: query4]"
-        )
+        content_with_markers = "Need [SEARCH: query1] and [SEARCH: query2] and " "[SEARCH: query3] and [SEARCH: query4]"
         context, provider = self._make_context(
             first_content=content_with_markers,
             second_content="Final answer",
@@ -491,7 +501,7 @@ class TestMarkerInterception:
         agent._governance_aware = True
         # Mock validate_response to track what gets checked
         validated = []
-        original_validate = agent.validate_response
+        original_validate = agent.validate_response  # noqa: F841
         agent.validate_response = lambda text: (validated.append(text), [])[1]
 
         context, provider = self._make_context(
@@ -508,6 +518,7 @@ class TestMarkerInterception:
 # ================================================================== #
 # Content Filtering — KnowledgeLoader
 # ================================================================== #
+
 
 class TestContentFiltering:
     """Tests for mode-based content filtering in compose_context."""
@@ -534,9 +545,7 @@ class TestContentFiltering:
 
         # Service file WITHOUT production section
         (services_dir / "key-vault.md").write_text(
-            "# Key Vault\n\n"
-            "## POC Defaults\n"
-            "- Standard tier\n",
+            "# Key Vault\n\n" "## POC Defaults\n" "- Standard tier\n",
             encoding="utf-8",
         )
 
@@ -617,11 +626,12 @@ class TestContentFiltering:
 # Backlog Integration
 # ================================================================== #
 
+
 class TestBacklogIntegration:
     """Tests for production items injection in BacklogSession."""
 
     def _make_session(self, tmp_path, items_response="[]"):
-        from azext_prototype.agents.base import AgentContext, AgentCapability
+        from azext_prototype.agents.base import AgentContext
         from azext_prototype.agents.registry import AgentRegistry
         from azext_prototype.stages.backlog_session import BacklogSession
 
@@ -661,6 +671,7 @@ class TestBacklogIntegration:
 
         # Create discovery state with services
         import yaml
+
         discovery = {
             "architecture": {"services": ["cosmos-db"]},
             "scope": {},
@@ -673,7 +684,9 @@ class TestBacklogIntegration:
         with patch("azext_prototype.stages.backlog_session.BacklogSession._get_production_items") as mock_items:
             mock_items.return_value = "### cosmos-db\n- Geo-replication\n- Autoscale throughput\n"
 
-            items_json = '[{"epic":"Core","title":"Setup","description":"d","acceptance_criteria":[],"tasks":[],"effort":"S"}]'
+            items_json = (
+                '[{"epic":"Core","title":"Setup","description":"d","acceptance_criteria":[],"tasks":[],"effort":"S"}]'
+            )
             provider.chat.return_value = AIResponse(
                 content=items_json,
                 model="gpt-4o",
@@ -699,7 +712,9 @@ class TestBacklogIntegration:
         with patch("azext_prototype.stages.backlog_session.BacklogSession._get_production_items") as mock_items:
             mock_items.return_value = ""
 
-            items_json = '[{"epic":"Core","title":"Setup","description":"d","acceptance_criteria":[],"tasks":[],"effort":"S"}]'
+            items_json = (
+                '[{"epic":"Core","title":"Setup","description":"d","acceptance_criteria":[],"tasks":[],"effort":"S"}]'
+            )
             provider.chat.return_value = AIResponse(
                 content=items_json,
                 model="gpt-4o",
@@ -723,6 +738,7 @@ class TestBacklogIntegration:
 
         # Create discovery state with multiple services
         import yaml
+
         discovery = {
             "architecture": {"services": ["cosmos-db", "app-service"]},
             "scope": {},
@@ -752,11 +768,18 @@ class TestBacklogIntegration:
             mock_items.return_value = "### cosmos-db\n- Geo-replication\n"
 
             # AI returns items including deferred epic with production items
-            items_json = json.dumps([
-                {"epic": "Deferred / Future Work", "title": "Geo-replication",
-                 "description": "Set up geo-replication", "acceptance_criteria": [],
-                 "tasks": [], "effort": "L"},
-            ])
+            items_json = json.dumps(
+                [
+                    {
+                        "epic": "Deferred / Future Work",
+                        "title": "Geo-replication",
+                        "description": "Set up geo-replication",
+                        "acceptance_criteria": [],
+                        "tasks": [],
+                        "effort": "L",
+                    },
+                ]
+            )
             provider.chat.return_value = AIResponse(
                 content=items_json,
                 model="gpt-4o",
@@ -777,6 +800,7 @@ class TestBacklogIntegration:
 # Session Integration
 # ================================================================== #
 
+
 class TestSessionIntegration:
     """Tests for session-level integration of web search."""
 
@@ -784,7 +808,7 @@ class TestSessionIntegration:
     def test_cache_attached_to_context_on_first_search(self, mock_search):
         mock_search.return_value = "Doc content"
 
-        from azext_prototype.agents.base import BaseAgent, AgentContext
+        from azext_prototype.agents.base import AgentContext, BaseAgent
 
         agent = BaseAgent(
             name="test",
@@ -796,12 +820,20 @@ class TestSessionIntegration:
 
         provider = MagicMock()
         provider.chat.side_effect = [
-            AIResponse(content="[SEARCH: test]", model="m", usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}),
-            AIResponse(content="Final", model="m", usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}),
+            AIResponse(
+                content="[SEARCH: test]",
+                model="m",
+                usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+            ),
+            AIResponse(
+                content="Final", model="m", usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+            ),
         ]
 
         context = AgentContext(
-            project_config={}, project_dir="/tmp", ai_provider=provider,
+            project_config={},
+            project_dir="/tmp",
+            ai_provider=provider,
         )
 
         assert not hasattr(context, "_search_cache")
@@ -813,7 +845,7 @@ class TestSessionIntegration:
     def test_cache_shared_across_agents(self, mock_search):
         mock_search.return_value = "Doc content"
 
-        from azext_prototype.agents.base import BaseAgent, AgentContext
+        from azext_prototype.agents.base import AgentContext, BaseAgent
 
         agent1 = BaseAgent(name="a1", description="", system_prompt="")
         agent1._enable_web_search = True
@@ -824,19 +856,26 @@ class TestSessionIntegration:
         agent2._governance_aware = False
 
         call_idx = [0]
+
         def chat_side_effect(messages, **kwargs):
             call_idx[0] += 1
             if call_idx[0] in (1, 3):  # First calls return search markers
-                return AIResponse(content="[SEARCH: same query]", model="m",
-                                  usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15})
-            return AIResponse(content="Answer", model="m",
-                              usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15})
+                return AIResponse(
+                    content="[SEARCH: same query]",
+                    model="m",
+                    usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+                )
+            return AIResponse(
+                content="Answer", model="m", usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+            )
 
         provider = MagicMock()
         provider.chat.side_effect = chat_side_effect
 
         context = AgentContext(
-            project_config={}, project_dir="/tmp", ai_provider=provider,
+            project_config={},
+            project_dir="/tmp",
+            ai_provider=provider,
         )
 
         agent1.execute(context, "task1")
@@ -851,7 +890,7 @@ class TestSessionIntegration:
         """Both AI calls are visible in the provider's call history."""
         mock_search.return_value = "Doc content"
 
-        from azext_prototype.agents.base import BaseAgent, AgentContext
+        from azext_prototype.agents.base import AgentContext, BaseAgent
 
         agent = BaseAgent(name="t", description="", system_prompt="")
         agent._enable_web_search = True
@@ -859,14 +898,20 @@ class TestSessionIntegration:
 
         provider = MagicMock()
         provider.chat.side_effect = [
-            AIResponse(content="[SEARCH: q]", model="m",
-                       usage={"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}),
-            AIResponse(content="Final", model="m",
-                       usage={"prompt_tokens": 200, "completion_tokens": 100, "total_tokens": 300}),
+            AIResponse(
+                content="[SEARCH: q]",
+                model="m",
+                usage={"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
+            ),
+            AIResponse(
+                content="Final", model="m", usage={"prompt_tokens": 200, "completion_tokens": 100, "total_tokens": 300}
+            ),
         ]
 
         context = AgentContext(
-            project_config={}, project_dir="/tmp", ai_provider=provider,
+            project_config={},
+            project_dir="/tmp",
+            ai_provider=provider,
         )
 
         result = agent.execute(context, "task")
@@ -881,7 +926,7 @@ class TestSessionIntegration:
         """Verify that agents called within sessions can use web search."""
         mock_search.return_value = "Doc content"
 
-        from azext_prototype.agents.base import BaseAgent, AgentContext
+        from azext_prototype.agents.base import AgentContext, BaseAgent
 
         agent = BaseAgent(name="terraform-agent", description="", system_prompt="")
         agent._enable_web_search = True
@@ -902,7 +947,9 @@ class TestSessionIntegration:
         ]
 
         context = AgentContext(
-            project_config={}, project_dir="/tmp", ai_provider=provider,
+            project_config={},
+            project_dir="/tmp",
+            ai_provider=provider,
         )
 
         result = agent.execute(context, "Generate Cosmos DB Terraform")
@@ -913,6 +960,7 @@ class TestSessionIntegration:
 # ================================================================== #
 # HTML Text Extractor
 # ================================================================== #
+
 
 class TestHTMLTextExtractor:
     """Tests for the internal HTML parser."""
@@ -939,7 +987,3 @@ class TestHTMLTextExtractor:
         text = _html_to_text(html)
         assert "Paragraph 1" in text
         assert "Paragraph 2" in text
-
-
-# Need json import for test_deferred_epic_includes_production_items
-import json

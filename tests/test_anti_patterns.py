@@ -3,11 +3,16 @@
 Tests the YAML-based anti-pattern loader and scanner across all domains.
 """
 
-import pytest
 from pathlib import Path
 
-from azext_prototype.governance import anti_patterns
-from azext_prototype.governance.anti_patterns import AntiPatternCheck, load, scan, reset_cache
+import pytest
+
+from azext_prototype.governance.anti_patterns import (
+    AntiPatternCheck,
+    load,
+    reset_cache,
+    scan,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -21,6 +26,7 @@ def _clean_cache():
 # ------------------------------------------------------------------ #
 # Loader tests
 # ------------------------------------------------------------------ #
+
 
 class TestAntiPatternLoader:
     """Test YAML loading from the anti_patterns directory."""
@@ -41,9 +47,7 @@ class TestAntiPatternLoader:
     def test_all_checks_have_search_patterns(self):
         checks = load()
         for check in checks:
-            assert len(check.search_patterns) > 0, (
-                f"Check has no search_patterns: {check.warning_message}"
-            )
+            assert len(check.search_patterns) > 0, f"Check has no search_patterns: {check.warning_message}"
 
     def test_all_checks_have_warning_message(self):
         checks = load()
@@ -94,9 +98,9 @@ class TestAntiPatternLoader:
             "domain: test\n"
             "patterns:\n"
             "  - search_patterns:\n"
-            "      - \"test_pattern\"\n"
+            '      - "test_pattern"\n'
             "    safe_patterns: []\n"
-            "    warning_message: \"Test warning\"\n"
+            '    warning_message: "Test warning"\n'
         )
         (tmp_path / "test.yaml").write_text(yaml_content)
         reset_cache()
@@ -113,10 +117,7 @@ class TestAntiPatternLoader:
 
     def test_load_skips_entries_without_search_patterns(self, tmp_path):
         yaml_content = (
-            "domain: test\n"
-            "patterns:\n"
-            "  - search_patterns: []\n"
-            "    warning_message: \"Empty search\"\n"
+            "domain: test\n" "patterns:\n" "  - search_patterns: []\n" '    warning_message: "Empty search"\n'
         )
         (tmp_path / "test.yaml").write_text(yaml_content)
         reset_cache()
@@ -125,11 +126,7 @@ class TestAntiPatternLoader:
 
     def test_load_skips_entries_without_warning_message(self, tmp_path):
         yaml_content = (
-            "domain: test\n"
-            "patterns:\n"
-            "  - search_patterns:\n"
-            "      - \"foo\"\n"
-            "    warning_message: \"\"\n"
+            "domain: test\n" "patterns:\n" "  - search_patterns:\n" '      - "foo"\n' '    warning_message: ""\n'
         )
         (tmp_path / "test.yaml").write_text(yaml_content)
         reset_cache()
@@ -141,27 +138,31 @@ class TestAntiPatternLoader:
 # Scanner tests — Security domain
 # ------------------------------------------------------------------ #
 
+
 class TestSecurityPatterns:
     """Test security anti-pattern detection."""
 
-    @pytest.mark.parametrize("pattern", [
-        "connection_string",
-        "connectionstring",
-        "access_key",
-        "accesskey",
-        "account_key",
-        "accountkey",
-        "shared_access_key",
-        "client_secret",
-        'password = "bad"',
-        "password=\"bad\"",
-        "password='bad'",
-    ])
+    @pytest.mark.parametrize(
+        "pattern",
+        [
+            "connection_string",
+            "connectionstring",
+            "access_key",
+            "accesskey",
+            "account_key",
+            "accountkey",
+            "shared_access_key",
+            "client_secret",
+            'password = "bad"',
+            'password="bad"',
+            "password='bad'",
+        ],
+    )
     def test_credential_patterns_detected(self, pattern):
         warnings = scan(f"Use {pattern} for auth")
-        assert any("credential" in w.lower() or "managed identity" in w.lower() for w in warnings), (
-            f"Pattern '{pattern}' should trigger credential warning"
-        )
+        assert any(
+            "credential" in w.lower() or "managed identity" in w.lower() for w in warnings
+        ), f"Pattern '{pattern}' should trigger credential warning"
 
     def test_app_insights_connection_string_safe(self):
         warnings = scan("applicationinsights_connection_string = InstrumentationKey=...")
@@ -189,11 +190,12 @@ class TestSecurityPatterns:
 # Scanner tests — Networking domain
 # ------------------------------------------------------------------ #
 
+
 class TestNetworkingPatterns:
     """Test networking anti-pattern detection."""
 
     def test_public_network_access_detected(self):
-        warnings = scan('public_network_access_enabled = true')
+        warnings = scan("public_network_access_enabled = true")
         assert any("public network" in w.lower() for w in warnings)
 
     def test_open_firewall_detected(self):
@@ -208,6 +210,7 @@ class TestNetworkingPatterns:
 # ------------------------------------------------------------------ #
 # Scanner tests — Authentication domain
 # ------------------------------------------------------------------ #
+
 
 class TestAuthenticationPatterns:
     """Test authentication anti-pattern detection."""
@@ -225,6 +228,7 @@ class TestAuthenticationPatterns:
 # Scanner tests — Storage domain
 # ------------------------------------------------------------------ #
 
+
 class TestStoragePatterns:
     """Test storage anti-pattern detection."""
 
@@ -233,13 +237,14 @@ class TestStoragePatterns:
         assert any("account-level" in w.lower() or "managed identity" in w.lower() for w in warnings)
 
     def test_public_blob_access_detected(self):
-        warnings = scan('allow_blob_public_access = true')
+        warnings = scan("allow_blob_public_access = true")
         assert any("public" in w.lower() and "blob" in w.lower() for w in warnings)
 
 
 # ------------------------------------------------------------------ #
 # Scanner tests — Containers domain
 # ------------------------------------------------------------------ #
+
 
 class TestContainerPatterns:
     """Test container anti-pattern detection."""
@@ -252,6 +257,7 @@ class TestContainerPatterns:
 # ------------------------------------------------------------------ #
 # Scanner — safe pattern exemptions
 # ------------------------------------------------------------------ #
+
 
 class TestSafePatternExemptions:
     """Test that safe patterns properly exempt matches."""
@@ -280,6 +286,7 @@ class TestSafePatternExemptions:
 # Scanner tests — Encryption domain
 # ------------------------------------------------------------------ #
 
+
 class TestEncryptionPatterns:
     """Test encryption anti-pattern detection."""
 
@@ -305,6 +312,7 @@ class TestEncryptionPatterns:
 # Scanner tests — Monitoring domain
 # ------------------------------------------------------------------ #
 
+
 class TestMonitoringPatterns:
     """Test monitoring anti-pattern detection."""
 
@@ -316,6 +324,7 @@ class TestMonitoringPatterns:
 # ------------------------------------------------------------------ #
 # Scanner tests — Cost domain
 # ------------------------------------------------------------------ #
+
 
 class TestCostPatterns:
     """Test cost anti-pattern detection."""
@@ -334,19 +343,30 @@ class TestCostPatterns:
 # Loader — domain coverage
 # ------------------------------------------------------------------ #
 
+
 class TestDomainCoverage:
     """Verify all expected domains are present."""
 
     def test_all_domains_loaded(self):
         checks = load()
         domains = {c.domain for c in checks}
-        expected = {"security", "networking", "authentication", "storage", "containers", "encryption", "monitoring", "cost"}
+        expected = {
+            "security",
+            "networking",
+            "authentication",
+            "storage",
+            "containers",
+            "encryption",
+            "monitoring",
+            "cost",
+        }
         assert expected.issubset(domains), f"Missing domains: {expected - domains}"
 
 
 # ------------------------------------------------------------------ #
 # Scanner — deduplication
 # ------------------------------------------------------------------ #
+
 
 class TestScannerDeduplication:
     """Test that the scanner produces one warning per check."""

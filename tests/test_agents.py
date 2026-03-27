@@ -7,16 +7,16 @@ import yaml
 from knack.util import CLIError
 
 from azext_prototype.agents.base import AgentCapability, BaseAgent
-from azext_prototype.agents.registry import AgentRegistry
 from azext_prototype.agents.loader import (
     load_agents_from_directory,
     load_python_agent,
     load_yaml_agent,
 )
+from azext_prototype.agents.registry import AgentRegistry
 from azext_prototype.ai.provider import AIResponse
 
-
 # --- A concrete agent for testing ---
+
 
 class StubAgent(BaseAgent):
     """Minimal agent for testing."""
@@ -202,7 +202,7 @@ class TestPythonAgentLoader:
     """Test loading agents from Python files."""
 
     def test_load_python_agent_with_agent_class(self, tmp_path):
-        code = '''
+        code = """
 from azext_prototype.agents.base import BaseAgent, AgentCapability
 from azext_prototype.ai.provider import AIResponse
 
@@ -214,7 +214,7 @@ class MyAgent(BaseAgent):
         return AIResponse(content="ok", model="test")
 
 AGENT_CLASS = MyAgent
-'''
+"""
         py_file = tmp_path / "my_agent.py"
         py_file.write_text(code)
 
@@ -238,10 +238,17 @@ class TestBuiltinRegistry:
 
     def test_all_builtin_agents_registered(self, populated_registry):
         expected = [
-            "cloud-architect", "terraform-agent", "bicep-agent",
-            "app-developer", "doc-agent", "qa-engineer",
-            "biz-analyst", "cost-analyst", "project-manager",
-            "security-reviewer", "monitoring-agent",
+            "cloud-architect",
+            "terraform-agent",
+            "bicep-agent",
+            "app-developer",
+            "doc-agent",
+            "qa-engineer",
+            "biz-analyst",
+            "cost-analyst",
+            "project-manager",
+            "security-reviewer",
+            "monitoring-agent",
         ]
         for name in expected:
             assert name in populated_registry, f"Built-in agent '{name}' not registered"
@@ -352,18 +359,14 @@ class TestProjectManagerAgent:
     def test_parse_items_valid_json(self):
         from azext_prototype.agents.builtin.project_manager import ProjectManagerAgent
 
-        items = ProjectManagerAgent._parse_items(
-            '[{"title": "Test", "tasks": []}]'
-        )
+        items = ProjectManagerAgent._parse_items('[{"title": "Test", "tasks": []}]')
         assert len(items) == 1
         assert items[0]["title"] == "Test"
 
     def test_parse_items_with_markdown_fences(self):
         from azext_prototype.agents.builtin.project_manager import ProjectManagerAgent
 
-        items = ProjectManagerAgent._parse_items(
-            '```json\n[{"title": "Fenced"}]\n```'
-        )
+        items = ProjectManagerAgent._parse_items('```json\n[{"title": "Fenced"}]\n```')
         assert len(items) == 1
         assert items[0]["title"] == "Fenced"
 
@@ -427,7 +430,7 @@ class TestAzureApiVersionInjection:
         contents = [m.content for m in messages if isinstance(m.content, str)]
         joined = "\n".join(contents)
         assert "AZAPI PROVIDER VERSION: 2.8.0" in joined
-        assert '~> 2.8.0' in joined
+        assert "~> 2.8.0" in joined
 
     def test_terraform_agent_constraint_says_pinned(self):
         from azext_prototype.agents.builtin.terraform_agent import TerraformAgent
@@ -458,8 +461,8 @@ class TestAzureApiVersionInjection:
         assert "deployment-language-bicep" in joined
 
     def test_cloud_architect_injects_azure_api_version_for_terraform(self):
-        from azext_prototype.agents.builtin.cloud_architect import CloudArchitectAgent
         from azext_prototype.agents.base import AgentContext
+        from azext_prototype.agents.builtin.cloud_architect import CloudArchitectAgent
 
         agent = CloudArchitectAgent()
         provider = MagicMock()
@@ -478,8 +481,8 @@ class TestAzureApiVersionInjection:
         assert "deployment-language-terraform" in joined
 
     def test_cloud_architect_injects_azure_api_version_for_bicep(self):
-        from azext_prototype.agents.builtin.cloud_architect import CloudArchitectAgent
         from azext_prototype.agents.base import AgentContext
+        from azext_prototype.agents.builtin.cloud_architect import CloudArchitectAgent
 
         agent = CloudArchitectAgent()
         provider = MagicMock()

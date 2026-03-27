@@ -1,18 +1,20 @@
 """Tests for azext_prototype.knowledge — KnowledgeLoader and agent integration."""
 
-import textwrap
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 import yaml
 
-from azext_prototype.knowledge import KnowledgeLoader, DEFAULT_TOKEN_BUDGET, _CHARS_PER_TOKEN
-
+from azext_prototype.knowledge import (
+    _CHARS_PER_TOKEN,
+    DEFAULT_TOKEN_BUDGET,
+    KnowledgeLoader,
+)
 
 # ------------------------------------------------------------------
 # Fixtures
 # ------------------------------------------------------------------
+
 
 @pytest.fixture
 def knowledge_dir(tmp_path):
@@ -45,45 +47,56 @@ def knowledge_dir(tmp_path):
         },
     }
     (kd / "service-registry.yaml").write_text(
-        yaml.dump(registry, default_flow_style=False), encoding="utf-8",
+        yaml.dump(registry, default_flow_style=False),
+        encoding="utf-8",
     )
 
     # Service files
     (kd / "services" / "cosmos-db.md").write_text(
-        "# Cosmos DB\n\nUse Cosmos DB for NoSQL.\n", encoding="utf-8",
+        "# Cosmos DB\n\nUse Cosmos DB for NoSQL.\n",
+        encoding="utf-8",
     )
     (kd / "services" / "key-vault.md").write_text(
-        "# Key Vault\n\nUse Key Vault for secrets.\n", encoding="utf-8",
+        "# Key Vault\n\nUse Key Vault for secrets.\n",
+        encoding="utf-8",
     )
 
     # Tool files
     (kd / "tools" / "terraform.md").write_text(
-        "# Terraform Patterns\n\nUse azurerm provider.\n", encoding="utf-8",
+        "# Terraform Patterns\n\nUse azurerm provider.\n",
+        encoding="utf-8",
     )
     (kd / "tools" / "bicep.md").write_text(
-        "# Bicep Patterns\n\nUse modules.\n", encoding="utf-8",
+        "# Bicep Patterns\n\nUse modules.\n",
+        encoding="utf-8",
     )
 
     # Language files
     (kd / "languages" / "python.md").write_text(
-        "# Python Patterns\n\nUse FastAPI.\n", encoding="utf-8",
+        "# Python Patterns\n\nUse FastAPI.\n",
+        encoding="utf-8",
     )
     (kd / "languages" / "auth-patterns.md").write_text(
-        "# Auth Patterns\n\nUse DefaultAzureCredential.\n", encoding="utf-8",
+        "# Auth Patterns\n\nUse DefaultAzureCredential.\n",
+        encoding="utf-8",
     )
 
     # Role files
     (kd / "roles" / "architect.md").write_text(
-        "# Architect Role\n\nDesign Azure architectures.\n", encoding="utf-8",
+        "# Architect Role\n\nDesign Azure architectures.\n",
+        encoding="utf-8",
     )
     (kd / "roles" / "infrastructure.md").write_text(
-        "# Infrastructure Role\n\nGenerate IaC code.\n", encoding="utf-8",
+        "# Infrastructure Role\n\nGenerate IaC code.\n",
+        encoding="utf-8",
     )
     (kd / "roles" / "developer.md").write_text(
-        "# Developer Role\n\nWrite application code.\n", encoding="utf-8",
+        "# Developer Role\n\nWrite application code.\n",
+        encoding="utf-8",
     )
     (kd / "roles" / "analyst.md").write_text(
-        "# Analyst Role\n\nGather requirements.\n", encoding="utf-8",
+        "# Analyst Role\n\nGather requirements.\n",
+        encoding="utf-8",
     )
 
     return kd
@@ -98,6 +111,7 @@ def loader(knowledge_dir):
 # ------------------------------------------------------------------
 # KnowledgeLoader — individual loaders
 # ------------------------------------------------------------------
+
 
 class TestKnowledgeLoaderIndividual:
     """Test individual load methods."""
@@ -152,6 +166,7 @@ class TestKnowledgeLoaderIndividual:
 # KnowledgeLoader — list methods
 # ------------------------------------------------------------------
 
+
 class TestKnowledgeLoaderList:
     """Test list methods for introspection."""
 
@@ -185,6 +200,7 @@ class TestKnowledgeLoaderList:
 # ------------------------------------------------------------------
 # KnowledgeLoader — compose_context
 # ------------------------------------------------------------------
+
 
 class TestKnowledgeLoaderCompose:
     """Test context composition."""
@@ -280,6 +296,7 @@ class TestKnowledgeLoaderCompose:
 # KnowledgeLoader — token budget
 # ------------------------------------------------------------------
 
+
 class TestKnowledgeLoaderBudget:
     """Test token budget enforcement."""
 
@@ -308,6 +325,7 @@ class TestKnowledgeLoaderBudget:
 # ------------------------------------------------------------------
 # KnowledgeLoader — real knowledge directory
 # ------------------------------------------------------------------
+
 
 class TestKnowledgeLoaderReal:
     """Test against the actual knowledge/ directory shipped with the package."""
@@ -369,6 +387,7 @@ class TestKnowledgeLoaderReal:
 # BaseAgent — knowledge injection
 # ------------------------------------------------------------------
 
+
 class TestBaseAgentKnowledge:
     """Test that BaseAgent.get_system_messages() injects knowledge."""
 
@@ -398,7 +417,8 @@ class TestBaseAgentKnowledge:
         agent._knowledge_role = "architect"
 
         with patch(
-            "azext_prototype.knowledge._KNOWLEDGE_DIR", knowledge_dir,
+            "azext_prototype.knowledge._KNOWLEDGE_DIR",
+            knowledge_dir,
         ):
             messages = agent.get_system_messages()
 
@@ -415,7 +435,8 @@ class TestBaseAgentKnowledge:
         agent._knowledge_tools = ["terraform"]
 
         with patch(
-            "azext_prototype.knowledge._KNOWLEDGE_DIR", knowledge_dir,
+            "azext_prototype.knowledge._KNOWLEDGE_DIR",
+            knowledge_dir,
         ):
             messages = agent.get_system_messages()
 
@@ -442,6 +463,7 @@ class TestBaseAgentKnowledge:
 # ------------------------------------------------------------------
 # Builtin agents — knowledge declarations
 # ------------------------------------------------------------------
+
 
 class TestBuiltinAgentKnowledge:
     """Test that builtin agents have correct knowledge declarations."""

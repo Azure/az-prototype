@@ -17,7 +17,6 @@ from azext_prototype.governance.embeddings import (
 )
 from azext_prototype.governance.policy_index import CACHE_FILE, IndexedRule, PolicyIndex
 
-
 # ======================================================================
 # Fixtures
 # ======================================================================
@@ -579,10 +578,7 @@ class TestFormatBrief:
     def test_format_brief_caps_at_eight_directives(self):
         from azext_prototype.governance.governor import _format_brief
 
-        rules = [
-            _make_rule(f"R-{i:03d}", "required", f"Rule number {i} is unique and different")
-            for i in range(15)
-        ]
+        rules = [_make_rule(f"R-{i:03d}", "required", f"Rule number {i} is unique and different") for i in range(15)]
 
         result = _format_brief(rules)
         # Count numbered directives (lines starting with "N. ")
@@ -623,13 +619,11 @@ class TestGovernorReview:
         governor.reset_index()
 
     def test_review_no_violations(self, tmp_path):
-        from azext_prototype.governance import governor
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.governance import governor
 
         mock_provider = MagicMock()
-        mock_provider.chat.return_value = AIResponse(
-            content="[NO_VIOLATIONS]", model="gpt-4o", usage={}
-        )
+        mock_provider.chat.return_value = AIResponse(content="[NO_VIOLATIONS]", model="gpt-4o", usage={})
 
         violations = governor.review(
             project_dir=str(tmp_path),
@@ -639,8 +633,8 @@ class TestGovernorReview:
         assert violations == []
 
     def test_review_with_violations(self, tmp_path):
-        from azext_prototype.governance import governor
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.governance import governor
 
         mock_provider = MagicMock()
         mock_provider.chat.return_value = AIResponse(

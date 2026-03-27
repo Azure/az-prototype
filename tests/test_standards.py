@@ -1,10 +1,15 @@
 """Tests for azext_prototype.standards — curated design principles and reference patterns."""
 
-import pytest
 from pathlib import Path
 
-from azext_prototype.governance import standards
-from azext_prototype.governance.standards import Standard, StandardPrinciple, load, format_for_prompt, reset_cache
+import pytest
+
+from azext_prototype.governance.standards import (
+    Standard,
+    format_for_prompt,
+    load,
+    reset_cache,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -17,6 +22,7 @@ def _clean_cache():
 # ------------------------------------------------------------------ #
 # Loader tests
 # ------------------------------------------------------------------ #
+
 
 class TestStandardsLoader:
     """Test YAML loading from the standards directory."""
@@ -102,6 +108,7 @@ class TestStandardsLoader:
 # Prompt formatting tests
 # ------------------------------------------------------------------ #
 
+
 class TestFormatForPrompt:
     """Test standards prompt formatting."""
 
@@ -139,6 +146,7 @@ class TestFormatForPrompt:
 # ------------------------------------------------------------------ #
 # Specific principles content
 # ------------------------------------------------------------------ #
+
 
 class TestPrincipleContent:
     """Verify specific principle content is correct."""

@@ -1,6 +1,5 @@
 """Tests for azext_prototype.telemetry — App Insights telemetry collection."""
 
-import logging
 import sys
 from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
@@ -72,10 +71,12 @@ def _fake_azure_cli_modules():
 # Helpers
 # ======================================================================
 
+
 @pytest.fixture(autouse=True)
 def _reset_telemetry():
     """Reset telemetry module state before each test."""
     from azext_prototype.telemetry import reset
+
     reset()
     yield
     reset()
@@ -380,9 +381,7 @@ class TestGetTenantId:
 
         cmd = MagicMock()
         mock_profile = MagicMock()
-        mock_profile.get_subscription.return_value = {
-            "tenantId": "aaaabbbb-1111-2222-3333-ccccddddeeee"
-        }
+        mock_profile.get_subscription.return_value = {"tenantId": "aaaabbbb-1111-2222-3333-ccccddddeeee"}
 
         with _fake_azure_cli_modules(), patch(
             "azure.cli.core._profile.Profile",
@@ -426,10 +425,7 @@ class TestParseConnectionString:
     def test_parses_valid_string(self):
         from azext_prototype.telemetry import _parse_connection_string
 
-        cs = (
-            "InstrumentationKey=abc-123;"
-            "IngestionEndpoint=https://example.in.applicationinsights.azure.com"
-        )
+        cs = "InstrumentationKey=abc-123;" "IngestionEndpoint=https://example.in.applicationinsights.azure.com"
         endpoint, ikey = _parse_connection_string(cs)
         assert endpoint == "https://example.in.applicationinsights.azure.com/v2/track"
         assert ikey == "abc-123"
@@ -437,10 +433,7 @@ class TestParseConnectionString:
     def test_strips_trailing_slash(self):
         from azext_prototype.telemetry import _parse_connection_string
 
-        cs = (
-            "InstrumentationKey=key1;"
-            "IngestionEndpoint=https://host.com/"
-        )
+        cs = "InstrumentationKey=key1;" "IngestionEndpoint=https://host.com/"
         endpoint, _ = _parse_connection_string(cs)
         assert endpoint == "https://host.com/v2/track"
 
@@ -452,16 +445,12 @@ class TestParseConnectionString:
     def test_missing_ikey(self):
         from azext_prototype.telemetry import _parse_connection_string
 
-        assert _parse_connection_string(
-            "IngestionEndpoint=https://host.com"
-        ) == ("", "")
+        assert _parse_connection_string("IngestionEndpoint=https://host.com") == ("", "")
 
     def test_missing_endpoint(self):
         from azext_prototype.telemetry import _parse_connection_string
 
-        assert _parse_connection_string(
-            "InstrumentationKey=abc-123"
-        ) == ("", "")
+        assert _parse_connection_string("InstrumentationKey=abc-123") == ("", "")
 
 
 # ======================================================================
@@ -480,7 +469,6 @@ class TestGetIngestionConfig:
         assert ikey == "00000000-0000-0000-0000-000000000000"
 
     def test_caches_result(self, monkeypatch, mock_env_conn_string):
-        from azext_prototype import telemetry
         from azext_prototype.telemetry import _get_ingestion_config
 
         _get_ingestion_config()
@@ -650,6 +638,7 @@ class TestTrackCommand:
 
     def test_parameters_field_sent(self, monkeypatch, mock_env_conn_string):
         import json as json_mod
+
         from azext_prototype.telemetry import track_command
 
         monkeypatch.delenv("AZURE_CORE_COLLECT_TELEMETRY", raising=False)
@@ -668,6 +657,7 @@ class TestTrackCommand:
 
     def test_parameters_sensitive_keys_redacted(self, monkeypatch, mock_env_conn_string):
         import json as json_mod
+
         from azext_prototype.telemetry import track_command
 
         monkeypatch.delenv("AZURE_CORE_COLLECT_TELEMETRY", raising=False)
@@ -777,6 +767,7 @@ class TestSendEnvelope:
             assert kwargs["headers"]["Content-Type"] == "application/json"
             assert kwargs["timeout"] == 5
             import json
+
             payload = json.loads(kwargs["data"])
             assert payload == [{"key": "val"}]
 
@@ -900,7 +891,6 @@ class TestTrackDecorator:
         @track_decorator("test name")
         def prototype_my_func(cmd):
             """My docstring."""
-            pass
 
         assert prototype_my_func.__name__ == "prototype_my_func"
         assert prototype_my_func.__doc__ == "My docstring."
@@ -984,6 +974,7 @@ class TestTrackDecorator:
             ("github-models", "gpt-4o"),
             ("azure-openai", "gpt-4o"),
         ]:
+
             @track_decorator(f"test default model {prov}")
             def my_command(cmd, ai_provider="copilot"):
                 return "ok"
@@ -997,8 +988,7 @@ class TestTrackDecorator:
                     _, kwargs = mock_tc.call_args
                     assert kwargs["provider"] == prov
                     assert kwargs["model"] == expected_model, (
-                        f"Expected model '{expected_model}' for provider '{prov}', "
-                        f"got '{kwargs['model']}'"
+                        f"Expected model '{expected_model}' for provider '{prov}', " f"got '{kwargs['model']}'"
                     )
 
     def test_decorator_reads_telemetry_overrides(self):
@@ -1078,9 +1068,7 @@ class TestGetAiConfig:
     def test_returns_provider_and_model(self, tmp_path, monkeypatch):
         from azext_prototype.telemetry import _get_ai_config
 
-        (tmp_path / "prototype.yaml").write_text(
-            "ai:\n  provider: github-models\n  model: gpt-4o-mini\n"
-        )
+        (tmp_path / "prototype.yaml").write_text("ai:\n  provider: github-models\n  model: gpt-4o-mini\n")
         monkeypatch.chdir(tmp_path)
         assert _get_ai_config() == ("github-models", "gpt-4o-mini")
 
@@ -1130,16 +1118,18 @@ class TestSanitizeParameters:
     def test_redacts_sensitive_keys(self):
         from azext_prototype.telemetry import _sanitize_parameters
 
-        result = _sanitize_parameters({
-            "subscription": "abc-123",
-            "token": "ghp_secret",
-            "api_key": "sk-xxx",
-            "password": "p@ss",
-            "key": "my-key",
-            "secret": "shhh",
-            "connection_string": "Server=...",
-            "name": "my-project",
-        })
+        result = _sanitize_parameters(
+            {
+                "subscription": "abc-123",
+                "token": "ghp_secret",
+                "api_key": "sk-xxx",
+                "password": "p@ss",
+                "key": "my-key",
+                "secret": "shhh",
+                "connection_string": "Server=...",
+                "name": "my-project",
+            }
+        )
         assert result["subscription"] == "***"
         assert result["token"] == "***"
         assert result["api_key"] == "***"
@@ -1177,26 +1167,20 @@ class TestCommandTelemetryIntegration:
         import azext_prototype.custom as custom_mod
 
         command_functions = [
-            name
-            for name in dir(custom_mod)
-            if name.startswith("prototype_") and callable(getattr(custom_mod, name))
+            name for name in dir(custom_mod) if name.startswith("prototype_") and callable(getattr(custom_mod, name))
         ]
 
         for name in command_functions:
             func = getattr(custom_mod, name)
             # Decorated functions have __wrapped__ set by functools.wraps
-            assert hasattr(func, "__wrapped__"), (
-                f"{name} is missing the @track decorator"
-            )
+            assert hasattr(func, "__wrapped__"), f"{name} is missing the @track decorator"
 
     def test_command_count(self):
         """Sanity check — we expect 22 command functions."""
         import azext_prototype.custom as custom_mod
 
         command_functions = [
-            name
-            for name in dir(custom_mod)
-            if name.startswith("prototype_") and callable(getattr(custom_mod, name))
+            name for name in dir(custom_mod) if name.startswith("prototype_") and callable(getattr(custom_mod, name))
         ]
 
         assert len(command_functions) == 24
@@ -1226,7 +1210,7 @@ class TestTelemetryFieldCoverage:
     # Fields that are only present conditionally
     CONDITIONAL_FIELDS = {
         "parameters",  # only when parameters dict is provided
-        "error",       # only when error string is provided
+        "error",  # only when error string is provided
     }
 
     def test_all_fields_in_track_command(self, monkeypatch, mock_env_conn_string):

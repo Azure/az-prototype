@@ -1,9 +1,9 @@
 """Tests for discovery_state scope management."""
 
-import pytest
-import yaml
-
-from azext_prototype.stages.discovery_state import DiscoveryState, _default_discovery_state
+from azext_prototype.stages.discovery_state import (
+    DiscoveryState,
+    _default_discovery_state,
+)
 
 
 class TestDiscoveryStateScope:

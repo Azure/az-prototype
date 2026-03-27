@@ -4,15 +4,14 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-
 from azext_prototype.agents.base import AgentCapability, AgentContext
 from azext_prototype.agents.builtin.governor_agent import GovernorAgent
 from azext_prototype.ai.provider import AIResponse
 
-
 # ======================================================================
 # Helpers
 # ======================================================================
+
 
 def _make_context(project_dir: str, ai_provider=None) -> AgentContext:
     """Create a minimal AgentContext for governor tests."""
@@ -26,6 +25,7 @@ def _make_context(project_dir: str, ai_provider=None) -> AgentContext:
 # ======================================================================
 # GovernorAgent construction
 # ======================================================================
+
 
 class TestGovernorAgentInit:
 
@@ -65,6 +65,7 @@ class TestGovernorAgentInit:
 # ======================================================================
 # brief() tests
 # ======================================================================
+
 
 class TestGovernorBrief:
 
@@ -137,6 +138,7 @@ class TestGovernorBrief:
 # review() tests
 # ======================================================================
 
+
 class TestGovernorReview:
 
     def test_review_no_ai_provider_returns_empty_list(self, tmp_path):
@@ -201,6 +203,7 @@ class TestGovernorReview:
 # ======================================================================
 # execute() tests
 # ======================================================================
+
 
 class TestGovernorExecute:
 
