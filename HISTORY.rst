@@ -58,9 +58,18 @@ Governor agent
   generation QA to catch violations.  The brief is also injected directly
   into the task prompt as a ``## MANDATORY GOVERNANCE RULES`` section near
   the end (where models pay the most attention), not just in system messages
-  where it was drowned out in 600KB+ prompts.  Policy requirements like
-  private endpoints and network isolation are enforced through governance
-  policies, not hardcoded as agent constraints.
+  where it was drowned out in 600KB+ prompts.  Policy requirements like private endpoints and network isolation are
+  enforced through governance policies, not hardcoded as agent constraints.
+* **Two-step build generation** — each build stage now uses a two-step
+  approach: (1) a lightweight context-extraction call sends the full
+  architecture and returns only the stage-relevant sections plus minimum
+  dependency info (~2-5KB), then (2) the generation call uses the focused
+  context + governor brief + task instructions (~15-20KB total instead of
+  622KB).  The governance brief is now ~10% of the prompt instead of 0.24%.
+* **Governance-reinforced QA remediation** — max attempts increased to 3
+  with escalating severity.  Each remediation attempt uses focused context
+  and re-applies the governor brief.  Severity escalates from "MUST fix"
+  to "CRITICAL" to "FINAL ATTEMPT — build will be rejected permanently."
   Agents receive focused policy briefs via ``set_governor_brief()``.
 * **Pre-computed neural embeddings** — built-in policy embeddings are
   generated at build time (``scripts/compute_embeddings.py``) using
