@@ -33,8 +33,7 @@ patterns:
       - "echo -e \"${red}"
       - "echo -e \"${green}"
     safe_patterns:
-      - "${nc}\""
-      - "${NC}\""
+      - "${nc}"
     correct_patterns:
       - 'echo -e "${YELLOW}message${NC}"'
       - 'echo -e "${RED}message${NC}"'
