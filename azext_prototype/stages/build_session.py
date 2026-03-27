@@ -1440,6 +1440,17 @@ class BuildSession:
         if scaffolding:
             task += scaffolding
 
+        # Inject governor brief as high-priority constraints (near the end
+        # of the prompt where models pay the most attention).
+        governor_brief = getattr(agent, "_governor_brief", "")
+        if governor_brief:
+            task += (
+                "\n## MANDATORY GOVERNANCE RULES (FAILURE TO COMPLY WILL REJECT THE BUILD)\n"
+                f"{governor_brief}\n"
+                "Violating any MUST rule above will cause the build to fail and require regeneration. "
+                "Generate code that complies with ALL listed rules.\n"
+            )
+
         task += (
             "\n## Output Format\n"
             "Wrap EACH generated file in a fenced code block whose label is "

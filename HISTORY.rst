@@ -55,7 +55,12 @@ Governor agent
   (e.g. "generate terraform for Foundation: managed-identity, log-analytics")
   and injects it via ``set_governor_brief()``.  This ensures generated code
   is policy-compliant from the start rather than relying solely on post-
-  generation QA to catch violations.
+  generation QA to catch violations.  The brief is also injected directly
+  into the task prompt as a ``## MANDATORY GOVERNANCE RULES`` section near
+  the end (where models pay the most attention), not just in system messages
+  where it was drowned out in 600KB+ prompts.  Policy requirements like
+  private endpoints and network isolation are enforced through governance
+  policies, not hardcoded as agent constraints.
   Agents receive focused policy briefs via ``set_governor_brief()``.
 * **Pre-computed neural embeddings** — built-in policy embeddings are
   generated at build time (``scripts/compute_embeddings.py``) using
