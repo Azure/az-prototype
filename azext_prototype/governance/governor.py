@@ -119,7 +119,7 @@ def brief(
 
 
 def _format_brief(rules: list[IndexedRule]) -> str:
-    """Format retrieved rules as concise directives."""
+    """Format retrieved rules as concise directives with rationale."""
     lines = ["## Governance Policy Brief", ""]
     lines.append("The following governance rules apply to this task:")
     lines.append("")
@@ -131,6 +131,9 @@ def _format_brief(rules: list[IndexedRule]) -> str:
             lines.append(f"### {current_category.title()}")
         severity_marker = "MUST" if rule.severity == "required" else "SHOULD"
         lines.append(f"- **{rule.rule_id}** ({severity_marker}): {rule.description}")
+        # Include rationale for MUST rules — tells the model HOW to comply
+        if rule.severity == "required" and rule.rationale:
+            lines.append(f"  Implementation: {rule.rationale}")
 
     lines.append("")
     lines.append("Ensure generated code follows these rules.")

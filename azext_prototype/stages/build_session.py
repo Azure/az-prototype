@@ -410,6 +410,11 @@ class BuildSession:
                         slug = f"build-stage-{s.get('stage', 0)}"
                         self._update_task_fn(slug, "completed")
 
+        # ---- Condense architecture into per-stage contexts (ONE call) ----
+        all_stages = self._build_state._state.get("deployment_stages", [])
+        with self._maybe_spinner("Condensing architecture into per-stage contexts...", use_styled):
+            stage_contexts = self._condense_architecture(architecture, all_stages, use_styled)
+
         # ---- Phase 3: Staged generation ----
         if skip_generation:
             pending = []
@@ -439,11 +444,8 @@ class BuildSession:
             if svc_display:
                 _print(f"       Resources: {svc_display}")
 
-            # Step 1: Extract stage-relevant context (lightweight call)
-            with self._maybe_spinner(f"Analyzing context for Stage {stage_num}...", use_styled):
-                focused_context = self._extract_stage_context(stage, architecture, use_styled)
-
-            # Step 2: Build task with focused context + governance
+            # Use condensed per-stage context (from one-time condensation call)
+            focused_context = stage_contexts.get(stage_num, "")
             agent, task = self._build_stage_task(stage, focused_context, templates)
             if not agent:
                 _print(f"       Skipped (no agent for category '{category}')")
@@ -451,6 +453,16 @@ class BuildSession:
 
             # Apply governor policy brief so generated code is compliant
             self._apply_governor_brief(agent, stage_name, services)
+
+            # Temporarily disable knowledge/standards to keep the prompt lean
+            # (~14KB vs 83KB). The condensed context + governor brief have
+            # everything the model needs.
+            saved_knowledge = (agent._knowledge_role, agent._knowledge_tools, agent._knowledge_languages)
+            saved_standards = agent._include_standards
+            agent._knowledge_role = ""
+            agent._knowledge_tools = []
+            agent._knowledge_languages = []
+            agent._include_standards = False
 
             try:
                 with self._maybe_spinner(f"Building Stage {stage_num}: {stage_name}...", use_styled):
@@ -470,6 +482,10 @@ class BuildSession:
                     source_agent=agent.name,
                     source_stage="build",
                 )
+            finally:
+                # Restore agent settings
+                agent._knowledge_role, agent._knowledge_tools, agent._knowledge_languages = saved_knowledge
+                agent._include_standards = saved_standards
                 continue
 
             if response:
@@ -1304,56 +1320,49 @@ class BuildSession:
         except Exception:
             pass  # Never let governor errors block generation
 
-    def _extract_stage_context(self, stage: dict, architecture: str, use_styled: bool) -> str:
-        """Step 1: Extract stage-relevant context from the full architecture.
+    def _condense_architecture(self, architecture: str, stages: list[dict], use_styled: bool) -> dict[int, str]:
+        """One-time condensation of the full architecture into per-stage contexts.
 
-        Makes a lightweight AI call with the full architecture to extract
-        ONLY the sections relevant to this stage and its dependencies.
-        No governance, templates, or standards — just context extraction.
+        Makes ONE AI call with the full architecture and deployment plan,
+        producing a ~1KB context excerpt per stage.  The result is cached
+        in ``build_state.stage_contexts`` so subsequent stages don't need
+        the 542KB architecture at all.
 
-        Falls back to the full architecture if extraction fails.
+        Returns ``{stage_num: context_str}`` mapping.
         """
         from azext_prototype.ai.provider import AIMessage
 
+        # Check cache first
+        cached = self._build_state._state.get("stage_contexts", {})
+        if cached and len(cached) >= len(stages):
+            return {int(k): v for k, v in cached.items()}
+
         if not self._context.ai_provider:
-            return architecture
+            return {}
 
-        stage_name = stage.get("name", "")
-        stage_num = stage.get("stage", 0)
-        services = stage.get("services", [])
-        svc_names = [s.get("name", "") for s in services if s.get("name")]
-        svc_types = [s.get("resource_type", "") for s in services if s.get("resource_type")]
-
-        # Get upstream dependency info
-        prev_stages = self._build_state.get_generated_stages()
-        dep_info = ""
-        if prev_stages:
-            dep_info = "Previously generated stages (available as dependencies):\n"
-            for ps in prev_stages:
-                ps_svcs = [s.get("computed_name") or s.get("name", "") for s in ps.get("services", [])]
-                dep_info += f"- Stage {ps['stage']}: {ps['name']} ({', '.join(ps_svcs)})\n"
+        # Build stage summary for the prompt
+        stage_list = ""
+        for s in stages:
+            svcs = [f"{sv.get('computed_name', '')} ({sv.get('resource_type', '')})" for sv in s.get("services", [])]
+            stage_list += f"- Stage {s['stage']}: {s['name']} ({s.get('category', '')}) — {', '.join(svcs)}\n"
 
         prompt = (
-            f"Extract ONLY the architecture context relevant to building "
-            f"Stage {stage_num}: {stage_name}.\n\n"
-            f"Services in this stage: {', '.join(svc_names)}\n"
-            f"Resource types: {', '.join(svc_types)}\n\n"
-            f"{dep_info}\n"
-            f"## Full Architecture\n{architecture}\n\n"
-            f"## Instructions\n"
-            f"Return a focused context document containing:\n"
-            f"1. Architecture details ONLY for the services in this stage\n"
-            f"2. Minimum dependency info from upstream stages "
-            f"(resource names, IDs, outputs this stage needs to reference)\n"
-            f"3. Integration points with downstream stages that consume this stage's outputs\n\n"
-            f"Do NOT include architecture details for unrelated services.\n"
-            f"Do NOT generate any code — only extract context.\n"
-            f"Keep the response under 3000 characters."
+            "Given this architecture and deployment plan, produce a stage-indexed "
+            "context document. For EACH stage below, provide:\n"
+            "1. What it builds and its role in the system (2-3 sentences)\n"
+            "2. Key configuration decisions (SKUs, tiers, network mode private/public)\n"
+            "3. Upstream dependencies (resource names/IDs this stage must reference)\n"
+            "4. Downstream outputs (what later stages need from this one)\n\n"
+            "Keep each stage's context under 1000 characters.\n"
+            "Return EXACTLY this format:\n\n"
+            "## Stage 1: <name>\n<context>\n\n## Stage 2: <name>\n<context>\n...\n\n"
+            f"## Deployment Plan\n{stage_list}\n"
+            f"## Architecture\n{architecture}"
         )
 
         system = AIMessage(
             role="system",
-            content="You are an architecture analyst. Extract relevant context concisely.",
+            content="You are an architecture analyst. Produce concise per-stage context summaries.",
         )
         user_msg = AIMessage(role="user", content=prompt)
 
@@ -1361,16 +1370,33 @@ class BuildSession:
             response = self._context.ai_provider.chat(
                 [system, user_msg],
                 temperature=0.1,
-                max_tokens=2048,
+                max_tokens=16384,
             )
-            if response and response.content and len(response.content) > 50:
+            if response:
                 self._token_tracker.record(response)
-                return response.content
         except Exception:
-            pass
+            return {}
 
-        # Fallback: return full architecture (old behavior)
-        return architecture
+        content = getattr(response, "content", None) if response else None
+        if not content or not isinstance(content, str):
+            return {}
+
+        # Parse the response into per-stage contexts
+        import re
+
+        result: dict[int, str] = {}
+        parts = re.split(r"\n(?=## Stage \d+)", content)
+        for part in parts:
+            m = re.match(r"## Stage (\d+)", part)
+            if m:
+                stage_num = int(m.group(1))
+                result[stage_num] = part.strip()
+
+        # Cache in build state
+        self._build_state._state["stage_contexts"] = {str(k): v for k, v in result.items()}
+        self._build_state.save()
+
+        return result
 
     # ------------------------------------------------------------------ #
     # Internal — stage generation
@@ -1960,8 +1986,9 @@ class BuildSession:
             # 6. Remediate — re-invoke IaC agent with focused context + governance
             _print(f"       Stage {stage_num}: QA found issues — remediating (attempt {attempt + 1})...")
 
-            # Use focused context (not full 622KB architecture)
-            focused = self._extract_stage_context(stage, architecture, use_styled)
+            # Use condensed stage context (cached from one-time condensation)
+            cached_contexts = self._build_state._state.get("stage_contexts", {})
+            focused = cached_contexts.get(str(stage_num), "")
             agent, task = self._build_stage_task(stage, focused, templates)
             if not agent:
                 return

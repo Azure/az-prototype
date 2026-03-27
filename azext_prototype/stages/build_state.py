@@ -69,6 +69,7 @@ def _default_build_state() -> dict[str, Any]:
         "review_decisions": [],
         "conversation_history": [],
         "resources": [],
+        "stage_contexts": {},  # {stage_num: condensed_context_str}
         "design_snapshot": {
             "iteration": None,
             "architecture_hash": None,
