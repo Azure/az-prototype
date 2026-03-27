@@ -145,6 +145,24 @@ def _format_brief(rules: list[IndexedRule]) -> str:
         if rule.severity == "required" and rule.rationale:
             lines.append(f"  Implementation: {rule.rationale}")
 
+    # Append ALL anti-patterns as "NEVER GENERATE" directives.
+    # Loaded from governance-managed YAML files — zero hardcoded logic.
+    try:
+        from azext_prototype.governance import anti_patterns
+
+        ap_checks = anti_patterns.load()
+        if ap_checks:
+            lines.append("")
+            lines.append("## Code Patterns That Will Be Rejected")
+            lines.append("The following patterns trigger automatic build rejection:")
+            lines.append("")
+            for check in ap_checks:
+                lines.append(f"- {check.warning_message}")
+                for sp in check.search_patterns:
+                    lines.append(f"  NEVER GENERATE: `{sp}`")
+    except Exception:
+        pass
+
     lines.append("")
     lines.append("Ensure generated code follows these rules.")
     return "\n".join(lines)

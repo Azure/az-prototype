@@ -10,8 +10,16 @@ metadata:
 rules:
   - id: NET-001
     severity: required
-    description: "Use private endpoints for all PaaS data services in production"
-    rationale: "Eliminates public internet exposure for data plane"
+    description: >-
+      Disable public network access AND use private endpoints for all PaaS
+      data services.  Set publicNetworkAccess to Disabled (or
+      public_network_access_enabled to false) on every PaaS resource.
+      NEVER generate public_network_access_enabled = true or
+      publicNetworkAccess = Enabled.
+    rationale: >-
+      Eliminates public internet exposure for data plane.  Both disabling
+      public access AND adding private endpoints are required — private
+      endpoints alone do not block public access.
     applies_to: [cloud-architect, terraform-agent, bicep-agent, biz-analyst]
     template_check:
       scope: [key-vault, sql-database, cosmos-db, storage]
@@ -26,6 +34,20 @@ rules:
     template_check:
       require_service: [virtual-network]
       error_message: "Template missing a virtual-network service for network isolation"
+
+  - id: NET-005
+    severity: required
+    description: >-
+      Every Azure PaaS resource that supports publicNetworkAccess MUST
+      explicitly set it to Disabled.  In Terraform azapi_resource body
+      blocks, set publicNetworkAccess = "Disabled".  In Bicep, set
+      properties.publicNetworkAccess = 'Disabled'.  Never omit this
+      property — Azure defaults to Enabled.
+    rationale: >-
+      Azure PaaS services default to public access enabled.  Omitting the
+      property results in a public endpoint.  Explicit Disabled is required
+      for both Terraform and Bicep.
+    applies_to: [terraform-agent, bicep-agent]
 
   - id: NET-003
     severity: recommended

@@ -72,9 +72,18 @@ Governor agent
   with escalating severity.  Each remediation attempt uses condensed context
   and re-applies the governor brief.  Severity escalates from "MUST fix"
   to "CRITICAL" to "FINAL ATTEMPT — build will be rejected permanently."
-* **Governor brief includes rationale** — MUST rules now include their
-  implementation rationale so the model knows HOW to comply, not just WHAT
-  to comply with.
+* **Governor brief includes rationale and anti-patterns** — MUST rules
+  include implementation rationale.  ALL anti-pattern violation patterns
+  (33 checks across 9 domains) are appended as ``NEVER GENERATE``
+  directives, loaded directly from governance YAML files with zero
+  hardcoded logic.
+* **NET-001 updated** — now explicitly requires disabling public network
+  access AND using private endpoints (previously only mentioned endpoints).
+* **NET-005 added** — requires ``publicNetworkAccess = Disabled`` in both
+  Terraform and Bicep.  Covers the gap where Azure defaults to Enabled.
+* **Anti-pattern safe_patterns** — networking anti-pattern now exempts
+  ``public_network_access_enabled = false`` and
+  ``publicnetworkaccess = "disabled"`` to avoid false positives.
   Agents receive focused policy briefs via ``set_governor_brief()``.
 * **Pre-computed neural embeddings** — built-in policy embeddings are
   generated at build time (``scripts/compute_embeddings.py``) using

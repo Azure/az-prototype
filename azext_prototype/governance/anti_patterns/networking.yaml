@@ -11,7 +11,10 @@ patterns:
       - "public_network_access_enabled = true"
       - "public_network_access = \"enabled\""
       - "publicnetworkaccess = \"enabled\""
-    safe_patterns: []
+    safe_patterns:
+      - "public_network_access_enabled = false"
+      - "publicnetworkaccess = \"disabled\""
+      - "public_network_access_enabled = var."
     warning_message: "Public network access is enabled — disable public access and use private endpoints or service endpoints."
 
   - search_patterns:
