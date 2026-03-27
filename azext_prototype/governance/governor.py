@@ -110,12 +110,22 @@ def brief(
     else:
         rules = index.retrieve(task_description, top_k=top_k)
 
-    log_flow("governor.brief", f"Retrieved {len(rules)} rules for brief", agent=agent_name, top_k=top_k)
+    # Always include MUST rules with severity="required" regardless of
+    # embedding similarity — these are universal governance constraints
+    # (e.g. network isolation, managed identity) that apply to ALL infra stages.
+    all_rules = index.retrieve(task_description, top_k=top_k * 3)
+    must_rules = [r for r in all_rules if r.severity == "required" and r not in rules]
+    combined = list(rules)
+    for r in must_rules:
+        if r.rule_id not in {existing.rule_id for existing in combined}:
+            combined.append(r)
 
-    if not rules:
+    log_flow("governor.brief", f"Retrieved {len(rules)} + {len(combined) - len(rules)} MUST rules", agent=agent_name)
+
+    if not combined:
         return ""
 
-    return _format_brief(rules)
+    return _format_brief(combined)
 
 
 def _format_brief(rules: list[IndexedRule]) -> str:
