@@ -25,7 +25,7 @@ class TestConsoleClearLastLine:
         from azext_prototype.ui.console import Console
 
         c = Console()
-        with patch("azext_prototype.ui.console.sys.stdout") as mock_stdout:
+        with patch("sys.stdout") as mock_stdout:
             c.clear_last_line()
             mock_stdout.write.assert_called_once_with("\033[A\033[2K\r")
             mock_stdout.flush.assert_called_once()
