@@ -2035,10 +2035,25 @@ class BuildSession:
 
             qa_content = qa_result.content if qa_result else ""
 
+            from azext_prototype.debug_log import log_flow as _dbg
+
+            _dbg(
+                "build_session.qa",
+                f"Stage {stage_num} QA review (attempt {attempt})",
+                qa_content_len=len(qa_content),
+                qa_content_full=qa_content,
+            )
+
             # 4. Check if issues found
             has_issues = qa_content and any(
                 kw in qa_content.lower() for kw in ["critical", "error", "missing", "fix", "issue", "broken"]
             )
+
+            if has_issues:
+                # Log which keywords triggered
+                qa_lower = qa_content.lower()
+                triggered = [kw for kw in ["critical", "error", "missing", "fix", "issue", "broken"] if kw in qa_lower]
+                _dbg("build_session.qa", f"Stage {stage_num} has_issues=True", triggered_keywords=triggered)
 
             if not has_issues:
                 _print(f"       Stage {stage_num} passed QA.")
