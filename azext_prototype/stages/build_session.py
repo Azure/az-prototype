@@ -494,6 +494,26 @@ class BuildSession:
                 self._token_tracker.record(response)
             content = response.content if response else ""
 
+            from azext_prototype.debug_log import log_flow as _dbg_flow
+            from azext_prototype.parsers.file_extractor import parse_file_blocks as _dbg_parse
+
+            _dbg_flow(
+                "build_session.generate",
+                f"Stage {stage_num} response",
+                content_len=len(content) if content else 0,
+                content_type=type(content).__name__,
+                content_preview=(content[:300] if content else "(empty)"),
+            )
+
+            # Debug: check what the parser would extract
+            _dbg_files = _dbg_parse(content) if content else {}
+            _dbg_flow(
+                "build_session.generate",
+                f"Stage {stage_num} parse_file_blocks",
+                file_count=len(_dbg_files),
+                filenames=list(_dbg_files.keys())[:10],
+            )
+
             if not content:
                 _print(f"       Empty response for Stage {stage_num} — routing to QA for diagnosis...")
                 svc_names_list = [s.get("name", "") for s in services if s.get("name")]
@@ -510,6 +530,13 @@ class BuildSession:
                     source_stage="build",
                 )
             written_paths = self._write_stage_files(stage, content)
+
+            _dbg_flow(
+                "build_session.generate",
+                f"Stage {stage_num} written_paths",
+                count=len(written_paths),
+                paths=written_paths[:5],
+            )
 
             self._build_state.mark_stage_generated(stage_num, written_paths, agent.name)
             if self._update_task_fn:
