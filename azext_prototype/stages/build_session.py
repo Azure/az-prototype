@@ -458,6 +458,10 @@ class BuildSession:
 
             agent, task = self._build_stage_task(stage, focused_context, templates)
 
+            # Disable standards during generation — the governance brief already
+            # has all the rules, standards add 10KB of redundant guidance
+            saved_standards = agent._include_standards
+            agent._include_standards = False
             try:
                 with self._maybe_spinner(f"Building Stage {stage_num}: {stage_name}...", use_styled):
                     response = agent.execute(self._context, task)
@@ -476,11 +480,13 @@ class BuildSession:
                     source_agent=agent.name,
                     source_stage="build",
                 )
-                # Clear override and skip to next stage
+                # Restore and skip to next stage
                 agent.set_knowledge_override("")
+                agent._include_standards = saved_standards
                 continue
-            # Clear override on success path
+            # Restore on success path
             agent.set_knowledge_override("")
+            agent._include_standards = saved_standards
 
             if response:
                 self._token_tracker.record(response)
@@ -1337,6 +1343,11 @@ class BuildSession:
                 include_constraints=True,
                 mode="poc",
             )
+            # Cap knowledge at ~12KB to keep generation prompts focused.
+            # The governance brief + condensed context already provide
+            # stage-specific guidance — knowledge adds general patterns.
+            if len(knowledge) > 12000:
+                knowledge = knowledge[:12000] + "\n\n[Knowledge truncated for prompt efficiency]"
             if knowledge:
                 agent.set_knowledge_override(knowledge)
         except Exception:
@@ -2076,10 +2087,13 @@ class BuildSession:
                 f"{qa_content}\n"
             )
 
+            saved_standards = agent._include_standards
+            agent._include_standards = False
             with self._maybe_spinner(f"Remediating Stage {stage_num} (attempt {attempt + 1})...", use_styled):
                 response = agent.execute(self._context, task)
 
-            agent.set_knowledge_override("")  # Clear override
+            agent.set_knowledge_override("")
+            agent._include_standards = saved_standards
 
             if response:
                 self._token_tracker.record(response)
