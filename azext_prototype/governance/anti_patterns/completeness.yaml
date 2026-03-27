@@ -29,18 +29,17 @@ patterns:
     warning_message: "Local/key-based authentication is disabled but no managed identity or RBAC role assignment found in the same stage. Applications will be unable to authenticate."
 
   - search_patterns:
-      - "echo -e \"${YELLOW}"
-      - "echo -e \"${RED}"
-      - "echo -e \"${GREEN}"
-      - "echo \""
+      - "echo -e \"${yellow}"
+      - "echo -e \"${red}"
+      - "echo -e \"${green}"
     safe_patterns:
-      - "echo \"\""
+      - "${nc}\""
+      - "${NC}\""
     correct_patterns:
       - 'echo -e "${YELLOW}message${NC}"'
       - 'echo -e "${RED}message${NC}"'
       - 'echo -e "${GREEN}message${NC}"'
-      - "# Ensure all echo strings are properly closed with matching quotes"
-    warning_message: "Possible incomplete echo statement in deploy script — verify all strings are properly closed."
+    warning_message: "Incomplete color echo statement in deploy script — use uppercase color variables and close with ${NC}."
 
   - search_patterns:
       - "terraform_remote_state"
