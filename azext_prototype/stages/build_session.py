@@ -446,13 +446,17 @@ class BuildSession:
 
             # Use condensed per-stage context (from one-time condensation call)
             focused_context = stage_contexts.get(stage_num, "")
-            agent, task = self._build_stage_task(stage, focused_context, templates)
-            if not agent:
-                _print(f"       Skipped (no agent for category '{category}')")
-                continue
 
-            # Apply governor policy brief so generated code is compliant
+            # Apply governor brief BEFORE building the task so the
+            # ## MANDATORY GOVERNANCE RULES section is injected into the
+            # task string (near the end where the model pays most attention).
+            agent = self._select_agent(stage)
+            if not agent:
+                _print(f"       Skipped (no agent for category '{stage.get('category', '')}')")
+                continue
             self._apply_governor_brief(agent, stage_name, services)
+
+            agent, task = self._build_stage_task(stage, focused_context, templates)
 
             # Temporarily disable knowledge/standards to keep the prompt lean
             # (~14KB vs 83KB). The condensed context + governor brief have
@@ -1430,6 +1434,18 @@ class BuildSession:
     # ------------------------------------------------------------------ #
     # Internal — stage generation
     # ------------------------------------------------------------------ #
+
+    def _select_agent(self, stage: dict) -> Any | None:
+        """Select the appropriate agent for a build stage category."""
+        category = stage.get("category", "infra")
+        if category in ("infra", "data", "integration"):
+            return self._iac_agents.get(self._iac_tool)
+        elif category in ("app", "schema", "cicd", "external"):
+            return self._dev_agent
+        elif category == "docs":
+            return self._doc_agent
+        else:
+            return self._iac_agents.get(self._iac_tool) or self._dev_agent
 
     def _build_stage_task(
         self,
