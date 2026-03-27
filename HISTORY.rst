@@ -50,6 +50,12 @@ Governor agent
   into every agent's system prompt.  Three modes: ``brief()`` retrieves the
   top-K most relevant rules (~1-2KB); ``review()`` evaluates output against
   the full policy set using parallel chunked AI calls (``max_workers=2``).
+  **Wired into the build session** — before each stage's agent generates
+  code, the governor produces a policy brief for the specific stage context
+  (e.g. "generate terraform for Foundation: managed-identity, log-analytics")
+  and injects it via ``set_governor_brief()``.  This ensures generated code
+  is policy-compliant from the start rather than relying solely on post-
+  generation QA to catch violations.
   Agents receive focused policy briefs via ``set_governor_brief()``.
 * **Pre-computed neural embeddings** — built-in policy embeddings are
   generated at build time (``scripts/compute_embeddings.py``) using

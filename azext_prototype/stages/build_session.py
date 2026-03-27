@@ -444,6 +444,9 @@ class BuildSession:
                 _print(f"       Skipped (no agent for category '{category}')")
                 continue
 
+            # Apply governor policy brief so generated code is compliant
+            self._apply_governor_brief(agent, stage_name, services)
+
             try:
                 with self._maybe_spinner(f"Building Stage {stage_num}: {stage_name}...", use_styled):
                     response = agent.execute(self._context, task)
@@ -1268,6 +1271,33 @@ class BuildSession:
                 if new_dir != old_dir:
                     stage["dir"] = new_dir
         self._build_state.save()
+
+    # ------------------------------------------------------------------ #
+    # Internal — governor integration
+    # ------------------------------------------------------------------ #
+
+    def _apply_governor_brief(self, agent: Any, stage_name: str, services: list[dict]) -> None:
+        """Set a governor policy brief on the agent before generation.
+
+        Retrieves the most relevant policy rules for this stage's context
+        and injects them as a concise ~1-2KB brief into the agent's system
+        prompt, replacing the full ~40KB policy dump.
+        """
+        try:
+            from azext_prototype.governance.governor import brief as governor_brief
+
+            svc_names = [s.get("name", "") for s in services if s.get("name")]
+            task_desc = f"Generate {self._iac_tool} code for {stage_name}: {', '.join(svc_names)}"
+            policy_brief = governor_brief(
+                project_dir=self._context.project_dir,
+                task_description=task_desc,
+                agent_name=agent.name,
+                top_k=15,
+            )
+            if policy_brief:
+                agent.set_governor_brief(policy_brief)
+        except Exception:
+            pass  # Never let governor errors block generation
 
     # ------------------------------------------------------------------ #
     # Internal — stage generation
