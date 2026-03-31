@@ -1,0 +1,253 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: azure-openai
+  category: azure
+  services: [azure-openai]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: AOI-001
+    severity: required
+    description: "Deploy Azure OpenAI with managed identity and disable API key authentication"
+    rationale: "API keys are long-lived credentials that cannot be scoped; managed identity eliminates credential management"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "openai" {
+        type      = "Microsoft.CognitiveServices/accounts@2024-04-01-preview"
+        name      = var.openai_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          kind = "OpenAI"
+          sku = {
+            name = var.sku_name  # "S0"
+          }
+          properties = {
+            customSubDomainName       = var.openai_subdomain
+            disableLocalAuth          = true
+            publicNetworkAccess       = "Disabled"
+            networkAcls = {
+              defaultAction = "Deny"
+              ipRules       = []
+            }
+            encryption = {
+              keySource = "Microsoft.CognitiveServices"
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource openai 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' = {
+        name: openaiName
+        location: location
+        kind: 'OpenAI'
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: skuName  // 'S0'
+        }
+        properties: {
+          customSubDomainName: openaiSubdomain
+          disableLocalAuth: true
+          publicNetworkAccess: 'Disabled'
+          networkAcls: {
+            defaultAction: 'Deny'
+            ipRules: []
+          }
+          encryption: {
+            keySource: 'Microsoft.CognitiveServices'
+          }
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Network/privateEndpoints@2024-01-01"
+        name: "pe-openai"
+        description: "Private endpoint for Azure OpenAI to eliminate public network exposure"
+        terraform_pattern: |
+          resource "azapi_resource" "pe_openai" {
+            type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+            name      = "pe-${var.openai_name}"
+            location  = var.location
+            parent_id = var.resource_group_id
+
+            body = {
+              properties = {
+                subnet = {
+                  id = var.subnet_id
+                }
+                privateLinkServiceConnections = [
+                  {
+                    name = "openai-connection"
+                    properties = {
+                      privateLinkServiceId = azapi_resource.openai.id
+                      groupIds             = ["account"]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource peOpenai 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+            name: 'pe-${openaiName}'
+            location: location
+            properties: {
+              subnet: {
+                id: subnetId
+              }
+              privateLinkServiceConnections: [
+                {
+                  name: 'openai-connection'
+                  properties: {
+                    privateLinkServiceId: openai.id
+                    groupIds: ['account']
+                  }
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Network/privateDnsZones@2024-06-01"
+        name: "privatelink.openai.azure.com"
+        description: "Private DNS zone for Azure OpenAI private endpoint resolution"
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name: "diag-openai"
+        description: "Diagnostic settings to route audit and request logs to Log Analytics"
+        terraform_pattern: |
+          resource "azapi_resource" "diag_openai" {
+            type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+            name      = "diag-${var.openai_name}"
+            parent_id = azapi_resource.openai.id
+
+            body = {
+              properties = {
+                workspaceId = var.log_analytics_workspace_id
+                logs = [
+                  {
+                    categoryGroup = "allLogs"
+                    enabled       = true
+                  }
+                ]
+                metrics = [
+                  {
+                    category = "AllMetrics"
+                    enabled  = true
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource diagOpenai 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+            name: 'diag-${openaiName}'
+            scope: openai
+            properties: {
+              workspaceId: logAnalyticsWorkspaceId
+              logs: [
+                {
+                  categoryGroup: 'allLogs'
+                  enabled: true
+                }
+              ]
+              metrics: [
+                {
+                  category: 'AllMetrics'
+                  enabled: true
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "Cognitive Services OpenAI User"
+        description: "RBAC role assignment granting consuming identity the Cognitive Services OpenAI User role"
+    prohibitions:
+      - "Never hardcode API keys in source code or IaC templates"
+      - "Never set disableLocalAuth to false — always disable key-based authentication"
+      - "Never set publicNetworkAccess to Enabled without compensating network controls"
+      - "Never embed endpoint URLs with keys in application configuration"
+      - "Never use Cognitive Services Contributor role when Cognitive Services OpenAI User suffices"
+
+  - id: AOI-002
+    severity: required
+    description: "Deploy model instances with explicit capacity and version pinning"
+    rationale: "Unpinned model versions cause non-deterministic behavior; unset capacity causes throttling"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "openai_deployment" {
+        type      = "Microsoft.CognitiveServices/accounts/deployments@2024-04-01-preview"
+        name      = var.deployment_name
+        parent_id = azapi_resource.openai.id
+
+        body = {
+          sku = {
+            name     = "Standard"
+            capacity = var.tpm_capacity  # tokens-per-minute in thousands
+          }
+          properties = {
+            model = {
+              format  = "OpenAI"
+              name    = var.model_name      # e.g. "gpt-4o"
+              version = var.model_version   # e.g. "2024-08-06"
+            }
+            versionUpgradeOption = "NoAutoUpgrade"
+          }
+        }
+      }
+    bicep_pattern: |
+      resource openaiDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-04-01-preview' = {
+        name: deploymentName
+        parent: openai
+        sku: {
+          name: 'Standard'
+          capacity: tpmCapacity
+        }
+        properties: {
+          model: {
+            format: 'OpenAI'
+            name: modelName
+            version: modelVersion
+          }
+          versionUpgradeOption: 'NoAutoUpgrade'
+        }
+      }
+    prohibitions:
+      - "Never omit model version — always pin to a specific version string"
+      - "Never use versionUpgradeOption 'OnceNewDefaultVersionAvailable' in production"
+      - "Never deploy without explicit capacity (sku.capacity)"
+
+  - id: AOI-003
+    severity: recommended
+    description: "Implement content filtering policies on all deployments"
+    rationale: "Content filtering prevents misuse and ensures responsible AI compliance"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+  - id: AOI-004
+    severity: recommended
+    description: "Configure rate limiting and retry logic in consuming applications"
+    rationale: "Azure OpenAI enforces TPM and RPM limits; clients must handle 429 responses gracefully"
+    applies_to: [app-developer, cloud-architect]
+
+patterns:
+  - name: "Azure OpenAI with private endpoint and RBAC"
+    description: "Secure Azure OpenAI deployment with no public access, managed identity, and private connectivity"
+
+anti_patterns:
+  - description: "Do not use API key authentication for Azure OpenAI"
+    instead: "Set disableLocalAuth=true and use managed identity with Cognitive Services OpenAI User role"
+  - description: "Do not deploy models without version pinning"
+    instead: "Always specify model.version and set versionUpgradeOption to NoAutoUpgrade"
+  - description: "Do not leave publicNetworkAccess as Enabled"
+    instead: "Set publicNetworkAccess to Disabled and use private endpoints"
+
+references:
+  - title: "Azure OpenAI Service documentation"
+    url: "https://learn.microsoft.com/azure/ai-services/openai/overview"
+  - title: "Azure OpenAI networking and security"
+    url: "https://learn.microsoft.com/azure/ai-services/openai/how-to/managed-identity"

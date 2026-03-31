@@ -1,0 +1,251 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: signalr
+  category: azure
+  services: [signalr]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: SIG-001
+    severity: required
+    description: "Deploy Azure SignalR Service with managed identity, disabled access keys, and no public access"
+    rationale: "Access keys are shared secrets; managed identity with Microsoft Entra auth provides auditable, per-client access control"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "signalr" {
+        type      = "Microsoft.SignalRService/signalR@2024-03-01"
+        name      = var.signalr_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          kind = "SignalR"
+          sku = {
+            name     = var.sku_name  # "Standard_S1", "Premium_P1"
+            tier     = var.sku_tier  # "Standard", "Premium"
+            capacity = var.sku_capacity
+          }
+          properties = {
+            disableLocalAuth     = true
+            publicNetworkAccess  = "Disabled"
+            tls = {
+              clientCertEnabled = false
+            }
+            features = [
+              {
+                flag  = "ServiceMode"
+                value = "Default"
+              },
+              {
+                flag  = "EnableConnectivityLogs"
+                value = "True"
+              },
+              {
+                flag  = "EnableMessagingLogs"
+                value = "True"
+              },
+              {
+                flag  = "EnableLiveTrace"
+                value = "False"
+              }
+            ]
+            networkACLs = {
+              defaultAction = "Deny"
+              publicNetwork = {
+                allow = []
+                deny  = ["ServerConnection", "ClientConnection", "RESTAPI", "Trace"]
+              }
+              privateEndpoints = []
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource signalr 'Microsoft.SignalRService/signalR@2024-03-01' = {
+        name: signalrName
+        location: location
+        kind: 'SignalR'
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: skuName
+          tier: skuTier
+          capacity: skuCapacity
+        }
+        properties: {
+          disableLocalAuth: true
+          publicNetworkAccess: 'Disabled'
+          tls: {
+            clientCertEnabled: false
+          }
+          features: [
+            {
+              flag: 'ServiceMode'
+              value: 'Default'
+            }
+            {
+              flag: 'EnableConnectivityLogs'
+              value: 'True'
+            }
+            {
+              flag: 'EnableMessagingLogs'
+              value: 'True'
+            }
+            {
+              flag: 'EnableLiveTrace'
+              value: 'False'
+            }
+          ]
+          networkACLs: {
+            defaultAction: 'Deny'
+            publicNetwork: {
+              allow: []
+              deny: ['ServerConnection', 'ClientConnection', 'RESTAPI', 'Trace']
+            }
+            privateEndpoints: []
+          }
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Network/privateEndpoints@2024-01-01"
+        name: "pe-signalr"
+        description: "Private endpoint for SignalR Service to secure real-time connections"
+        terraform_pattern: |
+          resource "azapi_resource" "pe_signalr" {
+            type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+            name      = "pe-${var.signalr_name}"
+            location  = var.location
+            parent_id = var.resource_group_id
+
+            body = {
+              properties = {
+                subnet = {
+                  id = var.subnet_id
+                }
+                privateLinkServiceConnections = [
+                  {
+                    name = "signalr-connection"
+                    properties = {
+                      privateLinkServiceId = azapi_resource.signalr.id
+                      groupIds             = ["signalr"]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource peSignalr 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+            name: 'pe-${signalrName}'
+            location: location
+            properties: {
+              subnet: {
+                id: subnetId
+              }
+              privateLinkServiceConnections: [
+                {
+                  name: 'signalr-connection'
+                  properties: {
+                    privateLinkServiceId: signalr.id
+                    groupIds: ['signalr']
+                  }
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Network/privateDnsZones@2024-06-01"
+        name: "privatelink.service.signalr.net"
+        description: "Private DNS zone for SignalR Service private endpoint resolution"
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name: "diag-signalr"
+        description: "Diagnostic settings for connectivity and messaging logs to Log Analytics"
+        terraform_pattern: |
+          resource "azapi_resource" "diag_signalr" {
+            type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+            name      = "diag-${var.signalr_name}"
+            parent_id = azapi_resource.signalr.id
+
+            body = {
+              properties = {
+                workspaceId = var.log_analytics_workspace_id
+                logs = [
+                  {
+                    categoryGroup = "allLogs"
+                    enabled       = true
+                  }
+                ]
+                metrics = [
+                  {
+                    category = "AllMetrics"
+                    enabled  = true
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource diagSignalr 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+            name: 'diag-${signalrName}'
+            scope: signalr
+            properties: {
+              workspaceId: logAnalyticsWorkspaceId
+              logs: [
+                {
+                  categoryGroup: 'allLogs'
+                  enabled: true
+                }
+              ]
+              metrics: [
+                {
+                  category: 'AllMetrics'
+                  enabled: true
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "SignalR App Server"
+        description: "RBAC role assignment granting the app server identity the SignalR App Server role (roleDefinitionId: 420fcaa2-552c-430f-98ca-3264be4806c7)"
+    prohibitions:
+      - "Never hardcode SignalR access keys or connection strings in application code"
+      - "Never set disableLocalAuth to false — always use Microsoft Entra authentication"
+      - "Never set publicNetworkAccess to Enabled without network ACLs"
+      - "Never enable LiveTrace in production — it is for debugging only"
+      - "Never use Free tier for production — it lacks SLA and private endpoint support"
+      - "When disableLocalAuth = true, primaryConnectionString and primaryKey are null in the ARM response. NEVER output or reference them."
+      - "Applications authenticate to SignalR via managed identity using DefaultAzureCredential, NOT connection strings."
+
+  - id: SIG-002
+    severity: required
+    description: "Enable connectivity and messaging logs for connection tracking and troubleshooting"
+    rationale: "Without logs, connection failures and message delivery issues cannot be diagnosed"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+
+  - id: SIG-003
+    severity: recommended
+    description: "Configure network ACLs to restrict access by connection type"
+    rationale: "Network ACLs provide fine-grained control over which connection types are allowed through which endpoints"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+
+patterns:
+  - name: "SignalR with private endpoint and Microsoft Entra auth"
+    description: "Secure SignalR deployment with no public access, managed identity, and connectivity logging"
+
+anti_patterns:
+  - description: "Do not use access key authentication for SignalR"
+    instead: "Set disableLocalAuth=true and use managed identity with SignalR App Server role"
+  - description: "Do not deploy SignalR with public network access"
+    instead: "Set publicNetworkAccess to Disabled and use private endpoints"
+
+references:
+  - title: "Azure SignalR Service documentation"
+    url: "https://learn.microsoft.com/azure/azure-signalr/signalr-overview"
+  - title: "SignalR Service authentication"
+    url: "https://learn.microsoft.com/azure/azure-signalr/signalr-concept-authenticate-oauth"

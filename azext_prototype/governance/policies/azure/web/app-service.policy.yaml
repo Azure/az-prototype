@@ -1,0 +1,437 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: app-service
+  category: azure
+  services: [app-service]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: AS-001
+    severity: required
+    description: "Create App Service Plan with appropriate SKU"
+    rationale: "Plan defines compute tier; B1+ required for VNet integration, P1v3+ for production"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "app_service_plan" {
+        type      = "Microsoft.Web/serverfarms@2023-12-01"
+        name      = var.app_service_plan_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "B1"
+            tier = "Basic"
+          }
+          kind = "linux"
+          properties = {
+            reserved = true
+          }
+        }
+      }
+    bicep_pattern: |
+      resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
+        name: appServicePlanName
+        location: location
+        kind: 'linux'
+        sku: {
+          name: 'B1'
+          tier: 'Basic'
+        }
+        properties: {
+          reserved: true
+        }
+      }
+
+  - id: AS-002
+    severity: required
+    description: "Create App Service with HTTPS-only, TLS 1.2, managed identity, VNet integration, and public access disabled"
+    rationale: "Baseline security configuration prevents cleartext transmission, enables identity-based access, and restricts network exposure"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "app_service" {
+        type      = "Microsoft.Web/sites@2023-12-01"
+        name      = var.app_service_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        identity {
+          type         = "UserAssigned"
+          identity_ids = [azapi_resource.user_assigned_identity.id]
+        }
+
+        body = {
+          kind = "app,linux"
+          properties = {
+            serverFarmId        = azapi_resource.app_service_plan.id
+            httpsOnly           = true
+            publicNetworkAccess = "Disabled"
+            virtualNetworkSubnetId = var.app_service_subnet_id
+            siteConfig = {
+              minTlsVersion          = "1.2"
+              ftpsState              = "Disabled"
+              vnetRouteAllEnabled    = true
+              http20Enabled          = true
+              linuxFxVersion         = var.linux_fx_version
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource appService 'Microsoft.Web/sites@2023-12-01' = {
+        name: appServiceName
+        location: location
+        kind: 'app,linux'
+        identity: {
+          type: 'UserAssigned'
+          userAssignedIdentities: {
+            '${userAssignedIdentity.id}': {}
+          }
+        }
+        properties: {
+          serverFarmId: appServicePlan.id
+          httpsOnly: true
+          publicNetworkAccess: 'Disabled'
+          virtualNetworkSubnetId: appServiceSubnetId
+          siteConfig: {
+            minTlsVersion: '1.2'
+            ftpsState: 'Disabled'
+            vnetRouteAllEnabled: true
+            http20Enabled: true
+            linuxFxVersion: linuxFxVersion
+          }
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Network/privateEndpoints@2024-01-01"
+        description: "Private endpoint for App Service — required when publicNetworkAccess is Disabled"
+        terraform_pattern: |
+          resource "azapi_resource" "app_private_endpoint" {
+            type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+            name      = "pe-${var.app_service_name}"
+            location  = var.location
+            parent_id = azapi_resource.resource_group.id
+
+            body = {
+              properties = {
+                subnet = {
+                  id = var.private_endpoint_subnet_id
+                }
+                privateLinkServiceConnections = [
+                  {
+                    name = "pe-${var.app_service_name}"
+                    properties = {
+                      privateLinkServiceId = azapi_resource.app_service.id
+                      groupIds             = ["sites"]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource appPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+            name: 'pe-${appServiceName}'
+            location: location
+            properties: {
+              subnet: {
+                id: privateEndpointSubnetId
+              }
+              privateLinkServiceConnections: [
+                {
+                  name: 'pe-${appServiceName}'
+                  properties: {
+                    privateLinkServiceId: appService.id
+                    groupIds: [
+                      'sites'
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Network/privateDnsZones@2020-06-01"
+        description: "Private DNS zone for App Service private endpoint resolution"
+        terraform_pattern: |
+          resource "azapi_resource" "app_dns_zone" {
+            type      = "Microsoft.Network/privateDnsZones@2020-06-01"
+            name      = "privatelink.azurewebsites.net"
+            location  = "global"
+            parent_id = azapi_resource.resource_group.id
+          }
+
+          resource "azapi_resource" "app_dns_zone_link" {
+            type      = "Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01"
+            name      = "link-${var.vnet_name}"
+            location  = "global"
+            parent_id = azapi_resource.app_dns_zone.id
+
+            body = {
+              properties = {
+                virtualNetwork = {
+                  id = var.vnet_id
+                }
+                registrationEnabled = false
+              }
+            }
+          }
+
+          resource "azapi_resource" "app_pe_dns_group" {
+            type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-01-01"
+            name      = "default"
+            parent_id = azapi_resource.app_private_endpoint.id
+
+            body = {
+              properties = {
+                privateDnsZoneConfigs = [
+                  {
+                    name = "privatelink-azurewebsites-net"
+                    properties = {
+                      privateDnsZoneId = azapi_resource.app_dns_zone.id
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource appDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+            name: 'privatelink.azurewebsites.net'
+            location: 'global'
+          }
+
+          resource appDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+            parent: appDnsZone
+            name: 'link-${vnetName}'
+            location: 'global'
+            properties: {
+              virtualNetwork: {
+                id: vnetId
+              }
+              registrationEnabled: false
+            }
+          }
+
+          resource appPeDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-01-01' = {
+            parent: appPrivateEndpoint
+            name: 'default'
+            properties: {
+              privateDnsZoneConfigs: [
+                {
+                  name: 'privatelink-azurewebsites-net'
+                  properties: {
+                    privateDnsZoneId: appDnsZone.id
+                  }
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        description: "Diagnostic settings for App Service to Log Analytics"
+        terraform_pattern: |
+          resource "azapi_resource" "app_diagnostics" {
+            type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+            name      = "diag-${var.app_service_name}"
+            parent_id = azapi_resource.app_service.id
+
+            body = {
+              properties = {
+                workspaceId = var.log_analytics_workspace_id
+                logs = [
+                  {
+                    categoryGroup = "allLogs"
+                    enabled       = true
+                  }
+                ]
+                metrics = [
+                  {
+                    category = "AllMetrics"
+                    enabled  = true
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource appDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+            scope: appService
+            name: 'diag-${appServiceName}'
+            properties: {
+              workspaceId: logAnalyticsWorkspaceId
+              logs: [
+                {
+                  categoryGroup: 'allLogs'
+                  enabled: true
+                }
+              ]
+              metrics: [
+                {
+                  category: 'AllMetrics'
+                  enabled: true
+                }
+              ]
+            }
+          }
+    prohibitions:
+      - "NEVER set httpsOnly to false"
+      - "NEVER set minTlsVersion below 1.2"
+      - "NEVER set ftpsState to AllAllowed — use Disabled"
+      - "NEVER set publicNetworkAccess to Enabled"
+      - "NEVER store secrets in App Settings as plaintext — use Key Vault references (@Microsoft.KeyVault(SecretUri=...))"
+    template_check:
+      scope: [app-service]
+      require_config: [https_only, identity]
+      error_message: "Service '{service_name}' ({service_type}) missing {config_key}: true"
+
+  - id: AS-003
+    severity: required
+    description: "Deploy into a VNet-integrated subnet for backend connectivity"
+    rationale: "Enables private access to databases, Key Vault, and other PaaS services"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    template_check:
+      when_services_present: [app-service]
+      require_service: [virtual-network]
+      error_message: "Template with app-service must include a virtual-network service for VNet integration"
+
+  - id: AS-004
+    severity: recommended
+    description: "Use deployment slots for zero-downtime deployments in production"
+    rationale: "Slot swaps are atomic and support rollback"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+
+  - id: AS-005
+    severity: recommended
+    description: "Use App Service Authentication (EasyAuth) or custom middleware for user-facing apps"
+    rationale: "Built-in auth handles token validation without custom code"
+    applies_to: [cloud-architect, app-developer]
+
+  - id: AS-006
+    severity: recommended
+    description: "Enable health check feature on the App Service"
+    rationale: "WAF Reliability: Health checks detect problems early and automatically exclude unhealthy instances from serving requests, improving overall availability"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, monitoring-agent]
+    terraform_pattern: |
+      # Add to the siteConfig properties in AS-002:
+      #   healthCheckPath = "/health"
+    bicep_pattern: |
+      // Add to the siteConfig properties in AS-002:
+      //   healthCheckPath: '/health'
+
+  - id: AS-007
+    severity: recommended
+    description: "Disable ARR affinity for stateless applications"
+    rationale: "WAF Reliability: Disabling ARR affinity distributes incoming requests evenly across all available nodes, preventing traffic from overwhelming a single node and enabling horizontal scaling"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    terraform_pattern: |
+      # Add to the properties block in AS-002:
+      #   clientAffinityEnabled = false
+    bicep_pattern: |
+      // Add to the properties block in AS-002:
+      //   clientAffinityEnabled: false
+
+  - id: AS-008
+    severity: recommended
+    description: "Enable zone redundancy on the App Service Plan for production workloads"
+    rationale: "WAF Reliability: Zone redundancy distributes instances across availability zones, maintaining application reliability if one zone is unavailable"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    terraform_pattern: |
+      # Add to the App Service Plan properties in AS-001:
+      #   properties = {
+      #     zoneRedundant = true
+      #   }
+    bicep_pattern: |
+      // Add to the App Service Plan properties in AS-001:
+      //   properties: {
+      //     zoneRedundant: true
+      //   }
+    prohibitions:
+      - "NEVER deploy production workloads on non-zone-redundant plans when the region supports availability zones"
+
+  - id: AS-009
+    severity: recommended
+    description: "Disable remote debugging and basic authentication"
+    rationale: "WAF Security: Remote debugging opens inbound ports and basic authentication uses username/password; disabling both reduces the attack surface"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, security-reviewer]
+    terraform_pattern: |
+      # Add to the siteConfig properties in AS-002:
+      #   remoteDebuggingEnabled = false
+
+      resource "azapi_resource" "app_basic_auth_ftp" {
+        type      = "Microsoft.Web/sites/basicPublishingCredentialsPolicies@2023-12-01"
+        name      = "ftp"
+        parent_id = azapi_resource.app_service.id
+
+        body = {
+          properties = {
+            allow = false
+          }
+        }
+      }
+
+      resource "azapi_resource" "app_basic_auth_scm" {
+        type      = "Microsoft.Web/sites/basicPublishingCredentialsPolicies@2023-12-01"
+        name      = "scm"
+        parent_id = azapi_resource.app_service.id
+
+        body = {
+          properties = {
+            allow = false
+          }
+        }
+      }
+    bicep_pattern: |
+      // Add to the siteConfig properties in AS-002:
+      //   remoteDebuggingEnabled: false
+
+      resource appBasicAuthFtp 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2023-12-01' = {
+        parent: appService
+        name: 'ftp'
+        properties: {
+          allow: false
+        }
+      }
+
+      resource appBasicAuthScm 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2023-12-01' = {
+        parent: appService
+        name: 'scm'
+        properties: {
+          allow: false
+        }
+      }
+    prohibitions:
+      - "NEVER enable remote debugging in production"
+      - "NEVER enable basic authentication (FTP or SCM) in production"
+
+  - id: AS-010
+    severity: recommended
+    description: "Enable auto-heal rules for automatic recovery from unexpected issues"
+    rationale: "WAF Reliability: Auto-heal triggers healing actions when configurable thresholds are breached (request count, slow requests, memory limits), enabling automatic proactive maintenance"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+
+patterns:
+  - name: "App Service with managed identity and VNet"
+    description: "Complete App Service deployment with HTTPS, TLS 1.2, managed identity, VNet integration, private endpoint, and diagnostics"
+
+anti_patterns:
+  - description: "Do not set httpsOnly = false or omit HTTPS enforcement"
+    instead: "Always set httpsOnly = true on App Service"
+  - description: "Do not store secrets in App Settings as plaintext"
+    instead: "Use Key Vault references (@Microsoft.KeyVault(SecretUri=...))"
+  - description: "Do not enable FTP/FTPS access"
+    instead: "Set ftpsState to Disabled"
+
+references:
+  - title: "App Service security best practices"
+    url: "https://learn.microsoft.com/azure/app-service/overview-security"
+  - title: "App Service VNet integration"
+    url: "https://learn.microsoft.com/azure/app-service/overview-vnet-integration"
+  - title: "App Service private endpoints"
+    url: "https://learn.microsoft.com/azure/app-service/networking/private-endpoint"
+  - title: "WAF: App Service Web Apps service guide"
+    url: "https://learn.microsoft.com/azure/well-architected/service-guides/app-service-web-apps"
+  - title: "App Service health check"
+    url: "https://learn.microsoft.com/azure/app-service/monitor-instances-health-check"
+  - title: "App Service auto-heal"
+    url: "https://learn.microsoft.com/azure/app-service/overview-diagnostics#auto-healing"

@@ -1,0 +1,446 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: cosmos-db
+  category: azure
+  services: [cosmos-db]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: CDB-001
+    severity: required
+    description: "Create Cosmos DB account with Entra RBAC and local auth disabled"
+    rationale: "Key-based auth grants full account access and cannot be scoped; Entra RBAC provides fine-grained control"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "cosmos_account" {
+        type      = "Microsoft.DocumentDB/databaseAccounts@2024-05-15"
+        name      = var.cosmos_account_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          kind = "GlobalDocumentDB"
+          properties = {
+            databaseAccountOfferType = "Standard"
+            disableLocalAuth         = true
+            publicNetworkAccess      = "Disabled"
+            consistencyPolicy = {
+              defaultConsistencyLevel = "Session"
+            }
+            locations = [
+              {
+                locationName     = var.location
+                failoverPriority = 0
+                isZoneRedundant  = false
+              }
+            ]
+            capabilities = [
+              {
+                name = "EnableServerless"
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
+        name: cosmosAccountName
+        location: location
+        kind: 'GlobalDocumentDB'
+        properties: {
+          databaseAccountOfferType: 'Standard'
+          disableLocalAuth: true
+          publicNetworkAccess: 'Disabled'
+          consistencyPolicy: {
+            defaultConsistencyLevel: 'Session'
+          }
+          locations: [
+            {
+              locationName: location
+              failoverPriority: 0
+              isZoneRedundant: false
+            }
+          ]
+          capabilities: [
+            {
+              name: 'EnableServerless'
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-05-15"
+        description: "RBAC role assignment granting Cosmos DB Built-in Data Contributor to the application identity"
+        terraform_pattern: |
+          resource "azapi_resource" "cosmos_role_assignment" {
+            type      = "Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-05-15"
+            name      = var.cosmos_role_assignment_name
+            parent_id = azapi_resource.cosmos_account.id
+
+            body = {
+              properties = {
+                roleDefinitionId = "${azapi_resource.cosmos_account.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
+                principalId      = var.app_identity_principal_id
+                scope            = azapi_resource.cosmos_account.id
+              }
+            }
+          }
+        bicep_pattern: |
+          resource cosmosRoleAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-05-15' = {
+            parent: cosmosAccount
+            name: cosmosRoleAssignmentName
+            properties: {
+              roleDefinitionId: '${cosmosAccount.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002'
+              principalId: appIdentityPrincipalId
+              scope: cosmosAccount.id
+            }
+          }
+      - type: "Microsoft.Network/privateEndpoints@2024-01-01"
+        description: "Private endpoint for Cosmos DB — required when publicNetworkAccess is Disabled"
+        terraform_pattern: |
+          resource "azapi_resource" "cosmos_private_endpoint" {
+            type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+            name      = "pe-${var.cosmos_account_name}"
+            location  = var.location
+            parent_id = azapi_resource.resource_group.id
+
+            body = {
+              properties = {
+                subnet = {
+                  id = var.private_endpoint_subnet_id
+                }
+                privateLinkServiceConnections = [
+                  {
+                    name = "pe-${var.cosmos_account_name}"
+                    properties = {
+                      privateLinkServiceId = azapi_resource.cosmos_account.id
+                      groupIds             = ["Sql"]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource cosmosPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+            name: 'pe-${cosmosAccountName}'
+            location: location
+            properties: {
+              subnet: {
+                id: privateEndpointSubnetId
+              }
+              privateLinkServiceConnections: [
+                {
+                  name: 'pe-${cosmosAccountName}'
+                  properties: {
+                    privateLinkServiceId: cosmosAccount.id
+                    groupIds: [
+                      'Sql'
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Network/privateDnsZones@2020-06-01"
+        description: "Private DNS zone for Cosmos DB private endpoint resolution"
+        terraform_pattern: |
+          resource "azapi_resource" "cosmos_dns_zone" {
+            type      = "Microsoft.Network/privateDnsZones@2020-06-01"
+            name      = "privatelink.documents.azure.com"
+            location  = "global"
+            parent_id = azapi_resource.resource_group.id
+          }
+
+          resource "azapi_resource" "cosmos_dns_zone_link" {
+            type      = "Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01"
+            name      = "link-${var.vnet_name}"
+            location  = "global"
+            parent_id = azapi_resource.cosmos_dns_zone.id
+
+            body = {
+              properties = {
+                virtualNetwork = {
+                  id = var.vnet_id
+                }
+                registrationEnabled = false
+              }
+            }
+          }
+
+          resource "azapi_resource" "cosmos_pe_dns_group" {
+            type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-01-01"
+            name      = "default"
+            parent_id = azapi_resource.cosmos_private_endpoint.id
+
+            body = {
+              properties = {
+                privateDnsZoneConfigs = [
+                  {
+                    name = "privatelink-documents-azure-com"
+                    properties = {
+                      privateDnsZoneId = azapi_resource.cosmos_dns_zone.id
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource cosmosDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+            name: 'privatelink.documents.azure.com'
+            location: 'global'
+          }
+
+          resource cosmosDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+            parent: cosmosDnsZone
+            name: 'link-${vnetName}'
+            location: 'global'
+            properties: {
+              virtualNetwork: {
+                id: vnetId
+              }
+              registrationEnabled: false
+            }
+          }
+
+          resource cosmosPeDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-01-01' = {
+            parent: cosmosPrivateEndpoint
+            name: 'default'
+            properties: {
+              privateDnsZoneConfigs: [
+                {
+                  name: 'privatelink-documents-azure-com'
+                  properties: {
+                    privateDnsZoneId: cosmosDnsZone.id
+                  }
+                }
+              ]
+            }
+          }
+    prohibitions:
+      - "NEVER set disableLocalAuth to false — all access must use Entra RBAC"
+      - "NEVER use account-level keys (listKeys) for application access"
+      - "NEVER use Strong consistency for POC workloads — use Session or Eventual"
+      - "NEVER set publicNetworkAccess to Enabled"
+    template_check:
+      scope: [cosmos-db]
+      require_config: [entra_rbac, local_auth_disabled]
+      error_message: "Service '{service_name}' ({service_type}) missing {config_key}: true"
+
+  - id: CDB-002
+    severity: recommended
+    description: "Do not use Strong consistency for POC workloads"
+    rationale: "Strong consistency has significant latency and cost implications; Session is sufficient for most POCs"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    template_check:
+      scope: [cosmos-db]
+      reject_config_value:
+        consistency: strong
+      error_message: "Service '{service_name}' ({service_type}) uses 'strong' consistency — consider Session or Eventual unless Strong is justified"
+
+  - id: CDB-003
+    severity: recommended
+    description: "Use autoscale throughput for variable workloads or serverless for POC"
+    rationale: "Avoids over-provisioning while handling traffic spikes; serverless has no idle cost"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, cost-analyst]
+    terraform_pattern: |
+      # For provisioned autoscale (non-serverless):
+      resource "azapi_resource" "cosmos_sql_database" {
+        type      = "Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-05-15"
+        name      = var.cosmos_database_name
+        parent_id = azapi_resource.cosmos_account.id
+
+        body = {
+          properties = {
+            resource = {
+              id = var.cosmos_database_name
+            }
+            options = {
+              autoscaleSettings = {
+                maxThroughput = 1000
+              }
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // For provisioned autoscale (non-serverless):
+      resource cosmosSqlDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-05-15' = {
+        parent: cosmosAccount
+        name: cosmosDatabaseName
+        properties: {
+          resource: {
+            id: cosmosDatabaseName
+          }
+          options: {
+            autoscaleSettings: {
+              maxThroughput: 1000
+            }
+          }
+        }
+      }
+    template_check:
+      scope: [cosmos-db]
+      require_config: [autoscale]
+      severity: warning
+      error_message: "Service '{service_name}' ({service_type}) missing autoscale configuration — consider autoscale throughput for variable workloads"
+
+  - id: CDB-004
+    severity: recommended
+    description: "Design partition keys based on query patterns, not just cardinality"
+    rationale: "Poor partition keys cause hot partitions and throttling"
+    applies_to: [cloud-architect, app-developer]
+    template_check:
+      scope: [cosmos-db]
+      require_config: [partition_key]
+      error_message: "Service '{service_name}' ({service_type}) missing partition_key definition"
+
+  - id: CDB-005
+    severity: recommended
+    description: "Enable continuous backup for point-in-time restore"
+    rationale: "WAF Reliability: Continuous backup provides point-in-time restore capability, recovering from accidental destructive operations and restoring deleted resources"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    terraform_pattern: |
+      # Set backupPolicy on the Cosmos DB account resource (CDB-001)
+      # Add to the properties block:
+      #   backupPolicy = {
+      #     type = "Continuous"
+      #     continuousModeProperties = {
+      #       tier = "Continuous7Days"
+      #     }
+      #   }
+    bicep_pattern: |
+      // Set backupPolicy on the Cosmos DB account resource (CDB-001)
+      // Add to the properties block:
+      //   backupPolicy: {
+      //     type: 'Continuous'
+      //     continuousModeProperties: {
+      //       tier: 'Continuous7Days'
+      //     }
+      //   }
+    prohibitions:
+      - "NEVER use Periodic backup for production workloads when Continuous is available — it provides inferior RPO"
+
+  - id: CDB-006
+    severity: recommended
+    description: "Configure availability zone support on the Cosmos DB account"
+    rationale: "WAF Reliability: Availability zones provide segregated power, networking, and cooling, isolating hardware failures to a subset of replicas"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    terraform_pattern: |
+      # In the locations block of CDB-001, set isZoneRedundant = true:
+      #   locations = [
+      #     {
+      #       locationName     = var.location
+      #       failoverPriority = 0
+      #       isZoneRedundant  = true
+      #     }
+      #   ]
+    bicep_pattern: |
+      // In the locations block of CDB-001, set isZoneRedundant to true:
+      //   locations: [
+      //     {
+      //       locationName: location
+      //       failoverPriority: 0
+      //       isZoneRedundant: true
+      //     }
+      //   ]
+
+  - id: CDB-007
+    severity: recommended
+    description: "Enable Microsoft Defender for Cosmos DB"
+    rationale: "WAF Security: Detects attempts to exploit databases, including potential SQL injections, suspicious access patterns, and other exploitation activities"
+    applies_to: [cloud-architect, security-reviewer]
+
+  - id: CDB-008
+    severity: recommended
+    description: "Configure multi-region replication for critical workloads"
+    rationale: "WAF Reliability: Spanning multiple regions ensures workload resilience to regional outages with automatic failover; enable service-managed failover for single-region write accounts"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+
+  - id: CDB-009
+    severity: recommended
+    description: "Implement TTL (time-to-live) on containers with transient data"
+    rationale: "WAF Cost: TTL automatically deletes unnecessary data, keeping the database clutter-free and optimizing storage costs"
+    applies_to: [cloud-architect, app-developer, terraform-agent, bicep-agent]
+
+  - id: CDB-010
+    severity: required
+    description: "Enable diagnostic settings to Log Analytics workspace"
+    rationale: "Audit trail for data access and performance monitoring"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    companion_resources:
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        description: "Diagnostic settings for Cosmos DB to Log Analytics"
+        terraform_pattern: |
+          resource "azapi_resource" "cosmos_diagnostics" {
+            type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+            name      = "diag-${var.cosmos_account_name}"
+            parent_id = azapi_resource.cosmos_account.id
+
+            body = {
+              properties = {
+                workspaceId = var.log_analytics_workspace_id
+                logs = [
+                  {
+                    categoryGroup = "allLogs"
+                    enabled       = true
+                  }
+                ]
+                metrics = [
+                  {
+                    category = "AllMetrics"
+                    enabled  = true
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource cosmosDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+            scope: cosmosAccount
+            name: 'diag-${cosmosAccountName}'
+            properties: {
+              workspaceId: logAnalyticsWorkspaceId
+              logs: [
+                {
+                  categoryGroup: 'allLogs'
+                  enabled: true
+                }
+              ]
+              metrics: [
+                {
+                  category: 'AllMetrics'
+                  enabled: true
+                }
+              ]
+            }
+          }
+
+patterns:
+  - name: "Cosmos DB with Entra RBAC and private endpoint"
+    description: "Complete Cosmos DB deployment with local auth disabled, RBAC role assignment, private endpoint, and diagnostics"
+
+anti_patterns:
+  - description: "Do not use account-level keys for application access"
+    instead: "Use Microsoft Entra RBAC with managed identity and Cosmos DB Built-in Data Contributor role"
+  - description: "Do not use unlimited containers without TTL policy"
+    instead: "Set TTL on containers with transient data"
+  - description: "Do not use Strong consistency unless explicitly justified"
+    instead: "Use Session consistency for most workloads"
+
+references:
+  - title: "Cosmos DB security baseline"
+    url: "https://learn.microsoft.com/azure/cosmos-db/security-baseline"
+  - title: "Cosmos DB RBAC"
+    url: "https://learn.microsoft.com/azure/cosmos-db/how-to-setup-rbac"
+  - title: "Cosmos DB private endpoints"
+    url: "https://learn.microsoft.com/azure/cosmos-db/how-to-configure-private-endpoints"
+  - title: "WAF: Cosmos DB service guide"
+    url: "https://learn.microsoft.com/azure/well-architected/service-guides/cosmos-db"
+  - title: "Cosmos DB continuous backup"
+    url: "https://learn.microsoft.com/azure/cosmos-db/continuous-backup-restore-introduction"
+  - title: "Cosmos DB availability zones"
+    url: "https://learn.microsoft.com/azure/reliability/reliability-cosmos-db-nosql"

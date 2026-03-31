@@ -1,0 +1,288 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: backup-vault
+  category: azure
+  services: [backup-vault]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: BKV-001
+    severity: required
+    description: "Deploy Backup Vault with geo-redundant storage, immutability, and soft delete enabled"
+    rationale: "GRS protects against regional outages; immutability prevents backup tampering; soft delete allows recovery"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "backup_vault" {
+        type      = "Microsoft.DataProtection/backupVaults@2024-04-01"
+        name      = var.backup_vault_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        identity {
+          type = "SystemAssigned"
+        }
+        body = {
+          properties = {
+            storageSettings = [
+              {
+                datastoreType = "VaultStore"
+                type          = "GeoRedundant"
+              }
+            ]
+            securitySettings = {
+              softDeleteSettings = {
+                state                   = "On"
+                retentionDurationInDays = 14
+              }
+              immutabilitySettings = {
+                state = "Unlocked"
+              }
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource backupVault 'Microsoft.DataProtection/backupVaults@2024-04-01' = {
+        name: backupVaultName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          storageSettings: [
+            {
+              datastoreType: 'VaultStore'
+              type: 'GeoRedundant'
+            }
+          ]
+          securitySettings: {
+            softDeleteSettings: {
+              state: 'On'
+              retentionDurationInDays: 14
+            }
+            immutabilitySettings: {
+              state: 'Unlocked'
+            }
+          }
+        }
+      }
+    companion_resources:
+      - "Microsoft.DataProtection/backupVaults/backupPolicies (retention and schedule policies)"
+      - "Microsoft.DataProtection/backupVaults/backupInstances (backup instances for protected resources)"
+      - "Microsoft.Authorization/roleAssignments (Backup Contributor role for vault identity on source resources)"
+      - "Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)"
+    prohibitions:
+      - "Do not use LocallyRedundant storage for production backups — data loss on regional failure"
+      - "Do not disable soft delete — backups cannot be recovered after accidental deletion"
+      - "Do not set immutability state to Disabled without explicit business justification"
+
+  - id: BKV-002
+    severity: required
+    description: "Create backup policies with appropriate retention and schedule"
+    rationale: "Backup policies define RPO and retention — they must match business recovery requirements"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "backup_policy" {
+        type      = "Microsoft.DataProtection/backupVaults/backupPolicies@2024-04-01"
+        name      = var.policy_name
+        parent_id = azapi_resource.backup_vault.id
+        body = {
+          properties = {
+            datasourceTypes = [var.datasource_type]
+            objectType      = "BackupPolicy"
+            policyRules = [
+              {
+                name       = "BackupDaily"
+                objectType = "AzureBackupRule"
+                backupParameters = {
+                  objectType     = "AzureBackupParams"
+                  backupType     = "Incremental"
+                }
+                trigger = {
+                  objectType = "ScheduleBasedTriggerContext"
+                  schedule = {
+                    repeatingTimeIntervals = ["R/2024-01-01T02:00:00+00:00/P1D"]
+                  }
+                  taggingCriteria = [
+                    {
+                      tagInfo = {
+                        tagName = "Default"
+                      }
+                      taggingPriority = 99
+                      isDefault       = true
+                    }
+                  ]
+                }
+                dataStore = {
+                  datastoreType = "VaultStore"
+                  objectType    = "DataStoreInfoBase"
+                }
+              },
+              {
+                name       = "RetainDaily"
+                objectType = "AzureRetentionRule"
+                isDefault  = true
+                lifecycles = [
+                  {
+                    deleteAfter = {
+                      objectType = "AbsoluteDeleteOption"
+                      duration   = "P30D"
+                    }
+                    sourceDataStore = {
+                      datastoreType = "VaultStore"
+                      objectType    = "DataStoreInfoBase"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource backupPolicy 'Microsoft.DataProtection/backupVaults/backupPolicies@2024-04-01' = {
+        parent: backupVault
+        name: policyName
+        properties: {
+          datasourceTypes: [datasourceType]
+          objectType: 'BackupPolicy'
+          policyRules: [
+            {
+              name: 'BackupDaily'
+              objectType: 'AzureBackupRule'
+              backupParameters: {
+                objectType: 'AzureBackupParams'
+                backupType: 'Incremental'
+              }
+              trigger: {
+                objectType: 'ScheduleBasedTriggerContext'
+                schedule: {
+                  repeatingTimeIntervals: ['R/2024-01-01T02:00:00+00:00/P1D']
+                }
+                taggingCriteria: [
+                  {
+                    tagInfo: {
+                      tagName: 'Default'
+                    }
+                    taggingPriority: 99
+                    isDefault: true
+                  }
+                ]
+              }
+              dataStore: {
+                datastoreType: 'VaultStore'
+                objectType: 'DataStoreInfoBase'
+              }
+            }
+            {
+              name: 'RetainDaily'
+              objectType: 'AzureRetentionRule'
+              isDefault: true
+              lifecycles: [
+                {
+                  deleteAfter: {
+                    objectType: 'AbsoluteDeleteOption'
+                    duration: 'P30D'
+                  }
+                  sourceDataStore: {
+                    datastoreType: 'VaultStore'
+                    objectType: 'DataStoreInfoBase'
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.DataProtection/backupVaults (parent backup vault)"
+    prohibitions:
+      - "Do not set retention below 7 days for production backups"
+      - "Do not use full backup type when incremental is available — it wastes storage"
+
+  - id: BKV-003
+    severity: recommended
+    description: "Enable diagnostic settings for Backup Vault operations"
+    rationale: "Monitor backup job success/failure rates and restore operations"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "bkv_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-backup-vault"
+        parent_id = azapi_resource.backup_vault.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "CoreAzureBackup"
+                enabled  = true
+              },
+              {
+                category = "AddonAzureBackupJobs"
+                enabled  = true
+              },
+              {
+                category = "AddonAzureBackupPolicy"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource bkvDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-backup-vault'
+        scope: backupVault
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
+            {
+              category: 'CoreAzureBackup'
+              enabled: true
+            }
+            {
+              category: 'AddonAzureBackupJobs'
+              enabled: true
+            }
+            {
+              category: 'AddonAzureBackupPolicy'
+              enabled: true
+            }
+          ]
+          metrics: [
+            {
+              category: 'AllMetrics'
+              enabled: true
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.OperationalInsights/workspaces (Log Analytics workspace)"
+    prohibitions:
+      - "Do not omit AddonAzureBackupJobs logs — they track backup success and failure"
+
+patterns:
+  - name: "Backup Vault with GRS, immutability, and daily policy"
+    description: "Production Backup Vault with geo-redundancy, soft delete, and daily incremental backups"
+    example: |
+      # See BKV-001 through BKV-003 for complete azapi_resource patterns
+
+anti_patterns:
+  - description: "Do not use locally redundant storage for production backup vaults"
+    instead: "Use GeoRedundant storage for cross-region protection"
+  - description: "Do not disable soft delete on backup vaults"
+    instead: "Keep soft delete enabled with at least 14 days retention"
+
+references:
+  - title: "Backup Vault documentation"
+    url: "https://learn.microsoft.com/azure/backup/backup-vault-overview"
+  - title: "Backup Vault immutability"
+    url: "https://learn.microsoft.com/azure/backup/backup-azure-immutable-vault-concept"

@@ -1,0 +1,263 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: mysql-flexible
+  category: azure
+  services: [mysql-flexible]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: MYSQL-001
+    severity: required
+    description: "Deploy MySQL Flexible Server with Microsoft Entra authentication and TLS 1.2 enforcement"
+    rationale: "Entra auth eliminates password management; TLS 1.2 prevents protocol downgrade attacks"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "mysql_flexible" {
+        type      = "Microsoft.DBforMySQL/flexibleServers@2023-12-30"
+        name      = var.mysql_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        identity {
+          type = "SystemAssigned"
+        }
+        body = {
+          sku = {
+            name = var.sku_name
+            tier = "GeneralPurpose"
+          }
+          properties = {
+            version = "8.0.21"
+            administratorLogin         = var.admin_login
+            administratorLoginPassword = var.admin_password
+            storage = {
+              storageSizeGB = var.storage_size_gb
+              autoGrow      = "Enabled"
+              autoIoScaling = "Enabled"
+            }
+            backup = {
+              backupRetentionDays  = 35
+              geoRedundantBackup   = "Enabled"
+            }
+            highAvailability = {
+              mode = "ZoneRedundant"
+            }
+            network = {
+              delegatedSubnetResourceId = var.delegated_subnet_id
+              privateDnsZoneResourceId  = var.private_dns_zone_id
+              publicNetworkAccess       = "Disabled"
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource mysqlFlexible 'Microsoft.DBforMySQL/flexibleServers@2023-12-30' = {
+        name: mysqlName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: skuName
+          tier: 'GeneralPurpose'
+        }
+        properties: {
+          version: '8.0.21'
+          administratorLogin: adminLogin
+          administratorLoginPassword: adminPassword
+          storage: {
+            storageSizeGB: storageSizeGb
+            autoGrow: 'Enabled'
+            autoIoScaling: 'Enabled'
+          }
+          backup: {
+            backupRetentionDays: 35
+            geoRedundantBackup: 'Enabled'
+          }
+          highAvailability: {
+            mode: 'ZoneRedundant'
+          }
+          network: {
+            delegatedSubnetResourceId: delegatedSubnetId
+            privateDnsZoneResourceId: privateDnsZoneId
+            publicNetworkAccess: 'Disabled'
+          }
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/virtualNetworks/subnets (delegated subnet with Microsoft.DBforMySQL/flexibleServers delegation)"
+      - "Microsoft.Network/privateDnsZones (privatelink.mysql.database.azure.com)"
+      - "Microsoft.Network/privateDnsZones/virtualNetworkLinks (link DNS zone to VNet)"
+      - "Microsoft.DBforMySQL/flexibleServers/configurations (TLS and audit log settings)"
+      - "Microsoft.Insights/diagnosticSettings (route audit logs to Log Analytics)"
+    prohibitions:
+      - "Do not enable publicNetworkAccess — use VNet integration or private endpoints"
+      - "Do not hardcode administratorLoginPassword in templates — use Key Vault references"
+      - "Do not use Burstable tier for production workloads with HA requirements"
+
+  - id: MYSQL-002
+    severity: required
+    description: "Enforce TLS 1.2 via server configuration parameters"
+    rationale: "TLS version enforcement must be set at the server parameter level in addition to network config"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "mysql_tls_config" {
+        type      = "Microsoft.DBforMySQL/flexibleServers/configurations@2023-12-30"
+        name      = "tls_version"
+        parent_id = azapi_resource.mysql_flexible.id
+        body = {
+          properties = {
+            value  = "TLSv1.2"
+            source = "user-override"
+          }
+        }
+      }
+
+      resource "azapi_resource" "mysql_require_ssl" {
+        type      = "Microsoft.DBforMySQL/flexibleServers/configurations@2023-12-30"
+        name      = "require_secure_transport"
+        parent_id = azapi_resource.mysql_flexible.id
+        body = {
+          properties = {
+            value  = "ON"
+            source = "user-override"
+          }
+        }
+      }
+    bicep_pattern: |
+      resource mysqlTlsConfig 'Microsoft.DBforMySQL/flexibleServers/configurations@2023-12-30' = {
+        parent: mysqlFlexible
+        name: 'tls_version'
+        properties: {
+          value: 'TLSv1.2'
+          source: 'user-override'
+        }
+      }
+
+      resource mysqlRequireSsl 'Microsoft.DBforMySQL/flexibleServers/configurations@2023-12-30' = {
+        parent: mysqlFlexible
+        name: 'require_secure_transport'
+        properties: {
+          value: 'ON'
+          source: 'user-override'
+        }
+      }
+    companion_resources: []
+    prohibitions:
+      - "Do not allow TLS 1.0 or 1.1 — they have known vulnerabilities"
+      - "Do not set require_secure_transport to OFF"
+
+  - id: MYSQL-003
+    severity: required
+    description: "Enable audit logging for MySQL Flexible Server"
+    rationale: "Audit logs track connection attempts, DDL changes, and DML operations for compliance"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "mysql_audit_config" {
+        type      = "Microsoft.DBforMySQL/flexibleServers/configurations@2023-12-30"
+        name      = "audit_log_enabled"
+        parent_id = azapi_resource.mysql_flexible.id
+        body = {
+          properties = {
+            value  = "ON"
+            source = "user-override"
+          }
+        }
+      }
+
+      resource "azapi_resource" "mysql_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-mysql"
+        parent_id = azapi_resource.mysql_flexible.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "MySqlAuditLogs"
+                enabled  = true
+              },
+              {
+                category = "MySqlSlowLogs"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource mysqlAuditConfig 'Microsoft.DBforMySQL/flexibleServers/configurations@2023-12-30' = {
+        parent: mysqlFlexible
+        name: 'audit_log_enabled'
+        properties: {
+          value: 'ON'
+          source: 'user-override'
+        }
+      }
+
+      resource mysqlDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-mysql'
+        scope: mysqlFlexible
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
+            {
+              category: 'MySqlAuditLogs'
+              enabled: true
+            }
+            {
+              category: 'MySqlSlowLogs'
+              enabled: true
+            }
+          ]
+          metrics: [
+            {
+              category: 'AllMetrics'
+              enabled: true
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.OperationalInsights/workspaces (Log Analytics workspace)"
+    prohibitions:
+      - "Do not disable audit logging in production"
+
+  - id: MYSQL-004
+    severity: recommended
+    description: "Enable zone-redundant high availability for production"
+    rationale: "Zone-redundant HA provides automatic failover across availability zones"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # Set highAvailability.mode = "ZoneRedundant" in server properties
+      # See MYSQL-001 terraform_pattern for full example
+    bicep_pattern: |
+      // Set highAvailability.mode: 'ZoneRedundant' in server properties
+      // See MYSQL-001 bicep_pattern for full example
+    companion_resources: []
+    prohibitions:
+      - "Do not use SameZone HA mode for production — it does not protect against zone failures"
+
+patterns:
+  - name: "MySQL Flexible Server with VNet integration and HA"
+    description: "Production MySQL with zone-redundant HA, VNet integration, and audit logging"
+    example: |
+      # See MYSQL-001 through MYSQL-004 for complete azapi_resource patterns
+
+anti_patterns:
+  - description: "Do not expose MySQL to the public internet"
+    instead: "Use VNet integration with delegated subnet or private endpoints"
+  - description: "Do not store database passwords in plain text"
+    instead: "Use Key Vault references for administratorLoginPassword"
+
+references:
+  - title: "MySQL Flexible Server documentation"
+    url: "https://learn.microsoft.com/azure/mysql/flexible-server/overview"
+  - title: "MySQL Flexible Server networking"
+    url: "https://learn.microsoft.com/azure/mysql/flexible-server/concepts-networking"

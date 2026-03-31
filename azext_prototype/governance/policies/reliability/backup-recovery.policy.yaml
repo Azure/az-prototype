@@ -1,0 +1,965 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: backup-recovery
+  category: reliability
+  services:
+    - sql-database
+    - cosmos-db
+    - postgresql-flexible
+    - mysql-flexible
+    - storage
+    - key-vault
+    - recovery-services
+    - backup-vault
+    - aks
+    - virtual-machines
+  last_reviewed: "2026-03-27"
+
+rules:
+  # ------------------------------------------------------------------ #
+  # BR-001: Automated backup for all data services (WAF RE-03)
+  # ------------------------------------------------------------------ #
+  - id: BR-001
+    severity: required
+    description: >-
+      Configure automated backup for ALL data services.  Every database,
+      storage account, and key vault MUST have automated backup enabled
+      with retention policies matching the environment tier.  SQL Database
+      and PostgreSQL Flexible have built-in automated backups — configure
+      retention.  Cosmos DB has continuous backup mode.  Storage accounts
+      use soft delete and versioning.  Key Vault uses soft delete and
+      purge protection.  NEVER deploy a data service without backup
+      configuration.
+    rationale: >-
+      Data loss is the most severe reliability failure.  Automated backups
+      are the last line of defense against accidental deletion, corruption,
+      ransomware, and application bugs.  Manual backups are unreliable
+      because they depend on human discipline.
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # === SQL Database: Automated backup with retention ===
+      # SQL Database backups are automatic — configure retention and redundancy.
+      resource "azapi_resource" "sql_database" {
+        type      = "Microsoft.Sql/servers/databases@2023-08-01-preview"
+        name      = var.sql_database_name
+        parent_id = azapi_resource.sql_server.id
+        location  = var.location
+
+        body = {
+          properties = {
+            requestedBackupStorageRedundancy = "Geo"    # Geo-redundant backup storage
+          }
+        }
+      }
+
+      # Configure short-term retention (PITR window)
+      resource "azapi_resource" "sql_backup_short_term" {
+        type      = "Microsoft.Sql/servers/databases/backupShortTermRetentionPolicies@2023-08-01-preview"
+        name      = "default"
+        parent_id = azapi_resource.sql_database.id
+
+        body = {
+          properties = {
+            retentionDays       = 14    # 7 days minimum, 35 days maximum
+            diffBackupIntervalInHours = 12    # Differential backup every 12 hours
+          }
+        }
+      }
+
+      # Configure long-term retention (LTR)
+      resource "azapi_resource" "sql_backup_long_term" {
+        type      = "Microsoft.Sql/servers/databases/backupLongTermRetentionPolicies@2023-08-01-preview"
+        name      = "default"
+        parent_id = azapi_resource.sql_database.id
+
+        body = {
+          properties = {
+            weeklyRetention  = "P4W"     # Keep weekly backups for 4 weeks
+            monthlyRetention = "P12M"    # Keep monthly backups for 12 months
+            yearlyRetention  = "P5Y"     # Keep yearly backups for 5 years
+            weekOfYear       = 1         # Yearly backup taken in week 1
+          }
+        }
+      }
+
+      # === Cosmos DB: Continuous backup ===
+      resource "azapi_resource" "cosmos_account" {
+        type      = "Microsoft.DocumentDB/databaseAccounts@2024-05-15"
+        name      = var.cosmos_account_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          properties = {
+            backupPolicy = {
+              type = "Continuous"
+              continuousModeProperties = {
+                tier = "Continuous7Days"    # Continuous7Days or Continuous30Days
+              }
+            }
+          }
+        }
+      }
+
+      # === PostgreSQL Flexible: Backup configuration ===
+      resource "azapi_resource" "postgresql_flexible" {
+        type      = "Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01"
+        name      = var.postgresql_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          properties = {
+            backup = {
+              backupRetentionDays = 35    # 7-35 days; use 35 for production
+              geoRedundantBackup  = "Enabled"
+            }
+          }
+        }
+      }
+
+      # === Storage Account: Soft delete + Versioning ===
+      resource "azapi_resource" "storage_blob_services" {
+        type      = "Microsoft.Storage/storageAccounts/blobServices@2023-05-01"
+        name      = "default"
+        parent_id = azapi_resource.storage_account.id
+
+        body = {
+          properties = {
+            deleteRetentionPolicy = {
+              enabled = true
+              days    = 30    # Retain deleted blobs for 30 days
+            }
+            containerDeleteRetentionPolicy = {
+              enabled = true
+              days    = 30    # Retain deleted containers for 30 days
+            }
+            isVersioningEnabled            = true    # Enable blob versioning
+            changeFeed = {
+              enabled           = true
+              retentionInDays   = 30
+            }
+          }
+        }
+      }
+
+      # === Key Vault: Soft delete + Purge protection ===
+      resource "azapi_resource" "key_vault" {
+        type      = "Microsoft.KeyVault/vaults@2023-07-01"
+        name      = var.key_vault_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          properties = {
+            enableSoftDelete        = true    # Cannot be disabled once enabled
+            softDeleteRetentionInDays = 90    # 7-90 days; default 90
+            enablePurgeProtection   = true    # Prevents permanent deletion during retention
+            tenantId                = var.tenant_id
+            sku = {
+              family = "A"
+              name   = "standard"
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // === SQL Database: Automated backup with retention ===
+      resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
+        parent: sqlServer
+        name: sqlDatabaseName
+        location: location
+        properties: {
+          requestedBackupStorageRedundancy: 'Geo'
+        }
+      }
+
+      resource sqlBackupShortTerm 'Microsoft.Sql/servers/databases/backupShortTermRetentionPolicies@2023-08-01-preview' = {
+        parent: sqlDatabase
+        name: 'default'
+        properties: {
+          retentionDays: 14
+          diffBackupIntervalInHours: 12
+        }
+      }
+
+      resource sqlBackupLongTerm 'Microsoft.Sql/servers/databases/backupLongTermRetentionPolicies@2023-08-01-preview' = {
+        parent: sqlDatabase
+        name: 'default'
+        properties: {
+          weeklyRetention: 'P4W'
+          monthlyRetention: 'P12M'
+          yearlyRetention: 'P5Y'
+          weekOfYear: 1
+        }
+      }
+
+      // === Cosmos DB: Continuous backup ===
+      resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
+        name: cosmosAccountName
+        location: location
+        properties: {
+          backupPolicy: {
+            type: 'Continuous'
+            continuousModeProperties: {
+              tier: 'Continuous7Days'
+            }
+          }
+        }
+      }
+
+      // === PostgreSQL Flexible: Backup configuration ===
+      resource postgresqlFlexible 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
+        name: postgresqlName
+        location: location
+        properties: {
+          backup: {
+            backupRetentionDays: 35
+            geoRedundantBackup: 'Enabled'
+          }
+        }
+      }
+
+      // === Storage Account: Soft delete + Versioning ===
+      resource storageBlobServices 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+        parent: storageAccount
+        name: 'default'
+        properties: {
+          deleteRetentionPolicy: {
+            enabled: true
+            days: 30
+          }
+          containerDeleteRetentionPolicy: {
+            enabled: true
+            days: 30
+          }
+          isVersioningEnabled: true
+          changeFeed: {
+            enabled: true
+            retentionInDays: 30
+          }
+        }
+      }
+
+      // === Key Vault: Soft delete + Purge protection ===
+      resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+        name: keyVaultName
+        location: location
+        properties: {
+          enableSoftDelete: true
+          softDeleteRetentionInDays: 90
+          enablePurgeProtection: true
+          tenantId: tenantId
+          sku: {
+            family: 'A'
+            name: 'standard'
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER deploy a data service without backup configuration — data loss is unrecoverable"
+      - "NEVER set SQL backup retention below 7 days for dev or 14 days for production"
+      - "NEVER use Periodic backup mode for Cosmos DB — Continuous mode provides sub-second RPO"
+      - "NEVER set PostgreSQL backup retention below 7 days for dev or 30 days for production"
+      - "NEVER disable blob soft delete or versioning on production storage accounts"
+      - "NEVER disable Key Vault purge protection — it prevents permanent secret/key/certificate destruction"
+      - "NEVER use LocallyRedundant backup storage for production SQL databases — use Geo for DR"
+
+  # ------------------------------------------------------------------ #
+  # BR-002: Recovery Services vault configuration (WAF RE-03)
+  # ------------------------------------------------------------------ #
+  - id: BR-002
+    severity: required
+    description: >-
+      Deploy a Recovery Services vault for VM backups with geo-redundant
+      storage, soft delete, immutability, and backup policies.  Every
+      production VM MUST be protected by a Recovery Services vault.
+      Configure backup policies with daily backups, weekly/monthly/yearly
+      retention, and cross-region restore capability.
+    rationale: >-
+      Recovery Services vault is the central backup management plane for
+      VMs, SQL in VMs, and file shares.  Without vault protection, VM
+      data is lost on disk failure or accidental deletion.  GRS ensures
+      backups survive regional disasters.
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # === Recovery Services Vault ===
+      resource "azapi_resource" "recovery_vault" {
+        type      = "Microsoft.RecoveryServices/vaults@2024-04-01"
+        name      = var.recovery_vault_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          sku = {
+            name = "Standard"
+          }
+          properties = {
+            publicNetworkAccess = "Disabled"
+            securitySettings = {
+              softDeleteSettings = {
+                softDeleteState                 = "Enabled"
+                softDeleteRetentionPeriodInDays = 14
+                enhancedSecurityState           = "Enabled"
+              }
+              immutabilitySettings = {
+                state = "Unlocked"
+              }
+            }
+          }
+        }
+      }
+
+      # Geo-redundant storage config — MUST be set before protecting items
+      resource "azapi_resource" "vault_storage_config" {
+        type      = "Microsoft.RecoveryServices/vaults/backupstorageconfig@2024-04-01"
+        name      = "vaultstorageconfig"
+        parent_id = azapi_resource.recovery_vault.id
+
+        body = {
+          properties = {
+            storageModelType      = "GeoRedundant"
+            crossRegionRestoreFlag = true    # Enable cross-region restore
+          }
+        }
+      }
+
+      # === VM Backup Policy ===
+      resource "azapi_resource" "vm_backup_policy" {
+        type      = "Microsoft.RecoveryServices/vaults/backupPolicies@2024-04-01"
+        name      = "vm-daily-policy"
+        parent_id = azapi_resource.recovery_vault.id
+
+        body = {
+          properties = {
+            backupManagementType = "AzureIaasVM"
+            instantRpRetentionRangeInDays = 5
+            schedulePolicy = {
+              schedulePolicyType  = "SimpleSchedulePolicy"
+              scheduleRunFrequency = "Daily"
+              scheduleRunTimes    = ["2024-01-01T02:00:00Z"]    # 2 AM UTC
+            }
+            retentionPolicy = {
+              retentionPolicyType = "LongTermRetentionPolicy"
+              dailySchedule = {
+                retentionTimes    = ["2024-01-01T02:00:00Z"]
+                retentionDuration = {
+                  count        = 30
+                  durationType = "Days"
+                }
+              }
+              weeklySchedule = {
+                daysOfTheWeek     = ["Sunday"]
+                retentionTimes    = ["2024-01-01T02:00:00Z"]
+                retentionDuration = {
+                  count        = 12
+                  durationType = "Weeks"
+                }
+              }
+              monthlySchedule = {
+                retentionScheduleFormatType = "Weekly"
+                retentionScheduleWeekly = {
+                  daysOfTheWeek = ["Sunday"]
+                  weeksOfTheMonth = ["First"]
+                }
+                retentionTimes    = ["2024-01-01T02:00:00Z"]
+                retentionDuration = {
+                  count        = 12
+                  durationType = "Months"
+                }
+              }
+            }
+            timeZone = "UTC"
+          }
+        }
+      }
+
+      # === Protect VM with Backup ===
+      resource "azapi_resource" "vm_backup_protected_item" {
+        type      = "Microsoft.RecoveryServices/vaults/backupFabrics/protectionContainers/protectedItems@2024-04-01"
+        name      = "VM;iaasvmcontainerv2;${var.resource_group_name};${var.vm_name}"
+        parent_id = "${azapi_resource.recovery_vault.id}/backupFabrics/Azure/protectionContainers/iaasvmcontainer;iaasvmcontainerv2;${var.resource_group_name};${var.vm_name}"
+
+        body = {
+          properties = {
+            protectedItemType = "Microsoft.Compute/virtualMachines"
+            policyId          = azapi_resource.vm_backup_policy.id
+            sourceResourceId  = azapi_resource.virtual_machine.id
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Recovery Services Vault ===
+      resource recoveryVault 'Microsoft.RecoveryServices/vaults@2024-04-01' = {
+        name: recoveryVaultName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: 'Standard'
+        }
+        properties: {
+          publicNetworkAccess: 'Disabled'
+          securitySettings: {
+            softDeleteSettings: {
+              softDeleteState: 'Enabled'
+              softDeleteRetentionPeriodInDays: 14
+              enhancedSecurityState: 'Enabled'
+            }
+            immutabilitySettings: {
+              state: 'Unlocked'
+            }
+          }
+        }
+      }
+
+      resource vaultStorageConfig 'Microsoft.RecoveryServices/vaults/backupstorageconfig@2024-04-01' = {
+        parent: recoveryVault
+        name: 'vaultstorageconfig'
+        properties: {
+          storageModelType: 'GeoRedundant'
+          crossRegionRestoreFlag: true
+        }
+      }
+
+      // === VM Backup Policy ===
+      resource vmBackupPolicy 'Microsoft.RecoveryServices/vaults/backupPolicies@2024-04-01' = {
+        parent: recoveryVault
+        name: 'vm-daily-policy'
+        properties: {
+          backupManagementType: 'AzureIaasVM'
+          instantRpRetentionRangeInDays: 5
+          schedulePolicy: {
+            schedulePolicyType: 'SimpleSchedulePolicy'
+            scheduleRunFrequency: 'Daily'
+            scheduleRunTimes: ['2024-01-01T02:00:00Z']
+          }
+          retentionPolicy: {
+            retentionPolicyType: 'LongTermRetentionPolicy'
+            dailySchedule: {
+              retentionTimes: ['2024-01-01T02:00:00Z']
+              retentionDuration: {
+                count: 30
+                durationType: 'Days'
+              }
+            }
+            weeklySchedule: {
+              daysOfTheWeek: ['Sunday']
+              retentionTimes: ['2024-01-01T02:00:00Z']
+              retentionDuration: {
+                count: 12
+                durationType: 'Weeks'
+              }
+            }
+            monthlySchedule: {
+              retentionScheduleFormatType: 'Weekly'
+              retentionScheduleWeekly: {
+                daysOfTheWeek: ['Sunday']
+                weeksOfTheMonth: ['First']
+              }
+              retentionTimes: ['2024-01-01T02:00:00Z']
+              retentionDuration: {
+                count: 12
+                durationType: 'Months'
+              }
+            }
+          }
+          timeZone: 'UTC'
+        }
+      }
+
+      // === Protect VM with Backup ===
+      resource vmBackupProtectedItem 'Microsoft.RecoveryServices/vaults/backupFabrics/protectionContainers/protectedItems@2024-04-01' = {
+        name: '${recoveryVault.name}/Azure/iaasvmcontainer;iaasvmcontainerv2;${resourceGroupName};${vmName}/VM;iaasvmcontainerv2;${resourceGroupName};${vmName}'
+        properties: {
+          protectedItemType: 'Microsoft.Compute/virtualMachines'
+          policyId: vmBackupPolicy.id
+          sourceResourceId: virtualMachine.id
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Network/privateEndpoints@2023-11-01"
+        description: "Private endpoint for Recovery Services vault (groupId: AzureBackup)"
+      - type: "Microsoft.Network/privateDnsZones@2020-06-01"
+        description: "Private DNS zone privatelink.{region}.backup.windowsazure.com for vault private endpoint"
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        description: "Diagnostic settings to route vault operation logs and backup health to Log Analytics"
+    prohibitions:
+      - "NEVER deploy production VMs without Recovery Services vault backup protection"
+      - "NEVER use LocallyRedundant storage for production vault — GRS is required for regional disaster recovery"
+      - "NEVER disable soft delete on Recovery Services vault — backup data cannot be recovered after deletion"
+      - "NEVER set daily retention below 7 days for dev or 30 days for production"
+      - "NEVER configure backup storage redundancy after protecting items — it cannot be changed once items are registered"
+
+  # ------------------------------------------------------------------ #
+  # BR-003: Point-in-time restore for databases (WAF RE-03)
+  # ------------------------------------------------------------------ #
+  - id: BR-003
+    severity: required
+    description: >-
+      Configure point-in-time restore (PITR) for all production databases.
+      SQL Database supports PITR within the short-term retention window
+      (7-35 days).  Cosmos DB Continuous backup enables PITR to any
+      second within the retention period (7 or 30 days).  PostgreSQL
+      Flexible supports PITR within the backup retention window (7-35
+      days).  PITR is the primary recovery mechanism for application
+      bugs, accidental deletes, and data corruption — it is NOT
+      optional.
+    rationale: >-
+      PITR enables recovery to the exact moment before a data-corrupting
+      event.  Traditional full-backup restore loses all data since the
+      last backup (hours of RPO).  PITR provides near-zero RPO (seconds
+      for Cosmos, minutes for SQL/PostgreSQL).
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # === SQL Database: PITR is built-in — configure retention window ===
+      # SQL Database automatically takes full, differential, and log backups.
+      # PITR recovery is available via Azure Portal, CLI, or ARM API.
+      # The retentionDays on backupShortTermRetentionPolicies controls the PITR window.
+      resource "azapi_resource" "sql_pitr_policy" {
+        type      = "Microsoft.Sql/servers/databases/backupShortTermRetentionPolicies@2023-08-01-preview"
+        name      = "default"
+        parent_id = azapi_resource.sql_database.id
+
+        body = {
+          properties = {
+            retentionDays             = 35    # Maximum PITR window (7-35 days)
+            diffBackupIntervalInHours = 12    # 12 or 24 hours between differentials
+          }
+        }
+      }
+
+      # === Cosmos DB: Continuous backup for PITR ===
+      # Restore to any point within the continuous backup window.
+      # Continuous7Days: 7-day window (free with provisioned throughput)
+      # Continuous30Days: 30-day window (additional cost)
+      resource "azapi_resource" "cosmos_continuous_backup" {
+        type      = "Microsoft.DocumentDB/databaseAccounts@2024-05-15"
+        name      = var.cosmos_account_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          properties = {
+            backupPolicy = {
+              type = "Continuous"
+              continuousModeProperties = {
+                tier = "Continuous30Days"    # 30-day PITR window for production
+              }
+            }
+          }
+        }
+      }
+
+      # === PostgreSQL Flexible: PITR via backup retention ===
+      # PITR is automatic — restore creates a new server at the chosen point.
+      resource "azapi_resource" "postgresql_pitr_config" {
+        type      = "Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01"
+        name      = var.postgresql_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          properties = {
+            backup = {
+              backupRetentionDays = 35    # Maximum PITR window (7-35 days)
+              geoRedundantBackup  = "Enabled"
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // === SQL Database: PITR retention window ===
+      resource sqlPitrPolicy 'Microsoft.Sql/servers/databases/backupShortTermRetentionPolicies@2023-08-01-preview' = {
+        parent: sqlDatabase
+        name: 'default'
+        properties: {
+          retentionDays: 35
+          diffBackupIntervalInHours: 12
+        }
+      }
+
+      // === Cosmos DB: Continuous backup for PITR ===
+      resource cosmosContinuousBackup 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
+        name: cosmosAccountName
+        location: location
+        properties: {
+          backupPolicy: {
+            type: 'Continuous'
+            continuousModeProperties: {
+              tier: 'Continuous30Days'
+            }
+          }
+        }
+      }
+
+      // === PostgreSQL Flexible: PITR via backup retention ===
+      resource postgresqlPitrConfig 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
+        name: postgresqlName
+        location: location
+        properties: {
+          backup: {
+            backupRetentionDays: 35
+            geoRedundantBackup: 'Enabled'
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER set SQL Database PITR retention below 7 days — minimum recovery window must cover a full week"
+      - "NEVER use Periodic backup mode for production Cosmos DB — Continuous mode is required for PITR"
+      - "NEVER set PostgreSQL backup retention below 7 days — insufficient for detecting and recovering from data corruption"
+      - "NEVER assume PITR restores in-place — SQL and PostgreSQL PITR creates a NEW server/database; plan for DNS/connection string updates"
+
+  # ------------------------------------------------------------------ #
+  # BR-004: Geo-redundant backup (WAF RE-03)
+  # ------------------------------------------------------------------ #
+  - id: BR-004
+    severity: required
+    description: >-
+      Configure geo-redundant backup storage for all production data
+      services.  SQL Database must use Geo backup storage redundancy.
+      PostgreSQL Flexible must enable geoRedundantBackup.  Storage
+      accounts must use GZRS or RA-GZRS for critical data.  Recovery
+      Services vaults must use GeoRedundant storage with cross-region
+      restore enabled.  Backup data must survive a full regional outage.
+    rationale: >-
+      Locally-redundant backups are lost in a regional disaster (earthquake,
+      flood, extended power outage).  Geo-redundant backups are replicated
+      to the Azure paired region, ensuring recovery even when the entire
+      primary region is unavailable.
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # === SQL Database: Geo-redundant backup storage ===
+      resource "azapi_resource" "sql_database_geo_backup" {
+        type      = "Microsoft.Sql/servers/databases@2023-08-01-preview"
+        name      = var.sql_database_name
+        parent_id = azapi_resource.sql_server.id
+        location  = var.location
+
+        body = {
+          properties = {
+            requestedBackupStorageRedundancy = "Geo"    # Options: Local, Zone, Geo, GeoZone
+          }
+        }
+      }
+
+      # === PostgreSQL Flexible: Geo-redundant backup ===
+      resource "azapi_resource" "postgresql_geo_backup" {
+        type      = "Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01"
+        name      = var.postgresql_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          properties = {
+            backup = {
+              geoRedundantBackup = "Enabled"    # Replicate backups to paired region
+            }
+          }
+        }
+      }
+
+      # === Storage Account: Geo-Zone-Redundant (GZRS) ===
+      resource "azapi_resource" "storage_gzrs" {
+        type      = "Microsoft.Storage/storageAccounts@2023-05-01"
+        name      = var.storage_account_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          sku = {
+            name = "Standard_GZRS"    # Geo-zone-redundant: 3 zones + paired region
+          }
+          kind = "StorageV2"
+          properties = {
+            minimumTlsVersion        = "TLS1_2"
+            supportsHttpsTrafficOnly = true
+          }
+        }
+      }
+
+      # === Recovery Services Vault: GRS with cross-region restore ===
+      resource "azapi_resource" "vault_geo_storage" {
+        type      = "Microsoft.RecoveryServices/vaults/backupstorageconfig@2024-04-01"
+        name      = "vaultstorageconfig"
+        parent_id = azapi_resource.recovery_vault.id
+
+        body = {
+          properties = {
+            storageModelType      = "GeoRedundant"
+            crossRegionRestoreFlag = true
+          }
+        }
+      }
+    bicep_pattern: |
+      // === SQL Database: Geo-redundant backup storage ===
+      resource sqlDatabaseGeoBackup 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
+        parent: sqlServer
+        name: sqlDatabaseName
+        location: location
+        properties: {
+          requestedBackupStorageRedundancy: 'Geo'
+        }
+      }
+
+      // === PostgreSQL Flexible: Geo-redundant backup ===
+      resource postgresqlGeoBackup 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
+        name: postgresqlName
+        location: location
+        properties: {
+          backup: {
+            geoRedundantBackup: 'Enabled'
+          }
+        }
+      }
+
+      // === Storage Account: GZRS ===
+      resource storageGzrs 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+        name: storageAccountName
+        location: location
+        sku: {
+          name: 'Standard_GZRS'
+        }
+        kind: 'StorageV2'
+        properties: {
+          minimumTlsVersion: 'TLS1_2'
+          supportsHttpsTrafficOnly: true
+        }
+      }
+
+      // === Recovery Services Vault: GRS with cross-region restore ===
+      resource vaultGeoStorage 'Microsoft.RecoveryServices/vaults/backupstorageconfig@2024-04-01' = {
+        parent: recoveryVault
+        name: 'vaultstorageconfig'
+        properties: {
+          storageModelType: 'GeoRedundant'
+          crossRegionRestoreFlag: true
+        }
+      }
+    prohibitions:
+      - "NEVER use Local or Zone backup storage redundancy for production SQL databases — regional failure causes backup loss"
+      - "NEVER disable geo-redundant backup for production PostgreSQL Flexible servers"
+      - "NEVER use Standard_LRS or Standard_ZRS for production storage containing critical data — use Standard_GZRS or Standard_RAGZRS"
+      - "NEVER use LocallyRedundant storage for production Recovery Services vaults"
+      - "NEVER disable cross-region restore on geo-redundant Recovery Services vaults — it is needed for regional DR"
+
+  # ------------------------------------------------------------------ #
+  # BR-005: Backup testing and validation (WAF RE-03, RE-04)
+  # ------------------------------------------------------------------ #
+  - id: BR-005
+    severity: recommended
+    description: >-
+      Implement backup verification and restore testing automation.
+      Deploy Azure Automation runbooks or Logic Apps that periodically
+      validate backup health, test restores to a staging environment,
+      and alert on backup failures.  Backup without tested restores
+      is a false sense of security.  Use Recovery Services vault
+      backup reports and Azure Monitor alerts to track backup health.
+    rationale: >-
+      Untested backups frequently fail at restore time due to corruption,
+      missing dependencies, or configuration drift.  Regular restore
+      testing proves recoverability and measures actual RTO.  Backup
+      health monitoring catches failures before they become critical.
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # === Backup Health Monitoring: Alert on backup failure ===
+      resource "azapi_resource" "backup_failure_alert" {
+        type      = "Microsoft.Insights/scheduledQueryRules@2023-03-15-preview"
+        name      = "alert-backup-failure-${var.project}-${var.environment}"
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          properties = {
+            displayName = "Backup Failure Alert"
+            description = "Fires when any backup job fails in the Recovery Services vault"
+            severity    = 1    # Critical
+            enabled     = true
+            evaluationFrequency = "PT1H"
+            windowSize          = "PT1H"
+            scopes = [azapi_resource.log_analytics_workspace.id]
+            criteria = {
+              allOf = [
+                {
+                  query = <<-KQL
+                    AzureDiagnostics
+                    | where Category == "AzureBackupReport"
+                    | where OperationName == "Job" and ResultType == "Failed"
+                    | project TimeGenerated, Resource, BackupItemUniqueId_s, BackupManagementType_s
+                  KQL
+                  timeAggregation   = "Count"
+                  operator          = "GreaterThan"
+                  threshold         = 0
+                  failingPeriods = {
+                    numberOfEvaluationPeriods = 1
+                    minFailingPeriodsToAlert  = 1
+                  }
+                }
+              ]
+            }
+            actions = {
+              actionGroups = [azapi_resource.action_group.id]
+            }
+          }
+        }
+      }
+
+      # === Backup Compliance: Alert on unprotected VMs ===
+      resource "azapi_resource" "unprotected_vm_alert" {
+        type      = "Microsoft.Insights/scheduledQueryRules@2023-03-15-preview"
+        name      = "alert-unprotected-vms-${var.project}-${var.environment}"
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          properties = {
+            displayName = "Unprotected VM Alert"
+            description = "Fires when VMs are detected without backup protection"
+            severity    = 2    # Warning
+            enabled     = true
+            evaluationFrequency = "P1D"    # Check daily
+            windowSize          = "P1D"
+            scopes = [azapi_resource.log_analytics_workspace.id]
+            criteria = {
+              allOf = [
+                {
+                  query = <<-KQL
+                    AzureDiagnostics
+                    | where Category == "AzureBackupReport"
+                    | where OperationName == "BackupItem"
+                    | where BackupItemType_s == "VM" and ProtectionState_s != "Protected"
+                    | distinct BackupItemUniqueId_s, BackupItemFriendlyName_s
+                  KQL
+                  timeAggregation   = "Count"
+                  operator          = "GreaterThan"
+                  threshold         = 0
+                  failingPeriods = {
+                    numberOfEvaluationPeriods = 1
+                    minFailingPeriodsToAlert  = 1
+                  }
+                }
+              ]
+            }
+            actions = {
+              actionGroups = [azapi_resource.action_group.id]
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Backup Health Monitoring: Alert on backup failure ===
+      resource backupFailureAlert 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview' = {
+        name: 'alert-backup-failure-${project}-${environment}'
+        location: location
+        properties: {
+          displayName: 'Backup Failure Alert'
+          description: 'Fires when any backup job fails in the Recovery Services vault'
+          severity: 1
+          enabled: true
+          evaluationFrequency: 'PT1H'
+          windowSize: 'PT1H'
+          scopes: [logAnalyticsWorkspace.id]
+          criteria: {
+            allOf: [
+              {
+                query: '''
+                  AzureDiagnostics
+                  | where Category == "AzureBackupReport"
+                  | where OperationName == "Job" and ResultType == "Failed"
+                  | project TimeGenerated, Resource, BackupItemUniqueId_s, BackupManagementType_s
+                '''
+                timeAggregation: 'Count'
+                operator: 'GreaterThan'
+                threshold: 0
+                failingPeriods: {
+                  numberOfEvaluationPeriods: 1
+                  minFailingPeriodsToAlert: 1
+                }
+              }
+            ]
+          }
+          actions: {
+            actionGroups: [actionGroup.id]
+          }
+        }
+      }
+
+      // === Backup Compliance: Alert on unprotected VMs ===
+      resource unprotectedVmAlert 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview' = {
+        name: 'alert-unprotected-vms-${project}-${environment}'
+        location: location
+        properties: {
+          displayName: 'Unprotected VM Alert'
+          description: 'Fires when VMs are detected without backup protection'
+          severity: 2
+          enabled: true
+          evaluationFrequency: 'P1D'
+          windowSize: 'P1D'
+          scopes: [logAnalyticsWorkspace.id]
+          criteria: {
+            allOf: [
+              {
+                query: '''
+                  AzureDiagnostics
+                  | where Category == "AzureBackupReport"
+                  | where OperationName == "BackupItem"
+                  | where BackupItemType_s == "VM" and ProtectionState_s != "Protected"
+                  | distinct BackupItemUniqueId_s, BackupItemFriendlyName_s
+                '''
+                timeAggregation: 'Count'
+                operator: 'GreaterThan'
+                threshold: 0
+                failingPeriods: {
+                  numberOfEvaluationPeriods: 1
+                  minFailingPeriodsToAlert: 1
+                }
+              }
+            ]
+          }
+          actions: {
+            actionGroups: [actionGroup.id]
+          }
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Insights/actionGroups@2023-01-01"
+        description: "Action group for backup failure notifications (email, SMS, webhook)"
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        description: "Diagnostic settings on Recovery Services vault to send backup logs to Log Analytics"
+    prohibitions:
+      - "NEVER deploy backup without alerting on failures — silent backup failures cause data loss"
+      - "NEVER assume backups are valid without periodic restore testing"
+      - "NEVER ignore backup health reports — review weekly at minimum"
+
+anti_patterns:
+  - description: "Deploying databases without any backup configuration"
+    instead: "Configure automated backups with retention matching environment tier (7+ days dev, 30+ days prod)"
+  - description: "Using locally-redundant backup storage for production workloads"
+    instead: "Use geo-redundant backup storage (GRS) for Recovery Services vaults and SQL databases"
+  - description: "Deploying VMs without Recovery Services vault protection"
+    instead: "Protect every production VM with a Recovery Services vault backup policy"
+  - description: "Setting backup retention to the minimum without business justification"
+    instead: "Set retention based on recovery requirements — 14+ days short-term, 12+ months long-term for production"
+  - description: "Using Cosmos DB Periodic backup mode for production"
+    instead: "Use Continuous backup mode for near-zero RPO and point-in-time restore capability"
+  - description: "Disabling Key Vault purge protection"
+    instead: "Always enable purge protection — it prevents permanent destruction of secrets, keys, and certificates"
+
+references:
+  - title: "Azure Well-Architected Framework — Design for recovery"
+    url: "https://learn.microsoft.com/azure/well-architected/reliability/recovery-design"
+  - title: "SQL Database automated backups"
+    url: "https://learn.microsoft.com/azure/azure-sql/database/automated-backups-overview"
+  - title: "Cosmos DB continuous backup"
+    url: "https://learn.microsoft.com/azure/cosmos-db/continuous-backup-restore-introduction"
+  - title: "Recovery Services vault overview"
+    url: "https://learn.microsoft.com/azure/backup/backup-azure-recovery-services-vault-overview"
+  - title: "PostgreSQL Flexible backup and restore"
+    url: "https://learn.microsoft.com/azure/postgresql/flexible-server/concepts-backup-restore"

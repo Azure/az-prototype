@@ -136,7 +136,7 @@ resource "azurerm_role_assignment" "storage_blob" {
 ### Private Endpoint
 
 ```hcl
-# Private endpoint for INBOUND access to the web app (not commonly needed for POC)
+# Unless told otherwise, private endpoint for INBOUND access is required per governance policy
 resource "azurerm_private_endpoint" "this" {
   count = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
 

@@ -1,0 +1,189 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: private-endpoints
+  category: azure
+  services: [private-endpoint]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: PE-001
+    severity: required
+    description: "Every private endpoint must have a Private DNS Zone, VNet Link, and DNS Zone Group"
+    rationale: "Without all three components, private endpoint DNS resolution fails and connections fall back to public endpoints"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # Step 1: Private Endpoint
+      resource "azapi_resource" "private_endpoint" {
+        type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+        name      = "pe-${var.resource_name}"
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            subnet = {
+              id = var.private_endpoint_subnet_id
+            }
+            privateLinkServiceConnections = [
+              {
+                name = "pe-${var.resource_name}"
+                properties = {
+                  privateLinkServiceId = var.target_resource_id
+                  groupIds             = [var.group_id]
+                }
+              }
+            ]
+          }
+        }
+      }
+
+      # Step 2: Private DNS Zone
+      resource "azapi_resource" "private_dns_zone" {
+        type      = "Microsoft.Network/privateDnsZones@2020-06-01"
+        name      = var.private_dns_zone_name
+        location  = "global"
+        parent_id = azapi_resource.resource_group.id
+      }
+
+      # Step 3: VNet Link to DNS Zone
+      resource "azapi_resource" "private_dns_zone_link" {
+        type      = "Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01"
+        name      = "link-${var.vnet_name}"
+        location  = "global"
+        parent_id = azapi_resource.private_dns_zone.id
+
+        body = {
+          properties = {
+            virtualNetwork = {
+              id = var.vnet_id
+            }
+            registrationEnabled = false
+          }
+        }
+      }
+
+      # Step 4: DNS Zone Group on the Private Endpoint
+      resource "azapi_resource" "pe_dns_zone_group" {
+        type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-01-01"
+        name      = "default"
+        parent_id = azapi_resource.private_endpoint.id
+
+        body = {
+          properties = {
+            privateDnsZoneConfigs = [
+              {
+                name = replace(var.private_dns_zone_name, ".", "-")
+                properties = {
+                  privateDnsZoneId = azapi_resource.private_dns_zone.id
+                }
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      // Step 1: Private Endpoint
+      resource privateEndpoint 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+        name: 'pe-${resourceName}'
+        location: location
+        properties: {
+          subnet: {
+            id: privateEndpointSubnetId
+          }
+          privateLinkServiceConnections: [
+            {
+              name: 'pe-${resourceName}'
+              properties: {
+                privateLinkServiceId: targetResourceId
+                groupIds: [
+                  groupId
+                ]
+              }
+            }
+          ]
+        }
+      }
+
+      // Step 2: Private DNS Zone
+      resource privateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+        name: privateDnsZoneName
+        location: 'global'
+      }
+
+      // Step 3: VNet Link to DNS Zone
+      resource privateDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+        parent: privateDnsZone
+        name: 'link-${vnetName}'
+        location: 'global'
+        properties: {
+          virtualNetwork: {
+            id: vnetId
+          }
+          registrationEnabled: false
+        }
+      }
+
+      // Step 4: DNS Zone Group on the Private Endpoint
+      resource peDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-01-01' = {
+        parent: privateEndpoint
+        name: 'default'
+        properties: {
+          privateDnsZoneConfigs: [
+            {
+              name: replace(privateDnsZoneName, '.', '-')
+              properties: {
+                privateDnsZoneId: privateDnsZone.id
+              }
+            }
+          ]
+        }
+      }
+    prohibitions:
+      - "NEVER create a private endpoint without a corresponding Private DNS Zone"
+      - "NEVER create a Private DNS Zone without linking it to the VNet"
+      - "NEVER omit the privateDnsZoneGroups child resource on the private endpoint"
+      - "NEVER place private endpoints in delegated subnets"
+      - "NEVER set registrationEnabled to true on PE DNS zone links — only hub DNS zones use auto-registration"
+
+  - id: PE-002
+    severity: required
+    description: "Use correct Private DNS Zone names for each Azure service"
+    rationale: "Each Azure service has a specific private DNS zone name; using the wrong name causes resolution failures"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    prohibitions:
+      - "NEVER use a custom DNS zone name — use the exact Azure-defined zone name for each service"
+      - "NEVER create duplicate DNS zones for the same service — reuse existing zones across private endpoints"
+
+  - id: PE-003
+    severity: required
+    description: "Use standard naming convention: pe-{resource-name} for private endpoints"
+    rationale: "Consistent naming enables automation and troubleshooting"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+  - id: PE-004
+    severity: recommended
+    description: "Centralize Private DNS Zones in a shared resource group for multi-resource architectures"
+    rationale: "Avoids DNS zone sprawl and simplifies management; all PEs share the same zone per service type"
+    applies_to: [cloud-architect]
+
+patterns:
+  - name: "Private Endpoint with DNS Zone and VNet Link"
+    description: "Complete private endpoint deployment with all four required components: PE, DNS Zone, VNet Link, DNS Zone Group"
+
+anti_patterns:
+  - description: "Do not create a private endpoint without DNS configuration"
+    instead: "Always create DNS Zone + VNet Link + DNS Zone Group alongside every private endpoint"
+  - description: "Do not use custom DNS zone names"
+    instead: "Use the exact Azure-defined privatelink.*.* zone name for each service"
+  - description: "Do not place private endpoints in delegated subnets"
+    instead: "Use a dedicated PE subnet (snet-pe) without delegations"
+
+references:
+  - title: "Private endpoint DNS integration"
+    url: "https://learn.microsoft.com/azure/private-link/private-endpoint-dns"
+  - title: "Private DNS zone values"
+    url: "https://learn.microsoft.com/azure/private-link/private-endpoint-dns#azure-services-dns-zone-configuration"
+  - title: "Private endpoint overview"
+    url: "https://learn.microsoft.com/azure/private-link/private-endpoint-overview"

@@ -1,0 +1,325 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: virtual-machines
+  category: azure
+  services: [virtual-machines]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: VM-001
+    severity: required
+    description: "Deploy VMs with managed identity, SSH key auth (Linux), and no public IP"
+    rationale: "Managed identity eliminates credential management; SSH keys prevent brute-force attacks; no public IP reduces attack surface"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "vm" {
+        type      = "Microsoft.Compute/virtualMachines@2024-03-01"
+        name      = var.vm_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        identity {
+          type = "SystemAssigned"
+        }
+        body = {
+          zones = [var.availability_zone]
+          properties = {
+            hardwareProfile = {
+              vmSize = var.vm_size
+            }
+            osProfile = {
+              computerName  = var.computer_name
+              adminUsername  = var.admin_username
+              linuxConfiguration = {
+                disablePasswordAuthentication = true
+                ssh = {
+                  publicKeys = [
+                    {
+                      path    = "/home/${var.admin_username}/.ssh/authorized_keys"
+                      keyData = var.ssh_public_key
+                    }
+                  ]
+                }
+                patchSettings = {
+                  patchMode         = "AutomaticByPlatform"
+                  assessmentMode    = "AutomaticByPlatform"
+                  automaticByPlatformSettings = {
+                    rebootSetting = "IfRequired"
+                  }
+                }
+              }
+            }
+            storageProfile = {
+              imageReference = {
+                publisher = "Canonical"
+                offer     = "0001-com-ubuntu-server-jammy"
+                sku       = "22_04-lts-gen2"
+                version   = "latest"
+              }
+              osDisk = {
+                name         = "${var.vm_name}-osdisk"
+                createOption = "FromImage"
+                caching      = "ReadWrite"
+                managedDisk = {
+                  storageAccountType = "Premium_LRS"
+                  diskEncryptionSet = {
+                    id = var.disk_encryption_set_id
+                  }
+                }
+                deleteOption = "Delete"
+              }
+            }
+            networkProfile = {
+              networkInterfaces = [
+                {
+                  id = azapi_resource.nic.id
+                  properties = {
+                    deleteOption = "Delete"
+                  }
+                }
+              ]
+            }
+            securityProfile = {
+              encryptionAtHost = true
+              securityType     = "TrustedLaunch"
+              uefiSettings = {
+                secureBootEnabled = true
+                vTpmEnabled       = true
+              }
+            }
+            diagnosticsProfile = {
+              bootDiagnostics = {
+                enabled = true
+              }
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource vm 'Microsoft.Compute/virtualMachines@2024-03-01' = {
+        name: vmName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        zones: [availabilityZone]
+        properties: {
+          hardwareProfile: {
+            vmSize: vmSize
+          }
+          osProfile: {
+            computerName: computerName
+            adminUsername: adminUsername
+            linuxConfiguration: {
+              disablePasswordAuthentication: true
+              ssh: {
+                publicKeys: [
+                  {
+                    path: '/home/${adminUsername}/.ssh/authorized_keys'
+                    keyData: sshPublicKey
+                  }
+                ]
+              }
+              patchSettings: {
+                patchMode: 'AutomaticByPlatform'
+                assessmentMode: 'AutomaticByPlatform'
+                automaticByPlatformSettings: {
+                  rebootSetting: 'IfRequired'
+                }
+              }
+            }
+          }
+          storageProfile: {
+            imageReference: {
+              publisher: 'Canonical'
+              offer: '0001-com-ubuntu-server-jammy'
+              sku: '22_04-lts-gen2'
+              version: 'latest'
+            }
+            osDisk: {
+              name: '${vmName}-osdisk'
+              createOption: 'FromImage'
+              caching: 'ReadWrite'
+              managedDisk: {
+                storageAccountType: 'Premium_LRS'
+                diskEncryptionSet: {
+                  id: diskEncryptionSetId
+                }
+              }
+              deleteOption: 'Delete'
+            }
+          }
+          networkProfile: {
+            networkInterfaces: [
+              {
+                id: nic.id
+                properties: {
+                  deleteOption: 'Delete'
+                }
+              }
+            ]
+          }
+          securityProfile: {
+            encryptionAtHost: true
+            securityType: 'TrustedLaunch'
+            uefiSettings: {
+              secureBootEnabled: true
+              vTpmEnabled: true
+            }
+          }
+          diagnosticsProfile: {
+            bootDiagnostics: {
+              enabled: true
+            }
+          }
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/networkInterfaces (NIC with NSG, no public IP)"
+      - "Microsoft.Compute/diskEncryptionSets (CMK for disk encryption)"
+      - "Microsoft.Network/bastionHosts (for secure remote access)"
+      - "Microsoft.Insights/diagnosticSettings (guest OS diagnostics)"
+      - "Microsoft.Compute/virtualMachines/extensions (Azure Monitor Agent)"
+    prohibitions:
+      - "Do not use password authentication for Linux VMs — use SSH keys"
+      - "Do not hardcode adminPassword in templates — use Key Vault references"
+      - "Do not assign public IPs to VMs — use Bastion for management access"
+      - "Do not deploy VMs without managed identity"
+      - "Do not use unmanaged disks — always use managed disks"
+
+  - id: VM-002
+    severity: required
+    description: "Enable Trusted Launch with Secure Boot and vTPM"
+    rationale: "Trusted Launch protects against boot-level attacks with measured boot, secure boot, and vTPM"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+    terraform_pattern: |
+      # Set in securityProfile:
+      # securityType = "TrustedLaunch"
+      # uefiSettings = { secureBootEnabled = true, vTpmEnabled = true }
+      # See VM-001 terraform_pattern for full example
+    bicep_pattern: |
+      // Set in securityProfile:
+      // securityType: 'TrustedLaunch'
+      // uefiSettings: { secureBootEnabled: true, vTpmEnabled: true }
+      // See VM-001 bicep_pattern for full example
+    companion_resources: []
+    prohibitions:
+      - "Do not disable Secure Boot or vTPM unless specific workload requires it"
+      - "Do not use Gen1 images with Trusted Launch — requires Gen2 images"
+
+  - id: VM-003
+    severity: required
+    description: "Enable encryption at host and use Disk Encryption Sets for CMK"
+    rationale: "Encryption at host ensures temp disks and caches are encrypted; CMK provides key control"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+    terraform_pattern: |
+      # Set securityProfile.encryptionAtHost = true
+      # Set osDisk.managedDisk.diskEncryptionSet.id to DES resource ID
+      # See VM-001 terraform_pattern for full example
+    bicep_pattern: |
+      // Set securityProfile.encryptionAtHost: true
+      // Set osDisk.managedDisk.diskEncryptionSet.id to DES resource ID
+      // See VM-001 bicep_pattern for full example
+    companion_resources:
+      - "Microsoft.Compute/diskEncryptionSets (CMK encryption set)"
+      - "Microsoft.KeyVault/vaults (Key Vault for encryption keys)"
+    prohibitions:
+      - "Do not rely solely on platform-managed encryption when compliance requires CMK"
+
+  - id: VM-004
+    severity: recommended
+    description: "Install Azure Monitor Agent and configure data collection rules"
+    rationale: "Azure Monitor Agent replaces the legacy Log Analytics agent and enables centralized log collection"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "ama_extension" {
+        type      = "Microsoft.Compute/virtualMachines/extensions@2024-03-01"
+        name      = "AzureMonitorLinuxAgent"
+        location  = var.location
+        parent_id = azapi_resource.vm.id
+        body = {
+          properties = {
+            publisher               = "Microsoft.Azure.Monitor"
+            type                    = "AzureMonitorLinuxAgent"
+            typeHandlerVersion      = "1.0"
+            autoUpgradeMinorVersion = true
+            enableAutomaticUpgrade  = true
+            settings = {
+              authentication = {
+                managedIdentity = {
+                  identifier-name  = "mi_res_id"
+                  identifier-value = azapi_resource.vm.id
+                }
+              }
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource amaExtension 'Microsoft.Compute/virtualMachines/extensions@2024-03-01' = {
+        parent: vm
+        name: 'AzureMonitorLinuxAgent'
+        location: location
+        properties: {
+          publisher: 'Microsoft.Azure.Monitor'
+          type: 'AzureMonitorLinuxAgent'
+          typeHandlerVersion: '1.0'
+          autoUpgradeMinorVersion: true
+          enableAutomaticUpgrade: true
+          settings: {
+            authentication: {
+              managedIdentity: {
+                'identifier-name': 'mi_res_id'
+                'identifier-value': vm.id
+              }
+            }
+          }
+        }
+      }
+    companion_resources:
+      - "Microsoft.Insights/dataCollectionRules (define what logs/metrics to collect)"
+      - "Microsoft.Insights/dataCollectionRuleAssociations (link DCR to VM)"
+      - "Microsoft.OperationalInsights/workspaces (Log Analytics destination)"
+    prohibitions:
+      - "Do not use the legacy Microsoft Monitoring Agent (MMA) — it is deprecated"
+
+  - id: VM-005
+    severity: recommended
+    description: "Enable automatic OS patching with AutomaticByPlatform mode"
+    rationale: "Automatic patching ensures VMs receive security updates without manual intervention"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # Set patchSettings in osProfile.linuxConfiguration:
+      # patchMode = "AutomaticByPlatform"
+      # assessmentMode = "AutomaticByPlatform"
+      # See VM-001 terraform_pattern for full example
+    bicep_pattern: |
+      // Set patchSettings in osProfile.linuxConfiguration:
+      // patchMode: 'AutomaticByPlatform'
+      // assessmentMode: 'AutomaticByPlatform'
+      // See VM-001 bicep_pattern for full example
+    companion_resources: []
+    prohibitions:
+      - "Do not use Manual patch mode without an explicit patching procedure"
+
+patterns:
+  - name: "Production VM with full security baseline"
+    description: "Linux VM with Trusted Launch, CMK encryption, managed identity, and monitoring"
+    example: |
+      # See VM-001 through VM-005 for complete azapi_resource patterns
+
+anti_patterns:
+  - description: "Do not use password authentication for Linux VMs"
+    instead: "Use SSH key authentication with disablePasswordAuthentication: true"
+  - description: "Do not assign public IPs directly to VMs"
+    instead: "Use Azure Bastion for management and internal load balancers for application access"
+  - description: "Do not deploy VMs without encryption at host"
+    instead: "Enable encryptionAtHost: true in the security profile"
+
+references:
+  - title: "Virtual machines documentation"
+    url: "https://learn.microsoft.com/azure/virtual-machines/overview"
+  - title: "Trusted Launch for VMs"
+    url: "https://learn.microsoft.com/azure/virtual-machines/trusted-launch"
+  - title: "Azure Monitor Agent"
+    url: "https://learn.microsoft.com/azure/azure-monitor/agents/azure-monitor-agent-overview"

@@ -1,0 +1,274 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: cdn
+  category: azure
+  services: [cdn]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: CDN-001
+    severity: required
+    description: "Deploy Azure CDN Standard profile with HTTPS enforcement and optimized caching"
+    rationale: "CDN accelerates content delivery globally; HTTPS enforcement prevents content interception"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "cdn_profile" {
+        type      = "Microsoft.Cdn/profiles@2024-02-01"
+        name      = var.cdn_profile_name
+        location  = "global"
+        parent_id = var.resource_group_id
+
+        body = {
+          sku = {
+            name = "Standard_Microsoft"  # "Standard_Microsoft", "Standard_Akamai", "Standard_Verizon", "Premium_Verizon"
+          }
+          properties = {
+            originResponseTimeoutSeconds = 60
+          }
+        }
+      }
+    bicep_pattern: |
+      resource cdnProfile 'Microsoft.Cdn/profiles@2024-02-01' = {
+        name: cdnProfileName
+        location: 'global'
+        sku: {
+          name: 'Standard_Microsoft'
+        }
+        properties: {
+          originResponseTimeoutSeconds: 60
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Cdn/profiles/endpoints@2024-02-01"
+        name: "cdn-endpoint"
+        description: "CDN endpoint with HTTPS enforcement and caching rules"
+        terraform_pattern: |
+          resource "azapi_resource" "cdn_endpoint" {
+            type      = "Microsoft.Cdn/profiles/endpoints@2024-02-01"
+            name      = var.endpoint_name
+            location  = "global"
+            parent_id = azapi_resource.cdn_profile.id
+
+            body = {
+              properties = {
+                isHttpAllowed        = false
+                isHttpsAllowed       = true
+                isCompressionEnabled = true
+                contentTypesToCompress = [
+                  "text/plain",
+                  "text/html",
+                  "text/css",
+                  "text/javascript",
+                  "application/javascript",
+                  "application/json",
+                  "application/xml",
+                  "image/svg+xml"
+                ]
+                originHostHeader = var.origin_host_name
+                origins = [
+                  {
+                    name = "primary-origin"
+                    properties = {
+                      hostName  = var.origin_host_name
+                      httpPort  = 80
+                      httpsPort = 443
+                      enabled   = true
+                    }
+                  }
+                ]
+                queryStringCachingBehavior = "IgnoreQueryString"
+                optimizationType          = "GeneralWebDelivery"
+                deliveryPolicy = {
+                  rules = [
+                    {
+                      name  = "HttpsRedirect"
+                      order = 1
+                      conditions = [
+                        {
+                          name = "RequestScheme"
+                          parameters = {
+                            typeName     = "DeliveryRuleRequestSchemeConditionParameters"
+                            matchValues  = ["HTTP"]
+                            operator     = "Equal"
+                            negateCondition = false
+                          }
+                        }
+                      ]
+                      actions = [
+                        {
+                          name = "UrlRedirect"
+                          parameters = {
+                            typeName        = "DeliveryRuleUrlRedirectActionParameters"
+                            redirectType    = "Found"
+                            destinationProtocol = "Https"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        bicep_pattern: |
+          resource cdnEndpoint 'Microsoft.Cdn/profiles/endpoints@2024-02-01' = {
+            name: endpointName
+            parent: cdnProfile
+            location: 'global'
+            properties: {
+              isHttpAllowed: false
+              isHttpsAllowed: true
+              isCompressionEnabled: true
+              contentTypesToCompress: [
+                'text/plain'
+                'text/html'
+                'text/css'
+                'text/javascript'
+                'application/javascript'
+                'application/json'
+                'application/xml'
+                'image/svg+xml'
+              ]
+              originHostHeader: originHostName
+              origins: [
+                {
+                  name: 'primary-origin'
+                  properties: {
+                    hostName: originHostName
+                    httpPort: 80
+                    httpsPort: 443
+                    enabled: true
+                  }
+                }
+              ]
+              queryStringCachingBehavior: 'IgnoreQueryString'
+              optimizationType: 'GeneralWebDelivery'
+              deliveryPolicy: {
+                rules: [
+                  {
+                    name: 'HttpsRedirect'
+                    order: 1
+                    conditions: [
+                      {
+                        name: 'RequestScheme'
+                        parameters: {
+                          typeName: 'DeliveryRuleRequestSchemeConditionParameters'
+                          matchValues: ['HTTP']
+                          operator: 'Equal'
+                          negateCondition: false
+                        }
+                      }
+                    ]
+                    actions: [
+                      {
+                        name: 'UrlRedirect'
+                        parameters: {
+                          typeName: 'DeliveryRuleUrlRedirectActionParameters'
+                          redirectType: 'Found'
+                          destinationProtocol: 'Https'
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+      - type: "Microsoft.Cdn/profiles/endpoints/customDomains@2024-02-01"
+        name: "custom-domain"
+        description: "Custom domain with managed HTTPS certificate for branded content delivery"
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name: "diag-cdn"
+        description: "Diagnostic settings for CDN access logs and core analytics"
+        terraform_pattern: |
+          resource "azapi_resource" "diag_cdn" {
+            type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+            name      = "diag-${var.cdn_profile_name}"
+            parent_id = azapi_resource.cdn_profile.id
+
+            body = {
+              properties = {
+                workspaceId = var.log_analytics_workspace_id
+                logs = [
+                  {
+                    categoryGroup = "allLogs"
+                    enabled       = true
+                  }
+                ]
+                metrics = [
+                  {
+                    category = "AllMetrics"
+                    enabled  = true
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource diagCdn 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+            name: 'diag-${cdnProfileName}'
+            scope: cdnProfile
+            properties: {
+              workspaceId: logAnalyticsWorkspaceId
+              logs: [
+                {
+                  categoryGroup: 'allLogs'
+                  enabled: true
+                }
+              ]
+              metrics: [
+                {
+                  category: 'AllMetrics'
+                  enabled: true
+                }
+              ]
+            }
+          }
+    prohibitions:
+      - "Never set isHttpAllowed to true without an HTTPS redirect rule"
+      - "Never serve content over HTTP without redirecting to HTTPS"
+      - "Never use wildcard custom domains without explicit security review"
+      - "Never cache authenticated or personalized content — use cache-control headers"
+      - "Never expose origin server directly — always serve through CDN endpoint"
+
+  - id: CDN-002
+    severity: required
+    description: "Enforce HTTPS-only delivery with HTTP-to-HTTPS redirect"
+    rationale: "HTTP content delivery is subject to interception and modification (content injection)"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+  - id: CDN-003
+    severity: recommended
+    description: "Enable compression for text-based content types"
+    rationale: "Compression reduces bandwidth consumption and improves page load time by 50-70% for text content"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+  - id: CDN-004
+    severity: recommended
+    description: "Configure custom domain with managed HTTPS certificate"
+    rationale: "Managed certificates auto-renew and eliminate manual certificate management overhead"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+  - id: CDN-005
+    severity: recommended
+    description: "Set appropriate cache TTLs and query string caching behavior"
+    rationale: "Proper caching configuration maximizes cache hit ratio and reduces origin load"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+patterns:
+  - name: "CDN Standard with HTTPS enforcement and compression"
+    description: "CDN profile with HTTPS-only delivery, compression, caching rules, and diagnostic logging"
+
+anti_patterns:
+  - description: "Do not allow HTTP content delivery"
+    instead: "Set isHttpAllowed to false or configure HTTP-to-HTTPS redirect rule"
+  - description: "Do not cache authenticated or user-specific content"
+    instead: "Use appropriate Cache-Control headers and bypass caching for authenticated requests"
+
+references:
+  - title: "Azure CDN documentation"
+    url: "https://learn.microsoft.com/azure/cdn/cdn-overview"
+  - title: "CDN caching rules"
+    url: "https://learn.microsoft.com/azure/cdn/cdn-caching-rules"

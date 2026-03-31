@@ -19,7 +19,7 @@ Prefer Event Grid over Service Bus when you need **event notification** (somethi
 | Topic type | Custom Topic | For application-generated events |
 | Topic type (alternative) | System Topic | For Azure resource events (auto-created) |
 | Schema | CloudEvents v1.0 | Recommended for new implementations |
-| Public network access | Enabled (POC) | Flag private endpoint as production backlog item |
+| Public network access | Disabled (unless user overrides) | Flag private endpoint as production backlog item |
 
 ## Terraform Patterns
 
@@ -38,7 +38,7 @@ resource "azurerm_eventgrid_topic" "this" {
     type = "SystemAssigned"
   }
 
-  public_network_access_enabled = true  # Set false when using private endpoint
+  public_network_access_enabled = false  # Unless told otherwise, disabled per governance policy
 
   tags = var.tags
 }
@@ -161,7 +161,7 @@ resource topic 'Microsoft.EventGrid/topics@2024-06-01-preview' = {
   }
   properties: {
     inputSchema: 'CloudEventSchemaV1_0'
-    publicNetworkAccess: 'Enabled'  // Set 'Disabled' when using private endpoint
+    publicNetworkAccess: 'Disabled'  // Unless told otherwise, disabled per governance policy
   }
 }
 

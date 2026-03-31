@@ -1,0 +1,622 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: database-optimization
+  category: performance
+  services:
+    - sql-database
+    - cosmos-db
+    - postgresql-flexible
+    - redis-cache
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: DBPERF-001
+    severity: required
+    description: "Define SQL indexing strategy — create indexes in deploy.sh post-deployment script for primary query patterns"
+    rationale: "Missing indexes cause full table scans; proper indexing can improve query performance by 100-1000x. Indexes are created post-deployment via T-SQL"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # === SQL Indexing Strategy (deploy.sh post-deployment script) ===
+      # Indexes are NOT created in Terraform/Bicep — they are database schema objects
+      # created via T-SQL in the deploy.sh post-deployment script.
+      #
+      # deploy.sh example:
+      # #!/bin/bash
+      # set -euo pipefail
+      #
+      # SQL_SERVER="${SQL_SERVER_NAME}.database.windows.net"
+      # SQL_DB="${SQL_DATABASE_NAME}"
+      #
+      # # Get access token via managed identity
+      # TOKEN=$(az account get-access-token --resource https://database.windows.net/ --query accessToken -o tsv)
+      #
+      # # Create indexes for primary query patterns
+      # sqlcmd -S "$SQL_SERVER" -d "$SQL_DB" -G -C --access-token "$TOKEN" -Q "
+      # -- Clustered index on primary key (typically auto-created)
+      # -- Nonclustered indexes for query patterns:
+      #
+      # -- Index for tenant-based queries (multi-tenant apps)
+      # IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Orders_TenantId_CreatedAt')
+      # CREATE NONCLUSTERED INDEX IX_Orders_TenantId_CreatedAt
+      #     ON dbo.Orders (TenantId, CreatedAt DESC)
+      #     INCLUDE (Status, TotalAmount);
+      #
+      # -- Index for status-based filtering
+      # IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Orders_Status')
+      # CREATE NONCLUSTERED INDEX IX_Orders_Status
+      #     ON dbo.Orders (Status)
+      #     INCLUDE (TenantId, CreatedAt)
+      #     WHERE Status IN ('Pending', 'Processing');
+      #
+      # -- Covering index for common SELECT patterns
+      # IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Products_CategoryId')
+      # CREATE NONCLUSTERED INDEX IX_Products_CategoryId
+      #     ON dbo.Products (CategoryId)
+      #     INCLUDE (Name, Price, IsActive);
+      #
+      # -- Full-text index for search (requires full-text catalog)
+      # IF NOT EXISTS (SELECT 1 FROM sys.fulltext_catalogs WHERE name = 'FT_Catalog')
+      # BEGIN
+      #     CREATE FULLTEXT CATALOG FT_Catalog;
+      #     CREATE FULLTEXT INDEX ON dbo.Products (Name, Description)
+      #         KEY INDEX PK_Products ON FT_Catalog;
+      # END
+      # "
+      #
+      # echo "Indexes created successfully"
+
+      # Ensure SQL diagnostic settings include Query Store
+      resource "azapi_resource" "sql_database" {
+        type      = "Microsoft.Sql/servers/databases@2023-08-01-preview"
+        name      = var.sql_database_name
+        location  = var.location
+        parent_id = azapi_resource.sql_server.id
+
+        body = {
+          properties = {
+            # Enable Query Store for index performance monitoring
+            requestedBackupStorageRedundancy = "Local"
+          }
+        }
+      }
+    bicep_pattern: |
+      // === SQL Indexing Strategy ===
+      // Indexes are created via T-SQL in deploy.sh, NOT in Bicep.
+      //
+      // deploy.sh post-deployment T-SQL:
+      //   -- Nonclustered index for tenant-scoped queries
+      //   CREATE NONCLUSTERED INDEX IX_Orders_TenantId_CreatedAt
+      //       ON dbo.Orders (TenantId, CreatedAt DESC)
+      //       INCLUDE (Status, TotalAmount);
+      //
+      //   -- Filtered index for active records
+      //   CREATE NONCLUSTERED INDEX IX_Orders_Status
+      //       ON dbo.Orders (Status)
+      //       INCLUDE (TenantId, CreatedAt)
+      //       WHERE Status IN ('Pending', 'Processing');
+      //
+      //   -- Covering index for SELECT patterns
+      //   CREATE NONCLUSTERED INDEX IX_Products_CategoryId
+      //       ON dbo.Products (CategoryId)
+      //       INCLUDE (Name, Price, IsActive);
+
+      // Ensure Query Store is enabled for monitoring
+      resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
+        parent: sqlServer
+        name: sqlDatabaseName
+        location: location
+        properties: {
+          requestedBackupStorageRedundancy: 'Local'
+        }
+      }
+    prohibitions:
+      - "NEVER deploy a SQL database without defining indexes for primary query patterns in deploy.sh"
+      - "NEVER create indexes on every column — over-indexing degrades write performance"
+      - "NEVER use clustered indexes on frequently updated columns — use nonclustered instead"
+      - "NEVER skip INCLUDE columns in nonclustered indexes — covering indexes eliminate key lookups"
+      - "NEVER create indexes without IF NOT EXISTS guards — re-running deploy.sh must be idempotent"
+
+  - id: DBPERF-002
+    severity: required
+    description: "Design Cosmos DB partition keys based on query patterns — use high-cardinality fields that align with read and write access patterns"
+    rationale: "Partition key choice is the single most important Cosmos DB design decision; bad keys cause hot partitions, throttling, and cross-partition queries"
+    applies_to: [cloud-architect, app-developer, terraform-agent, bicep-agent]
+    terraform_pattern: |
+      # === Cosmos DB Container with Well-Designed Partition Key ===
+      resource "azapi_resource" "cosmos_container" {
+        type      = "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15"
+        name      = var.container_name
+        parent_id = azapi_resource.cosmos_database.id
+
+        body = {
+          properties = {
+            resource = {
+              id = var.container_name
+              partitionKey = {
+                paths   = ["/tenantId"]     # High cardinality, aligns with query filter
+                kind    = "Hash"
+                version = 2                 # v2 supports larger partition keys (up to 2 KB)
+              }
+              indexingPolicy = {
+                indexingMode = "consistent"
+                automatic    = true
+                includedPaths = [
+                  {
+                    path = "/*"
+                  }
+                ]
+                excludedPaths = [
+                  {
+                    path = "/largeTextField/?"     # Exclude large text fields from indexing
+                  },
+                  {
+                    path = "/metadata/?"
+                  },
+                  {
+                    path = "/_etag/?"
+                  }
+                ]
+                compositeIndexes = [
+                  [
+                    { path = "/tenantId", order = "ascending" },
+                    { path = "/createdAt", order = "descending" }
+                  ]
+                ]
+              }
+              defaultTtl = -1               # Enable TTL at container level (items opt-in via ttl property)
+            }
+          }
+        }
+      }
+
+      # Partition Key Selection Guide:
+      #
+      # GOOD partition keys (high cardinality, even distribution):
+      #   /tenantId    — multi-tenant apps (queries always filter by tenant)
+      #   /userId      — user-specific data (each user is a partition)
+      #   /deviceId    — IoT scenarios (each device is a partition)
+      #   /orderId     — order processing (each order is a partition)
+      #
+      # BAD partition keys (low cardinality, hot partitions):
+      #   /status      — few distinct values → hot partitions
+      #   /country     — skewed distribution → some partitions 100x larger
+      #   /createdDate — time-series → recent partition is hot
+      #   /type        — few types → all data in few partitions
+      #
+      # Hierarchical partition keys (for complex access patterns):
+      #   ["/tenantId", "/departmentId", "/userId"]
+    bicep_pattern: |
+      // === Cosmos DB Container with Well-Designed Partition Key ===
+      resource cosmosContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15' = {
+        parent: cosmosDatabase
+        name: containerName
+        properties: {
+          resource: {
+            id: containerName
+            partitionKey: {
+              paths: ['/tenantId']        // High cardinality, aligns with query filter
+              kind: 'Hash'
+              version: 2
+            }
+            indexingPolicy: {
+              indexingMode: 'consistent'
+              automatic: true
+              includedPaths: [
+                {
+                  path: '/*'
+                }
+              ]
+              excludedPaths: [
+                {
+                  path: '/largeTextField/?'
+                }
+                {
+                  path: '/metadata/?'
+                }
+                {
+                  path: '/_etag/?'
+                }
+              ]
+              compositeIndexes: [
+                [
+                  { path: '/tenantId', order: 'ascending' }
+                  { path: '/createdAt', order: 'descending' }
+                ]
+              ]
+            }
+            defaultTtl: -1
+          }
+        }
+      }
+
+      // Partition Key Guide:
+      //   GOOD: /tenantId, /userId, /deviceId, /orderId (high cardinality)
+      //   BAD: /status, /country, /createdDate, /type (low cardinality/skew)
+    prohibitions:
+      - "NEVER use low-cardinality fields as partition keys — /status, /type, /category will create hot partitions"
+      - "NEVER use time-based fields as the sole partition key — /createdDate creates a hot partition for recent data"
+      - "NEVER design queries that require cross-partition fan-out for common read operations"
+      - "NEVER set partitionKey.version to 1 — always use version 2 for larger key support"
+      - "NEVER index large text or binary fields — exclude them from indexing policy"
+      - "NEVER omit composite indexes for ORDER BY queries on multiple fields"
+
+  - id: DBPERF-003
+    severity: required
+    description: "Configure connection pooling for all database connections — exact connection string patterns for SQL, Cosmos, and PostgreSQL"
+    rationale: "Connection creation takes 20-100ms; pooling reuses connections, reducing latency and preventing connection exhaustion under load"
+    applies_to: [app-developer, cloud-architect, terraform-agent, bicep-agent]
+    terraform_pattern: |
+      # === Connection Pooling Configuration ===
+      # Connection pooling is configured via connection strings and App Settings.
+      # These settings are applied to the compute resource (App Service, Container App, etc.)
+
+      resource "azapi_resource" "app_service" {
+        type      = "Microsoft.Web/sites@2023-12-01"
+        name      = var.app_service_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            siteConfig = {
+              appSettings = [
+                # === Azure SQL Connection (ADO.NET with pooling) ===
+                {
+                  name  = "ConnectionStrings__SqlDb"
+                  # Managed identity auth; Min/Max Pool Size controls connection reuse
+                  value = "Server=tcp:${var.sql_server_name}.database.windows.net,1433;Database=${var.sql_db_name};Authentication=Active Directory Default;Encrypt=True;TrustServerCertificate=False;Min Pool Size=5;Max Pool Size=100;Connection Timeout=30;Command Timeout=30;"
+                },
+
+                # === PostgreSQL Connection (Npgsql with pooling) ===
+                {
+                  name  = "ConnectionStrings__Postgres"
+                  value = "Host=${var.postgres_name}.postgres.database.azure.com;Database=${var.postgres_db_name};Username=${var.postgres_admin};Ssl Mode=Require;Trust Server Certificate=true;Pooling=true;Minimum Pool Size=5;Maximum Pool Size=100;Connection Idle Lifetime=300;"
+                },
+
+                # === Cosmos DB Connection (SDK handles pooling internally) ===
+                {
+                  name  = "CosmosDb__Endpoint"
+                  value = "https://${var.cosmos_account_name}.documents.azure.com:443/"
+                },
+                {
+                  name  = "CosmosDb__MaxConnectionsPerEndpoint"
+                  value = "50"                    # SDK connection limit per endpoint
+                },
+                {
+                  name  = "CosmosDb__MaxRequestsPerConnection"
+                  value = "30"                    # Multiplexed requests per connection
+                },
+                {
+                  name  = "CosmosDb__ConnectionMode"
+                  value = "Direct"                # Direct mode for lowest latency
+                }
+              ]
+            }
+          }
+        }
+      }
+
+      # Python connection pooling examples:
+      #
+      # Azure SQL (pyodbc):
+      #   import pyodbc
+      #   conn_str = (
+      #       f"Driver={{ODBC Driver 18 for SQL Server}};"
+      #       f"Server=tcp:{sql_server}.database.windows.net,1433;"
+      #       f"Database={sql_db};"
+      #       f"Authentication=ActiveDirectoryDefault;"
+      #       f"Encrypt=yes;"
+      #   )
+      #   # Use connection pool via SQLAlchemy:
+      #   engine = create_engine(conn_str, pool_size=10, max_overflow=20, pool_timeout=30)
+      #
+      # PostgreSQL (asyncpg with pool):
+      #   pool = await asyncpg.create_pool(
+      #       host=f"{postgres_name}.postgres.database.azure.com",
+      #       database=db_name,
+      #       min_size=5, max_size=20,
+      #       command_timeout=30,
+      #       ssl="require"
+      #   )
+    bicep_pattern: |
+      // === Connection Pooling via App Settings ===
+      resource appService 'Microsoft.Web/sites@2023-12-01' = {
+        name: appServiceName
+        location: location
+        properties: {
+          siteConfig: {
+            appSettings: [
+              // Azure SQL with connection pooling (managed identity)
+              {
+                name: 'ConnectionStrings__SqlDb'
+                value: 'Server=tcp:${sqlServerName}.database.windows.net,1433;Database=${sqlDbName};Authentication=Active Directory Default;Encrypt=True;Min Pool Size=5;Max Pool Size=100;Connection Timeout=30;'
+              }
+              // PostgreSQL with connection pooling
+              {
+                name: 'ConnectionStrings__Postgres'
+                value: 'Host=${postgresName}.postgres.database.azure.com;Database=${postgresDbName};Username=${postgresAdmin};Ssl Mode=Require;Pooling=true;Minimum Pool Size=5;Maximum Pool Size=100;Connection Idle Lifetime=300;'
+              }
+              // Cosmos DB SDK settings
+              {
+                name: 'CosmosDb__Endpoint'
+                value: 'https://${cosmosAccountName}.documents.azure.com:443/'
+              }
+              {
+                name: 'CosmosDb__MaxConnectionsPerEndpoint'
+                value: '50'
+              }
+              {
+                name: 'CosmosDb__ConnectionMode'
+                value: 'Direct'
+              }
+            ]
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER create a new database connection per request — always use connection pooling"
+      - "NEVER set Max Pool Size > 200 — excessive connections exhaust database resources"
+      - "NEVER set Min Pool Size = 0 for production — cold connections add latency to first requests"
+      - "NEVER omit Connection Timeout — default timeouts (15-30s) can cause thread starvation"
+      - "NEVER use connection strings with passwords — use managed identity (Authentication=Active Directory Default)"
+      - "NEVER use Cosmos DB Gateway mode in production for latency-sensitive workloads — use Direct mode"
+
+  - id: DBPERF-004
+    severity: recommended
+    description: "Configure read replicas for SQL and PostgreSQL to offload read traffic from the primary"
+    rationale: "Read replicas handle 50-80% of typical application traffic (reads); offloading reduces primary load and improves read latency"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # === Azure SQL Read Replica (built-in read scale-out) ===
+      resource "azapi_resource" "sql_database_with_read_replica" {
+        type      = "Microsoft.Sql/servers/databases@2023-08-01-preview"
+        name      = var.sql_database_name
+        location  = var.location
+        parent_id = azapi_resource.sql_server.id
+
+        body = {
+          sku = {
+            name     = "GP_Gen5"
+            tier     = "GeneralPurpose"
+            family   = "Gen5"
+            capacity = 2
+          }
+          properties = {
+            readScale = "Enabled"              # Enables read-only replica endpoint
+            highAvailabilityReplicaCount = 1   # Number of HA replicas (Premium/BC only)
+          }
+        }
+      }
+
+      # Application uses read replica via connection string:
+      # Read-only endpoint: ApplicationIntent=ReadOnly in connection string
+      # "Server=tcp:sql-server.database.windows.net,1433;Database=mydb;
+      #  Authentication=Active Directory Default;ApplicationIntent=ReadOnly;"
+
+      # === PostgreSQL Flexible Read Replica ===
+      resource "azapi_resource" "postgres_read_replica" {
+        type      = "Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview"
+        name      = "${var.postgres_name}-replica"
+        location  = var.replica_location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "Standard_D2s_v3"
+            tier = "GeneralPurpose"
+          }
+          properties = {
+            createMode        = "Replica"
+            sourceServerResourceId = azapi_resource.postgres_primary.id
+            version           = "16"
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Azure SQL Read Scale-Out ===
+      resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
+        parent: sqlServer
+        name: sqlDatabaseName
+        location: location
+        sku: {
+          name: 'GP_Gen5'
+          tier: 'GeneralPurpose'
+          family: 'Gen5'
+          capacity: 2
+        }
+        properties: {
+          readScale: 'Enabled'              // Read-only endpoint for read traffic
+        }
+      }
+
+      // Read-only connection string uses ApplicationIntent=ReadOnly
+
+      // === PostgreSQL Flexible Read Replica ===
+      resource postgresReplica 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview' = {
+        name: '${postgresName}-replica'
+        location: replicaLocation
+        sku: {
+          name: 'Standard_D2s_v3'
+          tier: 'GeneralPurpose'
+        }
+        properties: {
+          createMode: 'Replica'
+          sourceServerResourceId: postgresPrimary.id
+          version: '16'
+        }
+      }
+    prohibitions:
+      - "NEVER route write operations to read replicas — they are read-only"
+      - "NEVER assume read replicas are synchronous — there is replication lag (typically 1-5 seconds)"
+      - "NEVER use read replicas for dev/POC — they double database cost"
+      - "NEVER deploy read replicas in the same availability zone as the primary — use cross-zone for HA"
+      - "NEVER use ApplicationIntent=ReadOnly for operations requiring strong consistency"
+
+  - id: DBPERF-005
+    severity: required
+    description: "Enable Query Performance Insight and diagnostic settings for database performance monitoring"
+    rationale: "Without query monitoring, slow queries go undetected until they cause user-visible performance degradation"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      # === SQL Database Diagnostics (Query Store + Log Analytics) ===
+      resource "azapi_resource" "sql_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-${var.sql_database_name}"
+        parent_id = azapi_resource.sql_database.id
+
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "SQLInsights"
+                enabled  = true
+              },
+              {
+                category = "QueryStoreRuntimeStatistics"
+                enabled  = true
+              },
+              {
+                category = "QueryStoreWaitStatistics"
+                enabled  = true
+              },
+              {
+                category = "AutomaticTuning"
+                enabled  = true
+              },
+              {
+                category = "Errors"
+                enabled  = true
+              },
+              {
+                category = "Timeouts"
+                enabled  = true
+              },
+              {
+                category = "Deadlocks"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "Basic"
+                enabled  = true
+              },
+              {
+                category = "InstanceAndAppAdvanced"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+
+      # === PostgreSQL Diagnostics ===
+      resource "azapi_resource" "postgres_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-${var.postgres_name}"
+        parent_id = azapi_resource.postgres.id
+
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "PostgreSQLLogs"
+                enabled  = true
+              },
+              {
+                category = "PostgreSQLFlexSessions"
+                enabled  = true
+              },
+              {
+                category = "PostgreSQLFlexQueryStoreRuntime"
+                enabled  = true
+              },
+              {
+                category = "PostgreSQLFlexQueryStoreWaitStats"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      // === SQL Database Diagnostics ===
+      resource sqlDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        scope: sqlDatabase
+        name: 'diag-${sqlDatabaseName}'
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
+            { category: 'SQLInsights', enabled: true }
+            { category: 'QueryStoreRuntimeStatistics', enabled: true }
+            { category: 'QueryStoreWaitStatistics', enabled: true }
+            { category: 'AutomaticTuning', enabled: true }
+            { category: 'Errors', enabled: true }
+            { category: 'Timeouts', enabled: true }
+            { category: 'Deadlocks', enabled: true }
+          ]
+          metrics: [
+            { category: 'Basic', enabled: true }
+            { category: 'InstanceAndAppAdvanced', enabled: true }
+          ]
+        }
+      }
+
+      // === PostgreSQL Diagnostics ===
+      resource postgresDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        scope: postgres
+        name: 'diag-${postgresName}'
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
+            { category: 'PostgreSQLLogs', enabled: true }
+            { category: 'PostgreSQLFlexSessions', enabled: true }
+            { category: 'PostgreSQLFlexQueryStoreRuntime', enabled: true }
+            { category: 'PostgreSQLFlexQueryStoreWaitStats', enabled: true }
+          ]
+          metrics: [
+            { category: 'AllMetrics', enabled: true }
+          ]
+        }
+      }
+    prohibitions:
+      - "NEVER deploy databases without diagnostic settings to Log Analytics"
+      - "NEVER disable Query Store — it is essential for identifying slow queries"
+      - "NEVER skip Deadlocks and Timeouts log categories — they indicate critical performance issues"
+      - "NEVER disable Automatic Tuning for Azure SQL — it provides automated index and plan recommendations"
+
+patterns:
+  - name: "Database performance baseline"
+    description: "Enable diagnostics on all databases, create indexes for primary queries in deploy.sh, configure connection pooling, and set up read replicas for production"
+
+anti_patterns:
+  - description: "Do not use SELECT * in application queries"
+    instead: "Select only required columns and use covering indexes with INCLUDE"
+  - description: "Do not use cross-partition queries in Cosmos DB for common operations"
+    instead: "Design partition keys to align with primary query patterns; use point reads where possible"
+  - description: "Do not create database connections in a loop"
+    instead: "Use connection pooling with Min/Max Pool Size configured in the connection string"
+  - description: "Do not skip indexing for known query patterns"
+    instead: "Create nonclustered indexes with INCLUDE columns for all primary query patterns in deploy.sh"
+
+references:
+  - title: "SQL Database performance monitoring"
+    url: "https://learn.microsoft.com/azure/azure-sql/database/monitor-tune-overview"
+  - title: "Cosmos DB partition key design"
+    url: "https://learn.microsoft.com/azure/cosmos-db/partitioning-overview"
+  - title: "PostgreSQL performance tuning"
+    url: "https://learn.microsoft.com/azure/postgresql/flexible-server/concepts-query-performance-insight"
+  - title: "SQL indexing best practices"
+    url: "https://learn.microsoft.com/sql/relational-databases/indexes/indexes"
+  - title: "Azure SQL read scale-out"
+    url: "https://learn.microsoft.com/azure/azure-sql/database/read-scale-out"

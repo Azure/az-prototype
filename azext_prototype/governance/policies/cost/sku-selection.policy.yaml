@@ -1,0 +1,1113 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: sku-selection
+  category: cost
+  services:
+    - app-service
+    - functions
+    - container-apps
+    - virtual-machines
+    - sql-database
+    - cosmos-db
+    - postgresql-flexible
+    - storage
+    - load-balancer
+    - front-door
+    - vpn-gateway
+    - redis-cache
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: COST-001
+    severity: required
+    description: "Select appropriate compute SKU based on environment tier — B-series for dev/POC, D-series for production"
+    rationale: "Compute is typically the largest cost driver; right-sizing by environment prevents overspending on dev while ensuring production performance"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
+    terraform_pattern: |
+      # === App Service Plan: Dev/POC ===
+      resource "azapi_resource" "app_service_plan_dev" {
+        type      = "Microsoft.Web/serverfarms@2023-12-01"
+        name      = var.app_service_plan_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "B1"    # Dev/POC: Basic B1 ($13/mo) — 1 core, 1.75 GB RAM
+            tier = "Basic"
+          }
+          kind = "linux"
+          properties = {
+            reserved = true
+          }
+        }
+      }
+
+      # === App Service Plan: Staging ===
+      resource "azapi_resource" "app_service_plan_staging" {
+        type      = "Microsoft.Web/serverfarms@2023-12-01"
+        name      = var.app_service_plan_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "S1"      # Staging: Standard S1 ($73/mo) — 1 core, 1.75 GB RAM, slots, autoscale
+            tier = "Standard"
+          }
+          kind = "linux"
+          properties = {
+            reserved = true
+          }
+        }
+      }
+
+      # === App Service Plan: Production ===
+      resource "azapi_resource" "app_service_plan_prod" {
+        type      = "Microsoft.Web/serverfarms@2023-12-01"
+        name      = var.app_service_plan_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "P1v3"     # Production: Premium P1v3 ($138/mo) — 2 cores, 8 GB RAM, VNet, slots
+            tier = "PremiumV3"
+          }
+          kind = "linux"
+          properties = {
+            reserved         = true
+            zoneRedundant    = true
+          }
+        }
+      }
+
+      # === Azure Functions: Dev/POC (Consumption) ===
+      resource "azapi_resource" "functions_plan_dev" {
+        type      = "Microsoft.Web/serverfarms@2023-12-01"
+        name      = var.functions_plan_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "Y1"           # Dev/POC: Consumption — pay-per-execution, first 1M free
+            tier = "Dynamic"
+          }
+          kind = "functionapp"
+          properties = {
+            reserved = true
+          }
+        }
+      }
+
+      # === Azure Functions: Production (Elastic Premium) ===
+      resource "azapi_resource" "functions_plan_prod" {
+        type      = "Microsoft.Web/serverfarms@2023-12-01"
+        name      = var.functions_plan_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "EP1"          # Production: Elastic Premium EP1 ($155/mo) — 1 core, 3.5 GB RAM, VNet, always-ready
+            tier = "ElasticPremium"
+          }
+          kind = "functionapp"
+          properties = {
+            reserved            = true
+            maximumElasticWorkerCount = 20
+          }
+        }
+      }
+
+      # === Container Apps: Dev/POC (Consumption) ===
+      resource "azapi_resource" "container_app_env_dev" {
+        type      = "Microsoft.App/managedEnvironments@2024-03-01"
+        name      = var.container_env_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            workloadProfiles = [
+              {
+                name                = "Consumption"
+                workloadProfileType = "Consumption"       # Dev/POC: pay-per-use, no idle cost
+              }
+            ]
+          }
+        }
+      }
+
+      # === Container Apps: Production (Dedicated D4) ===
+      resource "azapi_resource" "container_app_env_prod" {
+        type      = "Microsoft.App/managedEnvironments@2024-03-01"
+        name      = var.container_env_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            zoneRedundant = true
+            workloadProfiles = [
+              {
+                name                = "Consumption"
+                workloadProfileType = "Consumption"
+              },
+              {
+                name                = "dedicated"
+                workloadProfileType = "D4"              # Production: Dedicated D4 — 4 cores, 16 GB RAM
+                minimumCount        = 1
+                maximumCount        = 10
+              }
+            ]
+          }
+        }
+      }
+
+      # === Virtual Machine: Dev/POC ===
+      resource "azapi_resource" "vm_dev" {
+        type      = "Microsoft.Compute/virtualMachines@2024-03-01"
+        name      = var.vm_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            hardwareProfile = {
+              vmSize = "Standard_B2s"    # Dev/POC: B-series burstable — 2 cores, 4 GB RAM (~$30/mo)
+            }
+            storageProfile = {
+              osDisk = {
+                createOption = "FromImage"
+                managedDisk = {
+                  storageAccountType = "Standard_LRS"    # Dev: Standard HDD is sufficient
+                }
+              }
+            }
+          }
+        }
+      }
+
+      # === Virtual Machine: Production ===
+      resource "azapi_resource" "vm_prod" {
+        type      = "Microsoft.Compute/virtualMachines@2024-03-01"
+        name      = var.vm_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            hardwareProfile = {
+              vmSize = "Standard_D4s_v5"   # Production: D-series — 4 cores, 16 GB RAM (~$140/mo)
+            }
+            storageProfile = {
+              osDisk = {
+                createOption = "FromImage"
+                managedDisk = {
+                  storageAccountType = "Premium_LRS"     # Production: Premium SSD for IOPS
+                }
+              }
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // === App Service Plan: Dev/POC ===
+      resource appServicePlanDev 'Microsoft.Web/serverfarms@2023-12-01' = {
+        name: appServicePlanName
+        location: location
+        kind: 'linux'
+        sku: {
+          name: 'B1'      // Dev/POC: Basic B1 ($13/mo)
+          tier: 'Basic'
+        }
+        properties: {
+          reserved: true
+        }
+      }
+
+      // === App Service Plan: Staging ===
+      resource appServicePlanStaging 'Microsoft.Web/serverfarms@2023-12-01' = {
+        name: appServicePlanName
+        location: location
+        kind: 'linux'
+        sku: {
+          name: 'S1'        // Staging: Standard S1 ($73/mo) — slots, autoscale
+          tier: 'Standard'
+        }
+        properties: {
+          reserved: true
+        }
+      }
+
+      // === App Service Plan: Production ===
+      resource appServicePlanProd 'Microsoft.Web/serverfarms@2023-12-01' = {
+        name: appServicePlanName
+        location: location
+        kind: 'linux'
+        sku: {
+          name: 'P1v3'       // Production: Premium P1v3 ($138/mo) — VNet, slots, zone-redundant
+          tier: 'PremiumV3'
+        }
+        properties: {
+          reserved: true
+          zoneRedundant: true
+        }
+      }
+
+      // === Azure Functions: Dev/POC (Consumption) ===
+      resource functionsPlanDev 'Microsoft.Web/serverfarms@2023-12-01' = {
+        name: functionsPlanName
+        location: location
+        kind: 'functionapp'
+        sku: {
+          name: 'Y1'          // Dev/POC: Consumption — pay-per-execution
+          tier: 'Dynamic'
+        }
+        properties: {
+          reserved: true
+        }
+      }
+
+      // === Azure Functions: Production (Elastic Premium) ===
+      resource functionsPlanProd 'Microsoft.Web/serverfarms@2023-12-01' = {
+        name: functionsPlanName
+        location: location
+        kind: 'functionapp'
+        sku: {
+          name: 'EP1'         // Production: Elastic Premium EP1 ($155/mo) — VNet, always-ready
+          tier: 'ElasticPremium'
+        }
+        properties: {
+          reserved: true
+          maximumElasticWorkerCount: 20
+        }
+      }
+
+      // === Container Apps Environment: Dev/POC ===
+      resource containerAppEnvDev 'Microsoft.App/managedEnvironments@2024-03-01' = {
+        name: containerEnvName
+        location: location
+        properties: {
+          workloadProfiles: [
+            {
+              name: 'Consumption'
+              workloadProfileType: 'Consumption'    // Dev/POC: pay-per-use
+            }
+          ]
+        }
+      }
+
+      // === Container Apps Environment: Production ===
+      resource containerAppEnvProd 'Microsoft.App/managedEnvironments@2024-03-01' = {
+        name: containerEnvName
+        location: location
+        properties: {
+          zoneRedundant: true
+          workloadProfiles: [
+            {
+              name: 'Consumption'
+              workloadProfileType: 'Consumption'
+            }
+            {
+              name: 'dedicated'
+              workloadProfileType: 'D4'             // Production: Dedicated D4 — 4 cores, 16 GB
+              minimumCount: 1
+              maximumCount: 10
+            }
+          ]
+        }
+      }
+
+      // === Virtual Machine: Dev/POC ===
+      resource vmDev 'Microsoft.Compute/virtualMachines@2024-03-01' = {
+        name: vmName
+        location: location
+        properties: {
+          hardwareProfile: {
+            vmSize: 'Standard_B2s'    // Dev/POC: Burstable — 2 cores, 4 GB (~$30/mo)
+          }
+          storageProfile: {
+            osDisk: {
+              createOption: 'FromImage'
+              managedDisk: {
+                storageAccountType: 'Standard_LRS'
+              }
+            }
+          }
+        }
+      }
+
+      // === Virtual Machine: Production ===
+      resource vmProd 'Microsoft.Compute/virtualMachines@2024-03-01' = {
+        name: vmName
+        location: location
+        properties: {
+          hardwareProfile: {
+            vmSize: 'Standard_D4s_v5'   // Production: D-series — 4 cores, 16 GB (~$140/mo)
+          }
+          storageProfile: {
+            osDisk: {
+              createOption: 'FromImage'
+              managedDisk: {
+                storageAccountType: 'Premium_LRS'
+              }
+            }
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER use Premium/PremiumV3 App Service Plans for dev/POC without written justification"
+      - "NEVER use Elastic Premium Functions plan for dev/POC — use Consumption (Y1)"
+      - "NEVER use D-series or F-series VMs for dev/POC — use B-series burstable"
+      - "NEVER use Dedicated workload profiles in Container Apps for dev/POC — use Consumption"
+      - "NEVER deploy Classic Cloud Services (PaaS) — use App Service or Container Apps"
+      - "NEVER use A-series or legacy VM SKUs — they are deprecated and cost-inefficient"
+
+  - id: COST-002
+    severity: required
+    description: "Select appropriate database SKU based on environment tier — serverless/burstable for dev, provisioned/GP for production"
+    rationale: "Database costs can exceed compute; serverless and burstable tiers eliminate idle costs in dev"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
+    terraform_pattern: |
+      # === Azure SQL: Dev/POC (Serverless) ===
+      resource "azapi_resource" "sql_database_dev" {
+        type      = "Microsoft.Sql/servers/databases@2023-08-01-preview"
+        name      = var.sql_database_name
+        location  = var.location
+        parent_id = azapi_resource.sql_server.id
+
+        body = {
+          sku = {
+            name     = "GP_S_Gen5"    # Dev/POC: Serverless Gen5 — auto-pause, pay-per-vCore-second
+            tier     = "GeneralPurpose"
+            family   = "Gen5"
+            capacity = 1              # Min 0.5 vCores when active
+          }
+          properties = {
+            autoPauseDelay         = 60           # Auto-pause after 60 minutes idle
+            minCapacity            = 0.5          # Scale down to 0.5 vCores
+            maxSizeBytes           = 34359738368  # 32 GB max
+            zoneRedundant          = false
+            requestedBackupStorageRedundancy = "Local"   # LRS backup for dev
+          }
+        }
+      }
+
+      # === Azure SQL: Production (Provisioned GP) ===
+      resource "azapi_resource" "sql_database_prod" {
+        type      = "Microsoft.Sql/servers/databases@2023-08-01-preview"
+        name      = var.sql_database_name
+        location  = var.location
+        parent_id = azapi_resource.sql_server.id
+
+        body = {
+          sku = {
+            name     = "GP_Gen5"       # Production: Provisioned Gen5 — predictable performance
+            tier     = "GeneralPurpose"
+            family   = "Gen5"
+            capacity = 2               # 2 vCores
+          }
+          properties = {
+            maxSizeBytes           = 107374182400   # 100 GB
+            zoneRedundant          = true
+            requestedBackupStorageRedundancy = "Geo"  # GRS backup for production
+            readScale              = "Enabled"
+          }
+        }
+      }
+
+      # === Cosmos DB: Dev/POC (Serverless) ===
+      resource "azapi_resource" "cosmos_account_dev" {
+        type      = "Microsoft.DocumentDB/databaseAccounts@2024-05-15"
+        name      = var.cosmos_account_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          kind = "GlobalDocumentDB"
+          properties = {
+            databaseAccountOfferType = "Standard"
+            consistencyPolicy = {
+              defaultConsistencyLevel = "Session"
+            }
+            locations = [
+              {
+                locationName     = var.location
+                failoverPriority = 0
+              }
+            ]
+            capabilities = [
+              {
+                name = "EnableServerless"      # Dev/POC: Serverless — no idle cost, pay per RU consumed
+              }
+            ]
+          }
+        }
+      }
+
+      # === Cosmos DB: Production (Autoscale) ===
+      resource "azapi_resource" "cosmos_database_prod" {
+        type      = "Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-05-15"
+        name      = var.cosmos_database_name
+        parent_id = azapi_resource.cosmos_account.id
+
+        body = {
+          properties = {
+            resource = {
+              id = var.cosmos_database_name
+            }
+            options = {
+              autoscaleSettings = {
+                maxThroughput = 4000    # Production: Autoscale — scales 10%-100% of max (400-4000 RU/s)
+              }
+            }
+          }
+        }
+      }
+
+      # === PostgreSQL Flexible: Dev/POC (Burstable) ===
+      resource "azapi_resource" "postgres_dev" {
+        type      = "Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview"
+        name      = var.postgres_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "Standard_B1ms"      # Dev/POC: Burstable B1ms — 1 vCore, 2 GB RAM (~$13/mo)
+            tier = "Burstable"
+          }
+          properties = {
+            version = "16"
+            storage = {
+              storageSizeGB = 32
+              autoGrow      = "Disabled"    # Dev: fixed storage to control costs
+            }
+            backup = {
+              backupRetentionDays  = 7
+              geoRedundantBackup   = "Disabled"  # Dev: no geo-backup needed
+            }
+          }
+        }
+      }
+
+      # === PostgreSQL Flexible: Production (General Purpose) ===
+      resource "azapi_resource" "postgres_prod" {
+        type      = "Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview"
+        name      = var.postgres_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "Standard_D2s_v3"    # Production: GP D2s_v3 — 2 vCores, 8 GB RAM (~$125/mo)
+            tier = "GeneralPurpose"
+          }
+          properties = {
+            version = "16"
+            storage = {
+              storageSizeGB = 128
+              autoGrow      = "Enabled"
+            }
+            backup = {
+              backupRetentionDays  = 35
+              geoRedundantBackup   = "Enabled"   # Production: geo-redundant backup
+            }
+            highAvailability = {
+              mode = "ZoneRedundant"
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Azure SQL: Dev/POC (Serverless) ===
+      resource sqlDatabaseDev 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
+        parent: sqlServer
+        name: sqlDatabaseName
+        location: location
+        sku: {
+          name: 'GP_S_Gen5'      // Dev/POC: Serverless Gen5 — auto-pause, pay per vCore-second
+          tier: 'GeneralPurpose'
+          family: 'Gen5'
+          capacity: 1
+        }
+        properties: {
+          autoPauseDelay: 60
+          minCapacity: json('0.5')
+          maxSizeBytes: 34359738368        // 32 GB
+          zoneRedundant: false
+          requestedBackupStorageRedundancy: 'Local'
+        }
+      }
+
+      // === Azure SQL: Production (Provisioned GP) ===
+      resource sqlDatabaseProd 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
+        parent: sqlServer
+        name: sqlDatabaseName
+        location: location
+        sku: {
+          name: 'GP_Gen5'         // Production: Provisioned Gen5
+          tier: 'GeneralPurpose'
+          family: 'Gen5'
+          capacity: 2
+        }
+        properties: {
+          maxSizeBytes: 107374182400     // 100 GB
+          zoneRedundant: true
+          requestedBackupStorageRedundancy: 'Geo'
+          readScale: 'Enabled'
+        }
+      }
+
+      // === Cosmos DB: Dev/POC (Serverless) ===
+      resource cosmosAccountDev 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
+        name: cosmosAccountName
+        location: location
+        kind: 'GlobalDocumentDB'
+        properties: {
+          databaseAccountOfferType: 'Standard'
+          consistencyPolicy: {
+            defaultConsistencyLevel: 'Session'
+          }
+          locations: [
+            {
+              locationName: location
+              failoverPriority: 0
+            }
+          ]
+          capabilities: [
+            {
+              name: 'EnableServerless'     // Dev/POC: no idle cost
+            }
+          ]
+        }
+      }
+
+      // === Cosmos DB: Production (Autoscale) ===
+      resource cosmosDatabaseProd 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-05-15' = {
+        parent: cosmosAccount
+        name: cosmosDatabaseName
+        properties: {
+          resource: {
+            id: cosmosDatabaseName
+          }
+          options: {
+            autoscaleSettings: {
+              maxThroughput: 4000     // Production: 400-4000 RU/s autoscale
+            }
+          }
+        }
+      }
+
+      // === PostgreSQL Flexible: Dev/POC (Burstable) ===
+      resource postgresDev 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview' = {
+        name: postgresName
+        location: location
+        sku: {
+          name: 'Standard_B1ms'    // Dev/POC: Burstable — 1 vCore, 2 GB (~$13/mo)
+          tier: 'Burstable'
+        }
+        properties: {
+          version: '16'
+          storage: {
+            storageSizeGB: 32
+            autoGrow: 'Disabled'
+          }
+          backup: {
+            backupRetentionDays: 7
+            geoRedundantBackup: 'Disabled'
+          }
+        }
+      }
+
+      // === PostgreSQL Flexible: Production (General Purpose) ===
+      resource postgresProd 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview' = {
+        name: postgresName
+        location: location
+        sku: {
+          name: 'Standard_D2s_v3'   // Production: GP — 2 vCores, 8 GB (~$125/mo)
+          tier: 'GeneralPurpose'
+        }
+        properties: {
+          version: '16'
+          storage: {
+            storageSizeGB: 128
+            autoGrow: 'Enabled'
+          }
+          backup: {
+            backupRetentionDays: 35
+            geoRedundantBackup: 'Enabled'
+          }
+          highAvailability: {
+            mode: 'ZoneRedundant'
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER use DTU-based SQL tiers (Basic, S0, S1) — always use vCore serverless or provisioned for cost predictability"
+      - "NEVER use provisioned throughput Cosmos DB for dev/POC — use Serverless capability"
+      - "NEVER use General Purpose or Memory Optimized PostgreSQL tiers for dev/POC — use Burstable"
+      - "NEVER set Cosmos DB fixed throughput (manual RU/s) in production — use autoscale"
+      - "NEVER use geo-redundant backup for dev/POC databases"
+
+  - id: COST-003
+    severity: required
+    description: "Select appropriate storage redundancy — LRS for dev/POC, GRS or ZRS for production; use tiered access (Hot/Cool/Archive)"
+    rationale: "Storage redundancy costs scale linearly; LRS is 2-3x cheaper than GRS. Access tiers reduce costs for infrequently accessed data"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
+    terraform_pattern: |
+      # === Storage Account: Dev/POC (LRS, Hot) ===
+      resource "azapi_resource" "storage_dev" {
+        type      = "Microsoft.Storage/storageAccounts@2023-05-01"
+        name      = var.storage_account_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "Standard_LRS"       # Dev/POC: Locally redundant — cheapest option
+          }
+          kind = "StorageV2"
+          properties = {
+            accessTier              = "Hot"
+            minimumTlsVersion       = "TLS1_2"
+            allowBlobPublicAccess   = false
+            supportsHttpsTrafficOnly = true
+          }
+        }
+      }
+
+      # === Storage Account: Production (ZRS, Hot) ===
+      resource "azapi_resource" "storage_prod" {
+        type      = "Microsoft.Storage/storageAccounts@2023-05-01"
+        name      = var.storage_account_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "Standard_ZRS"       # Production: Zone-redundant — survives zone failure
+          }
+          kind = "StorageV2"
+          properties = {
+            accessTier              = "Hot"
+            minimumTlsVersion       = "TLS1_2"
+            allowBlobPublicAccess   = false
+            supportsHttpsTrafficOnly = true
+          }
+        }
+      }
+
+      # === Storage Account: Production with geo-redundancy ===
+      resource "azapi_resource" "storage_prod_grs" {
+        type      = "Microsoft.Storage/storageAccounts@2023-05-01"
+        name      = var.storage_account_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "Standard_RAGRS"     # Production (DR): Read-access geo-redundant
+          }
+          kind = "StorageV2"
+          properties = {
+            accessTier              = "Hot"
+            minimumTlsVersion       = "TLS1_2"
+            allowBlobPublicAccess   = false
+            supportsHttpsTrafficOnly = true
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Storage Account: Dev/POC (LRS) ===
+      resource storageDev 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+        name: storageAccountName
+        location: location
+        kind: 'StorageV2'
+        sku: {
+          name: 'Standard_LRS'        // Dev/POC: Locally redundant
+        }
+        properties: {
+          accessTier: 'Hot'
+          minimumTlsVersion: 'TLS1_2'
+          allowBlobPublicAccess: false
+          supportsHttpsTrafficOnly: true
+        }
+      }
+
+      // === Storage Account: Production (ZRS) ===
+      resource storageProd 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+        name: storageAccountName
+        location: location
+        kind: 'StorageV2'
+        sku: {
+          name: 'Standard_ZRS'        // Production: Zone-redundant
+        }
+        properties: {
+          accessTier: 'Hot'
+          minimumTlsVersion: 'TLS1_2'
+          allowBlobPublicAccess: false
+          supportsHttpsTrafficOnly: true
+        }
+      }
+
+      // === Storage Account: Production with geo-redundancy ===
+      resource storageProdGrs 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+        name: storageAccountName
+        location: location
+        kind: 'StorageV2'
+        sku: {
+          name: 'Standard_RAGRS'      // Production (DR): Read-access geo-redundant
+        }
+        properties: {
+          accessTier: 'Hot'
+          minimumTlsVersion: 'TLS1_2'
+          allowBlobPublicAccess: false
+          supportsHttpsTrafficOnly: true
+        }
+      }
+    prohibitions:
+      - "NEVER use GRS/RAGRS/GZRS for dev/POC storage accounts — use LRS"
+      - "NEVER use Premium storage for blob/file workloads that do not require low-latency IOPS"
+      - "NEVER use Classic storage accounts — always use StorageV2"
+      - "NEVER use BlobStorage kind — use StorageV2 which supports all storage services"
+      - "NEVER leave large infrequently-accessed blobs in Hot tier — use lifecycle management to tier to Cool/Archive"
+
+  - id: COST-004
+    severity: required
+    description: "Select appropriate networking SKU — Basic for dev/POC, Standard for production"
+    rationale: "Networking services vary significantly in cost by tier; Basic SKUs are sufficient for development"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
+    terraform_pattern: |
+      # === Load Balancer: Dev/POC (Basic — free) ===
+      resource "azapi_resource" "lb_dev" {
+        type      = "Microsoft.Network/loadBalancers@2024-01-01"
+        name      = var.lb_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "Basic"        # Dev/POC: Basic LB — free, limited features
+            tier = "Regional"
+          }
+        }
+      }
+
+      # === Load Balancer: Production (Standard) ===
+      resource "azapi_resource" "lb_prod" {
+        type      = "Microsoft.Network/loadBalancers@2024-01-01"
+        name      = var.lb_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "Standard"     # Production: Standard LB ($18/mo + rules) — HA ports, AZ support
+            tier = "Regional"
+          }
+        }
+      }
+
+      # === Front Door: Dev/POC (Standard) ===
+      resource "azapi_resource" "frontdoor_dev" {
+        type      = "Microsoft.Cdn/profiles@2024-02-01"
+        name      = var.frontdoor_name
+        location  = "global"
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "Standard_AzureFrontDoor"    # Dev/POC: Standard ($35/mo) — CDN + routing
+          }
+        }
+      }
+
+      # === Front Door: Production (Premium) ===
+      resource "azapi_resource" "frontdoor_prod" {
+        type      = "Microsoft.Cdn/profiles@2024-02-01"
+        name      = var.frontdoor_name
+        location  = "global"
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "Premium_AzureFrontDoor"     # Production: Premium ($330/mo) — WAF, Private Link origins
+          }
+        }
+      }
+
+      # === VPN Gateway: Dev/POC (VpnGw1) ===
+      resource "azapi_resource" "vpn_gw_dev" {
+        type      = "Microsoft.Network/virtualNetworkGateways@2024-01-01"
+        name      = var.vpn_gw_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            gatewayType = "Vpn"
+            vpnType     = "RouteBased"
+            sku = {
+              name = "VpnGw1"       # Dev/POC: VpnGw1 (~$140/mo) — 650 Mbps, 30 S2S tunnels
+              tier = "VpnGw1"
+            }
+          }
+        }
+      }
+
+      # === VPN Gateway: Production (VpnGw2AZ) ===
+      resource "azapi_resource" "vpn_gw_prod" {
+        type      = "Microsoft.Network/virtualNetworkGateways@2024-01-01"
+        name      = var.vpn_gw_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            gatewayType = "Vpn"
+            vpnType     = "RouteBased"
+            sku = {
+              name = "VpnGw2AZ"     # Production: VpnGw2AZ (~$350/mo) — 1.25 Gbps, AZ-redundant
+              tier = "VpnGw2AZ"
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Load Balancer: Dev/POC (Basic — free) ===
+      resource lbDev 'Microsoft.Network/loadBalancers@2024-01-01' = {
+        name: lbName
+        location: location
+        sku: {
+          name: 'Basic'
+          tier: 'Regional'
+        }
+      }
+
+      // === Load Balancer: Production (Standard) ===
+      resource lbProd 'Microsoft.Network/loadBalancers@2024-01-01' = {
+        name: lbName
+        location: location
+        sku: {
+          name: 'Standard'
+          tier: 'Regional'
+        }
+      }
+
+      // === Front Door: Dev/POC (Standard) ===
+      resource frontDoorDev 'Microsoft.Cdn/profiles@2024-02-01' = {
+        name: frontDoorName
+        location: 'global'
+        sku: {
+          name: 'Standard_AzureFrontDoor'     // Dev/POC: $35/mo
+        }
+      }
+
+      // === Front Door: Production (Premium) ===
+      resource frontDoorProd 'Microsoft.Cdn/profiles@2024-02-01' = {
+        name: frontDoorName
+        location: 'global'
+        sku: {
+          name: 'Premium_AzureFrontDoor'      // Production: $330/mo — WAF, Private Link
+        }
+      }
+
+      // === VPN Gateway: Dev/POC ===
+      resource vpnGwDev 'Microsoft.Network/virtualNetworkGateways@2024-01-01' = {
+        name: vpnGwName
+        location: location
+        properties: {
+          gatewayType: 'Vpn'
+          vpnType: 'RouteBased'
+          sku: {
+            name: 'VpnGw1'          // Dev/POC: ~$140/mo, 650 Mbps
+            tier: 'VpnGw1'
+          }
+        }
+      }
+
+      // === VPN Gateway: Production ===
+      resource vpnGwProd 'Microsoft.Network/virtualNetworkGateways@2024-01-01' = {
+        name: vpnGwName
+        location: location
+        properties: {
+          gatewayType: 'Vpn'
+          vpnType: 'RouteBased'
+          sku: {
+            name: 'VpnGw2AZ'        // Production: ~$350/mo, 1.25 Gbps, AZ-redundant
+            tier: 'VpnGw2AZ'
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER use Premium Front Door for dev/POC — Standard is sufficient"
+      - "NEVER use VpnGw3/VpnGw4/VpnGw5 for dev/POC — VpnGw1 provides adequate throughput"
+      - "NEVER use Basic Load Balancer for production — it lacks availability zone support and SLA"
+      - "NEVER use legacy VPN Gateway SKUs (Basic) — they do not support IKEv2 or active-active"
+      - "NEVER deploy Application Gateway WAF v1 — use v2 for autoscaling and zone-redundancy"
+
+  - id: COST-005
+    severity: required
+    description: "Select appropriate cache SKU — Basic C0 for dev/POC, Standard C1+ for staging, Premium for production clustering"
+    rationale: "Redis cache pricing varies 10x between tiers; Basic is sufficient for development caching scenarios"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
+    terraform_pattern: |
+      # === Redis Cache: Dev/POC (Basic C0) ===
+      resource "azapi_resource" "redis_dev" {
+        type      = "Microsoft.Cache/redis@2024-03-01"
+        name      = var.redis_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            sku = {
+              name     = "Basic"     # Dev/POC: Basic C0 — 250 MB, no SLA (~$16/mo)
+              family   = "C"
+              capacity = 0
+            }
+            enableNonSslPort  = false
+            minimumTlsVersion = "1.2"
+            redisVersion      = "6.0"
+          }
+        }
+      }
+
+      # === Redis Cache: Staging (Standard C1) ===
+      resource "azapi_resource" "redis_staging" {
+        type      = "Microsoft.Cache/redis@2024-03-01"
+        name      = var.redis_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            sku = {
+              name     = "Standard"   # Staging: Standard C1 — 1 GB, replication, SLA (~$56/mo)
+              family   = "C"
+              capacity = 1
+            }
+            enableNonSslPort  = false
+            minimumTlsVersion = "1.2"
+            redisVersion      = "6.0"
+          }
+        }
+      }
+
+      # === Redis Cache: Production (Premium P1) ===
+      resource "azapi_resource" "redis_prod" {
+        type      = "Microsoft.Cache/redis@2024-03-01"
+        name      = var.redis_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            sku = {
+              name     = "Premium"    # Production: Premium P1 — 6 GB, clustering, VNet, persistence (~$220/mo)
+              family   = "P"
+              capacity = 1
+            }
+            enableNonSslPort    = false
+            minimumTlsVersion   = "1.2"
+            publicNetworkAccess = "Disabled"
+            redisVersion        = "6.0"
+            shardCount          = 2
+            replicasPerPrimary  = 1
+            redisConfiguration = {
+              "maxmemory-policy" = "volatile-lru"
+            }
+          }
+          zones = ["1", "2", "3"]
+        }
+      }
+    bicep_pattern: |
+      // === Redis Cache: Dev/POC (Basic C0) ===
+      resource redisDev 'Microsoft.Cache/redis@2024-03-01' = {
+        name: redisName
+        location: location
+        properties: {
+          sku: {
+            name: 'Basic'        // Dev/POC: ~$16/mo, 250 MB
+            family: 'C'
+            capacity: 0
+          }
+          enableNonSslPort: false
+          minimumTlsVersion: '1.2'
+          redisVersion: '6.0'
+        }
+      }
+
+      // === Redis Cache: Staging (Standard C1) ===
+      resource redisStaging 'Microsoft.Cache/redis@2024-03-01' = {
+        name: redisName
+        location: location
+        properties: {
+          sku: {
+            name: 'Standard'     // Staging: ~$56/mo, 1 GB, replication
+            family: 'C'
+            capacity: 1
+          }
+          enableNonSslPort: false
+          minimumTlsVersion: '1.2'
+          redisVersion: '6.0'
+        }
+      }
+
+      // === Redis Cache: Production (Premium P1) ===
+      resource redisProd 'Microsoft.Cache/redis@2024-03-01' = {
+        name: redisName
+        location: location
+        zones: ['1', '2', '3']
+        properties: {
+          sku: {
+            name: 'Premium'      // Production: ~$220/mo, 6 GB, clustering, VNet
+            family: 'P'
+            capacity: 1
+          }
+          enableNonSslPort: false
+          minimumTlsVersion: '1.2'
+          publicNetworkAccess: 'Disabled'
+          redisVersion: '6.0'
+          shardCount: 2
+          replicasPerPrimary: 1
+          redisConfiguration: {
+            'maxmemory-policy': 'volatile-lru'
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER use Premium or Enterprise Redis for dev/POC without justification — Basic C0 is sufficient"
+      - "NEVER use Standard or Basic Redis for production workloads requiring clustering or persistence"
+      - "NEVER set shardCount > 4 for POC — each shard doubles cost"
+      - "NEVER enable Redis Enterprise for POC — use Premium P1 as the ceiling"
+
+patterns:
+  - name: "Environment-tiered SKU selection"
+    description: "Select SKUs based on environment: dev/POC uses lowest viable tier, production uses appropriate performance tier with redundancy"
+
+anti_patterns:
+  - description: "Do not use the same SKU for dev and production environments"
+    instead: "Use tiered SKU selection — burstable/basic/consumption for dev, standard/premium for production"
+  - description: "Do not select SKUs based solely on feature availability"
+    instead: "Balance features against cost — many premium features are unnecessary for POC validation"
+  - description: "Do not use Classic or deprecated resource types"
+    instead: "Use current-generation resource types (StorageV2, Gen5 SQL, Flexible PostgreSQL)"
+
+references:
+  - title: "Azure pricing calculator"
+    url: "https://azure.microsoft.com/pricing/calculator/"
+  - title: "App Service pricing"
+    url: "https://azure.microsoft.com/pricing/details/app-service/"
+  - title: "Azure SQL Database pricing"
+    url: "https://azure.microsoft.com/pricing/details/azure-sql-database/"
+  - title: "Cosmos DB pricing"
+    url: "https://azure.microsoft.com/pricing/details/cosmos-db/"
+  - title: "Azure Cache for Redis pricing"
+    url: "https://azure.microsoft.com/pricing/details/cache/"

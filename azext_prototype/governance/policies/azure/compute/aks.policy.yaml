@@ -1,0 +1,370 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: aks
+  category: azure
+  services: [aks]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: AKS-001
+    severity: required
+    description: "Create AKS cluster with Azure AD RBAC, workload identity, private cluster, and managed identity"
+    rationale: "Azure AD RBAC centralizes access control; workload identity eliminates pod-level secrets; private cluster prevents API server exposure; managed identity eliminates service principal credential management"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "aks_cluster" {
+        type      = "Microsoft.ContainerService/managedClusters@2024-03-02-preview"
+        name      = var.aks_cluster_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        identity {
+          type         = "UserAssigned"
+          identity_ids = [azapi_resource.user_assigned_identity.id]
+        }
+
+        body = {
+          sku = {
+            name = "Base"
+            tier = "Free"
+          }
+          properties = {
+            kubernetesVersion = var.kubernetes_version
+            dnsPrefix         = var.aks_dns_prefix
+            enableRBAC        = true
+            aadProfile = {
+              managed                = true
+              enableAzureRBAC        = true
+              adminGroupObjectIDs    = [var.aks_admin_group_object_id]
+            }
+            apiServerAccessProfile = {
+              enablePrivateCluster         = true
+              enablePrivateClusterPublicFQDN = false
+            }
+            networkProfile = {
+              networkPlugin    = "azure"
+              networkPolicy    = "calico"
+              serviceCidr      = "10.0.0.0/16"
+              dnsServiceIP     = "10.0.0.10"
+              loadBalancerSku  = "standard"
+            }
+            agentPoolProfiles = [
+              {
+                name                = "system"
+                mode                = "System"
+                count               = 1
+                vmSize              = "Standard_D2s_v5"
+                osType              = "Linux"
+                osSKU               = "AzureLinux"
+                vnetSubnetID        = var.aks_subnet_id
+                enableAutoScaling   = true
+                minCount            = 1
+                maxCount            = 3
+              }
+            ]
+            oidcIssuerProfile = {
+              enabled = true
+            }
+            securityProfile = {
+              workloadIdentity = {
+                enabled = true
+              }
+            }
+            addonProfiles = {
+              omsagent = {
+                enabled = true
+                config = {
+                  logAnalyticsWorkspaceResourceID = var.log_analytics_workspace_id
+                }
+              }
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource aksCluster 'Microsoft.ContainerService/managedClusters@2024-03-02-preview' = {
+        name: aksClusterName
+        location: location
+        identity: {
+          type: 'UserAssigned'
+          userAssignedIdentities: {
+            '${userAssignedIdentity.id}': {}
+          }
+        }
+        sku: {
+          name: 'Base'
+          tier: 'Free'
+        }
+        properties: {
+          kubernetesVersion: kubernetesVersion
+          dnsPrefix: aksDnsPrefix
+          enableRBAC: true
+          aadProfile: {
+            managed: true
+            enableAzureRBAC: true
+            adminGroupObjectIDs: [
+              aksAdminGroupObjectId
+            ]
+          }
+          apiServerAccessProfile: {
+            enablePrivateCluster: true
+            enablePrivateClusterPublicFQDN: false
+          }
+          networkProfile: {
+            networkPlugin: 'azure'
+            networkPolicy: 'calico'
+            serviceCidr: '10.0.0.0/16'
+            dnsServiceIP: '10.0.0.10'
+            loadBalancerSku: 'standard'
+          }
+          agentPoolProfiles: [
+            {
+              name: 'system'
+              mode: 'System'
+              count: 1
+              vmSize: 'Standard_D2s_v5'
+              osType: 'Linux'
+              osSKU: 'AzureLinux'
+              vnetSubnetID: aksSubnetId
+              enableAutoScaling: true
+              minCount: 1
+              maxCount: 3
+            }
+          ]
+          oidcIssuerProfile: {
+            enabled: true
+          }
+          securityProfile: {
+            workloadIdentity: {
+              enabled: true
+            }
+          }
+          addonProfiles: {
+            omsagent: {
+              enabled: true
+              config: {
+                logAnalyticsWorkspaceResourceID: logAnalyticsWorkspace.id
+              }
+            }
+          }
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Network/privateDnsZones@2020-06-01"
+        description: "Private DNS zone for AKS private cluster API server resolution"
+        terraform_pattern: |
+          resource "azapi_resource" "aks_dns_zone" {
+            type      = "Microsoft.Network/privateDnsZones@2020-06-01"
+            name      = "privatelink.${var.location}.azmk8s.io"
+            location  = "global"
+            parent_id = azapi_resource.resource_group.id
+          }
+
+          resource "azapi_resource" "aks_dns_zone_link" {
+            type      = "Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01"
+            name      = "link-${var.vnet_name}"
+            location  = "global"
+            parent_id = azapi_resource.aks_dns_zone.id
+
+            body = {
+              properties = {
+                virtualNetwork = {
+                  id = var.vnet_id
+                }
+                registrationEnabled = false
+              }
+            }
+          }
+        bicep_pattern: |
+          resource aksDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+            name: 'privatelink.${location}.azmk8s.io'
+            location: 'global'
+          }
+
+          resource aksDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+            parent: aksDnsZone
+            name: 'link-${vnetName}'
+            location: 'global'
+            properties: {
+              virtualNetwork: {
+                id: vnetId
+              }
+              registrationEnabled: false
+            }
+          }
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        description: "Network Contributor role for AKS identity on the VNet subnet"
+        terraform_pattern: |
+          resource "azapi_resource" "aks_network_contributor" {
+            type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+            name      = var.aks_network_role_name
+            parent_id = var.aks_subnet_id
+
+            body = {
+              properties = {
+                roleDefinitionId = "${var.subscription_resource_id}/providers/Microsoft.Authorization/roleDefinitions/4d97b98b-1d4f-4787-a291-c67834d212e7"
+                principalId      = azapi_resource.user_assigned_identity.output.properties.principalId
+                principalType    = "ServicePrincipal"
+              }
+            }
+          }
+        bicep_pattern: |
+          resource aksNetworkContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+            scope: aksSubnet
+            name: aksNetworkRoleName
+            properties: {
+              roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4d97b98b-1d4f-4787-a291-c67834d212e7')
+              principalId: userAssignedIdentity.properties.principalId
+              principalType: 'ServicePrincipal'
+            }
+          }
+    prohibitions:
+      - "NEVER set enableRBAC to false — Kubernetes RBAC must always be enabled"
+      - "NEVER set enablePrivateCluster to false — API server must not be publicly accessible"
+      - "NEVER use service principal (servicePrincipalProfile) — use managed identity"
+      - "NEVER use kubenet network plugin — use azure CNI for VNet integration"
+      - "NEVER disable workload identity — it replaces pod identity and AAD pod identity (both deprecated)"
+      - "NEVER use local accounts — set disableLocalAccounts to true in production"
+
+  - id: AKS-002
+    severity: required
+    description: "Enable OMS agent addon for container monitoring"
+    rationale: "Container Insights provides CPU, memory, pod health, and log collection for troubleshooting"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+
+  - id: AKS-003
+    severity: required
+    description: "Use VNet integration with azure CNI for network policy support"
+    rationale: "Azure CNI assigns pod IPs from the VNet, enabling NSGs, network policies, and private endpoint connectivity"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    template_check:
+      when_services_present: [aks]
+      require_service: [virtual-network]
+      error_message: "Template with AKS must include a virtual-network service for VNet integration"
+
+  - id: AKS-004
+    severity: recommended
+    description: "Use Free tier for POC, Standard tier for production"
+    rationale: "Free tier has limited SLA; Standard provides 99.95% uptime SLA"
+    applies_to: [cloud-architect, cost-analyst]
+
+  - id: AKS-005
+    severity: recommended
+    description: "Enable cluster autoscaler on node pools"
+    rationale: "Automatically scales nodes based on pod scheduling demand; reduces idle cost"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
+
+  - id: AKS-006
+    severity: required
+    description: "Enable Microsoft Defender for Containers on the cluster"
+    rationale: "WAF Security: Provides runtime threat detection, vulnerability scanning, and security monitoring for clusters, containers, and applications"
+    applies_to: [cloud-architect, security-reviewer]
+    terraform_pattern: |
+      resource "azapi_resource" "defender_containers" {
+        type      = "Microsoft.Security/pricings@2024-01-01"
+        name      = "Containers"
+        parent_id = "/subscriptions/${var.subscription_id}"
+
+        body = {
+          properties = {
+            pricingTier = "Standard"
+          }
+        }
+      }
+    bicep_pattern: |
+      resource defenderContainers 'Microsoft.Security/pricings@2024-01-01' = {
+        name: 'Containers'
+        properties: {
+          pricingTier: 'Standard'
+        }
+      }
+
+  - id: AKS-007
+    severity: required
+    description: "Enable Azure Policy addon for AKS to enforce pod security and compliance"
+    rationale: "WAF Security: Azure Policy applies at-scale enforcement and safeguards on clusters in a centralized, consistent manner, controlling pod functions and detecting policy violations"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, security-reviewer]
+    terraform_pattern: |
+      # Add to the AKS cluster properties in AKS-001:
+      #   addonProfiles = {
+      #     azurepolicy = {
+      #       enabled = true
+      #     }
+      #   }
+    bicep_pattern: |
+      // Add to the AKS cluster properties in AKS-001:
+      //   addonProfiles: {
+      //     azurepolicy: {
+      //       enabled: true
+      //     }
+      //   }
+
+  - id: AKS-008
+    severity: recommended
+    description: "Disable local accounts and enforce Microsoft Entra ID-only authentication"
+    rationale: "WAF Security: Disabling local accounts ensures all cluster access flows through Microsoft Entra ID, providing centralized identity and auditable access control"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, security-reviewer]
+    terraform_pattern: |
+      # Add to the AKS cluster properties in AKS-001:
+      #   properties = {
+      #     disableLocalAccounts = true
+      #   }
+    bicep_pattern: |
+      // Add to the AKS cluster properties in AKS-001:
+      //   disableLocalAccounts: true
+
+  - id: AKS-009
+    severity: recommended
+    description: "Use availability zones for AKS node pools"
+    rationale: "WAF Reliability: Distributes AKS agent nodes across physically separate datacenters, ensuring nodes continue running even if one zone goes down"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    terraform_pattern: |
+      # Add to agentPoolProfiles in AKS-001:
+      #   availabilityZones = ["1", "2", "3"]
+    bicep_pattern: |
+      // Add to agentPoolProfiles in AKS-001:
+      //   availabilityZones: ['1', '2', '3']
+
+  - id: AKS-010
+    severity: recommended
+    description: "Use NAT gateway for clusters with many concurrent outbound connections"
+    rationale: "WAF Reliability: NAT Gateway supports reliable egress traffic at scale, avoiding reliability problems from Azure Load Balancer SNAT port exhaustion"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+
+  - id: AKS-011
+    severity: recommended
+    description: "Use the AKS uptime SLA (Standard tier) for production-grade clusters"
+    rationale: "WAF Reliability: Standard tier provides 99.95% uptime SLA for the Kubernetes API server endpoint, higher availability guarantees than the Free tier"
+    applies_to: [cloud-architect, cost-analyst]
+
+patterns:
+  - name: "AKS with Azure AD RBAC and workload identity"
+    description: "Complete AKS deployment with private cluster, Azure AD RBAC, workload identity, VNet integration, and container monitoring"
+
+anti_patterns:
+  - description: "Do not use service principal for AKS identity"
+    instead: "Use user-assigned managed identity"
+  - description: "Do not expose API server publicly"
+    instead: "Enable private cluster with enablePrivateCluster = true"
+  - description: "Do not use kubenet network plugin"
+    instead: "Use azure CNI for full VNet integration"
+  - description: "Do not use pod identity (deprecated)"
+    instead: "Use workload identity with OIDC issuer"
+
+references:
+  - title: "AKS best practices"
+    url: "https://learn.microsoft.com/azure/aks/best-practices"
+  - title: "AKS private clusters"
+    url: "https://learn.microsoft.com/azure/aks/private-clusters"
+  - title: "AKS workload identity"
+    url: "https://learn.microsoft.com/azure/aks/workload-identity-overview"
+  - title: "AKS Azure AD integration"
+    url: "https://learn.microsoft.com/azure/aks/managed-azure-ad"
+  - title: "WAF: AKS service guide"
+    url: "https://learn.microsoft.com/azure/well-architected/service-guides/azure-kubernetes-service"
+  - title: "Microsoft Defender for Containers"
+    url: "https://learn.microsoft.com/azure/defender-for-cloud/defender-for-containers-introduction"
+  - title: "Azure Policy for AKS"
+    url: "https://learn.microsoft.com/azure/aks/use-azure-policy"

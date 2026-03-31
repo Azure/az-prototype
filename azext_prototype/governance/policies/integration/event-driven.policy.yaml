@@ -1,0 +1,810 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: event-driven
+  category: integration
+  services: [event-grid, service-bus, event-hubs, functions, container-apps, stream-analytics]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: ED-001
+    severity: required
+    description: "Wire Event Grid subscriptions to Function App or Container App endpoints with dead-letter storage and managed identity delivery"
+    rationale: "Event Grid provides at-least-once delivery; dead-letter captures undeliverable events; managed identity eliminates connection strings"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer]
+    terraform_pattern: |
+      # Event Grid system topic for Azure resource events
+      resource "azapi_resource" "eg_system_topic" {
+        type      = "Microsoft.EventGrid/systemTopics@2024-06-01-preview"
+        name      = var.system_topic_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        identity {
+          type = "SystemAssigned"
+        }
+        body = {
+          properties = {
+            source    = var.source_resource_id
+            topicType = var.topic_type    # e.g., "Microsoft.Storage.StorageAccounts"
+          }
+        }
+      }
+
+      # Event subscription delivering to Function App via managed identity
+      resource "azapi_resource" "eg_sub_function" {
+        type      = "Microsoft.EventGrid/systemTopics/eventSubscriptions@2024-06-01-preview"
+        name      = var.subscription_name
+        parent_id = azapi_resource.eg_system_topic.id
+
+        body = {
+          properties = {
+            deliveryWithResourceIdentity = {
+              identity = {
+                type = "SystemAssigned"
+              }
+              destination = {
+                endpointType = "AzureFunction"
+                properties = {
+                  resourceId         = "${azapi_resource.function_app.id}/functions/${var.function_name}"
+                  maxEventsPerBatch  = 1
+                  preferredBatchSizeInKilobytes = 64
+                }
+              }
+            }
+            retryPolicy = {
+              maxDeliveryAttempts      = 30
+              eventTimeToLiveInMinutes = 1440
+            }
+            deadLetterWithResourceIdentity = {
+              identity = {
+                type = "SystemAssigned"
+              }
+              deadLetterDestination = {
+                endpointType = "StorageBlob"
+                properties = {
+                  resourceId        = azapi_resource.storage_account.id
+                  blobContainerName = "dead-letters"
+                }
+              }
+            }
+            filter = {
+              includedEventTypes = var.event_types    # e.g., ["Microsoft.Storage.BlobCreated"]
+              isSubjectCaseSensitive = false
+              subjectBeginsWith = var.subject_prefix
+            }
+          }
+        }
+      }
+
+      # Event subscription delivering to Container App webhook
+      resource "azapi_resource" "eg_sub_container_app" {
+        type      = "Microsoft.EventGrid/systemTopics/eventSubscriptions@2024-06-01-preview"
+        name      = "${var.subscription_name}-ca"
+        parent_id = azapi_resource.eg_system_topic.id
+
+        body = {
+          properties = {
+            deliveryWithResourceIdentity = {
+              identity = {
+                type = "SystemAssigned"
+              }
+              destination = {
+                endpointType = "WebHook"
+                properties = {
+                  endpointUrl                  = "https://${azapi_resource.container_app.output.properties.configuration.ingress.fqdn}/api/events"
+                  maxEventsPerBatch            = 1
+                  preferredBatchSizeInKilobytes = 64
+                }
+              }
+            }
+            retryPolicy = {
+              maxDeliveryAttempts      = 30
+              eventTimeToLiveInMinutes = 1440
+            }
+            deadLetterWithResourceIdentity = {
+              identity = {
+                type = "SystemAssigned"
+              }
+              deadLetterDestination = {
+                endpointType = "StorageBlob"
+                properties = {
+                  resourceId        = azapi_resource.storage_account.id
+                  blobContainerName = "dead-letters"
+                }
+              }
+            }
+          }
+        }
+      }
+
+      # RBAC: Grant Event Grid system topic identity Storage Blob Data Contributor for dead-letter
+      resource "azapi_resource" "eg_dlq_role" {
+        type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name      = var.eg_dlq_role_name
+        parent_id = azapi_resource.storage_account.id
+        body = {
+          properties = {
+            roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe"
+            principalId      = azapi_resource.eg_system_topic.output.identity.principalId
+            principalType    = "ServicePrincipal"
+          }
+        }
+      }
+    bicep_pattern: |
+      // Event Grid system topic for Azure resource events
+      resource egSystemTopic 'Microsoft.EventGrid/systemTopics@2024-06-01-preview' = {
+        name: systemTopicName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          source: sourceResourceId
+          topicType: topicType    // e.g., 'Microsoft.Storage.StorageAccounts'
+        }
+      }
+
+      // Event subscription delivering to Function App via managed identity
+      resource egSubFunction 'Microsoft.EventGrid/systemTopics/eventSubscriptions@2024-06-01-preview' = {
+        parent: egSystemTopic
+        name: subscriptionName
+        properties: {
+          deliveryWithResourceIdentity: {
+            identity: {
+              type: 'SystemAssigned'
+            }
+            destination: {
+              endpointType: 'AzureFunction'
+              properties: {
+                resourceId: '${functionApp.id}/functions/${functionName}'
+                maxEventsPerBatch: 1
+                preferredBatchSizeInKilobytes: 64
+              }
+            }
+          }
+          retryPolicy: {
+            maxDeliveryAttempts: 30
+            eventTimeToLiveInMinutes: 1440
+          }
+          deadLetterWithResourceIdentity: {
+            identity: {
+              type: 'SystemAssigned'
+            }
+            deadLetterDestination: {
+              endpointType: 'StorageBlob'
+              properties: {
+                resourceId: storageAccount.id
+                blobContainerName: 'dead-letters'
+              }
+            }
+          }
+          filter: {
+            includedEventTypes: eventTypes
+            isSubjectCaseSensitive: false
+            subjectBeginsWith: subjectPrefix
+          }
+        }
+      }
+
+      // Event subscription delivering to Container App webhook
+      resource egSubContainerApp 'Microsoft.EventGrid/systemTopics/eventSubscriptions@2024-06-01-preview' = {
+        parent: egSystemTopic
+        name: '${subscriptionName}-ca'
+        properties: {
+          deliveryWithResourceIdentity: {
+            identity: {
+              type: 'SystemAssigned'
+            }
+            destination: {
+              endpointType: 'WebHook'
+              properties: {
+                endpointUrl: 'https://${containerApp.properties.configuration.ingress.fqdn}/api/events'
+                maxEventsPerBatch: 1
+                preferredBatchSizeInKilobytes: 64
+              }
+            }
+          }
+          retryPolicy: {
+            maxDeliveryAttempts: 30
+            eventTimeToLiveInMinutes: 1440
+          }
+          deadLetterWithResourceIdentity: {
+            identity: {
+              type: 'SystemAssigned'
+            }
+            deadLetterDestination: {
+              endpointType: 'StorageBlob'
+              properties: {
+                resourceId: storageAccount.id
+                blobContainerName: 'dead-letters'
+              }
+            }
+          }
+        }
+      }
+
+      // Grant Event Grid system topic Storage Blob Data Contributor for dead-letter
+      resource egDlqRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+        name: guid(storageAccount.id, egSystemTopic.id, 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+        scope: storageAccount
+        properties: {
+          roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+          principalId: egSystemTopic.identity.principalId
+          principalType: 'ServicePrincipal'
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.EventGrid/systemTopics@2024-06-01-preview"
+        name: "system-topic"
+        description: "System topic with managed identity for secure event delivery"
+      - type: "Microsoft.Storage/storageAccounts@2023-05-01"
+        name: "dead-letter-storage"
+        description: "Storage account with blob container for dead-letter event capture"
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "eg-dlq-role"
+        description: "Storage Blob Data Contributor role for Event Grid to write dead-letter blobs"
+    prohibitions:
+      - "NEVER create Event Grid subscriptions without a deadLetterDestination — undeliverable events are silently lost"
+      - "NEVER use connection strings for Event Grid delivery — use deliveryWithResourceIdentity with managed identity"
+      - "NEVER set maxDeliveryAttempts to 1 — transient failures will immediately dead-letter events"
+      - "NEVER hardcode webhook URLs with embedded credentials or SAS tokens"
+    template_check:
+      when_services_present: [event-grid, functions]
+      require_service: [storage-account]
+      severity: warning
+      error_message: "Event Grid + Functions template must include a storage account for dead-letter configuration"
+
+  - id: ED-002
+    severity: required
+    description: "Wire Service Bus triggers to Function App or Container App using managed identity connections"
+    rationale: "Service Bus provides reliable ordered messaging; managed identity eliminates connection string management and rotation burden"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer]
+    terraform_pattern: |
+      # Service Bus namespace with managed identity (see SB-001 for full namespace config)
+
+      # Service Bus queue for function trigger
+      resource "azapi_resource" "sb_trigger_queue" {
+        type      = "Microsoft.ServiceBus/namespaces/queues@2024-01-01"
+        name      = var.trigger_queue_name
+        parent_id = azapi_resource.servicebus_namespace.id
+        body = {
+          properties = {
+            maxSizeInMegabytes              = 5120
+            requiresDuplicateDetection      = true
+            duplicateDetectionHistoryTimeWindow = "PT10M"
+            deadLetteringOnMessageExpiration = true
+            maxDeliveryCount                = 10
+            lockDuration                    = "PT5M"
+            defaultMessageTimeToLive        = "P14D"
+            enableBatchedOperations         = true
+          }
+        }
+      }
+
+      # RBAC: Grant Function App identity Azure Service Bus Data Receiver role
+      resource "azapi_resource" "fn_sb_receiver_role" {
+        type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name      = var.fn_sb_role_name
+        parent_id = azapi_resource.servicebus_namespace.id
+        body = {
+          properties = {
+            roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0"
+            principalId      = azapi_resource.function_app.output.identity.principalId
+            principalType    = "ServicePrincipal"
+          }
+        }
+      }
+
+      # Function App with Service Bus trigger using managed identity connection
+      # In host.json / function.json, use:
+      #   "connection": "ServiceBusConnection__fullyQualifiedNamespace"
+      # In app settings:
+      resource "azapi_resource" "fn_sb_app_settings" {
+        type      = "Microsoft.Web/sites/config@2023-12-01"
+        name      = "appsettings"
+        parent_id = azapi_resource.function_app.id
+        body = {
+          properties = {
+            "ServiceBusConnection__fullyQualifiedNamespace" = "${var.sb_namespace_name}.servicebus.windows.net"
+            "FUNCTIONS_EXTENSION_VERSION"                   = "~4"
+            "FUNCTIONS_WORKER_RUNTIME"                      = var.functions_worker_runtime
+          }
+        }
+      }
+    bicep_pattern: |
+      // Service Bus queue for function trigger
+      resource sbTriggerQueue 'Microsoft.ServiceBus/namespaces/queues@2024-01-01' = {
+        parent: serviceBusNamespace
+        name: triggerQueueName
+        properties: {
+          maxSizeInMegabytes: 5120
+          requiresDuplicateDetection: true
+          duplicateDetectionHistoryTimeWindow: 'PT10M'
+          deadLetteringOnMessageExpiration: true
+          maxDeliveryCount: 10
+          lockDuration: 'PT5M'
+          defaultMessageTimeToLive: 'P14D'
+          enableBatchedOperations: true
+        }
+      }
+
+      // Grant Function App identity Azure Service Bus Data Receiver role
+      resource fnSbReceiverRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+        name: guid(serviceBusNamespace.id, functionApp.id, '4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0')
+        scope: serviceBusNamespace
+        properties: {
+          roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0')
+          principalId: functionApp.identity.principalId
+          principalType: 'ServicePrincipal'
+        }
+      }
+
+      // Function App settings for Service Bus managed identity connection
+      resource fnSbAppSettings 'Microsoft.Web/sites/config@2023-12-01' = {
+        parent: functionApp
+        name: 'appsettings'
+        properties: {
+          'ServiceBusConnection__fullyQualifiedNamespace': '${sbNamespaceName}.servicebus.windows.net'
+          FUNCTIONS_EXTENSION_VERSION: '~4'
+          FUNCTIONS_WORKER_RUNTIME: functionsWorkerRuntime
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "fn-sb-data-receiver"
+        description: "Azure Service Bus Data Receiver role (4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0) for Function App identity"
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "fn-sb-data-sender"
+        description: "Azure Service Bus Data Sender role (69a216fc-b8fb-44d8-bc22-1f3c2cd27a39) if Function App also sends messages"
+    prohibitions:
+      - "NEVER use connection strings for Service Bus triggers — use __fullyQualifiedNamespace with managed identity"
+      - "NEVER set lockDuration shorter than expected processing time — messages will be abandoned and redelivered"
+      - "NEVER disable deadLetteringOnMessageExpiration — expired messages will be silently lost"
+      - "NEVER share a single queue between multiple unrelated consumers — use topics with subscriptions instead"
+    template_check:
+      when_services_present: [service-bus, functions]
+      require_service: [managed-identity]
+      severity: warning
+      error_message: "Service Bus + Functions template must include managed identity for connection string-free triggers"
+
+  - id: ED-003
+    severity: required
+    description: "Wire Event Hubs to Stream Analytics to Storage/SQL for real-time stream processing pipelines"
+    rationale: "Event Hubs provides high-throughput ingestion; Stream Analytics handles windowed aggregation; output to durable storage completes the pipeline"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer]
+    terraform_pattern: |
+      # Stream Analytics job consuming from Event Hub
+      resource "azapi_resource" "stream_analytics_job" {
+        type      = "Microsoft.StreamAnalytics/streamingJobs@2021-10-01-preview"
+        name      = var.asa_job_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        identity {
+          type = "SystemAssigned"
+        }
+        body = {
+          properties = {
+            sku = {
+              name = "Standard"
+            }
+            outputErrorPolicy        = "Stop"
+            eventsOutOfOrderPolicy   = "Adjust"
+            eventsOutOfOrderMaxDelayInSeconds = 5
+            eventsLateArrivalMaxDelayInSeconds = 16
+            compatibilityLevel       = "1.2"
+          }
+        }
+      }
+
+      # Stream Analytics input from Event Hub
+      resource "azapi_resource" "asa_input_eventhub" {
+        type      = "Microsoft.StreamAnalytics/streamingJobs/inputs@2021-10-01-preview"
+        name      = "input-eventhub"
+        parent_id = azapi_resource.stream_analytics_job.id
+        body = {
+          properties = {
+            type = "Stream"
+            datasource = {
+              type = "Microsoft.EventHub/EventHub"
+              properties = {
+                serviceBusNamespace    = var.eh_namespace_name
+                eventHubName           = var.eventhub_name
+                consumerGroupName      = var.asa_consumer_group_name
+                authenticationMode     = "Msi"
+              }
+            }
+            serialization = {
+              type = "Json"
+              properties = {
+                encoding = "UTF8"
+              }
+            }
+          }
+        }
+      }
+
+      # Stream Analytics output to Blob Storage
+      resource "azapi_resource" "asa_output_blob" {
+        type      = "Microsoft.StreamAnalytics/streamingJobs/outputs@2021-10-01-preview"
+        name      = "output-blob"
+        parent_id = azapi_resource.stream_analytics_job.id
+        body = {
+          properties = {
+            datasource = {
+              type = "Microsoft.Storage/Blob"
+              properties = {
+                storageAccounts = [
+                  {
+                    accountName = var.output_storage_account_name
+                  }
+                ]
+                container          = var.output_container_name
+                pathPattern        = "{date}/{time}"
+                dateFormat         = "yyyy/MM/dd"
+                timeFormat         = "HH"
+                authenticationMode = "Msi"
+              }
+            }
+            serialization = {
+              type = "Json"
+              properties = {
+                encoding = "UTF8"
+                format   = "LineSeparated"
+              }
+            }
+          }
+        }
+      }
+
+      # RBAC: Grant Stream Analytics identity Event Hubs Data Receiver
+      resource "azapi_resource" "asa_eh_role" {
+        type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name      = var.asa_eh_role_name
+        parent_id = azapi_resource.eventhub_namespace.id
+        body = {
+          properties = {
+            roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/a638d3c7-ab3a-418d-83e6-5f17a39d4fde"
+            principalId      = azapi_resource.stream_analytics_job.output.identity.principalId
+            principalType    = "ServicePrincipal"
+          }
+        }
+      }
+
+      # RBAC: Grant Stream Analytics identity Storage Blob Data Contributor
+      resource "azapi_resource" "asa_storage_role" {
+        type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name      = var.asa_storage_role_name
+        parent_id = azapi_resource.output_storage_account.id
+        body = {
+          properties = {
+            roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe"
+            principalId      = azapi_resource.stream_analytics_job.output.identity.principalId
+            principalType    = "ServicePrincipal"
+          }
+        }
+      }
+    bicep_pattern: |
+      // Stream Analytics job consuming from Event Hub
+      resource streamAnalyticsJob 'Microsoft.StreamAnalytics/streamingJobs@2021-10-01-preview' = {
+        name: asaJobName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          sku: {
+            name: 'Standard'
+          }
+          outputErrorPolicy: 'Stop'
+          eventsOutOfOrderPolicy: 'Adjust'
+          eventsOutOfOrderMaxDelayInSeconds: 5
+          eventsLateArrivalMaxDelayInSeconds: 16
+          compatibilityLevel: '1.2'
+        }
+      }
+
+      // Stream Analytics input from Event Hub
+      resource asaInputEventhub 'Microsoft.StreamAnalytics/streamingJobs/inputs@2021-10-01-preview' = {
+        parent: streamAnalyticsJob
+        name: 'input-eventhub'
+        properties: {
+          type: 'Stream'
+          datasource: {
+            type: 'Microsoft.EventHub/EventHub'
+            properties: {
+              serviceBusNamespace: ehNamespaceName
+              eventHubName: eventhubName
+              consumerGroupName: asaConsumerGroupName
+              authenticationMode: 'Msi'
+            }
+          }
+          serialization: {
+            type: 'Json'
+            properties: {
+              encoding: 'UTF8'
+            }
+          }
+        }
+      }
+
+      // Stream Analytics output to Blob Storage
+      resource asaOutputBlob 'Microsoft.StreamAnalytics/streamingJobs/outputs@2021-10-01-preview' = {
+        parent: streamAnalyticsJob
+        name: 'output-blob'
+        properties: {
+          datasource: {
+            type: 'Microsoft.Storage/Blob'
+            properties: {
+              storageAccounts: [
+                {
+                  accountName: outputStorageAccountName
+                }
+              ]
+              container: outputContainerName
+              pathPattern: '{date}/{time}'
+              dateFormat: 'yyyy/MM/dd'
+              timeFormat: 'HH'
+              authenticationMode: 'Msi'
+            }
+          }
+          serialization: {
+            type: 'Json'
+            properties: {
+              encoding: 'UTF8'
+              format: 'LineSeparated'
+            }
+          }
+        }
+      }
+
+      // Grant Stream Analytics identity Event Hubs Data Receiver
+      resource asaEhRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+        name: guid(eventhubNamespace.id, streamAnalyticsJob.id, 'a638d3c7-ab3a-418d-83e6-5f17a39d4fde')
+        scope: eventhubNamespace
+        properties: {
+          roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'a638d3c7-ab3a-418d-83e6-5f17a39d4fde')
+          principalId: streamAnalyticsJob.identity.principalId
+          principalType: 'ServicePrincipal'
+        }
+      }
+
+      // Grant Stream Analytics identity Storage Blob Data Contributor
+      resource asaStorageRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+        name: guid(outputStorageAccount.id, streamAnalyticsJob.id, 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+        scope: outputStorageAccount
+        properties: {
+          roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+          principalId: streamAnalyticsJob.identity.principalId
+          principalType: 'ServicePrincipal'
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.EventHub/namespaces/eventhubs/consumergroups@2024-01-01"
+        name: "asa-consumer-group"
+        description: "Dedicated consumer group for Stream Analytics — never use $Default"
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "asa-eh-receiver"
+        description: "Azure Event Hubs Data Receiver role for Stream Analytics managed identity"
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "asa-storage-contributor"
+        description: "Storage Blob Data Contributor role for Stream Analytics output"
+    prohibitions:
+      - "NEVER use connection strings for Stream Analytics inputs or outputs — use authenticationMode: Msi"
+      - "NEVER use the $Default consumer group for Stream Analytics — create a dedicated consumer group"
+      - "NEVER set outputErrorPolicy to Drop in production — use Stop to surface data issues"
+      - "NEVER skip eventsOutOfOrderPolicy — unordered events corrupt aggregation results"
+
+  - id: ED-004
+    severity: required
+    description: "Configure dead-letter queues for Service Bus and dead-letter storage for Event Grid"
+    rationale: "Dead-letter captures messages/events that cannot be delivered or processed, enabling investigation and replay"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer]
+    terraform_pattern: |
+      # Service Bus queue with dead-letter enabled (dead-letter sub-queue is automatic)
+      resource "azapi_resource" "sb_queue_with_dlq" {
+        type      = "Microsoft.ServiceBus/namespaces/queues@2024-01-01"
+        name      = var.queue_name
+        parent_id = azapi_resource.servicebus_namespace.id
+        body = {
+          properties = {
+            deadLetteringOnMessageExpiration = true
+            maxDeliveryCount                = 10
+            lockDuration                    = "PT5M"
+            defaultMessageTimeToLive        = "P14D"
+            enableBatchedOperations         = true
+            # Dead-letter sub-queue is automatically created at:
+            #   <queue-name>/$DeadLetterQueue
+            # Access via: entityPath = "<queue-name>/$DeadLetterQueue"
+          }
+        }
+      }
+
+      # Service Bus topic subscription with dead-letter on filter exceptions
+      resource "azapi_resource" "sb_sub_with_dlq" {
+        type      = "Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01"
+        name      = var.subscription_name
+        parent_id = azapi_resource.sb_topic.id
+        body = {
+          properties = {
+            deadLetteringOnMessageExpiration              = true
+            deadLetteringOnFilterEvaluationExceptions     = true
+            maxDeliveryCount                              = 10
+            lockDuration                                  = "PT5M"
+            defaultMessageTimeToLive                      = "P14D"
+            enableBatchedOperations                       = true
+          }
+        }
+      }
+
+      # Event Grid dead-letter storage container
+      resource "azapi_resource" "dlq_container" {
+        type      = "Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01"
+        name      = "dead-letters"
+        parent_id = "${azapi_resource.storage_account.id}/blobServices/default"
+        body = {
+          properties = {
+            publicAccess = "None"
+          }
+        }
+      }
+    bicep_pattern: |
+      // Service Bus queue with dead-letter enabled
+      resource sbQueueWithDlq 'Microsoft.ServiceBus/namespaces/queues@2024-01-01' = {
+        parent: serviceBusNamespace
+        name: queueName
+        properties: {
+          deadLetteringOnMessageExpiration: true
+          maxDeliveryCount: 10
+          lockDuration: 'PT5M'
+          defaultMessageTimeToLive: 'P14D'
+          enableBatchedOperations: true
+        }
+      }
+
+      // Service Bus topic subscription with dead-letter on filter exceptions
+      resource sbSubWithDlq 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+        parent: sbTopic
+        name: subscriptionName
+        properties: {
+          deadLetteringOnMessageExpiration: true
+          deadLetteringOnFilterEvaluationExceptions: true
+          maxDeliveryCount: 10
+          lockDuration: 'PT5M'
+          defaultMessageTimeToLive: 'P14D'
+          enableBatchedOperations: true
+        }
+      }
+
+      // Event Grid dead-letter storage container
+      resource dlqContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+        parent: blobService
+        name: 'dead-letters'
+        properties: {
+          publicAccess: 'None'
+        }
+      }
+    prohibitions:
+      - "NEVER disable deadLetteringOnMessageExpiration — expired messages are silently discarded"
+      - "NEVER set maxDeliveryCount below 3 — transient failures will prematurely dead-letter messages"
+      - "NEVER skip dead-letter configuration on Event Grid subscriptions — undeliverable events are lost permanently"
+      - "NEVER grant public access to dead-letter storage containers"
+
+  - id: ED-005
+    severity: required
+    description: "Implement poison message handling patterns for failed message processing"
+    rationale: "Poison messages that repeatedly fail processing block other messages; explicit handling prevents queue stalls"
+    applies_to: [cloud-architect, app-developer, terraform-agent, bicep-agent]
+    terraform_pattern: |
+      # Poison message handling queue — messages moved here after maxDeliveryCount exceeded
+      # Application code should monitor the dead-letter queue and alert on new messages
+
+      # Alert rule for dead-letter queue depth
+      resource "azapi_resource" "dlq_alert" {
+        type      = "Microsoft.Insights/metricAlerts@2018-03-01"
+        name      = "alert-dlq-depth-${var.queue_name}"
+        location  = "global"
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            severity    = 2
+            enabled     = true
+            description = "Dead-letter queue depth exceeds threshold for ${var.queue_name}"
+            evaluationFrequency = "PT5M"
+            windowSize          = "PT15M"
+            criteria = {
+              "odata.type" = "Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria"
+              allOf = [
+                {
+                  name             = "dlq-depth"
+                  metricName       = "DeadletteredMessages"
+                  metricNamespace  = "Microsoft.ServiceBus/namespaces"
+                  operator         = "GreaterThan"
+                  threshold        = 10
+                  timeAggregation  = "Average"
+                  criterionType    = "StaticThresholdCriterion"
+                }
+              ]
+            }
+            scopes  = [azapi_resource.servicebus_namespace.id]
+            actions = [
+              {
+                actionGroupId = azapi_resource.action_group.id
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      // Alert rule for dead-letter queue depth
+      resource dlqAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
+        name: 'alert-dlq-depth-${queueName}'
+        location: 'global'
+        properties: {
+          severity: 2
+          enabled: true
+          description: 'Dead-letter queue depth exceeds threshold for ${queueName}'
+          evaluationFrequency: 'PT5M'
+          windowSize: 'PT15M'
+          criteria: {
+            'odata.type': 'Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria'
+            allOf: [
+              {
+                name: 'dlq-depth'
+                metricName: 'DeadletteredMessages'
+                metricNamespace: 'Microsoft.ServiceBus/namespaces'
+                operator: 'GreaterThan'
+                threshold: 10
+                timeAggregation: 'Average'
+                criterionType: 'StaticThresholdCriterion'
+              }
+            ]
+          }
+          scopes: [serviceBusNamespace.id]
+          actions: [
+            {
+              actionGroupId: actionGroup.id
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Insights/metricAlerts@2018-03-01"
+        name: "dlq-depth-alert"
+        description: "Alert when dead-letter queue depth exceeds threshold — triggers investigation"
+      - type: "Microsoft.Insights/actionGroups@2023-01-01"
+        name: "ops-action-group"
+        description: "Action group for dead-letter alerts — email and webhook notifications"
+    prohibitions:
+      - "NEVER process events or messages without idempotency — at-least-once delivery means duplicates are expected"
+      - "NEVER ignore dead-letter queues — they contain messages that need investigation and potential replay"
+      - "NEVER set maxDeliveryCount to maximum (2147483647) — poison messages will retry indefinitely and block processing"
+      - "NEVER process poison messages in the same pipeline as normal messages — use a separate handler"
+
+patterns:
+  - name: "Event Grid to Function App with dead-letter"
+    description: "System topic subscription delivering to Azure Function with managed identity and dead-letter storage"
+  - name: "Service Bus trigger with managed identity"
+    description: "Function App consuming Service Bus queue using managed identity connection string-free binding"
+  - name: "Event Hub to Stream Analytics pipeline"
+    description: "Real-time stream processing with Event Hub input, Stream Analytics windowed query, and blob output"
+
+anti_patterns:
+  - description: "Do not use connection strings for event source authentication"
+    instead: "Use managed identity with RBAC role assignments for all event source connections"
+  - description: "Do not skip dead-letter configuration on any event subscription or queue"
+    instead: "Always configure dead-letter storage for Event Grid and ensure deadLetteringOnMessageExpiration for Service Bus"
+  - description: "Do not process events without idempotency checks"
+    instead: "Use message deduplication (requiresDuplicateDetection) and implement idempotent event handlers"
+
+references:
+  - title: "Event Grid dead-letter and retry"
+    url: "https://learn.microsoft.com/azure/event-grid/delivery-and-retry"
+  - title: "Service Bus dead-letter queues"
+    url: "https://learn.microsoft.com/azure/service-bus-messaging/service-bus-dead-letter-queues"
+  - title: "Azure Functions Service Bus trigger"
+    url: "https://learn.microsoft.com/azure/azure-functions/functions-bindings-service-bus-trigger"
+  - title: "Stream Analytics with Event Hubs"
+    url: "https://learn.microsoft.com/azure/stream-analytics/stream-analytics-define-inputs"
+  - title: "Event Grid managed identity delivery"
+    url: "https://learn.microsoft.com/azure/event-grid/managed-service-identity"

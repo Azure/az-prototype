@@ -1,0 +1,990 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: microservices
+  category: integration
+  services: [container-apps, app-service, application-insights]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: MS-001
+    severity: required
+    description: "Authenticate service-to-service calls via managed identity and RBAC — never shared keys or hardcoded tokens"
+    rationale: "Managed identity eliminates credential management between microservices; RBAC provides auditable access control"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer]
+    terraform_pattern: |
+      # Container App A calling Container App B via managed identity
+      # Container App A: caller with user-assigned managed identity
+      resource "azapi_resource" "service_a" {
+        type      = "Microsoft.App/containerApps@2024-03-01"
+        name      = "${var.project_name}-svc-a"
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type         = "UserAssigned"
+          identity_ids = [azapi_resource.svc_a_identity.id]
+        }
+
+        body = {
+          properties = {
+            managedEnvironmentId = azapi_resource.container_app_env.id
+            configuration = {
+              ingress = {
+                external   = false
+                targetPort = 8080
+                transport  = "http"
+              }
+            }
+            template = {
+              containers = [
+                {
+                  name  = "svc-a"
+                  image = "${var.acr_login_server}/svc-a:${var.image_tag}"
+                  resources = {
+                    cpu    = 0.5
+                    memory = "1Gi"
+                  }
+                  env = [
+                    {
+                      name  = "SVC_B_URL"
+                      value = "https://${azapi_resource.service_b.output.properties.configuration.ingress.fqdn}"
+                    },
+                    {
+                      name  = "AZURE_CLIENT_ID"
+                      value = azapi_resource.svc_a_identity.output.properties.clientId
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+
+      # User-assigned identity for Service A
+      resource "azapi_resource" "svc_a_identity" {
+        type      = "Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31"
+        name      = "id-svc-a"
+        location  = var.location
+        parent_id = var.resource_group_id
+        body      = {}
+      }
+
+      # Container App B: target service
+      resource "azapi_resource" "service_b" {
+        type      = "Microsoft.App/containerApps@2024-03-01"
+        name      = "${var.project_name}-svc-b"
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type         = "UserAssigned"
+          identity_ids = [azapi_resource.svc_b_identity.id]
+        }
+
+        body = {
+          properties = {
+            managedEnvironmentId = azapi_resource.container_app_env.id
+            configuration = {
+              ingress = {
+                external   = false
+                targetPort = 8080
+                transport  = "http"
+              }
+            }
+            template = {
+              containers = [
+                {
+                  name  = "svc-b"
+                  image = "${var.acr_login_server}/svc-b:${var.image_tag}"
+                  resources = {
+                    cpu    = 0.5
+                    memory = "1Gi"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+
+      resource "azapi_resource" "svc_b_identity" {
+        type      = "Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31"
+        name      = "id-svc-b"
+        location  = var.location
+        parent_id = var.resource_group_id
+        body      = {}
+      }
+    bicep_pattern: |
+      // User-assigned identity for Service A
+      resource svcAIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+        name: 'id-svc-a'
+        location: location
+      }
+
+      // Container App A: caller with managed identity
+      resource serviceA 'Microsoft.App/containerApps@2024-03-01' = {
+        name: '${projectName}-svc-a'
+        location: location
+        identity: {
+          type: 'UserAssigned'
+          userAssignedIdentities: {
+            '${svcAIdentity.id}': {}
+          }
+        }
+        properties: {
+          managedEnvironmentId: containerAppEnv.id
+          configuration: {
+            ingress: {
+              external: false
+              targetPort: 8080
+              transport: 'http'
+            }
+          }
+          template: {
+            containers: [
+              {
+                name: 'svc-a'
+                image: '${acrLoginServer}/svc-a:${imageTag}'
+                resources: {
+                  cpu: json('0.5')
+                  memory: '1Gi'
+                }
+                env: [
+                  {
+                    name: 'SVC_B_URL'
+                    value: 'https://${serviceB.properties.configuration.ingress.fqdn}'
+                  }
+                  {
+                    name: 'AZURE_CLIENT_ID'
+                    value: svcAIdentity.properties.clientId
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+
+      // User-assigned identity for Service B
+      resource svcBIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+        name: 'id-svc-b'
+        location: location
+      }
+
+      // Container App B: target service
+      resource serviceB 'Microsoft.App/containerApps@2024-03-01' = {
+        name: '${projectName}-svc-b'
+        location: location
+        identity: {
+          type: 'UserAssigned'
+          userAssignedIdentities: {
+            '${svcBIdentity.id}': {}
+          }
+        }
+        properties: {
+          managedEnvironmentId: containerAppEnv.id
+          configuration: {
+            ingress: {
+              external: false
+              targetPort: 8080
+              transport: 'http'
+            }
+          }
+          template: {
+            containers: [
+              {
+                name: 'svc-b'
+                image: '${acrLoginServer}/svc-b:${imageTag}'
+                resources: {
+                  cpu: json('0.5')
+                  memory: '1Gi'
+                }
+              }
+            ]
+          }
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31"
+        name: "id-svc-*"
+        description: "User-assigned managed identity per microservice for cross-service authentication"
+    prohibitions:
+      - "NEVER hardcode service URLs in container images — pass them as environment variables or use service discovery"
+      - "NEVER use shared API keys or tokens for service-to-service auth — use managed identity with DefaultAzureCredential"
+      - "NEVER use the same managed identity across all services — use per-service identities for least privilege"
+      - "NEVER expose internal services externally (ingress.external: true) unless they serve external traffic"
+    template_check:
+      scope: [container-apps]
+      require_config: [identity]
+      error_message: "Service '{service_name}' ({service_type}) missing managed identity for service-to-service authentication"
+
+  - id: MS-002
+    severity: recommended
+    description: "Enable Dapr sidecar for service invocation, pub/sub, and state management in Container Apps"
+    rationale: "Dapr provides service discovery, mTLS, pub/sub abstraction, and state management without application-level implementation"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer]
+    terraform_pattern: |
+      # Container Apps Environment with Dapr components
+      # Note: Dapr is configured at the Container App level, components at the environment level
+
+      # Dapr pub/sub component using Azure Service Bus
+      resource "azapi_resource" "dapr_pubsub" {
+        type      = "Microsoft.App/managedEnvironments/daprComponents@2024-03-01"
+        name      = "pubsub-servicebus"
+        parent_id = azapi_resource.container_app_env.id
+
+        body = {
+          properties = {
+            componentType = "pubsub.azure.servicebus.topics"
+            version       = "v1"
+            metadata = [
+              {
+                name  = "namespaceName"
+                value = "${var.sb_namespace_name}.servicebus.windows.net"
+              },
+              {
+                name  = "azureClientId"
+                value = azapi_resource.svc_identity.output.properties.clientId
+              }
+            ]
+            scopes = [var.publisher_app_name, var.subscriber_app_name]
+          }
+        }
+      }
+
+      # Dapr state store component using Azure Cosmos DB
+      resource "azapi_resource" "dapr_statestore" {
+        type      = "Microsoft.App/managedEnvironments/daprComponents@2024-03-01"
+        name      = "statestore-cosmos"
+        parent_id = azapi_resource.container_app_env.id
+
+        body = {
+          properties = {
+            componentType = "state.azure.cosmosdb"
+            version       = "v1"
+            metadata = [
+              {
+                name  = "url"
+                value = azapi_resource.cosmos_account.output.properties.documentEndpoint
+              },
+              {
+                name  = "database"
+                value = var.cosmos_database_name
+              },
+              {
+                name  = "collection"
+                value = var.cosmos_container_name
+              },
+              {
+                name  = "azureClientId"
+                value = azapi_resource.svc_identity.output.properties.clientId
+              }
+            ]
+            scopes = [var.stateful_app_name]
+          }
+        }
+      }
+
+      # Container App with Dapr sidecar enabled
+      resource "azapi_resource" "dapr_enabled_app" {
+        type      = "Microsoft.App/containerApps@2024-03-01"
+        name      = var.dapr_app_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type         = "UserAssigned"
+          identity_ids = [azapi_resource.svc_identity.id]
+        }
+
+        body = {
+          properties = {
+            managedEnvironmentId = azapi_resource.container_app_env.id
+            configuration = {
+              dapr = {
+                enabled       = true
+                appId         = var.dapr_app_id
+                appPort       = 8080
+                appProtocol   = "http"
+                logLevel      = "info"
+                enableApiLogging = true
+              }
+              ingress = {
+                external   = false
+                targetPort = 8080
+                transport  = "http"
+              }
+            }
+            template = {
+              containers = [
+                {
+                  name  = var.dapr_app_name
+                  image = "${var.acr_login_server}/${var.dapr_app_name}:${var.image_tag}"
+                  resources = {
+                    cpu    = 0.5
+                    memory = "1Gi"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // Dapr pub/sub component using Azure Service Bus
+      resource daprPubsub 'Microsoft.App/managedEnvironments/daprComponents@2024-03-01' = {
+        parent: containerAppEnv
+        name: 'pubsub-servicebus'
+        properties: {
+          componentType: 'pubsub.azure.servicebus.topics'
+          version: 'v1'
+          metadata: [
+            {
+              name: 'namespaceName'
+              value: '${sbNamespaceName}.servicebus.windows.net'
+            }
+            {
+              name: 'azureClientId'
+              value: svcIdentity.properties.clientId
+            }
+          ]
+          scopes: [publisherAppName, subscriberAppName]
+        }
+      }
+
+      // Dapr state store component using Azure Cosmos DB
+      resource daprStatestore 'Microsoft.App/managedEnvironments/daprComponents@2024-03-01' = {
+        parent: containerAppEnv
+        name: 'statestore-cosmos'
+        properties: {
+          componentType: 'state.azure.cosmosdb'
+          version: 'v1'
+          metadata: [
+            {
+              name: 'url'
+              value: cosmosAccount.properties.documentEndpoint
+            }
+            {
+              name: 'database'
+              value: cosmosDatabaseName
+            }
+            {
+              name: 'collection'
+              value: cosmosContainerName
+            }
+            {
+              name: 'azureClientId'
+              value: svcIdentity.properties.clientId
+            }
+          ]
+          scopes: [statefulAppName]
+        }
+      }
+
+      // Container App with Dapr sidecar enabled
+      resource daprEnabledApp 'Microsoft.App/containerApps@2024-03-01' = {
+        name: daprAppName
+        location: location
+        identity: {
+          type: 'UserAssigned'
+          userAssignedIdentities: {
+            '${svcIdentity.id}': {}
+          }
+        }
+        properties: {
+          managedEnvironmentId: containerAppEnv.id
+          configuration: {
+            dapr: {
+              enabled: true
+              appId: daprAppId
+              appPort: 8080
+              appProtocol: 'http'
+              logLevel: 'info'
+              enableApiLogging: true
+            }
+            ingress: {
+              external: false
+              targetPort: 8080
+              transport: 'http'
+            }
+          }
+          template: {
+            containers: [
+              {
+                name: daprAppName
+                image: '${acrLoginServer}/${daprAppName}:${imageTag}'
+                resources: {
+                  cpu: json('0.5')
+                  memory: '1Gi'
+                }
+              }
+            ]
+          }
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.App/managedEnvironments/daprComponents@2024-03-01"
+        name: "pubsub-servicebus"
+        description: "Dapr pub/sub component backed by Azure Service Bus with managed identity"
+      - type: "Microsoft.App/managedEnvironments/daprComponents@2024-03-01"
+        name: "statestore-cosmos"
+        description: "Dapr state store component backed by Azure Cosmos DB with managed identity"
+    prohibitions:
+      - "NEVER use connection strings in Dapr component metadata — use managed identity via azureClientId"
+      - "NEVER omit scopes on Dapr components — unscoped components are accessible to all apps in the environment"
+      - "NEVER set appPort incorrectly — Dapr cannot route to the application if the port is wrong"
+      - "NEVER use Dapr secrets component to store secrets — use Key Vault references in Container Apps secrets array"
+
+  - id: MS-003
+    severity: required
+    description: "Configure distributed tracing with Application Insights and OpenTelemetry for all microservices"
+    rationale: "Distributed tracing correlates requests across microservices; without it, debugging cross-service failures is impossible"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer, monitoring-agent]
+    terraform_pattern: |
+      # Application Insights workspace-based instance
+      resource "azapi_resource" "app_insights" {
+        type      = "Microsoft.Insights/components@2020-02-02"
+        name      = var.app_insights_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          kind = "web"
+          properties = {
+            Application_Type       = "web"
+            WorkspaceResourceId    = azapi_resource.log_analytics.id
+            DisableIpMasking       = false
+            RetentionInDays        = 90
+            IngestionMode          = "LogAnalytics"
+            publicNetworkAccessForIngestion = "Disabled"
+            publicNetworkAccessForQuery     = "Disabled"
+          }
+        }
+      }
+
+      # Container App with OpenTelemetry environment variables
+      resource "azapi_resource" "traced_service" {
+        type      = "Microsoft.App/containerApps@2024-03-01"
+        name      = var.service_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type         = "UserAssigned"
+          identity_ids = [azapi_resource.svc_identity.id]
+        }
+
+        body = {
+          properties = {
+            managedEnvironmentId = azapi_resource.container_app_env.id
+            configuration = {
+              ingress = {
+                external   = false
+                targetPort = 8080
+              }
+              secrets = [
+                {
+                  name        = "appinsights-connection"
+                  keyVaultUrl = "https://${var.key_vault_name}.vault.azure.net/secrets/appinsights-connection-string"
+                  identity    = azapi_resource.svc_identity.id
+                }
+              ]
+            }
+            template = {
+              containers = [
+                {
+                  name  = var.service_name
+                  image = "${var.acr_login_server}/${var.service_name}:${var.image_tag}"
+                  resources = {
+                    cpu    = 0.5
+                    memory = "1Gi"
+                  }
+                  env = [
+                    {
+                      name      = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+                      secretRef = "appinsights-connection"
+                    },
+                    {
+                      name  = "OTEL_SERVICE_NAME"
+                      value = var.service_name
+                    },
+                    {
+                      name  = "OTEL_RESOURCE_ATTRIBUTES"
+                      value = "service.namespace=${var.project_name},service.version=${var.image_tag}"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+
+      # Container Apps Environment with OpenTelemetry configuration
+      resource "azapi_resource" "container_app_env_otel" {
+        type      = "Microsoft.App/managedEnvironments@2024-03-01"
+        name      = var.container_app_env_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            appInsightsConfiguration = {
+              connectionString = var.app_insights_connection_string
+            }
+            openTelemetryConfiguration = {
+              tracesConfiguration = {
+                destinations = ["appInsights"]
+              }
+              logsConfiguration = {
+                destinations = ["appInsights"]
+              }
+            }
+            vnetConfiguration = {
+              infrastructureSubnetId = var.container_app_subnet_id
+              internal               = true
+            }
+            appLogsConfiguration = {
+              destination = "log-analytics"
+              logAnalyticsConfiguration = {
+                customerId = var.log_analytics_customer_id
+                sharedKey  = var.log_analytics_shared_key
+              }
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // Application Insights workspace-based instance
+      resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
+        name: appInsightsName
+        location: location
+        kind: 'web'
+        properties: {
+          Application_Type: 'web'
+          WorkspaceResourceId: logAnalytics.id
+          DisableIpMasking: false
+          RetentionInDays: 90
+          IngestionMode: 'LogAnalytics'
+          publicNetworkAccessForIngestion: 'Disabled'
+          publicNetworkAccessForQuery: 'Disabled'
+        }
+      }
+
+      // Container App with OpenTelemetry environment variables
+      resource tracedService 'Microsoft.App/containerApps@2024-03-01' = {
+        name: serviceName
+        location: location
+        identity: {
+          type: 'UserAssigned'
+          userAssignedIdentities: {
+            '${svcIdentity.id}': {}
+          }
+        }
+        properties: {
+          managedEnvironmentId: containerAppEnv.id
+          configuration: {
+            ingress: {
+              external: false
+              targetPort: 8080
+            }
+            secrets: [
+              {
+                name: 'appinsights-connection'
+                keyVaultUrl: 'https://${keyVaultName}.vault.azure.net/secrets/appinsights-connection-string'
+                identity: svcIdentity.id
+              }
+            ]
+          }
+          template: {
+            containers: [
+              {
+                name: serviceName
+                image: '${acrLoginServer}/${serviceName}:${imageTag}'
+                resources: {
+                  cpu: json('0.5')
+                  memory: '1Gi'
+                }
+                env: [
+                  {
+                    name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+                    secretRef: 'appinsights-connection'
+                  }
+                  {
+                    name: 'OTEL_SERVICE_NAME'
+                    value: serviceName
+                  }
+                  {
+                    name: 'OTEL_RESOURCE_ATTRIBUTES'
+                    value: 'service.namespace=${projectName},service.version=${imageTag}'
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+
+      // Container Apps Environment with OpenTelemetry configuration
+      resource containerAppEnvOtel 'Microsoft.App/managedEnvironments@2024-03-01' = {
+        name: containerAppEnvName
+        location: location
+        properties: {
+          appInsightsConfiguration: {
+            connectionString: appInsightsConnectionString
+          }
+          openTelemetryConfiguration: {
+            tracesConfiguration: {
+              destinations: ['appInsights']
+            }
+            logsConfiguration: {
+              destinations: ['appInsights']
+            }
+          }
+          vnetConfiguration: {
+            infrastructureSubnetId: containerAppSubnetId
+            internal: true
+          }
+          appLogsConfiguration: {
+            destination: 'log-analytics'
+            logAnalyticsConfiguration: {
+              customerId: logAnalyticsCustomerId
+              sharedKey: logAnalyticsSharedKey
+            }
+          }
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Insights/components@2020-02-02"
+        name: "app-insights"
+        description: "Workspace-based Application Insights for distributed tracing and metrics"
+      - type: "Microsoft.OperationalInsights/workspaces@2023-09-01"
+        name: "log-analytics"
+        description: "Log Analytics workspace backing Application Insights"
+    prohibitions:
+      - "NEVER deploy microservices without distributed tracing — cross-service debugging is impossible without it"
+      - "NEVER hardcode Application Insights connection strings in images — use Key Vault references or environment variables"
+      - "NEVER omit OTEL_SERVICE_NAME — traces without service names are unattributable"
+      - "NEVER enable public network access on Application Insights for production — use private endpoints"
+    template_check:
+      when_services_present: [container-apps]
+      require_service: [application-insights]
+      severity: warning
+      error_message: "Microservices template must include Application Insights for distributed tracing"
+
+  - id: MS-004
+    severity: required
+    description: "Configure health checks (liveness and readiness probes) on all Container Apps and App Service instances"
+    rationale: "Health probes enable automatic restart of unhealthy instances and prevent traffic routing to unready services"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer]
+    terraform_pattern: |
+      # Container App with liveness, readiness, and startup probes
+      resource "azapi_resource" "healthy_service" {
+        type      = "Microsoft.App/containerApps@2024-03-01"
+        name      = var.service_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        body = {
+          properties = {
+            managedEnvironmentId = azapi_resource.container_app_env.id
+            configuration = {
+              ingress = {
+                external   = false
+                targetPort = 8080
+              }
+            }
+            template = {
+              containers = [
+                {
+                  name  = var.service_name
+                  image = "${var.acr_login_server}/${var.service_name}:${var.image_tag}"
+                  resources = {
+                    cpu    = 0.5
+                    memory = "1Gi"
+                  }
+                  probes = [
+                    {
+                      type = "startup"
+                      httpGet = {
+                        path = "/healthz"
+                        port = 8080
+                      }
+                      initialDelaySeconds = 3
+                      periodSeconds       = 3
+                      failureThreshold    = 30
+                      timeoutSeconds      = 1
+                    },
+                    {
+                      type = "liveness"
+                      httpGet = {
+                        path = "/healthz"
+                        port = 8080
+                      }
+                      initialDelaySeconds = 0
+                      periodSeconds       = 10
+                      failureThreshold    = 3
+                      timeoutSeconds      = 1
+                    },
+                    {
+                      type = "readiness"
+                      httpGet = {
+                        path = "/ready"
+                        port = 8080
+                      }
+                      initialDelaySeconds = 0
+                      periodSeconds       = 5
+                      failureThreshold    = 3
+                      timeoutSeconds      = 1
+                      successThreshold    = 1
+                    }
+                  ]
+                }
+              ]
+              scale = {
+                minReplicas = 1
+                maxReplicas = 10
+              }
+            }
+          }
+        }
+      }
+
+      # App Service health check configuration (via siteConfig)
+      resource "azapi_resource" "app_service_health" {
+        type      = "Microsoft.Web/sites@2023-12-01"
+        name      = var.app_service_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        body = {
+          kind = "app,linux"
+          properties = {
+            serverFarmId = azapi_resource.app_service_plan.id
+            siteConfig = {
+              healthCheckPath    = "/healthz"
+              minTlsVersion      = "1.2"
+              linuxFxVersion     = var.linux_fx_version
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // Container App with liveness, readiness, and startup probes
+      resource healthyService 'Microsoft.App/containerApps@2024-03-01' = {
+        name: serviceName
+        location: location
+        properties: {
+          managedEnvironmentId: containerAppEnv.id
+          configuration: {
+            ingress: {
+              external: false
+              targetPort: 8080
+            }
+          }
+          template: {
+            containers: [
+              {
+                name: serviceName
+                image: '${acrLoginServer}/${serviceName}:${imageTag}'
+                resources: {
+                  cpu: json('0.5')
+                  memory: '1Gi'
+                }
+                probes: [
+                  {
+                    type: 'Startup'
+                    httpGet: {
+                      path: '/healthz'
+                      port: 8080
+                    }
+                    initialDelaySeconds: 3
+                    periodSeconds: 3
+                    failureThreshold: 30
+                    timeoutSeconds: 1
+                  }
+                  {
+                    type: 'Liveness'
+                    httpGet: {
+                      path: '/healthz'
+                      port: 8080
+                    }
+                    initialDelaySeconds: 0
+                    periodSeconds: 10
+                    failureThreshold: 3
+                    timeoutSeconds: 1
+                  }
+                  {
+                    type: 'Readiness'
+                    httpGet: {
+                      path: '/ready'
+                      port: 8080
+                    }
+                    initialDelaySeconds: 0
+                    periodSeconds: 5
+                    failureThreshold: 3
+                    timeoutSeconds: 1
+                    successThreshold: 1
+                  }
+                ]
+              }
+            ]
+            scale: {
+              minReplicas: 1
+              maxReplicas: 10
+            }
+          }
+        }
+      }
+
+      // App Service health check configuration
+      resource appServiceHealth 'Microsoft.Web/sites@2023-12-01' = {
+        name: appServiceName
+        location: location
+        kind: 'app,linux'
+        properties: {
+          serverFarmId: appServicePlan.id
+          siteConfig: {
+            healthCheckPath: '/healthz'
+            minTlsVersion: '1.2'
+            linuxFxVersion: linuxFxVersion
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER deploy microservices without liveness and readiness probes — unhealthy instances receive traffic and are not restarted"
+      - "NEVER use the same path for liveness and readiness probes — liveness checks if the process is alive, readiness checks if it can accept traffic"
+      - "NEVER set failureThreshold to 1 on liveness probes — a single failure will immediately restart the container"
+      - "NEVER skip startup probes on slow-starting containers — liveness probes will kill them before they are ready"
+
+  - id: MS-005
+    severity: recommended
+    description: "Configure circuit breaker and retry patterns using Dapr resiliency policies"
+    rationale: "Circuit breakers prevent cascade failures; retries with backoff handle transient errors gracefully"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer]
+    terraform_pattern: |
+      # Dapr resiliency component for Container Apps
+      resource "azapi_resource" "dapr_resiliency" {
+        type      = "Microsoft.App/managedEnvironments/daprComponents@2024-03-01"
+        name      = "resiliency"
+        parent_id = azapi_resource.container_app_env.id
+
+        body = {
+          properties = {
+            componentType = "configuration.resiliency"
+            version       = "v1"
+            metadata = [
+              {
+                name  = "circuitBreakerScope"
+                value = "app"
+              },
+              {
+                name  = "circuitBreakerThreshold"
+                value = "5"
+              },
+              {
+                name  = "circuitBreakerTimeout"
+                value = "30s"
+              },
+              {
+                name  = "retryMaxRetries"
+                value = "3"
+              },
+              {
+                name  = "retryDuration"
+                value = "1s"
+              },
+              {
+                name  = "retryMaxDuration"
+                value = "10s"
+              },
+              {
+                name  = "retryPolicy"
+                value = "exponential"
+              },
+              {
+                name  = "timeoutDuration"
+                value = "30s"
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      // Dapr resiliency component for Container Apps
+      resource daprResiliency 'Microsoft.App/managedEnvironments/daprComponents@2024-03-01' = {
+        parent: containerAppEnv
+        name: 'resiliency'
+        properties: {
+          componentType: 'configuration.resiliency'
+          version: 'v1'
+          metadata: [
+            {
+              name: 'circuitBreakerScope'
+              value: 'app'
+            }
+            {
+              name: 'circuitBreakerThreshold'
+              value: '5'
+            }
+            {
+              name: 'circuitBreakerTimeout'
+              value: '30s'
+            }
+            {
+              name: 'retryMaxRetries'
+              value: '3'
+            }
+            {
+              name: 'retryDuration'
+              value: '1s'
+            }
+            {
+              name: 'retryMaxDuration'
+              value: '10s'
+            }
+            {
+              name: 'retryPolicy'
+              value: 'exponential'
+            }
+            {
+              name: 'timeoutDuration'
+              value: '30s'
+            }
+          ]
+        }
+      }
+    prohibitions:
+      - "NEVER make synchronous inter-service calls without timeouts — a hanging downstream service will exhaust caller resources"
+      - "NEVER retry non-idempotent operations (POST without idempotency key) — retries may duplicate side effects"
+      - "NEVER set circuit breaker threshold too low (< 3) — normal jitter will trip the breaker unnecessarily"
+      - "NEVER use linear retry for high-throughput services — use exponential backoff with jitter to prevent thundering herd"
+
+patterns:
+  - name: "Service-to-service auth via managed identity"
+    description: "Container Apps calling each other using user-assigned managed identities and DefaultAzureCredential"
+  - name: "Dapr-enabled microservices"
+    description: "Container Apps with Dapr sidecar for service invocation, pub/sub, state, and resiliency"
+  - name: "Observable microservices"
+    description: "All services emit OpenTelemetry traces to shared Application Insights with service.name attribution"
+
+anti_patterns:
+  - description: "Do not hardcode service URLs in container images"
+    instead: "Use environment variables, Dapr service invocation, or internal DNS for service discovery"
+  - description: "Do not skip health probes on any microservice"
+    instead: "Configure startup, liveness, and readiness probes with appropriate thresholds"
+  - description: "Do not use synchronous calls without circuit breakers"
+    instead: "Configure Dapr resiliency policies or application-level circuit breakers with timeouts"
+
+references:
+  - title: "Container Apps service-to-service communication"
+    url: "https://learn.microsoft.com/azure/container-apps/connect-apps"
+  - title: "Container Apps Dapr integration"
+    url: "https://learn.microsoft.com/azure/container-apps/dapr-overview"
+  - title: "Container Apps health probes"
+    url: "https://learn.microsoft.com/azure/container-apps/health-probes"
+  - title: "Application Insights with Container Apps"
+    url: "https://learn.microsoft.com/azure/container-apps/opentelemetry-agents"
+  - title: "Dapr resiliency policies"
+    url: "https://docs.dapr.io/operations/resiliency/policies/"

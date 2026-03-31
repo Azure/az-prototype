@@ -1,0 +1,233 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: batch
+  category: azure
+  services: [batch]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: BATCH-001
+    severity: required
+    description: "Deploy Azure Batch account with managed identity, no public access, and user-subscription pool allocation mode"
+    rationale: "User-subscription mode puts VMs in your subscription for VNet control; managed identity eliminates shared key usage"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "batch_account" {
+        type      = "Microsoft.Batch/batchAccounts@2024-02-01"
+        name      = var.batch_account_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          properties = {
+            poolAllocationMode   = "UserSubscription"
+            publicNetworkAccess  = "Disabled"
+            allowedAuthenticationModes = [
+              "AAD"
+            ]
+            autoStorage = {
+              storageAccountId        = var.storage_account_id
+              authenticationMode      = "BatchAccountManagedIdentity"
+            }
+            encryption = {
+              keySource = "Microsoft.Batch"
+            }
+            keyVaultReference = {
+              id  = var.key_vault_id
+              url = var.key_vault_url
+            }
+            networkProfile = {
+              accountAccess = {
+                defaultAction = "Deny"
+                ipRules       = []
+              }
+              nodeManagementAccess = {
+                defaultAction = "Deny"
+                ipRules       = []
+              }
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource batchAccount 'Microsoft.Batch/batchAccounts@2024-02-01' = {
+        name: batchAccountName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          poolAllocationMode: 'UserSubscription'
+          publicNetworkAccess: 'Disabled'
+          allowedAuthenticationModes: [
+            'AAD'
+          ]
+          autoStorage: {
+            storageAccountId: storageAccountId
+            authenticationMode: 'BatchAccountManagedIdentity'
+          }
+          encryption: {
+            keySource: 'Microsoft.Batch'
+          }
+          keyVaultReference: {
+            id: keyVaultId
+            url: keyVaultUrl
+          }
+          networkProfile: {
+            accountAccess: {
+              defaultAction: 'Deny'
+              ipRules: []
+            }
+            nodeManagementAccess: {
+              defaultAction: 'Deny'
+              ipRules: []
+            }
+          }
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Network/privateEndpoints@2024-01-01"
+        name: "pe-batch"
+        description: "Private endpoint for Batch account management plane"
+        terraform_pattern: |
+          resource "azapi_resource" "pe_batch" {
+            type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+            name      = "pe-${var.batch_account_name}"
+            location  = var.location
+            parent_id = var.resource_group_id
+
+            body = {
+              properties = {
+                subnet = {
+                  id = var.subnet_id
+                }
+                privateLinkServiceConnections = [
+                  {
+                    name = "batch-connection"
+                    properties = {
+                      privateLinkServiceId = azapi_resource.batch_account.id
+                      groupIds             = ["batchAccount"]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource peBatch 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+            name: 'pe-${batchAccountName}'
+            location: location
+            properties: {
+              subnet: {
+                id: subnetId
+              }
+              privateLinkServiceConnections: [
+                {
+                  name: 'batch-connection'
+                  properties: {
+                    privateLinkServiceId: batchAccount.id
+                    groupIds: ['batchAccount']
+                  }
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Network/privateDnsZones@2024-06-01"
+        name: "privatelink.batch.azure.com"
+        description: "Private DNS zone for Batch account private endpoint resolution"
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name: "diag-batch"
+        description: "Diagnostic settings to route Batch service logs and task events to Log Analytics"
+        terraform_pattern: |
+          resource "azapi_resource" "diag_batch" {
+            type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+            name      = "diag-${var.batch_account_name}"
+            parent_id = azapi_resource.batch_account.id
+
+            body = {
+              properties = {
+                workspaceId = var.log_analytics_workspace_id
+                logs = [
+                  {
+                    categoryGroup = "allLogs"
+                    enabled       = true
+                  }
+                ]
+                metrics = [
+                  {
+                    category = "AllMetrics"
+                    enabled  = true
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource diagBatch 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+            name: 'diag-${batchAccountName}'
+            scope: batchAccount
+            properties: {
+              workspaceId: logAnalyticsWorkspaceId
+              logs: [
+                {
+                  categoryGroup: 'allLogs'
+                  enabled: true
+                }
+              ]
+              metrics: [
+                {
+                  category: 'AllMetrics'
+                  enabled: true
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "Batch Account Contributor"
+        description: "RBAC role assignment for Batch account management and pool operations"
+    prohibitions:
+      - "Never use shared key authentication — set allowedAuthenticationModes to AAD only"
+      - "Never hardcode storage account keys in auto-storage config — use BatchAccountManagedIdentity"
+      - "Never set publicNetworkAccess to Enabled without network profile restrictions"
+      - "Never use BatchService pool allocation mode when VNet control is required"
+      - "Never embed secrets in task command lines — use Key Vault references"
+
+  - id: BATCH-002
+    severity: required
+    description: "Deploy Batch pools with VNet injection and no public IP for compute nodes"
+    rationale: "Compute nodes with public IPs create attack surface; VNet injection enables network security group control"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+  - id: BATCH-003
+    severity: recommended
+    description: "Configure auto-scale formulas for cost optimization"
+    rationale: "Static pools waste resources during idle periods; auto-scale adjusts capacity to workload demand"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
+
+  - id: BATCH-004
+    severity: recommended
+    description: "Use container task execution for reproducible and isolated job processing"
+    rationale: "Container tasks provide consistent execution environments and faster node startup via pre-fetched images"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+
+patterns:
+  - name: "Batch account with user-subscription pools and private networking"
+    description: "Batch account with AAD auth, private endpoints, VNet-injected pools, and auto-scale"
+
+anti_patterns:
+  - description: "Do not use shared key authentication for Batch"
+    instead: "Set allowedAuthenticationModes to AAD only and use managed identity"
+  - description: "Do not deploy pools with public IP addresses"
+    instead: "Use VNet injection with publicIPAddressConfiguration set to NoPublicIPAddresses"
+
+references:
+  - title: "Azure Batch security best practices"
+    url: "https://learn.microsoft.com/azure/batch/security-best-practices"
+  - title: "Batch account with private endpoints"
+    url: "https://learn.microsoft.com/azure/batch/private-connectivity"

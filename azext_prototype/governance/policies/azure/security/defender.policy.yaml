@@ -1,0 +1,254 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: defender
+  category: azure
+  services: [defender-for-cloud]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: DEF-001
+    severity: required
+    description: "Enable Microsoft Defender for Cloud on all resource types used in the deployment"
+    rationale: "Defender provides continuous threat detection, vulnerability assessment, and security recommendations"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+    terraform_pattern: |
+      resource "azapi_resource" "defender_servers" {
+        type      = "Microsoft.Security/pricings@2024-01-01"
+        name      = "VirtualMachines"
+        parent_id = "/subscriptions/${var.subscription_id}"
+
+        body = {
+          properties = {
+            pricingTier = "Standard"
+            subPlan     = "P2"
+          }
+        }
+      }
+
+      resource "azapi_resource" "defender_app_services" {
+        type      = "Microsoft.Security/pricings@2024-01-01"
+        name      = "AppServices"
+        parent_id = "/subscriptions/${var.subscription_id}"
+
+        body = {
+          properties = {
+            pricingTier = "Standard"
+          }
+        }
+      }
+
+      resource "azapi_resource" "defender_storage" {
+        type      = "Microsoft.Security/pricings@2024-01-01"
+        name      = "StorageAccounts"
+        parent_id = "/subscriptions/${var.subscription_id}"
+
+        body = {
+          properties = {
+            pricingTier = "Standard"
+            subPlan     = "DefenderForStorageV2"
+          }
+        }
+      }
+
+      resource "azapi_resource" "defender_sql" {
+        type      = "Microsoft.Security/pricings@2024-01-01"
+        name      = "SqlServers"
+        parent_id = "/subscriptions/${var.subscription_id}"
+
+        body = {
+          properties = {
+            pricingTier = "Standard"
+          }
+        }
+      }
+
+      resource "azapi_resource" "defender_keyvault" {
+        type      = "Microsoft.Security/pricings@2024-01-01"
+        name      = "KeyVaults"
+        parent_id = "/subscriptions/${var.subscription_id}"
+
+        body = {
+          properties = {
+            pricingTier = "Standard"
+          }
+        }
+      }
+
+      resource "azapi_resource" "defender_arm" {
+        type      = "Microsoft.Security/pricings@2024-01-01"
+        name      = "Arm"
+        parent_id = "/subscriptions/${var.subscription_id}"
+
+        body = {
+          properties = {
+            pricingTier = "Standard"
+          }
+        }
+      }
+
+      resource "azapi_resource" "defender_containers" {
+        type      = "Microsoft.Security/pricings@2024-01-01"
+        name      = "Containers"
+        parent_id = "/subscriptions/${var.subscription_id}"
+
+        body = {
+          properties = {
+            pricingTier = "Standard"
+          }
+        }
+      }
+    bicep_pattern: |
+      targetScope = 'subscription'
+
+      resource defenderServers 'Microsoft.Security/pricings@2024-01-01' = {
+        name: 'VirtualMachines'
+        properties: {
+          pricingTier: 'Standard'
+          subPlan: 'P2'
+        }
+      }
+
+      resource defenderAppServices 'Microsoft.Security/pricings@2024-01-01' = {
+        name: 'AppServices'
+        properties: {
+          pricingTier: 'Standard'
+        }
+      }
+
+      resource defenderStorage 'Microsoft.Security/pricings@2024-01-01' = {
+        name: 'StorageAccounts'
+        properties: {
+          pricingTier: 'Standard'
+          subPlan: 'DefenderForStorageV2'
+        }
+      }
+
+      resource defenderSql 'Microsoft.Security/pricings@2024-01-01' = {
+        name: 'SqlServers'
+        properties: {
+          pricingTier: 'Standard'
+        }
+      }
+
+      resource defenderKeyVault 'Microsoft.Security/pricings@2024-01-01' = {
+        name: 'KeyVaults'
+        properties: {
+          pricingTier: 'Standard'
+        }
+      }
+
+      resource defenderArm 'Microsoft.Security/pricings@2024-01-01' = {
+        name: 'Arm'
+        properties: {
+          pricingTier: 'Standard'
+        }
+      }
+
+      resource defenderContainers 'Microsoft.Security/pricings@2024-01-01' = {
+        name: 'Containers'
+        properties: {
+          pricingTier: 'Standard'
+        }
+      }
+    prohibitions:
+      - "Never set pricingTier to Free for production subscriptions"
+      - "Never disable Defender for ARM — it monitors control plane operations"
+      - "Never skip Defender for Key Vault when Key Vault is deployed"
+      - "Never disable Defender for Storage when storage accounts exist"
+
+  - id: DEF-002
+    severity: required
+    description: "Enable auto-provisioning of security agents and vulnerability assessment"
+    rationale: "Auto-provisioning ensures all new resources are automatically protected"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+    terraform_pattern: |
+      resource "azapi_resource" "defender_auto_provision" {
+        type      = "Microsoft.Security/autoProvisioningSettings@2017-08-01-preview"
+        name      = "default"
+        parent_id = "/subscriptions/${var.subscription_id}"
+
+        body = {
+          properties = {
+            autoProvision = "On"
+          }
+        }
+      }
+    bicep_pattern: |
+      targetScope = 'subscription'
+
+      resource autoProvision 'Microsoft.Security/autoProvisioningSettings@2017-08-01-preview' = {
+        name: 'default'
+        properties: {
+          autoProvision: 'On'
+        }
+      }
+
+  - id: DEF-003
+    severity: required
+    description: "Configure security contact for alert notifications"
+    rationale: "Security alerts must reach the operations team promptly for incident response"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+    terraform_pattern: |
+      resource "azapi_resource" "security_contact" {
+        type      = "Microsoft.Security/securityContacts@2020-01-01-preview"
+        name      = "default"
+        parent_id = "/subscriptions/${var.subscription_id}"
+
+        body = {
+          properties = {
+            emails                 = var.security_contact_email
+            notificationsByRole = {
+              state = "On"
+              roles = ["Owner", "ServiceAdmin"]
+            }
+            alertNotifications = {
+              state        = "On"
+              minimalSeverity = "Medium"
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      targetScope = 'subscription'
+
+      resource securityContact 'Microsoft.Security/securityContacts@2020-01-01-preview' = {
+        name: 'default'
+        properties: {
+          emails: securityContactEmail
+          notificationsByRole: {
+            state: 'On'
+            roles: ['Owner', 'ServiceAdmin']
+          }
+          alertNotifications: {
+            state: 'On'
+            minimalSeverity: 'Medium'
+          }
+        }
+      }
+    prohibitions:
+      - "Never disable alert notifications for Owner and ServiceAdmin roles"
+      - "Never set minimalSeverity to High — Medium ensures broader coverage"
+
+  - id: DEF-004
+    severity: recommended
+    description: "Enable continuous export of Defender alerts to Log Analytics"
+    rationale: "Continuous export enables SIEM integration, custom alerting, and long-term retention beyond Defender"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer, monitoring-agent]
+
+patterns:
+  - name: "Defender for Cloud with full coverage"
+    description: "Enable Defender Standard tier on all resource types with auto-provisioning and alert routing"
+
+anti_patterns:
+  - description: "Do not use Free tier Defender in production"
+    instead: "Enable Standard tier on all resource types used in the deployment"
+  - description: "Do not skip security contact configuration"
+    instead: "Configure security contact email with alert notifications enabled"
+
+references:
+  - title: "Microsoft Defender for Cloud documentation"
+    url: "https://learn.microsoft.com/azure/defender-for-cloud/defender-for-cloud-introduction"
+  - title: "Defender for Cloud pricing tiers"
+    url: "https://learn.microsoft.com/azure/defender-for-cloud/enhanced-security-features-overview"

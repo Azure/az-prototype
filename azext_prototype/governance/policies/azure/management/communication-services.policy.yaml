@@ -1,0 +1,191 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: communication-services
+  category: azure
+  services: [communication-services]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: ACS-001
+    severity: required
+    description: "Deploy Azure Communication Services with managed identity and disabled access key authentication"
+    rationale: "Access keys grant full control and cannot be scoped; managed identity with RBAC provides auditable access"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "communication" {
+        type      = "Microsoft.Communication/communicationServices@2023-04-01"
+        name      = var.communication_name
+        location  = "global"
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          properties = {
+            dataLocation = var.data_location  # "United States", "Europe", "UK", "Japan", etc.
+          }
+        }
+      }
+    bicep_pattern: |
+      resource communication 'Microsoft.Communication/communicationServices@2023-04-01' = {
+        name: communicationName
+        location: 'global'
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          dataLocation: dataLocation
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Communication/emailServices@2023-04-01"
+        name: "email-service"
+        description: "Email Communication Service for email sending capabilities"
+        terraform_pattern: |
+          resource "azapi_resource" "email_service" {
+            type      = "Microsoft.Communication/emailServices@2023-04-01"
+            name      = var.email_service_name
+            location  = "global"
+            parent_id = var.resource_group_id
+
+            body = {
+              properties = {
+                dataLocation = var.data_location
+              }
+            }
+          }
+        bicep_pattern: |
+          resource emailService 'Microsoft.Communication/emailServices@2023-04-01' = {
+            name: emailServiceName
+            location: 'global'
+            properties: {
+              dataLocation: dataLocation
+            }
+          }
+      - type: "Microsoft.Communication/emailServices/domains@2023-04-01"
+        name: "email-domain"
+        description: "Email domain with DKIM, SPF, and DMARC configuration for verified sending"
+        terraform_pattern: |
+          resource "azapi_resource" "email_domain" {
+            type      = "Microsoft.Communication/emailServices/domains@2023-04-01"
+            name      = var.email_domain_name
+            location  = "global"
+            parent_id = azapi_resource.email_service.id
+
+            body = {
+              properties = {
+                domainManagement       = "CustomerManaged"
+                userEngagementTracking = "Disabled"
+              }
+            }
+          }
+        bicep_pattern: |
+          resource emailDomain 'Microsoft.Communication/emailServices/domains@2023-04-01' = {
+            name: emailDomainName
+            parent: emailService
+            location: 'global'
+            properties: {
+              domainManagement: 'CustomerManaged'
+              userEngagementTracking: 'Disabled'
+            }
+          }
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name: "diag-acs"
+        description: "Diagnostic settings for chat, SMS, voice, and email operation logs"
+        terraform_pattern: |
+          resource "azapi_resource" "diag_acs" {
+            type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+            name      = "diag-${var.communication_name}"
+            parent_id = azapi_resource.communication.id
+
+            body = {
+              properties = {
+                workspaceId = var.log_analytics_workspace_id
+                logs = [
+                  {
+                    categoryGroup = "allLogs"
+                    enabled       = true
+                  }
+                ]
+                metrics = [
+                  {
+                    category = "AllMetrics"
+                    enabled  = true
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource diagAcs 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+            name: 'diag-${communicationName}'
+            scope: communication
+            properties: {
+              workspaceId: logAnalyticsWorkspaceId
+              logs: [
+                {
+                  categoryGroup: 'allLogs'
+                  enabled: true
+                }
+              ]
+              metrics: [
+                {
+                  category: 'AllMetrics'
+                  enabled: true
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "Communication Service Contributor"
+        description: "RBAC role assignment for ACS resource management"
+    prohibitions:
+      - "Never hardcode ACS access keys or connection strings in application code"
+      - "Never distribute access keys to client-side applications — use user access tokens"
+      - "Never use AzureManaged domains for production email — use CustomerManaged with verified domains"
+      - "Never enable userEngagementTracking without user consent (privacy regulations)"
+      - "Never skip data location selection — it determines data residency and compliance boundary"
+
+  - id: ACS-002
+    severity: required
+    description: "Set dataLocation to match compliance requirements for data residency"
+    rationale: "Communication data (chat transcripts, call recordings) must reside in the correct geography for regulatory compliance"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+  - id: ACS-003
+    severity: required
+    description: "Use user access tokens for client applications — never expose connection strings to clients"
+    rationale: "Connection strings grant full access; user tokens are scoped, short-lived, and tied to identity"
+    applies_to: [cloud-architect, app-developer]
+
+  - id: ACS-004
+    severity: recommended
+    description: "Configure custom domains with DKIM and SPF for email sending"
+    rationale: "Azure-managed domains have sending limits and cannot be customized; custom domains improve deliverability"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+  - id: ACS-005
+    severity: recommended
+    description: "Enable diagnostic logging for all communication modalities"
+    rationale: "Logs enable troubleshooting, usage analytics, and compliance auditing for chat, SMS, voice, and email"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+
+patterns:
+  - name: "Communication Services with email and managed identity"
+    description: "ACS resource with email service, custom domain, managed identity, and diagnostic logging"
+
+anti_patterns:
+  - description: "Do not embed access keys in client applications"
+    instead: "Use server-side token issuance with CommunicationIdentityClient to generate scoped user tokens"
+  - description: "Do not use Azure-managed domains for production email"
+    instead: "Configure customer-managed domains with DKIM, SPF, and DMARC verification"
+
+references:
+  - title: "Azure Communication Services documentation"
+    url: "https://learn.microsoft.com/azure/communication-services/overview"
+  - title: "ACS authentication best practices"
+    url: "https://learn.microsoft.com/azure/communication-services/concepts/authentication"

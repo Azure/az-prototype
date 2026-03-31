@@ -19,7 +19,7 @@ Azure AI Search is the recommended retrieval engine for RAG patterns on Azure. P
 | Partitions | 1 | Scale up for storage/throughput |
 | Semantic ranker | Free tier | 1,000 queries/month free on Basic+ |
 | Authentication | API key (POC) | Flag RBAC-only as production backlog item |
-| Public network access | Enabled (POC) | Flag private endpoint as production backlog item |
+| Public network access | Disabled (unless user overrides) | Flag private endpoint as production backlog item |
 
 ## Terraform Patterns
 
@@ -33,7 +33,7 @@ resource "azurerm_search_service" "this" {
   sku                           = "basic"
   replica_count                 = 1
   partition_count               = 1
-  public_network_access_enabled = true  # Set false when using private endpoint
+  public_network_access_enabled = false  # Unless told otherwise, disabled per governance policy
   local_authentication_enabled  = true  # Set false when using RBAC-only
 
   identity {

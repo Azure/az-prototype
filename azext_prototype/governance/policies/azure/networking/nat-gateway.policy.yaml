@@ -1,0 +1,191 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: nat-gateway
+  category: azure
+  services: [nat-gateway]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: NAT-001
+    severity: required
+    description: "Use Standard SKU for NAT Gateway with zone-redundant public IP"
+    rationale: "Standard SKU is the only supported SKU; zone redundancy ensures high availability"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "nat_gateway" {
+        type      = "Microsoft.Network/natGateways@2024-01-01"
+        name      = var.nat_gateway_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          sku = {
+            name = "Standard"
+          }
+          properties = {
+            idleTimeoutInMinutes = 4
+          }
+          zones = ["1", "2", "3"]
+        }
+      }
+    bicep_pattern: |
+      resource natGateway 'Microsoft.Network/natGateways@2024-01-01' = {
+        name: natGatewayName
+        location: location
+        sku: {
+          name: 'Standard'
+        }
+        zones: ['1', '2', '3']
+        properties: {
+          idleTimeoutInMinutes: 4
+          publicIpAddresses: [
+            { id: publicIp.id }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/publicIPAddresses (Standard SKU, static allocation, zone-redundant)"
+      - "Microsoft.Network/virtualNetworks/subnets (associate NAT gateway with subnet)"
+      - "Microsoft.Insights/diagnosticSettings (route metrics to Log Analytics)"
+    prohibitions:
+      - "Do not use Basic SKU public IPs — NAT Gateway requires Standard SKU"
+      - "Do not set idleTimeoutInMinutes above 120 — causes connection tracking overhead"
+      - "Do not associate NAT Gateway with subnets that already have instance-level public IPs for outbound"
+
+  - id: NAT-002
+    severity: required
+    description: "Associate NAT Gateway with a Standard SKU static public IP address"
+    rationale: "NAT Gateway only works with Standard SKU static public IPs; dynamic allocation is not supported"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "nat_public_ip" {
+        type      = "Microsoft.Network/publicIPAddresses@2024-01-01"
+        name      = var.nat_public_ip_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          sku = {
+            name = "Standard"
+            tier = "Regional"
+          }
+          properties = {
+            publicIPAllocationMethod = "Static"
+            publicIPAddressVersion   = "IPv4"
+          }
+          zones = ["1", "2", "3"]
+        }
+      }
+    bicep_pattern: |
+      resource natPublicIp 'Microsoft.Network/publicIPAddresses@2024-01-01' = {
+        name: natPublicIpName
+        location: location
+        sku: {
+          name: 'Standard'
+          tier: 'Regional'
+        }
+        zones: ['1', '2', '3']
+        properties: {
+          publicIPAllocationMethod: 'Static'
+          publicIPAddressVersion: 'IPv4'
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/natGateways (parent NAT gateway resource)"
+    prohibitions:
+      - "Do not use Dynamic allocation — NAT Gateway requires Static"
+      - "Do not use Basic SKU public IPs with NAT Gateway"
+
+  - id: NAT-003
+    severity: recommended
+    description: "Associate NAT Gateway with private subnets for controlled outbound connectivity"
+    rationale: "Subnets without NAT Gateway or other outbound mechanism lose internet access when default outbound is retired"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "subnet" {
+        type      = "Microsoft.Network/virtualNetworks/subnets@2024-01-01"
+        name      = var.subnet_name
+        parent_id = azapi_resource.vnet.id
+        body = {
+          properties = {
+            addressPrefix = var.subnet_prefix
+            natGateway = {
+              id = azapi_resource.nat_gateway.id
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-01-01' = {
+        parent: vnet
+        name: subnetName
+        properties: {
+          addressPrefix: subnetPrefix
+          natGateway: {
+            id: natGateway.id
+          }
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/networkSecurityGroups (NSG on subnet for inbound filtering)"
+    prohibitions:
+      - "Do not assign NAT Gateway to GatewaySubnet — use on application subnets only"
+
+  - id: NAT-004
+    severity: recommended
+    description: "Enable diagnostic settings for NAT Gateway metrics"
+    rationale: "Monitor SNAT port utilization, packet counts, and dropped packets for capacity planning"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "nat_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-nat-gateway"
+        parent_id = azapi_resource.nat_gateway.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource natDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-nat-gateway'
+        scope: natGateway
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          metrics: [
+            {
+              category: 'AllMetrics'
+              enabled: true
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.OperationalInsights/workspaces (Log Analytics workspace)"
+    prohibitions:
+      - "Do not omit diagnostic settings — SNAT exhaustion is undetectable without metrics"
+
+patterns:
+  - name: "NAT Gateway with zone-redundant public IP"
+    description: "Standard NAT Gateway associated with a zone-redundant static public IP and subnet"
+    example: |
+      # Deploy NAT Gateway with Standard public IP and subnet association
+      # See NAT-001 through NAT-004 for complete azapi_resource patterns
+
+anti_patterns:
+  - description: "Do not rely on default outbound access for internet connectivity"
+    instead: "Use NAT Gateway for deterministic, scalable outbound SNAT"
+  - description: "Do not attach multiple NAT Gateways to the same subnet"
+    instead: "Use a single NAT Gateway with multiple public IPs for scale"
+
+references:
+  - title: "Azure NAT Gateway documentation"
+    url: "https://learn.microsoft.com/azure/nat-gateway/nat-overview"
+  - title: "NAT Gateway metrics and alerts"
+    url: "https://learn.microsoft.com/azure/nat-gateway/nat-metrics"

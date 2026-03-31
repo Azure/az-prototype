@@ -1,0 +1,97 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: resource-groups
+  category: azure
+  services: [resource-group]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: RG-001
+    severity: required
+    description: "Create Resource Group with required tags and location from variable"
+    rationale: "Tags enable cost tracking, ownership identification, and automated governance; location must be parameterized for portability"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "resource_group" {
+        type     = "Microsoft.Resources/resourceGroups@2024-03-01"
+        name     = var.resource_group_name
+        location = var.location
+
+        tags = {
+          project     = var.project_name
+          environment = var.environment
+          owner       = var.owner
+          created_by  = "azext-prototype"
+        }
+
+        body = {}
+      }
+    bicep_pattern: |
+      targetScope = 'subscription'
+
+      resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
+        name: resourceGroupName
+        location: location
+        tags: {
+          project: projectName
+          environment: environment
+          owner: owner
+          created_by: 'azext-prototype'
+        }
+      }
+    prohibitions:
+      - "NEVER hardcode the location — always use a variable (var.location in Terraform, location parameter in Bicep)"
+      - "NEVER create a resource group without tags"
+      - "NEVER hardcode the resource group name — always use a variable"
+
+  - id: RG-002
+    severity: required
+    description: "Include mandatory tags: project, environment, owner, created_by"
+    rationale: "These tags are required for cost tracking, environment identification, ownership, and audit trail"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    prohibitions:
+      - "NEVER omit the project tag — it identifies which POC this resource group belongs to"
+      - "NEVER omit the environment tag — it distinguishes dev/staging/prod resources"
+      - "NEVER omit the owner tag — it identifies who is responsible for the resource group"
+
+  - id: RG-003
+    severity: required
+    description: "Set Bicep targetScope to subscription when creating resource groups"
+    rationale: "Resource groups are subscription-level resources; Bicep defaults to resourceGroup scope which cannot create resource groups"
+    applies_to: [bicep-agent]
+    prohibitions:
+      - "NEVER omit targetScope = 'subscription' in the Bicep file that creates resource groups"
+
+  - id: RG-004
+    severity: recommended
+    description: "Use naming convention: rg-{project}-{environment}-{location}"
+    rationale: "Consistent naming enables automation, scripting, and resource identification"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+
+  - id: RG-005
+    severity: recommended
+    description: "Create separate resource groups for different lifecycle boundaries"
+    rationale: "Shared resources (VNet, DNS, Key Vault) should be in a separate resource group from application resources to avoid accidental deletion"
+    applies_to: [cloud-architect]
+
+patterns:
+  - name: "Resource Group with tags"
+    description: "Standard resource group with required tags and parameterized location"
+
+anti_patterns:
+  - description: "Do not hardcode resource group location"
+    instead: "Use a variable/parameter for location to enable multi-region deployment"
+  - description: "Do not create resource groups without tags"
+    instead: "Always include project, environment, owner, and created_by tags"
+  - description: "Do not put all resources in a single resource group"
+    instead: "Separate by lifecycle boundary — shared infrastructure vs application resources"
+
+references:
+  - title: "Resource group design"
+    url: "https://learn.microsoft.com/azure/cloud-adoption-framework/ready/azure-setup-guide/organize-resources"
+  - title: "Tagging strategy"
+    url: "https://learn.microsoft.com/azure/cloud-adoption-framework/ready/azure-best-practices/resource-tagging"
+  - title: "Naming conventions"
+    url: "https://learn.microsoft.com/azure/cloud-adoption-framework/ready/azure-best-practices/resource-naming"

@@ -1,0 +1,643 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: compute-optimization
+  category: performance
+  services:
+    - container-apps
+    - aks
+    - app-service
+    - functions
+    - virtual-machines
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: COMP-001
+    severity: required
+    description: "Define explicit CPU and memory resource limits for Container Apps — prevent unbounded resource consumption and noisy neighbor issues"
+    rationale: "Containers without resource limits can consume all available CPU/memory, starving co-located containers and causing OOM kills"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # === Container App with Resource Limits ===
+      resource "azapi_resource" "container_app" {
+        type      = "Microsoft.App/containerApps@2024-03-01"
+        name      = var.container_app_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            managedEnvironmentId = azapi_resource.container_app_env.id
+            template = {
+              containers = [
+                {
+                  name  = "web"
+                  image = var.web_image
+                  resources = {
+                    cpu    = 0.5               # 0.5 vCPU per replica
+                    memory = "1Gi"             # 1 GB RAM per replica
+                  }
+                  probes = [
+                    {
+                      type = "liveness"
+                      httpGet = {
+                        path = "/healthz"
+                        port = 8080
+                      }
+                      initialDelaySeconds = 10
+                      periodSeconds       = 30
+                      failureThreshold    = 3
+                    },
+                    {
+                      type = "readiness"
+                      httpGet = {
+                        path = "/ready"
+                        port = 8080
+                      }
+                      initialDelaySeconds = 5
+                      periodSeconds       = 10
+                      failureThreshold    = 3
+                    },
+                    {
+                      type = "startup"
+                      httpGet = {
+                        path = "/healthz"
+                        port = 8080
+                      }
+                      initialDelaySeconds = 0
+                      periodSeconds       = 5
+                      failureThreshold    = 30       # Allow up to 150s for startup
+                    }
+                  ]
+                },
+                {
+                  name  = "worker"
+                  image = var.worker_image
+                  resources = {
+                    cpu    = 0.25              # Background worker needs less CPU
+                    memory = "0.5Gi"
+                  }
+                }
+              ]
+              scale = {
+                minReplicas = 1
+                maxReplicas = 10
+              }
+            }
+          }
+        }
+      }
+
+      # Resource Limit Guidelines (Container Apps):
+      # +-----------------+--------+--------+----------------------------+
+      # | Workload Type   | CPU    | Memory | Notes                      |
+      # +-----------------+--------+--------+----------------------------+
+      # | API / Web       | 0.5    | 1Gi    | Typical web application    |
+      # | Background Job  | 0.25   | 0.5Gi  | Queue processor, cron      |
+      # | CPU-Intensive   | 1.0    | 2Gi    | Data processing, ML        |
+      # | Memory-Heavy    | 0.5    | 2Gi    | In-memory cache, analytics |
+      # +-----------------+--------+--------+----------------------------+
+      # Valid CPU/Memory combos: 0.25/0.5Gi, 0.5/1Gi, 0.75/1.5Gi,
+      #   1.0/2Gi, 1.25/2.5Gi, 1.5/3Gi, 1.75/3.5Gi, 2.0/4Gi
+    bicep_pattern: |
+      // === Container App with Resource Limits ===
+      resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
+        name: containerAppName
+        location: location
+        properties: {
+          managedEnvironmentId: containerAppEnv.id
+          template: {
+            containers: [
+              {
+                name: 'web'
+                image: webImage
+                resources: {
+                  cpu: json('0.5')
+                  memory: '1Gi'
+                }
+                probes: [
+                  {
+                    type: 'liveness'
+                    httpGet: {
+                      path: '/healthz'
+                      port: 8080
+                    }
+                    initialDelaySeconds: 10
+                    periodSeconds: 30
+                    failureThreshold: 3
+                  }
+                  {
+                    type: 'readiness'
+                    httpGet: {
+                      path: '/ready'
+                      port: 8080
+                    }
+                    initialDelaySeconds: 5
+                    periodSeconds: 10
+                    failureThreshold: 3
+                  }
+                  {
+                    type: 'startup'
+                    httpGet: {
+                      path: '/healthz'
+                      port: 8080
+                    }
+                    initialDelaySeconds: 0
+                    periodSeconds: 5
+                    failureThreshold: 30
+                  }
+                ]
+              }
+              {
+                name: 'worker'
+                image: workerImage
+                resources: {
+                  cpu: json('0.25')
+                  memory: '0.5Gi'
+                }
+              }
+            ]
+            scale: {
+              minReplicas: 1
+              maxReplicas: 10
+            }
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER deploy containers without explicit CPU and memory resource limits"
+      - "NEVER set CPU > 2.0 or memory > 4Gi per container in Container Apps — use dedicated workload profiles for larger workloads"
+      - "NEVER omit health probes (liveness, readiness, startup) — they are essential for reliable scaling and self-healing"
+      - "NEVER set liveness probe initialDelaySeconds < 5 — give the application time to start"
+      - "NEVER skip the startup probe for slow-starting applications — liveness probes will kill containers during startup"
+
+  - id: COMP-002
+    severity: recommended
+    description: "Configure App Service per-app scaling and deployment slots for density optimization and zero-downtime deployments"
+    rationale: "Per-app scaling prevents a single app from consuming all plan capacity; slots enable blue-green deployments without downtime"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # === App Service Plan with Per-App Scaling ===
+      resource "azapi_resource" "app_service_plan" {
+        type      = "Microsoft.Web/serverfarms@2023-12-01"
+        name      = var.app_service_plan_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "P1v3"
+            tier = "PremiumV3"
+          }
+          kind = "linux"
+          properties = {
+            reserved         = true
+            perSiteScaling   = true        # Enable per-app scaling
+          }
+        }
+      }
+
+      # === Deployment Slot (Staging) ===
+      resource "azapi_resource" "app_staging_slot" {
+        type      = "Microsoft.Web/sites/slots@2023-12-01"
+        name      = "staging"
+        location  = var.location
+        parent_id = azapi_resource.app_service.id
+
+        body = {
+          properties = {
+            serverFarmId = azapi_resource.app_service_plan.id
+            siteConfig = {
+              autoSwapSlotName = "production"     # Auto-swap after staging validation
+              appSettings = [
+                {
+                  name  = "SLOT_SETTING"
+                  value = "staging"
+                }
+              ]
+            }
+          }
+        }
+      }
+
+      # Deployment workflow:
+      # 1. Deploy to staging slot
+      # 2. Warm up staging (hit health endpoint)
+      # 3. Swap staging → production (atomic, zero-downtime)
+      # 4. If issues: swap back (instant rollback)
+      #
+      # deploy.sh:
+      # az webapp deployment slot swap \
+      #   --resource-group $RG_NAME \
+      #   --name $APP_NAME \
+      #   --slot staging \
+      #   --target-slot production
+    bicep_pattern: |
+      // === App Service Plan with Per-App Scaling ===
+      resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
+        name: appServicePlanName
+        location: location
+        kind: 'linux'
+        sku: {
+          name: 'P1v3'
+          tier: 'PremiumV3'
+        }
+        properties: {
+          reserved: true
+          perSiteScaling: true              // Enable per-app scaling
+        }
+      }
+
+      // === Deployment Slot (Staging) ===
+      resource appStagingSlot 'Microsoft.Web/sites/slots@2023-12-01' = {
+        parent: appService
+        name: 'staging'
+        location: location
+        properties: {
+          serverFarmId: appServicePlan.id
+          siteConfig: {
+            autoSwapSlotName: 'production'
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER deploy directly to the production slot — always deploy to staging and swap"
+      - "NEVER use slots on Basic (B1) tier — slots require Standard (S1) or higher"
+      - "NEVER omit slot-sticky settings for environment-specific configuration (connection strings, feature flags)"
+      - "NEVER forget to warm up the staging slot before swapping — cold swaps cause latency spikes"
+
+  - id: COMP-003
+    severity: required
+    description: "Define Kubernetes pod resource requests and limits for AKS workloads — prevent scheduling issues and resource contention"
+    rationale: "Pods without requests cannot be scheduled efficiently; pods without limits can starve other workloads. Requests drive scheduling, limits prevent starvation"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # === AKS Pod Resource Configuration ===
+      # Pod resource requests/limits are configured in Kubernetes manifests, not IaC.
+      # However, IaC must provision the cluster with appropriate node sizes.
+      #
+      # Kubernetes deployment manifest (generated by app-developer agent):
+      # apiVersion: apps/v1
+      # kind: Deployment
+      # metadata:
+      #   name: web-api
+      # spec:
+      #   replicas: 2
+      #   template:
+      #     spec:
+      #       containers:
+      #       - name: web-api
+      #         image: myregistry.azurecr.io/web-api:latest
+      #         resources:
+      #           requests:
+      #             cpu: "250m"          # Request 0.25 vCPU (scheduling guarantee)
+      #             memory: "512Mi"      # Request 512 MB (scheduling guarantee)
+      #           limits:
+      #             cpu: "500m"          # Limit to 0.5 vCPU (throttled above this)
+      #             memory: "1Gi"        # Limit to 1 GB (OOM-killed above this)
+      #         livenessProbe:
+      #           httpGet:
+      #             path: /healthz
+      #             port: 8080
+      #           initialDelaySeconds: 15
+      #           periodSeconds: 20
+      #         readinessProbe:
+      #           httpGet:
+      #             path: /ready
+      #             port: 8080
+      #           initialDelaySeconds: 5
+      #           periodSeconds: 10
+      #         startupProbe:
+      #           httpGet:
+      #             path: /healthz
+      #             port: 8080
+      #           failureThreshold: 30
+      #           periodSeconds: 10
+      #
+      # Resource Guidelines:
+      # +-------------------+----------------+----------------+
+      # | Workload          | Request        | Limit          |
+      # +-------------------+----------------+----------------+
+      # | Web API           | 250m / 512Mi   | 500m / 1Gi     |
+      # | Background Worker | 100m / 256Mi   | 250m / 512Mi   |
+      # | Data Processing   | 500m / 1Gi     | 1000m / 2Gi    |
+      # | Cache Sidecar     | 50m / 128Mi    | 100m / 256Mi   |
+      # +-------------------+----------------+----------------+
+      #
+      # Ratio rule: Limits should be 1.5-2x requests for bursty workloads,
+      #             1x requests for steady-state workloads (guaranteed QoS)
+
+      # AKS cluster should have LimitRange for namespace defaults
+      # apiVersion: v1
+      # kind: LimitRange
+      # metadata:
+      #   name: default-limits
+      #   namespace: app
+      # spec:
+      #   limits:
+      #   - default:
+      #       cpu: "500m"
+      #       memory: "1Gi"
+      #     defaultRequest:
+      #       cpu: "100m"
+      #       memory: "256Mi"
+      #     type: Container
+    bicep_pattern: |
+      // Pod resource requests/limits are configured in Kubernetes manifests.
+      // Ensure AKS cluster nodes are sized appropriately for the workload.
+      //
+      // Node sizing formula:
+      //   Node capacity = (Node CPU/Memory) - (system reserved) - (kube reserved)
+      //   Standard_D4s_v5: 4 vCPU, 16 GB → ~3.5 vCPU, ~13 GB available for pods
+      //
+      // Pod density per node (Standard_D4s_v5):
+      //   Web API (250m/512Mi request): ~14 pods per node
+      //   Worker (100m/256Mi request): ~35 pods per node
+
+      resource aksCluster 'Microsoft.ContainerService/managedClusters@2024-06-02-preview' = {
+        name: aksName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          agentPoolProfiles: [
+            {
+              name: 'system'
+              count: 2
+              vmSize: 'Standard_D4s_v5'       // 4 vCPU, 16 GB — fits ~14 web pods
+              mode: 'System'
+              enableAutoScaling: true
+              minCount: 2
+              maxCount: 5
+            }
+          ]
+        }
+      }
+    prohibitions:
+      - "NEVER deploy Kubernetes pods without resource requests — the scheduler cannot make optimal placement decisions"
+      - "NEVER deploy pods without resource limits — a single pod can consume all node resources"
+      - "NEVER set CPU limits equal to requests for bursty workloads — allow 1.5-2x headroom"
+      - "NEVER set memory limits lower than requests — this is invalid and will be rejected"
+      - "NEVER omit health probes (liveness, readiness, startup) on AKS pods"
+      - "NEVER skip LimitRange on namespaces — it provides defaults for pods that omit resource specs"
+
+  - id: COMP-004
+    severity: required
+    description: "Configure Azure Functions timeout, concurrency, and batching settings in host.json"
+    rationale: "Default Function settings are not optimized for production; incorrect timeout causes failures, incorrect concurrency causes throttling or resource exhaustion"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # === Azure Functions host.json Configuration ===
+      # host.json is deployed with application code, not IaC.
+      # However, IaC must configure the Function App settings that interact with host.json.
+
+      resource "azapi_resource" "function_app" {
+        type      = "Microsoft.Web/sites@2023-12-01"
+        name      = var.function_app_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          kind = "functionapp,linux"
+          properties = {
+            serverFarmId = azapi_resource.function_plan.id
+            siteConfig = {
+              linuxFxVersion = "DOTNET-ISOLATED|8.0"
+              appSettings = [
+                {
+                  name  = "FUNCTIONS_EXTENSION_VERSION"
+                  value = "~4"
+                },
+                {
+                  name  = "FUNCTIONS_WORKER_RUNTIME"
+                  value = "dotnet-isolated"
+                },
+                {
+                  name  = "WEBSITE_MAX_DYNAMIC_APPLICATION_SCALE_OUT"
+                  value = "10"                    # Consumption: max 10 instances
+                },
+                {
+                  name  = "AzureFunctionsJobHost__extensions__serviceBus__maxConcurrentCalls"
+                  value = "16"                    # Service Bus concurrent message processing
+                },
+                {
+                  name  = "AzureFunctionsJobHost__extensions__serviceBus__prefetchCount"
+                  value = "32"                    # Prefetch 2x concurrency for throughput
+                }
+              ]
+            }
+          }
+        }
+      }
+
+      # host.json (deployed with application code):
+      # {
+      #   "version": "2.0",
+      #   "functionTimeout": "00:10:00",       // 10 minutes (max for Consumption)
+      #   "extensions": {
+      #     "http": {
+      #       "routePrefix": "api",
+      #       "maxOutstandingRequests": 200,     // Max queued HTTP requests
+      #       "maxConcurrentRequests": 100,      // Max parallel HTTP requests
+      #       "dynamicThrottlesEnabled": true    // Auto-throttle on high CPU/memory
+      #     },
+      #     "serviceBus": {
+      #       "maxConcurrentCalls": 16,          // Parallel message processing
+      #       "prefetchCount": 32,               // Prefetch buffer
+      #       "autoCompleteMessages": true,
+      #       "maxAutoLockRenewalDuration": "00:05:00"
+      #     },
+      #     "queues": {
+      #       "maxPollingInterval": "00:00:02",  // Poll every 2s
+      #       "visibilityTimeout": "00:05:00",   // 5-minute poison message timeout
+      #       "batchSize": 16,                   // Process 16 messages per batch
+      #       "maxDequeueCount": 5,              // Max retries before poison queue
+      #       "newBatchThreshold": 8             // Fetch new batch when 8 messages remain
+      #     }
+      #   },
+      #   "logging": {
+      #     "applicationInsights": {
+      #       "samplingSettings": {
+      #         "isEnabled": true,
+      #         "maxTelemetryItemsPerSecond": 20,
+      #         "excludedTypes": "Dependency;Event"
+      #       }
+      #     }
+      #   }
+      # }
+    bicep_pattern: |
+      // === Azure Functions App Settings ===
+      resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
+        name: functionAppName
+        location: location
+        kind: 'functionapp,linux'
+        properties: {
+          serverFarmId: functionPlan.id
+          siteConfig: {
+            linuxFxVersion: 'DOTNET-ISOLATED|8.0'
+            appSettings: [
+              { name: 'FUNCTIONS_EXTENSION_VERSION', value: '~4' }
+              { name: 'FUNCTIONS_WORKER_RUNTIME', value: 'dotnet-isolated' }
+              { name: 'WEBSITE_MAX_DYNAMIC_APPLICATION_SCALE_OUT', value: '10' }
+            ]
+          }
+        }
+      }
+
+      // host.json (deployed with code):
+      // {
+      //   "version": "2.0",
+      //   "functionTimeout": "00:10:00",
+      //   "extensions": {
+      //     "http": {
+      //       "maxOutstandingRequests": 200,
+      //       "maxConcurrentRequests": 100,
+      //       "dynamicThrottlesEnabled": true
+      //     },
+      //     "queues": {
+      //       "batchSize": 16,
+      //       "maxDequeueCount": 5,
+      //       "newBatchThreshold": 8
+      //     }
+      //   }
+      // }
+    prohibitions:
+      - "NEVER set functionTimeout > 10 minutes on Consumption plan — it will be rejected"
+      - "NEVER set maxConcurrentRequests > 500 — this can exhaust downstream resources"
+      - "NEVER set maxDequeueCount > 10 — poison messages should fail fast and move to dead-letter queue"
+      - "NEVER disable dynamicThrottlesEnabled — it prevents resource exhaustion under load"
+      - "NEVER omit Application Insights sampling — unsampled telemetry can cost more than the function itself"
+      - "NEVER use in-process .NET model for new functions — use isolated worker model (.NET 8+)"
+
+  - id: COMP-005
+    severity: required
+    description: "Offload long-running operations to asynchronous processing with queues and background workers"
+    rationale: "Synchronous processing of operations > 5 seconds blocks threads, degrades UX, and causes timeout failures. Async processing decouples producers from consumers"
+    applies_to: [cloud-architect, app-developer, terraform-agent, bicep-agent]
+    terraform_pattern: |
+      # === Service Bus Queue for Async Processing ===
+      resource "azapi_resource" "service_bus_namespace" {
+        type      = "Microsoft.ServiceBus/namespaces@2022-10-01-preview"
+        name      = var.service_bus_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "Standard"        # Standard: queues, topics, 256 KB messages
+            tier = "Standard"
+          }
+          properties = {
+            minimumTlsVersion       = "1.2"
+            publicNetworkAccess     = "Disabled"
+            disableLocalAuth        = true       # Entra-only auth
+          }
+        }
+      }
+
+      resource "azapi_resource" "async_processing_queue" {
+        type      = "Microsoft.ServiceBus/namespaces/queues@2022-10-01-preview"
+        name      = "async-tasks"
+        parent_id = azapi_resource.service_bus_namespace.id
+
+        body = {
+          properties = {
+            maxDeliveryCount       = 10           # Max retries before dead-letter
+            defaultMessageTimeToLive = "P7D"      # Messages expire after 7 days
+            lockDuration           = "PT5M"       # 5-minute lock for processing
+            deadLetteringOnMessageExpiration = true
+            duplicateDetectionHistoryTimeWindow = "PT10M"
+            requiresDuplicateDetection = true     # Prevent duplicate processing
+            enablePartitioning     = false
+            maxSizeInMegabytes     = 5120         # 5 GB queue size
+          }
+        }
+      }
+
+      # Async Processing Pattern:
+      #
+      # API Controller (synchronous entry point):
+      #   POST /api/reports/generate
+      #   → Validate request
+      #   → Enqueue message to Service Bus
+      #   → Return 202 Accepted + status URL
+      #   → Respond in < 1 second
+      #
+      # Background Worker (async processor):
+      #   → Receive message from Service Bus
+      #   → Process long-running task (generate report, process data)
+      #   → Update status (blob storage, database)
+      #   → Complete message
+      #
+      # Status Endpoint:
+      #   GET /api/reports/{id}/status
+      #   → Return { status: "processing" | "completed" | "failed" }
+    bicep_pattern: |
+      // === Service Bus Queue for Async Processing ===
+      resource serviceBusNamespace 'Microsoft.ServiceBus/namespaces@2022-10-01-preview' = {
+        name: serviceBusName
+        location: location
+        sku: {
+          name: 'Standard'
+          tier: 'Standard'
+        }
+        properties: {
+          minimumTlsVersion: '1.2'
+          publicNetworkAccess: 'Disabled'
+          disableLocalAuth: true
+        }
+      }
+
+      resource asyncQueue 'Microsoft.ServiceBus/namespaces/queues@2022-10-01-preview' = {
+        parent: serviceBusNamespace
+        name: 'async-tasks'
+        properties: {
+          maxDeliveryCount: 10
+          defaultMessageTimeToLive: 'P7D'
+          lockDuration: 'PT5M'
+          deadLetteringOnMessageExpiration: true
+          requiresDuplicateDetection: true
+          duplicateDetectionHistoryTimeWindow: 'PT10M'
+          maxSizeInMegabytes: 5120
+        }
+      }
+
+      // Pattern: API returns 202 Accepted + enqueues to Service Bus
+      // Worker processes asynchronously and updates status
+    prohibitions:
+      - "NEVER process operations > 5 seconds synchronously in HTTP request handlers"
+      - "NEVER use HTTP polling without a status endpoint — always provide a status URL in the 202 response"
+      - "NEVER use Storage Queues for mission-critical workloads — use Service Bus for guaranteed delivery, dead-lettering, and ordering"
+      - "NEVER set lockDuration < 1 minute for processing queues — short locks cause duplicate processing"
+      - "NEVER skip dead-letter queue monitoring — failed messages accumulate silently"
+      - "NEVER disable duplicate detection for idempotency-sensitive workloads"
+
+patterns:
+  - name: "Right-sized container resources"
+    description: "Define CPU/memory based on workload type: API (0.5 CPU/1Gi), worker (0.25 CPU/0.5Gi), data processing (1.0 CPU/2Gi)"
+  - name: "Async request-reply pattern"
+    description: "API returns 202 Accepted with status URL; background worker processes via Service Bus; status endpoint returns progress"
+
+anti_patterns:
+  - description: "Do not run long-running operations in HTTP request handlers"
+    instead: "Enqueue to Service Bus and process asynchronously; return 202 Accepted with a status URL"
+  - description: "Do not deploy containers or pods without resource limits"
+    instead: "Define explicit CPU and memory requests/limits based on workload profiling"
+  - description: "Do not deploy directly to production App Service slot"
+    instead: "Deploy to staging slot, warm up, then swap to production for zero-downtime deployment"
+  - description: "Do not use default Azure Functions host.json settings"
+    instead: "Configure timeout, concurrency, batching, and sampling based on workload requirements"
+
+references:
+  - title: "Container Apps resource management"
+    url: "https://learn.microsoft.com/azure/container-apps/containers"
+  - title: "AKS resource management"
+    url: "https://learn.microsoft.com/azure/aks/developer-best-practices-resource-management"
+  - title: "App Service deployment slots"
+    url: "https://learn.microsoft.com/azure/app-service/deploy-staging-slots"
+  - title: "Azure Functions host.json reference"
+    url: "https://learn.microsoft.com/azure/azure-functions/functions-host-json"
+  - title: "Async request-reply pattern"
+    url: "https://learn.microsoft.com/azure/architecture/patterns/async-request-reply"

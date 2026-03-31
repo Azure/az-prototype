@@ -26,6 +26,9 @@ patterns:
       - "appinsights_connection_string"
       - "application_insights_connection_string"
       - "appinsights_connectionstring"
+      - ".properties.connectionstring"
+      - "connection_string_for_"
+      - "instrumentation"
     correct_patterns:
       - "# Use managed identity via DefaultAzureCredential"
       - "azurerm_user_assigned_identity"
@@ -52,6 +55,9 @@ patterns:
       - "avoid hardcod"
       - "never hardcode"
       - "don't hardcode"
+      - "possible hard-coded value detected"
+      - "rather than hardcoded"
+      - "instead of hardcod"
     correct_patterns:
       - "# Externalize secrets to Key Vault or use managed identity"
       - "azurerm_key_vault_secret"

@@ -1,0 +1,150 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: static-web-apps
+  category: azure
+  services: [static-web-apps]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: SWA-001
+    severity: required
+    description: "Deploy Azure Static Web Apps with Standard SKU, managed identity, and enterprise-grade auth"
+    rationale: "Standard SKU enables custom auth, private endpoints, and enterprise features; managed identity secures backend API connections"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "static_web_app" {
+        type      = "Microsoft.Web/staticSites@2023-12-01"
+        name      = var.swa_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          sku = {
+            name = "Standard"
+            tier = "Standard"
+          }
+          properties = {
+            stagingEnvironmentPolicy  = "Enabled"
+            allowConfigFileUpdates    = true
+            enterpriseGradeCdnStatus  = "Enabled"
+          }
+        }
+      }
+    bicep_pattern: |
+      resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
+        name: swaName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: 'Standard'
+          tier: 'Standard'
+        }
+        properties: {
+          stagingEnvironmentPolicy: 'Enabled'
+          allowConfigFileUpdates: true
+          enterpriseGradeCdnStatus: 'Enabled'
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Web/staticSites/config@2023-12-01"
+        name: "appsettings"
+        description: "Application settings for backend API configuration — never embed secrets directly"
+      - type: "Microsoft.Network/privateEndpoints@2024-01-01"
+        name: "pe-swa"
+        description: "Private endpoint for Static Web App (Standard SKU only)"
+        terraform_pattern: |
+          resource "azapi_resource" "pe_swa" {
+            type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+            name      = "pe-${var.swa_name}"
+            location  = var.location
+            parent_id = var.resource_group_id
+
+            body = {
+              properties = {
+                subnet = {
+                  id = var.subnet_id
+                }
+                privateLinkServiceConnections = [
+                  {
+                    name = "swa-connection"
+                    properties = {
+                      privateLinkServiceId = azapi_resource.static_web_app.id
+                      groupIds             = ["staticSites"]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource peSwa 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+            name: 'pe-${swaName}'
+            location: location
+            properties: {
+              subnet: {
+                id: subnetId
+              }
+              privateLinkServiceConnections: [
+                {
+                  name: 'swa-connection'
+                  properties: {
+                    privateLinkServiceId: staticWebApp.id
+                    groupIds: ['staticSites']
+                  }
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Network/privateDnsZones@2024-06-01"
+        name: "privatelink.azurestaticapps.net"
+        description: "Private DNS zone for Static Web App private endpoint resolution"
+      - type: "Microsoft.Web/staticSites/linkedBackends@2023-12-01"
+        name: "linked-backend"
+        description: "Linked backend API (e.g., Container Apps, Functions) for managed API routing"
+    prohibitions:
+      - "Never hardcode API keys or connection strings in staticwebapp.config.json"
+      - "Never use Free SKU in production — it lacks private endpoints, custom auth, and SLA"
+      - "Never embed secrets in application settings without Key Vault references"
+      - "Never disable stagingEnvironmentPolicy — staging environments enable safe preview deployments"
+
+  - id: SWA-002
+    severity: required
+    description: "Configure custom authentication with identity providers in staticwebapp.config.json"
+    rationale: "Default GitHub auth is insufficient for enterprise; custom auth enables Entra ID and other IdPs"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+
+  - id: SWA-003
+    severity: recommended
+    description: "Enable enterprise-grade CDN for global content distribution"
+    rationale: "Enterprise CDN provides edge caching, WAF integration, and custom domains with managed certificates"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+  - id: SWA-004
+    severity: recommended
+    description: "Configure custom domain with managed SSL certificate"
+    rationale: "Managed certificates auto-renew and eliminate manual certificate management"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+patterns:
+  - name: "Static Web App with linked backend and custom auth"
+    description: "Standard SWA with managed identity, linked backend API, and Entra ID authentication"
+
+anti_patterns:
+  - description: "Do not use Free tier for production workloads"
+    instead: "Use Standard SKU which provides SLA, private endpoints, and enterprise features"
+  - description: "Do not rely on default GitHub auth for enterprise applications"
+    instead: "Configure custom authentication with Microsoft Entra ID in staticwebapp.config.json"
+
+references:
+  - title: "Azure Static Web Apps documentation"
+    url: "https://learn.microsoft.com/azure/static-web-apps/overview"
+  - title: "Static Web Apps authentication"
+    url: "https://learn.microsoft.com/azure/static-web-apps/authentication-authorization"

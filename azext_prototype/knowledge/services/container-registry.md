@@ -17,7 +17,7 @@ Container Registry is a foundational infrastructure service. Any architecture us
 | SKU | Basic | Lowest cost; 10 GiB storage |
 | SKU (with geo-replication) | Standard | 100 GiB storage, webhooks |
 | Admin user | Disabled | Always use managed identity with AcrPull role |
-| Public network access | Enabled (POC) | Flag private endpoint as production backlog item |
+| Public network access | Disabled (unless user overrides) | Flag private endpoint as production backlog item |
 | Anonymous pull | Disabled | Require authentication for all image pulls |
 
 ## Terraform Patterns
@@ -31,7 +31,7 @@ resource "azurerm_container_registry" "this" {
   resource_group_name           = var.resource_group_name
   sku                           = "Basic"
   admin_enabled                 = false  # CRITICAL: Never enable admin user
-  public_network_access_enabled = true   # Set false when using private endpoint
+  public_network_access_enabled = false  # Unless told otherwise, disabled per governance policy
 
   tags = var.tags
 }
@@ -116,7 +116,7 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' = {
   }
   properties: {
     adminUserEnabled: false  // CRITICAL: Never enable admin user
-    publicNetworkAccess: 'Enabled'  // Set 'Disabled' when using private endpoint
+    publicNetworkAccess: 'Disabled'  // Unless told otherwise, disabled per governance policy
   }
 }
 

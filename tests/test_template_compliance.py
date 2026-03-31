@@ -62,6 +62,7 @@ def _compliant_template(**overrides) -> dict:
                 "config": {
                     "ingress": "internal",
                     "identity": "system-assigned",
+                    "zone_redundant": True,
                 },
             },
             {
@@ -389,7 +390,7 @@ class TestContainerAppsChecks:
         data["services"][0]["config"].pop("identity")
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
-        assert any(v.rule_id == "CA-001" and "api" in v.message for v in vs)
+        assert any(v.rule_id == "CA-002" and "api" in v.message for v in vs)
 
     def test_container_registry_needs_identity(self, tmp_path):
         data = _compliant_template(
@@ -401,7 +402,7 @@ class TestContainerAppsChecks:
         )
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
-        assert any(v.rule_id == "CA-001" and "acr" in v.message for v in vs)
+        assert not any(v.rule_id == "CA-002" and "acr" in v.message for v in vs)
 
     def test_container_registry_with_identity_passes(self, tmp_path):
         data = _compliant_template(
@@ -425,23 +426,23 @@ class TestContainerAppsChecks:
         )
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
-        assert not any(v.rule_id == "CA-001" for v in vs)
+        assert not any(v.rule_id == "CA-002" for v in vs)
 
     def test_missing_vnet_triggers_ca002(self, tmp_path):
         data = _compliant_template()
         data["services"] = [s for s in data["services"] if s["type"] != "virtual-network"]
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
-        assert any(v.rule_id == "CA-002" for v in vs)
+        assert any(v.rule_id == "CA-001" for v in vs)
 
-    def test_vnet_present_passes_ca002(self, tmp_path):
+    def test_vnet_present_passes_ca001(self, tmp_path):
         data = _compliant_template()
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
-        assert not any(v.rule_id == "CA-002" for v in vs)
+        assert not any(v.rule_id == "CA-001" for v in vs)
 
-    def test_no_container_apps_skips_ca002(self, tmp_path):
-        """CA-002 only fires when container-apps are present."""
+    def test_no_container_apps_skips_ca001(self, tmp_path):
+        """CA-001 only fires when container-apps are present."""
         data = _compliant_template(
             services=[
                 {"name": "fn", "type": "functions", "config": {"identity": "system-assigned"}},
@@ -460,7 +461,7 @@ class TestContainerAppsChecks:
         )
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
-        assert not any(v.rule_id == "CA-002" for v in vs)
+        assert not any(v.rule_id == "CA-001" for v in vs)
 
     def test_compliant_container_apps(self, tmp_path):
         data = _compliant_template()
@@ -629,21 +630,23 @@ class TestKeyVaultChecks:
         data["services"][2]["config"].pop("rbac_authorization")
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
-        assert any(v.rule_id == "KV-002" for v in vs)
+        assert any(v.rule_id == "KV-001" and "rbac_authorization" in v.message for v in vs)
 
     def test_missing_diagnostics(self, tmp_path):
+        """Diagnostics enforcement moved to monitoring policy."""
         data = _compliant_template()
         data["services"][2]["config"].pop("diagnostics")
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
-        assert any(v.rule_id == "KV-004" and "diagnostics" in v.message for v in vs)
+        assert not any(v.rule_id == "KV-001" for v in vs)
 
     def test_missing_kv_private_endpoint(self, tmp_path):
+        """PE enforcement moved to networking policy."""
         data = _compliant_template()
         data["services"][2]["config"].pop("private_endpoint")
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
-        assert any(v.rule_id == "KV-005" and "private_endpoint" in v.message for v in vs)
+        assert not any(v.rule_id == "KV-001" for v in vs)
 
     def test_compliant_key_vault(self, tmp_path):
         data = _compliant_template()
@@ -685,13 +688,13 @@ class TestSqlDatabaseChecks:
         data = self._sql_template(tde_enabled=False)
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
-        assert any(v.rule_id == "SQL-002" for v in vs)
+        assert any(v.rule_id == "SQL-003" for v in vs)
 
     def test_missing_threat_protection(self, tmp_path):
         data = self._sql_template(threat_protection=False)
         path = _write_template(tmp_path / "t.template.yaml", data)
         vs = validate_template_compliance(path)
-        assert any(v.rule_id == "SQL-003" for v in vs)
+        assert any(v.rule_id == "SQL-004" for v in vs)
 
     def test_compliant_sql(self, tmp_path):
         data = self._sql_template()
@@ -719,7 +722,7 @@ class TestCosmosDbChecks:
         base_config.update(config_overrides)
         return _compliant_template(
             services=[
-                {"name": "api", "type": "container-apps", "config": {"identity": "system-assigned"}},
+                {"name": "api", "type": "container-apps", "config": {"identity": "system-assigned", "zone_redundant": True}},
                 {"name": "store", "type": "cosmos-db", "config": base_config},
                 {"name": "net", "type": "virtual-network", "config": {}},
             ]

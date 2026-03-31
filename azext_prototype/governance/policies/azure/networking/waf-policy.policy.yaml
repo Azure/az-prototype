@@ -1,0 +1,176 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: waf-policy
+  category: azure
+  services: [waf-policy]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: WAF-001
+    severity: required
+    description: "Deploy WAF policy in Prevention mode with OWASP 3.2 managed rule set and bot protection"
+    rationale: "Detection mode only logs attacks; Prevention mode actively blocks them; OWASP 3.2 covers current threat landscape"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "waf_policy" {
+        type      = "Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies@2024-01-01"
+        name      = var.waf_policy_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        body = {
+          properties = {
+            policySettings = {
+              state                  = "Enabled"
+              mode                   = "Prevention"
+              requestBodyCheck       = true
+              maxRequestBodySizeInKb = 128
+              fileUploadLimitInMb    = 100
+              requestBodyEnforcement = true
+              requestBodyInspectLimitInKB = 128
+            }
+            managedRules = {
+              managedRuleSets = [
+                {
+                  ruleSetType    = "OWASP"
+                  ruleSetVersion = "3.2"
+                  ruleGroupOverrides = []
+                },
+                {
+                  ruleSetType    = "Microsoft_BotManagerRuleSet"
+                  ruleSetVersion = "1.0"
+                  ruleGroupOverrides = []
+                }
+              ]
+              exclusions = []
+            }
+            customRules = []
+          }
+        }
+      }
+    bicep_pattern: |
+      resource wafPolicy 'Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies@2024-01-01' = {
+        name: wafPolicyName
+        location: location
+        properties: {
+          policySettings: {
+            state: 'Enabled'
+            mode: 'Prevention'
+            requestBodyCheck: true
+            maxRequestBodySizeInKb: 128
+            fileUploadLimitInMb: 100
+            requestBodyEnforcement: true
+            requestBodyInspectLimitInKB: 128
+          }
+          managedRules: {
+            managedRuleSets: [
+              {
+                ruleSetType: 'OWASP'
+                ruleSetVersion: '3.2'
+                ruleGroupOverrides: []
+              }
+              {
+                ruleSetType: 'Microsoft_BotManagerRuleSet'
+                ruleSetVersion: '1.0'
+                ruleGroupOverrides: []
+              }
+            ]
+            exclusions: []
+          }
+          customRules: []
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name: "diag-waf"
+        description: "Diagnostic settings for WAF logs to monitor blocked requests and rule matches"
+    prohibitions:
+      - "Never set WAF mode to Detection in production — always use Prevention"
+      - "Never disable requestBodyCheck — it is required for SQL injection and XSS detection"
+      - "Never remove OWASP managed rule set — only add exclusions for verified false positives"
+      - "Never add broad exclusions (e.g., entire rule groups) without documenting justification"
+      - "Never deploy Application Gateway without WAF policy association"
+
+  - id: WAF-002
+    severity: required
+    description: "Enable request body inspection and set appropriate size limits"
+    rationale: "Without body inspection, injection attacks in POST payloads bypass the WAF"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+  - id: WAF-003
+    severity: recommended
+    description: "Add custom rules for geo-filtering and rate limiting before managed rules"
+    rationale: "Custom rules execute first and can block traffic by geography or rate before managed rule processing"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+    terraform_pattern: |
+      # Add to customRules array in WAF policy
+      # Rate limiting custom rule example:
+      {
+        name     = "RateLimitRule"
+        priority = 100
+        ruleType = "RateLimitRule"
+        action   = "Block"
+        rateLimitDuration     = "OneMin"
+        rateLimitThreshold    = 100
+        groupByUserSession    = []
+        matchConditions = [
+          {
+            matchVariables = [
+              {
+                variableName = "RemoteAddr"
+                selector     = null
+              }
+            ]
+            operator         = "IPMatch"
+            negationConditon = true
+            matchValues      = []
+            transforms       = []
+          }
+        ]
+      }
+    bicep_pattern: |
+      // Add to customRules array in WAF policy
+      {
+        name: 'RateLimitRule'
+        priority: 100
+        ruleType: 'RateLimitRule'
+        action: 'Block'
+        rateLimitDuration: 'OneMin'
+        rateLimitThreshold: 100
+        matchConditions: [
+          {
+            matchVariables: [
+              {
+                variableName: 'RemoteAddr'
+              }
+            ]
+            operator: 'IPMatch'
+            negationConditon: true
+            matchValues: []
+          }
+        ]
+      }
+
+  - id: WAF-004
+    severity: recommended
+    description: "Configure WAF exclusions only for verified false positives with documented justification"
+    rationale: "Overly broad exclusions weaken WAF protection; each exclusion must be validated"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+
+patterns:
+  - name: "WAF policy with OWASP 3.2 and bot protection"
+    description: "Prevention mode WAF with managed rules, bot protection, and rate limiting"
+
+anti_patterns:
+  - description: "Do not use Detection mode in production"
+    instead: "Set mode to Prevention to actively block attacks"
+  - description: "Do not add broad WAF exclusions without justification"
+    instead: "Add targeted exclusions for specific rules and request fields with documented false positive evidence"
+
+references:
+  - title: "Azure WAF on Application Gateway"
+    url: "https://learn.microsoft.com/azure/web-application-firewall/ag/ag-overview"
+  - title: "WAF policy configuration"
+    url: "https://learn.microsoft.com/azure/web-application-firewall/ag/policy-overview"

@@ -1,0 +1,206 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: azure-ai-search
+  category: azure
+  services: [azure-ai-search]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: AIS-001
+    severity: required
+    description: "Deploy Azure AI Search with managed identity, disabled API key auth, and no public access"
+    rationale: "API keys cannot be scoped or audited; managed identity with RBAC provides fine-grained access control"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "search" {
+        type      = "Microsoft.Search/searchServices@2024-03-01-preview"
+        name      = var.search_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          sku = {
+            name = var.sku_name  # "basic", "standard", "standard2", "standard3"
+          }
+          properties = {
+            hostingMode          = "default"
+            publicNetworkAccess  = "disabled"
+            disableLocalAuth     = true
+            authOptions = {
+              aadOrApiKey = {
+                aadAuthFailureMode = "http401WithBearerChallenge"
+              }
+            }
+            encryptionWithCmk = {
+              enforcement = "Enabled"
+            }
+            replicaCount   = var.replica_count
+            partitionCount = var.partition_count
+          }
+        }
+      }
+    bicep_pattern: |
+      resource search 'Microsoft.Search/searchServices@2024-03-01-preview' = {
+        name: searchName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: skuName
+        }
+        properties: {
+          hostingMode: 'default'
+          publicNetworkAccess: 'disabled'
+          disableLocalAuth: true
+          authOptions: {
+            aadOrApiKey: {
+              aadAuthFailureMode: 'http401WithBearerChallenge'
+            }
+          }
+          encryptionWithCmk: {
+            enforcement: 'Enabled'
+          }
+          replicaCount: replicaCount
+          partitionCount: partitionCount
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Network/privateEndpoints@2024-01-01"
+        name: "pe-search"
+        description: "Private endpoint for Azure AI Search to eliminate public network exposure"
+        terraform_pattern: |
+          resource "azapi_resource" "pe_search" {
+            type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+            name      = "pe-${var.search_name}"
+            location  = var.location
+            parent_id = var.resource_group_id
+
+            body = {
+              properties = {
+                subnet = {
+                  id = var.subnet_id
+                }
+                privateLinkServiceConnections = [
+                  {
+                    name = "search-connection"
+                    properties = {
+                      privateLinkServiceId = azapi_resource.search.id
+                      groupIds             = ["searchService"]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource peSearch 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+            name: 'pe-${searchName}'
+            location: location
+            properties: {
+              subnet: {
+                id: subnetId
+              }
+              privateLinkServiceConnections: [
+                {
+                  name: 'search-connection'
+                  properties: {
+                    privateLinkServiceId: search.id
+                    groupIds: ['searchService']
+                  }
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Network/privateDnsZones@2024-06-01"
+        name: "privatelink.search.windows.net"
+        description: "Private DNS zone for Azure AI Search private endpoint resolution"
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name: "diag-search"
+        description: "Diagnostic settings to route operational and query logs to Log Analytics"
+        terraform_pattern: |
+          resource "azapi_resource" "diag_search" {
+            type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+            name      = "diag-${var.search_name}"
+            parent_id = azapi_resource.search.id
+
+            body = {
+              properties = {
+                workspaceId = var.log_analytics_workspace_id
+                logs = [
+                  {
+                    categoryGroup = "allLogs"
+                    enabled       = true
+                  }
+                ]
+                metrics = [
+                  {
+                    category = "AllMetrics"
+                    enabled  = true
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource diagSearch 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+            name: 'diag-${searchName}'
+            scope: search
+            properties: {
+              workspaceId: logAnalyticsWorkspaceId
+              logs: [
+                {
+                  categoryGroup: 'allLogs'
+                  enabled: true
+                }
+              ]
+              metrics: [
+                {
+                  category: 'AllMetrics'
+                  enabled: true
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "Search Index Data Reader / Contributor"
+        description: "RBAC role assignment granting consuming identity the appropriate Search data-plane role"
+    prohibitions:
+      - "Never hardcode search admin keys or query keys in source code or IaC"
+      - "Never set disableLocalAuth to false — always use Microsoft Entra authentication"
+      - "Never set publicNetworkAccess to enabled without compensating network controls"
+      - "Never use admin keys for query operations — use query keys or RBAC"
+
+  - id: AIS-002
+    severity: recommended
+    description: "Configure semantic ranking and vector search with appropriate dimensions"
+    rationale: "Semantic ranker improves relevance; vector dimensions must match the embedding model"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+
+  - id: AIS-003
+    severity: recommended
+    description: "Enable customer-managed key encryption for indexes containing sensitive data"
+    rationale: "CMK encryption provides an additional layer of control over data-at-rest encryption"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+
+patterns:
+  - name: "Azure AI Search with private endpoint and RBAC"
+    description: "Secure search service with no public access, managed identity, and private connectivity"
+
+anti_patterns:
+  - description: "Do not use API key authentication for Azure AI Search"
+    instead: "Set disableLocalAuth=true and use RBAC with Search Index Data Reader/Contributor roles"
+  - description: "Do not leave publicNetworkAccess enabled"
+    instead: "Set publicNetworkAccess to disabled and use private endpoints"
+
+references:
+  - title: "Azure AI Search security overview"
+    url: "https://learn.microsoft.com/azure/search/search-security-overview"
+  - title: "Azure AI Search RBAC"
+    url: "https://learn.microsoft.com/azure/search/search-security-rbac"

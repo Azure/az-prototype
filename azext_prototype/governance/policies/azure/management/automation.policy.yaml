@@ -1,0 +1,197 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: automation
+  category: azure
+  services: [automation]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: AUTO-001
+    severity: required
+    description: "Deploy Azure Automation account with managed identity, disabled public access, and encryption"
+    rationale: "Automation accounts execute privileged runbooks; managed identity eliminates Run As account credentials"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "automation" {
+        type      = "Microsoft.Automation/automationAccounts@2023-11-01"
+        name      = var.automation_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          properties = {
+            sku = {
+              name = "Basic"
+            }
+            publicNetworkAccess  = false
+            disableLocalAuth     = true
+            encryption = {
+              keySource = "Microsoft.Automation"
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource automation 'Microsoft.Automation/automationAccounts@2023-11-01' = {
+        name: automationName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          sku: {
+            name: 'Basic'
+          }
+          publicNetworkAccess: false
+          disableLocalAuth: true
+          encryption: {
+            keySource: 'Microsoft.Automation'
+          }
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Network/privateEndpoints@2024-01-01"
+        name: "pe-automation"
+        description: "Private endpoint for Automation account to secure webhook and DSC endpoints"
+        terraform_pattern: |
+          resource "azapi_resource" "pe_automation" {
+            type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+            name      = "pe-${var.automation_name}"
+            location  = var.location
+            parent_id = var.resource_group_id
+
+            body = {
+              properties = {
+                subnet = {
+                  id = var.subnet_id
+                }
+                privateLinkServiceConnections = [
+                  {
+                    name = "automation-connection"
+                    properties = {
+                      privateLinkServiceId = azapi_resource.automation.id
+                      groupIds             = ["DSCAndHybridWorker"]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource peAutomation 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+            name: 'pe-${automationName}'
+            location: location
+            properties: {
+              subnet: {
+                id: subnetId
+              }
+              privateLinkServiceConnections: [
+                {
+                  name: 'automation-connection'
+                  properties: {
+                    privateLinkServiceId: automation.id
+                    groupIds: ['DSCAndHybridWorker']
+                  }
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Network/privateDnsZones@2024-06-01"
+        name: "privatelink.azure-automation.net"
+        description: "Private DNS zone for Automation account private endpoint resolution"
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name: "diag-automation"
+        description: "Diagnostic settings to route job logs, DSC logs, and runbook output to Log Analytics"
+        terraform_pattern: |
+          resource "azapi_resource" "diag_automation" {
+            type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+            name      = "diag-${var.automation_name}"
+            parent_id = azapi_resource.automation.id
+
+            body = {
+              properties = {
+                workspaceId = var.log_analytics_workspace_id
+                logs = [
+                  {
+                    categoryGroup = "allLogs"
+                    enabled       = true
+                  }
+                ]
+                metrics = [
+                  {
+                    category = "AllMetrics"
+                    enabled  = true
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource diagAutomation 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+            name: 'diag-${automationName}'
+            scope: automation
+            properties: {
+              workspaceId: logAnalyticsWorkspaceId
+              logs: [
+                {
+                  categoryGroup: 'allLogs'
+                  enabled: true
+                }
+              ]
+              metrics: [
+                {
+                  category: 'AllMetrics'
+                  enabled: true
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "Automation Contributor"
+        description: "RBAC role assignment for automation account management"
+    prohibitions:
+      - "Never use Run As accounts — they are deprecated; use managed identity"
+      - "Never hardcode credentials in runbook scripts or variables"
+      - "Never set disableLocalAuth to false — use Microsoft Entra authentication"
+      - "Never store secrets as plain-text Automation variables — use encrypted variables or Key Vault"
+      - "Never enable public network access without compensating network controls"
+
+  - id: AUTO-002
+    severity: required
+    description: "Use managed identity for all runbook authentication instead of Run As accounts"
+    rationale: "Run As accounts use certificates that must be rotated; managed identity is automatic and auditable"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+
+  - id: AUTO-003
+    severity: recommended
+    description: "Link Automation account to Log Analytics workspace for job log aggregation"
+    rationale: "Linked workspace enables centralized monitoring of runbook execution and failure analysis"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+
+  - id: AUTO-004
+    severity: recommended
+    description: "Use encrypted Automation variables or Key Vault references for sensitive configuration"
+    rationale: "Plain-text variables are visible to account contributors; encrypted variables add a protection layer"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+
+patterns:
+  - name: "Automation account with managed identity and private endpoint"
+    description: "Secure Automation account with no public access, managed identity, and Log Analytics integration"
+
+anti_patterns:
+  - description: "Do not use Run As accounts for runbook authentication"
+    instead: "Use system-assigned managed identity with RBAC role assignments"
+  - description: "Do not store secrets in plain-text Automation variables"
+    instead: "Use encrypted variables or Key Vault references accessed via managed identity"
+
+references:
+  - title: "Azure Automation documentation"
+    url: "https://learn.microsoft.com/azure/automation/overview"
+  - title: "Automation managed identity"
+    url: "https://learn.microsoft.com/azure/automation/automation-security-overview"

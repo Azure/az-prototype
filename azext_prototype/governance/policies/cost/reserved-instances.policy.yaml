@@ -1,0 +1,338 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: reserved-instances
+  category: cost
+  services:
+    - virtual-machines
+    - sql-database
+    - cosmos-db
+    - app-service
+    - aks
+    - redis-cache
+    - postgresql-flexible
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: RI-001
+    severity: recommended
+    description: "Recommend Azure Reserved VM Instances for production workloads with stable, predictable compute usage over 12+ months"
+    rationale: "1-year reservations save 30-40% over pay-as-you-go; 3-year reservations save 55-65%. Only applicable to stable production workloads"
+    applies_to: [cost-analyst, cloud-architect, project-manager]
+    terraform_pattern: |
+      # === Reservation Recommendation Comment Block ===
+      # Reservations are purchased at the subscription/management-group level via Azure Portal
+      # or REST API — they are NOT deployed as IaC resources alongside workloads.
+      #
+      # For the following VMs, consider Reserved VM Instances:
+      #
+      # Production VMs with stable usage:
+      #   VM Size: Standard_D4s_v5
+      #   Region: ${var.location}
+      #   Term: 1-year (recommended for POC-to-production transition)
+      #   Savings: ~36% vs pay-as-you-go (~$140/mo → ~$90/mo per VM)
+      #
+      # AKS node pools with stable baseline:
+      #   VM Size: Standard_D4s_v5
+      #   Region: ${var.location}
+      #   Quantity: minCount value from autoscaler (baseline nodes)
+      #   Term: 1-year
+      #   Savings: ~36% on baseline nodes
+      #
+      # When to purchase:
+      #   - After 1-2 months of production usage data confirms stable baseline
+      #   - Use Azure Advisor reservation recommendations for data-driven sizing
+      #   - Purchase reservations scoped to the resource group or subscription
+      #
+      # Azure CLI to check advisor recommendations:
+      #   az advisor recommendation list --category Cost --output table
+
+      # Tag resources eligible for reservation consideration
+      resource "azapi_resource" "vm_prod" {
+        type      = "Microsoft.Compute/virtualMachines@2024-03-01"
+        name      = var.vm_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        tags = merge(local.mandatory_tags, {
+          ReservationEligible = "true"
+          ReservationTerm     = "1-year"
+          ReservationVMSize   = "Standard_D4s_v5"
+        })
+
+        body = {
+          properties = {
+            hardwareProfile = {
+              vmSize = "Standard_D4s_v5"
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Reservation Recommendation ===
+      // Reservations are purchased at subscription/management-group level via Azure Portal.
+      // They are NOT deployed as Bicep resources.
+      //
+      // For production VMs with stable usage:
+      //   VM Size: Standard_D4s_v5
+      //   Region: location
+      //   Term: 1-year (recommended for POC-to-production transition)
+      //   Savings: ~36% vs pay-as-you-go
+      //
+      // For AKS node pools:
+      //   Quantity: minCount from autoscaler (baseline nodes)
+      //   Savings: ~36% on baseline
+      //
+      // Check advisor recommendations:
+      //   az advisor recommendation list --category Cost --output table
+
+      // Tag resources eligible for reservation
+      resource vmProd 'Microsoft.Compute/virtualMachines@2024-03-01' = {
+        name: vmName
+        location: location
+        tags: union(mandatoryTags, {
+          ReservationEligible: 'true'
+          ReservationTerm: '1-year'
+          ReservationVMSize: 'Standard_D4s_v5'
+        })
+        properties: {
+          hardwareProfile: {
+            vmSize: 'Standard_D4s_v5'
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER recommend reserved instances for dev/POC environments — they require 1-3 year commitment"
+      - "NEVER recommend reservations before 1-2 months of production usage data"
+      - "NEVER recommend 3-year reserved instances without explicit cost-analyst approval and stakeholder sign-off"
+      - "NEVER purchase reservations for burstable B-series VMs — they are designed for variable workloads"
+      - "NEVER scope reservations to a single resource group unless the workload will remain in that group"
+
+  - id: RI-002
+    severity: recommended
+    description: "Recommend Azure Savings Plans for compute when workloads may change VM size, region, or service type"
+    rationale: "Savings Plans provide 15-25% savings with flexibility to change compute type, unlike reservations which are locked to a specific VM size and region"
+    applies_to: [cost-analyst, cloud-architect, project-manager]
+    terraform_pattern: |
+      # === Savings Plan Recommendation Comment Block ===
+      # Azure Savings Plans are purchased at subscription/management-group level.
+      # They are NOT deployed as IaC resources.
+      #
+      # Savings Plans vs Reservations:
+      #   - Savings Plans: Commit to hourly spend ($X/hr) — flexible across VM sizes, regions, services
+      #   - Reservations: Commit to specific VM size in specific region — higher savings but locked in
+      #
+      # Recommend Savings Plans when:
+      #   - Workload may change VM sizes (e.g., D4s_v5 → D8s_v5)
+      #   - Workload may move regions
+      #   - Mix of App Service, VMs, AKS, and Container Instances
+      #
+      # Compute Savings Plan:
+      #   Scope: Subscription (covers all compute in subscription)
+      #   Term: 1-year
+      #   Hourly commitment: Based on Azure Advisor recommendation
+      #   Savings: ~15-25% vs pay-as-you-go
+      #
+      # Azure CLI to check savings plan recommendations:
+      #   az advisor recommendation list --category Cost --output table
+    bicep_pattern: |
+      // === Savings Plan Recommendation ===
+      // Azure Savings Plans are purchased at subscription/management-group level.
+      // They are NOT deployed as Bicep resources.
+      //
+      // Recommend Savings Plans when:
+      //   - Workload may change VM sizes or regions
+      //   - Mix of compute services (App Service, VMs, AKS, Container Instances)
+      //
+      // Savings: ~15-25% vs pay-as-you-go
+      // Term: 1-year recommended for initial commitment
+      // Scope: Subscription level for maximum flexibility
+    prohibitions:
+      - "NEVER recommend savings plans for dev/POC environments"
+      - "NEVER recommend both savings plans AND reservations for the same compute without calculating overlap"
+      - "NEVER recommend savings plans before understanding the workload's compute mix"
+
+  - id: RI-003
+    severity: recommended
+    description: "Recommend Cosmos DB reserved capacity for production workloads with predictable RU/s consumption"
+    rationale: "Cosmos DB 1-year reserved capacity saves ~20% on provisioned throughput; 3-year saves ~30%. Only for provisioned (not serverless) accounts"
+    applies_to: [cost-analyst, cloud-architect]
+    terraform_pattern: |
+      # === Cosmos DB Reserved Capacity Recommendation ===
+      # Cosmos DB reserved capacity is purchased via Azure Portal at account level.
+      #
+      # Prerequisites:
+      #   - Account must use provisioned throughput (NOT serverless)
+      #   - Workload must have stable baseline RU/s consumption
+      #   - Review 1+ months of Azure Monitor metrics: "Total Request Units" per hour
+      #
+      # Reservation sizing:
+      #   Step 1: Identify baseline RU/s from Azure Monitor
+      #     az monitor metrics list --resource ${cosmosAccountResourceId} \
+      #       --metric "TotalRequestUnits" --aggregation Average --interval PT1H
+      #   Step 2: Purchase reservation for baseline, let autoscale handle spikes
+      #     Example: If baseline is 2000 RU/s and peaks at 8000 RU/s:
+      #       - Reserve 2000 RU/s (covers steady state)
+      #       - Autoscale handles 2000-8000 RU/s spikes at pay-as-you-go rate
+      #
+      # Savings: 1-year ~20%, 3-year ~30% on reserved RU/s
+      # Scope: Subscription (applies to all Cosmos DB accounts)
+
+      # Tag Cosmos DB accounts with reservation eligibility
+      resource "azapi_resource" "cosmos_account" {
+        type      = "Microsoft.DocumentDB/databaseAccounts@2024-05-15"
+        name      = var.cosmos_account_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        tags = merge(local.mandatory_tags, {
+          ReservationEligible   = "true"
+          ReservationService    = "cosmos-db"
+          BaselineRUsPerSecond  = "2000"
+        })
+
+        body = {}
+      }
+    bicep_pattern: |
+      // === Cosmos DB Reserved Capacity Recommendation ===
+      // Purchased via Azure Portal at subscription level.
+      //
+      // Prerequisites:
+      //   - Provisioned throughput account (NOT serverless)
+      //   - 1+ months of stable baseline RU/s data
+      //
+      // Sizing:
+      //   1. Check baseline from Azure Monitor: TotalRequestUnits metric
+      //   2. Reserve baseline RU/s; autoscale handles spikes
+      //
+      // Savings: 1-year ~20%, 3-year ~30%
+
+      resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
+        name: cosmosAccountName
+        location: location
+        tags: union(mandatoryTags, {
+          ReservationEligible: 'true'
+          ReservationService: 'cosmos-db'
+          BaselineRUsPerSecond: '2000'
+        })
+      }
+    prohibitions:
+      - "NEVER recommend Cosmos DB reserved capacity for serverless accounts — serverless has no provisioned throughput to reserve"
+      - "NEVER recommend Cosmos DB reserved capacity for dev/POC — use serverless for zero idle cost"
+      - "NEVER reserve more RU/s than the measured baseline — spikes should use autoscale at pay-as-you-go rates"
+      - "NEVER recommend 3-year Cosmos DB reservations without confirmed production commitment"
+
+  - id: RI-004
+    severity: recommended
+    description: "Recommend SQL Database reserved capacity for production vCore databases with stable utilization"
+    rationale: "SQL reserved capacity saves ~30-40% on provisioned vCore compute (not serverless). Only for databases with consistent CPU usage"
+    applies_to: [cost-analyst, cloud-architect]
+    terraform_pattern: |
+      # === SQL Reserved Capacity Recommendation ===
+      # SQL reserved capacity is purchased via Azure Portal at subscription level.
+      #
+      # Prerequisites:
+      #   - Database must use provisioned vCore tier (NOT serverless GP_S_Gen5)
+      #   - DTU databases are NOT eligible — convert to vCore first
+      #   - 1+ months of stable CPU utilization data
+      #
+      # Reservation sizing:
+      #   Step 1: Review CPU utilization from Azure Monitor
+      #     az monitor metrics list --resource ${sqlDatabaseResourceId} \
+      #       --metric "cpu_percent" --aggregation Average --interval PT1H
+      #   Step 2: If average CPU > 30%, the provisioned tier is cost-effective
+      #     - Reserve the baseline vCore count
+      #     - Use elastic pools for variable workloads
+      #
+      # Savings: 1-year ~33%, 3-year ~55% on provisioned vCore compute
+      # Scope: Subscription (applies to all SQL databases)
+      #
+      # Eligible SKUs:
+      #   General Purpose: GP_Gen5 (2-128 vCores)
+      #   Business Critical: BC_Gen5 (2-128 vCores)
+      #   Hyperscale: HS_Gen5 (2-128 vCores)
+
+      # Tag SQL databases with reservation eligibility
+      resource "azapi_resource" "sql_database" {
+        type      = "Microsoft.Sql/servers/databases@2023-08-01-preview"
+        name      = var.sql_database_name
+        location  = var.location
+        parent_id = azapi_resource.sql_server.id
+
+        tags = merge(local.mandatory_tags, {
+          ReservationEligible = "true"
+          ReservationService  = "sql-database"
+          ProvisionedVCores   = "2"
+        })
+
+        body = {
+          sku = {
+            name     = "GP_Gen5"
+            tier     = "GeneralPurpose"
+            family   = "Gen5"
+            capacity = 2
+          }
+        }
+      }
+    bicep_pattern: |
+      // === SQL Reserved Capacity Recommendation ===
+      // Purchased via Azure Portal at subscription level.
+      //
+      // Prerequisites:
+      //   - Provisioned vCore tier (NOT serverless GP_S_Gen5, NOT DTU)
+      //   - 1+ months of stable CPU utilization data
+      //
+      // Eligible SKUs: GP_Gen5, BC_Gen5, HS_Gen5
+      // Savings: 1-year ~33%, 3-year ~55%
+
+      resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
+        parent: sqlServer
+        name: sqlDatabaseName
+        location: location
+        tags: union(mandatoryTags, {
+          ReservationEligible: 'true'
+          ReservationService: 'sql-database'
+          ProvisionedVCores: '2'
+        })
+        sku: {
+          name: 'GP_Gen5'
+          tier: 'GeneralPurpose'
+          family: 'Gen5'
+          capacity: 2
+        }
+      }
+    prohibitions:
+      - "NEVER recommend SQL reserved capacity for serverless (GP_S_Gen5) databases — they auto-pause and have variable compute"
+      - "NEVER recommend SQL reserved capacity for DTU-based databases — convert to vCore first"
+      - "NEVER recommend SQL reserved capacity for dev/POC databases"
+      - "NEVER recommend 3-year SQL reservations without confirmed database sizing and growth projections"
+      - "NEVER recommend reservations for databases with average CPU utilization below 20% — consider downsizing or serverless first"
+
+patterns:
+  - name: "Reservation strategy for production workloads"
+    description: "After 1-2 months of production data, analyze Azure Advisor recommendations and purchase 1-year reservations for stable baseline compute. Use savings plans for flexible workloads"
+  - name: "Tag-based reservation tracking"
+    description: "Tag reservation-eligible resources with ReservationEligible, ReservationTerm, and service-specific metadata for cost tracking"
+
+anti_patterns:
+  - description: "Do not purchase reservations before production workloads are stable"
+    instead: "Wait 1-2 months for usage data; use Azure Advisor reservation recommendations"
+  - description: "Do not purchase 3-year reservations for new workloads"
+    instead: "Start with 1-year reservations; upgrade to 3-year after confirming workload stability"
+  - description: "Do not reserve compute for dev/POC environments"
+    instead: "Use pay-as-you-go, serverless, burstable, and spot instances for dev/POC"
+  - description: "Do not reserve more capacity than your measured baseline"
+    instead: "Reserve the stable baseline; let autoscale/pay-as-you-go handle spikes"
+
+references:
+  - title: "Azure Reserved VM Instances"
+    url: "https://learn.microsoft.com/azure/cost-management-billing/reservations/save-compute-costs-reservations"
+  - title: "Azure Savings Plans"
+    url: "https://learn.microsoft.com/azure/cost-management-billing/savings-plan/savings-plan-compute-overview"
+  - title: "Cosmos DB reserved capacity"
+    url: "https://learn.microsoft.com/azure/cosmos-db/reserved-capacity"
+  - title: "SQL Database reserved capacity"
+    url: "https://learn.microsoft.com/azure/azure-sql/database/reserved-capacity-overview"
+  - title: "Azure Advisor cost recommendations"
+    url: "https://learn.microsoft.com/azure/advisor/advisor-cost-recommendations"

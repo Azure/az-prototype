@@ -1,0 +1,384 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: vmss
+  category: azure
+  services: [vmss]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: VMSS-001
+    severity: required
+    description: "Deploy VMSS with Flexible orchestration mode, managed identity, and zone distribution"
+    rationale: "Flexible mode is the recommended orchestration; Uniform is legacy. Managed identity eliminates credential management"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "vmss" {
+        type      = "Microsoft.Compute/virtualMachineScaleSets@2024-03-01"
+        name      = var.vmss_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        identity {
+          type = "SystemAssigned"
+        }
+        body = {
+          sku = {
+            name     = var.vm_size
+            tier     = "Standard"
+            capacity = var.instance_count
+          }
+          zones = ["1", "2", "3"]
+          properties = {
+            orchestrationMode  = "Flexible"
+            platformFaultDomainCount = 1
+            singlePlacementGroup     = false
+            virtualMachineProfile = {
+              osProfile = {
+                computerNamePrefix    = var.name_prefix
+                adminUsername          = var.admin_username
+                linuxConfiguration = {
+                  disablePasswordAuthentication = true
+                  ssh = {
+                    publicKeys = [
+                      {
+                        path    = "/home/${var.admin_username}/.ssh/authorized_keys"
+                        keyData = var.ssh_public_key
+                      }
+                    ]
+                  }
+                }
+              }
+              storageProfile = {
+                imageReference = {
+                  publisher = "Canonical"
+                  offer     = "0001-com-ubuntu-server-jammy"
+                  sku       = "22_04-lts-gen2"
+                  version   = "latest"
+                }
+                osDisk = {
+                  createOption = "FromImage"
+                  managedDisk = {
+                    storageAccountType = "Premium_LRS"
+                    diskEncryptionSet = {
+                      id = var.disk_encryption_set_id
+                    }
+                  }
+                }
+              }
+              networkProfile = {
+                networkInterfaceConfigurations = [
+                  {
+                    name = "nic-config"
+                    properties = {
+                      primary                 = true
+                      enableAcceleratedNetworking = true
+                      networkSecurityGroup = {
+                        id = var.nsg_id
+                      }
+                      ipConfigurations = [
+                        {
+                          name = "ipconfig1"
+                          properties = {
+                            primary = true
+                            subnet = {
+                              id = var.subnet_id
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+              securityProfile = {
+                encryptionAtHost = true
+              }
+            }
+            automaticRepairsPolicy = {
+              enabled     = true
+              gracePeriod = "PT30M"
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource vmss 'Microsoft.Compute/virtualMachineScaleSets@2024-03-01' = {
+        name: vmssName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: vmSize
+          tier: 'Standard'
+          capacity: instanceCount
+        }
+        zones: ['1', '2', '3']
+        properties: {
+          orchestrationMode: 'Flexible'
+          platformFaultDomainCount: 1
+          singlePlacementGroup: false
+          virtualMachineProfile: {
+            osProfile: {
+              computerNamePrefix: namePrefix
+              adminUsername: adminUsername
+              linuxConfiguration: {
+                disablePasswordAuthentication: true
+                ssh: {
+                  publicKeys: [
+                    {
+                      path: '/home/${adminUsername}/.ssh/authorized_keys'
+                      keyData: sshPublicKey
+                    }
+                  ]
+                }
+              }
+            }
+            storageProfile: {
+              imageReference: {
+                publisher: 'Canonical'
+                offer: '0001-com-ubuntu-server-jammy'
+                sku: '22_04-lts-gen2'
+                version: 'latest'
+              }
+              osDisk: {
+                createOption: 'FromImage'
+                managedDisk: {
+                  storageAccountType: 'Premium_LRS'
+                  diskEncryptionSet: {
+                    id: diskEncryptionSetId
+                  }
+                }
+              }
+            }
+            networkProfile: {
+              networkInterfaceConfigurations: [
+                {
+                  name: 'nic-config'
+                  properties: {
+                    primary: true
+                    enableAcceleratedNetworking: true
+                    networkSecurityGroup: {
+                      id: nsgId
+                    }
+                    ipConfigurations: [
+                      {
+                        name: 'ipconfig1'
+                        properties: {
+                          primary: true
+                          subnet: {
+                            id: subnetId
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+            securityProfile: {
+              encryptionAtHost: true
+            }
+          }
+          automaticRepairsPolicy: {
+            enabled: true
+            gracePeriod: 'PT30M'
+          }
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/networkSecurityGroups (NSG for VMSS NICs)"
+      - "Microsoft.Network/loadBalancers (Standard LB for traffic distribution)"
+      - "Microsoft.Compute/diskEncryptionSets (CMK for OS/data disk encryption)"
+      - "Microsoft.Insights/diagnosticSettings (VM diagnostics and metrics)"
+      - "Microsoft.Insights/autoscaleSettings (autoscale rules based on metrics)"
+    prohibitions:
+      - "Do not use Uniform orchestration mode for new deployments — Flexible is recommended"
+      - "Do not use password authentication for Linux — use SSH keys"
+      - "Do not hardcode adminPassword in templates — use Key Vault references"
+      - "Do not deploy VMSS without NSG on network interfaces"
+      - "Do not assign public IPs to VMSS instances — use internal LB and Bastion"
+
+  - id: VMSS-002
+    severity: required
+    description: "Enable encryption at host for VMSS instances"
+    rationale: "Encryption at host ensures temp disks, caches, and data-in-transit to storage are encrypted"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+    terraform_pattern: |
+      # Set securityProfile.encryptionAtHost = true in virtualMachineProfile
+      # See VMSS-001 terraform_pattern for full example
+    bicep_pattern: |
+      // Set securityProfile.encryptionAtHost: true in virtualMachineProfile
+      // See VMSS-001 bicep_pattern for full example
+    companion_resources: []
+    prohibitions:
+      - "Do not disable encryption at host — temp disks and caches would be unencrypted"
+
+  - id: VMSS-003
+    severity: required
+    description: "Configure autoscale rules based on relevant metrics"
+    rationale: "Without autoscale, VMSS requires manual capacity management and cannot respond to load changes"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "vmss_autoscale" {
+        type      = "Microsoft.Insights/autoscaleSettings@2022-10-01"
+        name      = var.autoscale_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            enabled            = true
+            targetResourceUri  = azapi_resource.vmss.id
+            profiles = [
+              {
+                name = "default"
+                capacity = {
+                  minimum = tostring(var.min_instances)
+                  maximum = tostring(var.max_instances)
+                  default = tostring(var.default_instances)
+                }
+                rules = [
+                  {
+                    metricTrigger = {
+                      metricName        = "Percentage CPU"
+                      metricResourceUri = azapi_resource.vmss.id
+                      timeGrain         = "PT1M"
+                      statistic         = "Average"
+                      timeWindow        = "PT5M"
+                      timeAggregation   = "Average"
+                      operator          = "GreaterThan"
+                      threshold         = 75
+                    }
+                    scaleAction = {
+                      direction = "Increase"
+                      type      = "ChangeCount"
+                      value     = "1"
+                      cooldown  = "PT5M"
+                    }
+                  },
+                  {
+                    metricTrigger = {
+                      metricName        = "Percentage CPU"
+                      metricResourceUri = azapi_resource.vmss.id
+                      timeGrain         = "PT1M"
+                      statistic         = "Average"
+                      timeWindow        = "PT5M"
+                      timeAggregation   = "Average"
+                      operator          = "LessThan"
+                      threshold         = 25
+                    }
+                    scaleAction = {
+                      direction = "Decrease"
+                      type      = "ChangeCount"
+                      value     = "1"
+                      cooldown  = "PT5M"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource vmssAutoscale 'Microsoft.Insights/autoscaleSettings@2022-10-01' = {
+        name: autoscaleName
+        location: location
+        properties: {
+          enabled: true
+          targetResourceUri: vmss.id
+          profiles: [
+            {
+              name: 'default'
+              capacity: {
+                minimum: string(minInstances)
+                maximum: string(maxInstances)
+                default: string(defaultInstances)
+              }
+              rules: [
+                {
+                  metricTrigger: {
+                    metricName: 'Percentage CPU'
+                    metricResourceUri: vmss.id
+                    timeGrain: 'PT1M'
+                    statistic: 'Average'
+                    timeWindow: 'PT5M'
+                    timeAggregation: 'Average'
+                    operator: 'GreaterThan'
+                    threshold: 75
+                  }
+                  scaleAction: {
+                    direction: 'Increase'
+                    type: 'ChangeCount'
+                    value: '1'
+                    cooldown: 'PT5M'
+                  }
+                }
+                {
+                  metricTrigger: {
+                    metricName: 'Percentage CPU'
+                    metricResourceUri: vmss.id
+                    timeGrain: 'PT1M'
+                    statistic: 'Average'
+                    timeWindow: 'PT5M'
+                    timeAggregation: 'Average'
+                    operator: 'LessThan'
+                    threshold: 25
+                  }
+                  scaleAction: {
+                    direction: 'Decrease'
+                    type: 'ChangeCount'
+                    value: '1'
+                    cooldown: 'PT5M'
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.Compute/virtualMachineScaleSets (target VMSS)"
+    prohibitions:
+      - "Do not set minimum capacity to 0 in production — leaves no instances for traffic"
+      - "Do not use only scale-out rules without scale-in — costs will grow unbounded"
+
+  - id: VMSS-004
+    severity: recommended
+    description: "Enable automatic OS upgrades and automatic instance repairs"
+    rationale: "Automatic upgrades keep instances patched; automatic repairs replace unhealthy instances"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # Add to VMSS properties:
+      # automaticRepairsPolicy = { enabled = true, gracePeriod = "PT30M" }
+      # See VMSS-001 terraform_pattern for automaticRepairsPolicy
+      # For automatic OS upgrades, add upgradePolicy:
+      # upgradePolicy = { mode = "Automatic" }
+    bicep_pattern: |
+      // Add to VMSS properties:
+      // automaticRepairsPolicy: { enabled: true, gracePeriod: 'PT30M' }
+      // See VMSS-001 bicep_pattern for automaticRepairsPolicy
+      // For automatic OS upgrades, add upgradePolicy:
+      // upgradePolicy: { mode: 'Automatic' }
+    companion_resources:
+      - "Microsoft.Network/loadBalancers/probes (health probe for automatic repairs)"
+    prohibitions:
+      - "Do not enable automatic repairs without a health probe — repairs need health signal"
+
+patterns:
+  - name: "VMSS Flexible with autoscale and encryption"
+    description: "Zone-redundant VMSS with Flexible orchestration, CMK encryption, and autoscale"
+    example: |
+      # See VMSS-001 through VMSS-004 for complete azapi_resource patterns
+
+anti_patterns:
+  - description: "Do not use Uniform orchestration for new VMSS deployments"
+    instead: "Use Flexible orchestration mode for better availability and flexibility"
+  - description: "Do not use password authentication for Linux VMSS instances"
+    instead: "Use SSH key authentication with disablePasswordAuthentication: true"
+
+references:
+  - title: "VMSS documentation"
+    url: "https://learn.microsoft.com/azure/virtual-machine-scale-sets/overview"
+  - title: "Flexible orchestration mode"
+    url: "https://learn.microsoft.com/azure/virtual-machine-scale-sets/virtual-machine-scale-sets-orchestration-modes"

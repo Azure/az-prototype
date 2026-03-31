@@ -1,0 +1,187 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: logic-apps
+  category: azure
+  services: [logic-apps]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: LA-001
+    severity: required
+    description: "Deploy Logic Apps Standard with managed identity, VNet integration, and disabled public access"
+    rationale: "Logic Apps process business workflows that often handle sensitive data; managed identity eliminates connection credentials"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "logic_app" {
+        type      = "Microsoft.Logic/workflows@2019-05-01"
+        name      = var.logic_app_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          properties = {
+            state = "Enabled"
+            accessControl = {
+              triggers = {
+                allowedCallerIpAddresses = []
+              }
+              contents = {
+                allowedCallerIpAddresses = []
+              }
+              actions = {
+                allowedCallerIpAddresses = []
+              }
+              workflowManagement = {
+                allowedCallerIpAddresses = []
+              }
+            }
+            endpointsConfiguration = {
+              workflow = {
+                outgoingIpAddresses    = []
+                accessEndpointIpAddresses = []
+              }
+              connector = {
+                outgoingIpAddresses = []
+              }
+            }
+            definition = {
+              "$schema"      = "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#"
+              contentVersion = "1.0.0.0"
+              triggers       = {}
+              actions        = {}
+              outputs        = {}
+            }
+            parameters = {}
+          }
+        }
+      }
+    bicep_pattern: |
+      resource logicApp 'Microsoft.Logic/workflows@2019-05-01' = {
+        name: logicAppName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          state: 'Enabled'
+          accessControl: {
+            triggers: {
+              allowedCallerIpAddresses: []
+            }
+            contents: {
+              allowedCallerIpAddresses: []
+            }
+            actions: {
+              allowedCallerIpAddresses: []
+            }
+            workflowManagement: {
+              allowedCallerIpAddresses: []
+            }
+          }
+          definition: {
+            '$schema': 'https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#'
+            contentVersion: '1.0.0.0'
+            triggers: {}
+            actions: {}
+            outputs: {}
+          }
+          parameters: {}
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name: "diag-logic-app"
+        description: "Diagnostic settings to route workflow run logs and trigger events to Log Analytics"
+        terraform_pattern: |
+          resource "azapi_resource" "diag_logic_app" {
+            type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+            name      = "diag-${var.logic_app_name}"
+            parent_id = azapi_resource.logic_app.id
+
+            body = {
+              properties = {
+                workspaceId = var.log_analytics_workspace_id
+                logs = [
+                  {
+                    categoryGroup = "allLogs"
+                    enabled       = true
+                  }
+                ]
+                metrics = [
+                  {
+                    category = "AllMetrics"
+                    enabled  = true
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource diagLogicApp 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+            name: 'diag-${logicAppName}'
+            scope: logicApp
+            properties: {
+              workspaceId: logAnalyticsWorkspaceId
+              logs: [
+                {
+                  categoryGroup: 'allLogs'
+                  enabled: true
+                }
+              ]
+              metrics: [
+                {
+                  category: 'AllMetrics'
+                  enabled: true
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "Logic App Contributor"
+        description: "RBAC role assignments for Logic App management"
+    prohibitions:
+      - "Never hardcode connection strings or credentials in workflow parameters"
+      - "Never leave accessControl IP restrictions empty in production — use VNet or specific IPs"
+      - "Never embed secrets directly in workflow definitions — use Key Vault references"
+      - "Never disable managed identity — it is required for secure API connections"
+      - "Never use shared access signature (SAS) trigger URLs without IP restrictions"
+
+  - id: LA-002
+    severity: required
+    description: "Use managed identity for all API connections instead of connection strings"
+    rationale: "Connection strings are shared secrets; managed identity provides per-connection, auditable access"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+
+  - id: LA-003
+    severity: recommended
+    description: "Configure IP-based access control for triggers, actions, and management endpoints"
+    rationale: "IP restrictions limit who can invoke workflows and access run history"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+
+  - id: LA-004
+    severity: recommended
+    description: "Enable diagnostic logging for workflow runs and trigger history"
+    rationale: "Workflow logs provide audit trail and troubleshooting data for business process execution"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+
+patterns:
+  - name: "Logic App with managed identity and access control"
+    description: "Secure Logic App with managed identity, IP restrictions, and Key Vault-backed parameters"
+
+anti_patterns:
+  - description: "Do not hardcode credentials in workflow parameters"
+    instead: "Use managed identity for API connections and Key Vault references for secrets"
+  - description: "Do not expose trigger URLs without access restrictions"
+    instead: "Configure allowedCallerIpAddresses to restrict trigger invocation"
+
+references:
+  - title: "Logic Apps security overview"
+    url: "https://learn.microsoft.com/azure/logic-apps/logic-apps-securing-a-logic-app"
+  - title: "Logic Apps managed identity"
+    url: "https://learn.microsoft.com/azure/logic-apps/authenticate-with-managed-identity"

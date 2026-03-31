@@ -1,0 +1,197 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: container-instances
+  category: azure
+  services: [container-instances]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: ACI-001
+    severity: required
+    description: "Deploy Azure Container Instances with managed identity, VNet injection, and no public IP"
+    rationale: "ACI containers often run batch or integration tasks; VNet injection prevents public exposure, managed identity removes credential needs"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "container_group" {
+        type      = "Microsoft.ContainerInstance/containerGroups@2023-05-01"
+        name      = var.container_group_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          properties = {
+            osType = "Linux"
+            restartPolicy = "OnFailure"
+            ipAddress = {
+              type = "Private"
+              ports = [
+                {
+                  port     = var.container_port
+                  protocol = "TCP"
+                }
+              ]
+            }
+            subnetIds = [
+              {
+                id   = var.subnet_id
+                name = var.subnet_name
+              }
+            ]
+            containers = [
+              {
+                name = var.container_name
+                properties = {
+                  image = var.container_image
+                  ports = [
+                    {
+                      port     = var.container_port
+                      protocol = "TCP"
+                    }
+                  ]
+                  resources = {
+                    requests = {
+                      cpu        = var.cpu_cores
+                      memoryInGB = var.memory_gb
+                    }
+                    limits = {
+                      cpu        = var.cpu_cores
+                      memoryInGB = var.memory_gb
+                    }
+                  }
+                  environmentVariables = []
+                }
+              }
+            ]
+            imageRegistryCredentials = [
+              {
+                server   = var.acr_login_server
+                identity = var.acr_identity_id
+              }
+            ]
+            encryptionProperties = {
+              vaultBaseUrl   = var.key_vault_url
+              keyName        = var.encryption_key_name
+              keyVersion     = var.encryption_key_version
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01' = {
+        name: containerGroupName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          osType: 'Linux'
+          restartPolicy: 'OnFailure'
+          ipAddress: {
+            type: 'Private'
+            ports: [
+              {
+                port: containerPort
+                protocol: 'TCP'
+              }
+            ]
+          }
+          subnetIds: [
+            {
+              id: subnetId
+              name: subnetName
+            }
+          ]
+          containers: [
+            {
+              name: containerName
+              properties: {
+                image: containerImage
+                ports: [
+                  {
+                    port: containerPort
+                    protocol: 'TCP'
+                  }
+                ]
+                resources: {
+                  requests: {
+                    cpu: cpuCores
+                    memoryInGB: memoryGb
+                  }
+                  limits: {
+                    cpu: cpuCores
+                    memoryInGB: memoryGb
+                  }
+                }
+                environmentVariables: []
+              }
+            }
+          ]
+          imageRegistryCredentials: [
+            {
+              server: acrLoginServer
+              identity: acrIdentityId
+            }
+          ]
+          encryptionProperties: {
+            vaultBaseUrl: keyVaultUrl
+            keyName: encryptionKeyName
+            keyVersion: encryptionKeyVersion
+          }
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.ContainerRegistry/registries@2023-07-01"
+        name: "Container Registry"
+        description: "Private container registry for image storage — use managed identity for image pull"
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name: "diag-aci"
+        description: "Diagnostic settings to route container logs and events to Log Analytics"
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "AcrPull role"
+        description: "RBAC role assignment granting ACI managed identity the AcrPull role on the container registry"
+    prohibitions:
+      - "Never hardcode registry passwords in imageRegistryCredentials — use managed identity"
+      - "Never set ipAddress.type to Public for production workloads"
+      - "Never pass secrets as plain-text environment variables — use secure environment variables or Key Vault"
+      - "Never omit resource limits — always set both requests and limits for cpu and memory"
+      - "Never use latest tag for container images — always pin to a specific version or digest"
+
+  - id: ACI-002
+    severity: required
+    description: "Use secure environment variables or Key Vault references for secrets"
+    rationale: "Plain-text environment variables are visible in container group definitions; secure variables are encrypted at rest"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+
+  - id: ACI-003
+    severity: recommended
+    description: "Set resource limits and requests on all containers"
+    rationale: "Resource limits prevent noisy-neighbor issues and ensure predictable performance"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+  - id: ACI-004
+    severity: recommended
+    description: "Pull images from a private registry using managed identity"
+    rationale: "Public registry pulls are subject to rate limiting, supply chain attacks, and unavailability"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+
+patterns:
+  - name: "ACI with VNet injection and managed identity"
+    description: "Private container group with VNet integration, managed identity for ACR pull, and encrypted secrets"
+
+anti_patterns:
+  - description: "Do not deploy containers with public IP addresses"
+    instead: "Use VNet injection with ipAddress.type=Private and subnetIds"
+  - description: "Do not use registry passwords for image pull"
+    instead: "Use managed identity with AcrPull role assignment on the container registry"
+
+references:
+  - title: "Azure Container Instances documentation"
+    url: "https://learn.microsoft.com/azure/container-instances/container-instances-overview"
+  - title: "ACI VNet deployment"
+    url: "https://learn.microsoft.com/azure/container-instances/container-instances-vnet"

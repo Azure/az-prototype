@@ -1,0 +1,292 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: event-grid
+  category: azure
+  services: [event-grid]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: EG-001
+    severity: required
+    description: "Deploy Event Grid topic with managed identity, TLS 1.2, local auth disabled, and public access off"
+    rationale: "Managed identity enables secure delivery; disabling local auth prevents SAS key usage"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "event_grid_topic" {
+        type      = "Microsoft.EventGrid/topics@2024-06-01-preview"
+        name      = var.eg_topic_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        identity {
+          type = "SystemAssigned"
+        }
+        body = {
+          properties = {
+            inputSchema         = "EventGridSchema"
+            publicNetworkAccess = "Disabled"
+            disableLocalAuth    = true
+            minimumTlsVersionAllowed = "1.2"
+            dataResidencyBoundary    = "WithinGeopair"
+          }
+        }
+      }
+    bicep_pattern: |
+      resource eventGridTopic 'Microsoft.EventGrid/topics@2024-06-01-preview' = {
+        name: egTopicName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          inputSchema: 'EventGridSchema'
+          publicNetworkAccess: 'Disabled'
+          disableLocalAuth: true
+          minimumTlsVersionAllowed: '1.2'
+          dataResidencyBoundary: 'WithinGeopair'
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/privateEndpoints (private endpoint with groupId 'topic')"
+      - "Microsoft.Network/privateDnsZones (privatelink.eventgrid.azure.net)"
+      - "Microsoft.EventGrid/topics/eventSubscriptions (event subscriptions)"
+      - "Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)"
+    prohibitions:
+      - "Do not enable publicNetworkAccess — use private endpoints"
+      - "Do not enable local auth (SAS keys) — use Entra RBAC"
+      - "Do not allow TLS versions below 1.2"
+
+  - id: EG-002
+    severity: required
+    description: "Configure event subscriptions with dead-letter destination and retry policy"
+    rationale: "Without dead-letter, undeliverable events are lost; retry policy handles transient failures"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      resource "azapi_resource" "eg_subscription" {
+        type      = "Microsoft.EventGrid/topics/eventSubscriptions@2024-06-01-preview"
+        name      = var.subscription_name
+        parent_id = azapi_resource.event_grid_topic.id
+        body = {
+          properties = {
+            destination = {
+              endpointType = "WebHook"
+              properties = {
+                endpointUrl                  = var.webhook_url
+                maxEventsPerBatch            = 1
+                preferredBatchSizeInKilobytes = 64
+              }
+            }
+            retryPolicy = {
+              maxDeliveryAttempts  = 30
+              eventTimeToLiveInMinutes = 1440
+            }
+            deadLetterDestination = {
+              endpointType = "StorageBlob"
+              properties = {
+                resourceId         = var.storage_account_id
+                blobContainerName  = "dead-letters"
+              }
+            }
+            filter = {
+              isSubjectCaseSensitive = false
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource egSubscription 'Microsoft.EventGrid/topics/eventSubscriptions@2024-06-01-preview' = {
+        parent: eventGridTopic
+        name: subscriptionName
+        properties: {
+          destination: {
+            endpointType: 'WebHook'
+            properties: {
+              endpointUrl: webhookUrl
+              maxEventsPerBatch: 1
+              preferredBatchSizeInKilobytes: 64
+            }
+          }
+          retryPolicy: {
+            maxDeliveryAttempts: 30
+            eventTimeToLiveInMinutes: 1440
+          }
+          deadLetterDestination: {
+            endpointType: 'StorageBlob'
+            properties: {
+              resourceId: storageAccountId
+              blobContainerName: 'dead-letters'
+            }
+          }
+          filter: {
+            isSubjectCaseSensitive: false
+          }
+        }
+      }
+    companion_resources:
+      - "Microsoft.Storage/storageAccounts (storage account for dead-letter container)"
+    prohibitions:
+      - "Do not create event subscriptions without a dead-letter destination"
+      - "Do not set maxDeliveryAttempts to 1 — transient failures will immediately discard events"
+      - "Do not hardcode webhook URLs with embedded credentials"
+
+  - id: EG-003
+    severity: recommended
+    description: "Use managed identity for event delivery to Azure destinations"
+    rationale: "Managed identity eliminates the need for access keys or connection strings in delivery configuration"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # For Azure destinations (Event Hubs, Service Bus, Storage Queue), use deliveryWithResourceIdentity
+      resource "azapi_resource" "eg_subscription_msi" {
+        type      = "Microsoft.EventGrid/topics/eventSubscriptions@2024-06-01-preview"
+        name      = var.subscription_name
+        parent_id = azapi_resource.event_grid_topic.id
+        body = {
+          properties = {
+            deliveryWithResourceIdentity = {
+              identity = {
+                type = "SystemAssigned"
+              }
+              destination = {
+                endpointType = "EventHub"
+                properties = {
+                  resourceId = var.eventhub_id
+                }
+              }
+            }
+            retryPolicy = {
+              maxDeliveryAttempts  = 30
+              eventTimeToLiveInMinutes = 1440
+            }
+            deadLetterWithResourceIdentity = {
+              identity = {
+                type = "SystemAssigned"
+              }
+              deadLetterDestination = {
+                endpointType = "StorageBlob"
+                properties = {
+                  resourceId        = var.storage_account_id
+                  blobContainerName = "dead-letters"
+                }
+              }
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // For Azure destinations, use deliveryWithResourceIdentity
+      resource egSubscriptionMsi 'Microsoft.EventGrid/topics/eventSubscriptions@2024-06-01-preview' = {
+        parent: eventGridTopic
+        name: subscriptionName
+        properties: {
+          deliveryWithResourceIdentity: {
+            identity: {
+              type: 'SystemAssigned'
+            }
+            destination: {
+              endpointType: 'EventHub'
+              properties: {
+                resourceId: eventhubId
+              }
+            }
+          }
+          retryPolicy: {
+            maxDeliveryAttempts: 30
+            eventTimeToLiveInMinutes: 1440
+          }
+          deadLetterWithResourceIdentity: {
+            identity: {
+              type: 'SystemAssigned'
+            }
+            deadLetterDestination: {
+              endpointType: 'StorageBlob'
+              properties: {
+                resourceId: storageAccountId
+                blobContainerName: 'dead-letters'
+              }
+            }
+          }
+        }
+      }
+    companion_resources:
+      - "Microsoft.Authorization/roleAssignments (Data Sender role on destination resource)"
+    prohibitions:
+      - "Do not use connection strings for Azure destination delivery — use managed identity"
+
+  - id: EG-004
+    severity: recommended
+    description: "Enable diagnostic settings for Event Grid topic"
+    rationale: "Monitor delivery success rates, failures, and dead-lettered events"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "eg_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-event-grid"
+        parent_id = azapi_resource.event_grid_topic.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "DeliveryFailures"
+                enabled  = true
+              },
+              {
+                category = "PublishFailures"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource egDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-event-grid'
+        scope: eventGridTopic
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
+            {
+              category: 'DeliveryFailures'
+              enabled: true
+            }
+            {
+              category: 'PublishFailures'
+              enabled: true
+            }
+          ]
+          metrics: [
+            {
+              category: 'AllMetrics'
+              enabled: true
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.OperationalInsights/workspaces (Log Analytics workspace)"
+    prohibitions:
+      - "Do not omit DeliveryFailures logs — they are critical for diagnosing event loss"
+
+patterns:
+  - name: "Event Grid topic with private endpoint and dead-letter"
+    description: "Production Event Grid with Entra auth, private endpoint, and dead-letter storage"
+    example: |
+      # See EG-001 through EG-004 for complete azapi_resource patterns
+
+anti_patterns:
+  - description: "Do not use SAS keys for Event Grid authentication"
+    instead: "Disable local auth and use Entra RBAC with managed identity"
+  - description: "Do not create event subscriptions without dead-letter configuration"
+    instead: "Always configure a dead-letter destination for undeliverable events"
+
+references:
+  - title: "Event Grid documentation"
+    url: "https://learn.microsoft.com/azure/event-grid/overview"
+  - title: "Event Grid security"
+    url: "https://learn.microsoft.com/azure/event-grid/security-authentication"

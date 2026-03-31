@@ -1,0 +1,286 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: functions
+  category: azure
+  services: [functions]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: FN-001
+    severity: required
+    description: "Create Azure Functions app with HTTPS-only, TLS 1.2, managed identity, and Key Vault references"
+    rationale: "Baseline security configuration prevents cleartext transmission, enables identity-based access, and eliminates secret sprawl"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "function_app_plan" {
+        type      = "Microsoft.Web/serverfarms@2023-12-01"
+        name      = var.function_plan_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "Y1"
+            tier = "Dynamic"
+          }
+          kind = "functionapp"
+          properties = {
+            reserved = true
+          }
+        }
+      }
+
+      resource "azapi_resource" "function_app" {
+        type      = "Microsoft.Web/sites@2023-12-01"
+        name      = var.function_app_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        identity {
+          type         = "UserAssigned"
+          identity_ids = [azapi_resource.user_assigned_identity.id]
+        }
+
+        body = {
+          kind = "functionapp,linux"
+          properties = {
+            serverFarmId = azapi_resource.function_app_plan.id
+            httpsOnly    = true
+            siteConfig = {
+              minTlsVersion    = "1.2"
+              ftpsState        = "Disabled"
+              http20Enabled    = true
+              linuxFxVersion   = var.linux_fx_version
+              appSettings = [
+                {
+                  name  = "AzureWebJobsStorage__accountName"
+                  value = var.storage_account_name
+                },
+                {
+                  name  = "FUNCTIONS_EXTENSION_VERSION"
+                  value = "~4"
+                },
+                {
+                  name  = "FUNCTIONS_WORKER_RUNTIME"
+                  value = var.functions_worker_runtime
+                },
+                {
+                  name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+                  value = var.app_insights_connection_string
+                },
+                {
+                  name  = "MY_SECRET"
+                  value = "@Microsoft.KeyVault(SecretUri=https://${var.key_vault_name}.vault.azure.net/secrets/my-secret/)"
+                }
+              ]
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource functionAppPlan 'Microsoft.Web/serverfarms@2023-12-01' = {
+        name: functionPlanName
+        location: location
+        kind: 'functionapp'
+        sku: {
+          name: 'Y1'
+          tier: 'Dynamic'
+        }
+        properties: {
+          reserved: true
+        }
+      }
+
+      resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
+        name: functionAppName
+        location: location
+        kind: 'functionapp,linux'
+        identity: {
+          type: 'UserAssigned'
+          userAssignedIdentities: {
+            '${userAssignedIdentity.id}': {}
+          }
+        }
+        properties: {
+          serverFarmId: functionAppPlan.id
+          httpsOnly: true
+          siteConfig: {
+            minTlsVersion: '1.2'
+            ftpsState: 'Disabled'
+            http20Enabled: true
+            linuxFxVersion: linuxFxVersion
+            appSettings: [
+              {
+                name: 'AzureWebJobsStorage__accountName'
+                value: storageAccountName
+              }
+              {
+                name: 'FUNCTIONS_EXTENSION_VERSION'
+                value: '~4'
+              }
+              {
+                name: 'FUNCTIONS_WORKER_RUNTIME'
+                value: functionsWorkerRuntime
+              }
+              {
+                name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+                value: appInsightsConnectionString
+              }
+              {
+                name: 'MY_SECRET'
+                value: '@Microsoft.KeyVault(SecretUri=https://${keyVaultName}.vault.azure.net/secrets/my-secret/)'
+              }
+            ]
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER set httpsOnly to false"
+      - "NEVER set minTlsVersion below 1.2"
+      - "NEVER store secrets directly in appSettings — use Key Vault references (@Microsoft.KeyVault(SecretUri=...))"
+      - "NEVER use AzureWebJobsStorage with a connection string — use identity-based connection with AzureWebJobsStorage__accountName"
+      - "NEVER set ftpsState to AllAllowed — use Disabled"
+    template_check:
+      scope: [functions]
+      require_config: [https_only, identity]
+      error_message: "Service '{service_name}' ({service_type}) missing {config_key}: true"
+
+  - id: FN-002
+    severity: required
+    description: "C# Azure Functions must use the isolated worker model (not in-process)"
+    rationale: "In-process model is deprecated; isolated worker provides better performance, dependency isolation, and long-term support"
+    applies_to: [cloud-architect, app-developer, terraform-agent, bicep-agent]
+    prohibitions:
+      - "NEVER use FUNCTIONS_WORKER_RUNTIME=dotnet (in-process) — use FUNCTIONS_WORKER_RUNTIME=dotnet-isolated"
+      - "NEVER reference Microsoft.NET.Sdk.Functions — use Microsoft.Azure.Functions.Worker.Sdk"
+
+  - id: FN-003
+    severity: recommended
+    description: "Use Consumption plan for event-driven, variable workloads; Premium for VNet or sustained load"
+    rationale: "Consumption plan has cold starts but costs nothing at idle; Premium (EP1+) provides VNet integration"
+    applies_to: [cloud-architect, cost-analyst]
+
+  - id: FN-004
+    severity: recommended
+    description: "Enable Application Insights for function monitoring and distributed tracing"
+    rationale: "Functions are inherently distributed — observability is critical for debugging"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, monitoring-agent, app-developer]
+
+  - id: FN-005
+    severity: recommended
+    description: "Use durable functions or Service Bus for long-running orchestrations"
+    rationale: "Regular functions have a 5-10 minute timeout; durable functions handle complex workflows"
+    applies_to: [cloud-architect, app-developer]
+
+  - id: FN-006
+    severity: recommended
+    description: "Use Premium plan (EP1+) or Flex Consumption when VNet integration is required"
+    rationale: "WAF Security: Consumption plan does not support VNet integration or private endpoints; Premium/Flex Consumption provides private networking and prewarmed instances to minimize cold starts"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    prohibitions:
+      - "NEVER use Consumption plan when VNet integration or private endpoints are required"
+
+  - id: FN-007
+    severity: recommended
+    description: "Enable availability zone support for critical function apps"
+    rationale: "WAF Reliability: Zone-redundant deployment provides protection against datacenter-level failures through automatic failover across availability zones"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    terraform_pattern: |
+      # For zone-redundant App Service Plan, set zoneRedundant in AS-001:
+      #   properties = {
+      #     zoneRedundant = true
+      #   }
+      # Note: Requires Premium v3 plan or Flex Consumption plan
+    bicep_pattern: |
+      // For zone-redundant App Service Plan, set zoneRedundant in AS-001:
+      //   properties: {
+      //     zoneRedundant: true
+      //   }
+      // Note: Requires Premium v3 plan or Flex Consumption plan
+
+  - id: FN-008
+    severity: recommended
+    description: "Configure automatic retries for transient errors on function triggers"
+    rationale: "WAF Reliability: Automatic retries reduce the likelihood of data loss or interruption from transient failures, improving reliability without custom code"
+    applies_to: [cloud-architect, app-developer]
+
+  - id: FN-009
+    severity: recommended
+    description: "Enable diagnostic settings to Log Analytics workspace"
+    rationale: "Captures function execution logs, errors, and performance metrics"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    companion_resources:
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        description: "Diagnostic settings for Function App to Log Analytics"
+        terraform_pattern: |
+          resource "azapi_resource" "function_diagnostics" {
+            type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+            name      = "diag-${var.function_app_name}"
+            parent_id = azapi_resource.function_app.id
+
+            body = {
+              properties = {
+                workspaceId = var.log_analytics_workspace_id
+                logs = [
+                  {
+                    categoryGroup = "allLogs"
+                    enabled       = true
+                  }
+                ]
+                metrics = [
+                  {
+                    category = "AllMetrics"
+                    enabled  = true
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource functionDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+            scope: functionApp
+            name: 'diag-${functionAppName}'
+            properties: {
+              workspaceId: logAnalyticsWorkspaceId
+              logs: [
+                {
+                  categoryGroup: 'allLogs'
+                  enabled: true
+                }
+              ]
+              metrics: [
+                {
+                  category: 'AllMetrics'
+                  enabled: true
+                }
+              ]
+            }
+          }
+
+patterns:
+  - name: "Function App with managed identity and Key Vault references"
+    description: "Standard Function App deployment with identity-based storage, Key Vault secret references, and monitoring"
+
+anti_patterns:
+  - description: "Do not store connection strings in Function App Settings as plaintext"
+    instead: "Use Key Vault references: @Microsoft.KeyVault(SecretUri=...)"
+  - description: "Do not use Consumption plan when VNet integration is required"
+    instead: "Use Premium plan (EP1+) or App Service plan for VNet-integrated functions"
+  - description: "Do not use in-process model for C# functions"
+    instead: "Use isolated worker model with Microsoft.Azure.Functions.Worker.Sdk"
+
+references:
+  - title: "Azure Functions security"
+    url: "https://learn.microsoft.com/azure/azure-functions/security-concepts"
+  - title: "Functions networking options"
+    url: "https://learn.microsoft.com/azure/azure-functions/functions-networking-options"
+  - title: "Functions isolated worker model"
+    url: "https://learn.microsoft.com/azure/azure-functions/dotnet-isolated-process-guide"
+  - title: "WAF: Azure Functions service guide"
+    url: "https://learn.microsoft.com/azure/well-architected/service-guides/azure-functions"
+  - title: "Functions error handling and retries"
+    url: "https://learn.microsoft.com/azure/azure-functions/functions-bindings-error-pages"
+  - title: "Functions reliability"
+    url: "https://learn.microsoft.com/azure/reliability/reliability-functions"

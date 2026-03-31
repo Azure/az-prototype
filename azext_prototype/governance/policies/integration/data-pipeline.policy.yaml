@@ -1,0 +1,784 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: data-pipeline
+  category: integration
+  services: [data-factory, synapse-workspace, databricks, storage-account, azure-sql]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: DP-INT-001
+    severity: required
+    description: "Configure Data Factory linked services to SQL Database and Storage using managed identity — never stored credentials"
+    rationale: "Managed identity eliminates credential rotation burden and prevents secret sprawl across linked services"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer]
+    terraform_pattern: |
+      # Data Factory with managed identity (see ADF-001 for full factory config)
+
+      # Managed VNet integration runtime for private data movement
+      resource "azapi_resource" "adf_managed_vnet" {
+        type      = "Microsoft.DataFactory/factories/managedVirtualNetworks@2018-06-01"
+        name      = "default"
+        parent_id = azapi_resource.data_factory.id
+        body = {
+          properties = {}
+        }
+      }
+
+      resource "azapi_resource" "adf_managed_ir" {
+        type      = "Microsoft.DataFactory/factories/integrationRuntimes@2018-06-01"
+        name      = "ManagedVNetIR"
+        parent_id = azapi_resource.data_factory.id
+        body = {
+          properties = {
+            type = "Managed"
+            managedVirtualNetwork = {
+              referenceName = "default"
+              type          = "ManagedVirtualNetworkReference"
+            }
+            typeProperties = {
+              computeProperties = {
+                location = "AutoResolve"
+              }
+            }
+          }
+        }
+      }
+
+      # Managed private endpoint from ADF to SQL Database
+      resource "azapi_resource" "adf_mpe_sql" {
+        type      = "Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints@2018-06-01"
+        name      = "mpe-sql"
+        parent_id = azapi_resource.adf_managed_vnet.id
+        body = {
+          properties = {
+            privateLinkResourceId = azapi_resource.sql_server.id
+            groupId               = "sqlServer"
+            fqdns                 = ["${var.sql_server_name}.database.windows.net"]
+          }
+        }
+      }
+
+      # Managed private endpoint from ADF to Storage Account
+      resource "azapi_resource" "adf_mpe_storage" {
+        type      = "Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints@2018-06-01"
+        name      = "mpe-storage"
+        parent_id = azapi_resource.adf_managed_vnet.id
+        body = {
+          properties = {
+            privateLinkResourceId = azapi_resource.storage_account.id
+            groupId               = "blob"
+            fqdns                 = ["${var.storage_account_name}.blob.core.windows.net"]
+          }
+        }
+      }
+
+      # RBAC: Grant ADF identity SQL DB Contributor on SQL Server
+      resource "azapi_resource" "adf_sql_role" {
+        type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name      = var.adf_sql_role_name
+        parent_id = azapi_resource.sql_server.id
+        body = {
+          properties = {
+            roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"
+            principalId      = azapi_resource.data_factory.output.identity.principalId
+            principalType    = "ServicePrincipal"
+          }
+        }
+      }
+
+      # RBAC: Grant ADF identity Storage Blob Data Contributor on Storage Account
+      resource "azapi_resource" "adf_storage_role" {
+        type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name      = var.adf_storage_role_name
+        parent_id = azapi_resource.storage_account.id
+        body = {
+          properties = {
+            roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe"
+            principalId      = azapi_resource.data_factory.output.identity.principalId
+            principalType    = "ServicePrincipal"
+          }
+        }
+      }
+
+      # RBAC: Grant ADF identity Key Vault Secrets User for Key Vault linked service
+      resource "azapi_resource" "adf_kv_role" {
+        type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name      = var.adf_kv_role_name
+        parent_id = azapi_resource.key_vault.id
+        body = {
+          properties = {
+            roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/4633458b-17de-408a-b874-0445c86b69e6"
+            principalId      = azapi_resource.data_factory.output.identity.principalId
+            principalType    = "ServicePrincipal"
+          }
+        }
+      }
+    bicep_pattern: |
+      // Managed VNet integration runtime for private data movement
+      resource adfManagedVnet 'Microsoft.DataFactory/factories/managedVirtualNetworks@2018-06-01' = {
+        parent: dataFactory
+        name: 'default'
+        properties: {}
+      }
+
+      resource adfManagedIr 'Microsoft.DataFactory/factories/integrationRuntimes@2018-06-01' = {
+        parent: dataFactory
+        name: 'ManagedVNetIR'
+        properties: {
+          type: 'Managed'
+          managedVirtualNetwork: {
+            referenceName: 'default'
+            type: 'ManagedVirtualNetworkReference'
+          }
+          typeProperties: {
+            computeProperties: {
+              location: 'AutoResolve'
+            }
+          }
+        }
+      }
+
+      // Managed private endpoint from ADF to SQL Database
+      resource adfMpeSql 'Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints@2018-06-01' = {
+        parent: adfManagedVnet
+        name: 'mpe-sql'
+        properties: {
+          privateLinkResourceId: sqlServer.id
+          groupId: 'sqlServer'
+          fqdns: ['${sqlServerName}.database.windows.net']
+        }
+      }
+
+      // Managed private endpoint from ADF to Storage Account
+      resource adfMpeStorage 'Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints@2018-06-01' = {
+        parent: adfManagedVnet
+        name: 'mpe-storage'
+        properties: {
+          privateLinkResourceId: storageAccount.id
+          groupId: 'blob'
+          fqdns: ['${storageAccountName}.blob.core.windows.net']
+        }
+      }
+
+      // Grant ADF identity Storage Blob Data Contributor
+      resource adfStorageRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+        name: guid(storageAccount.id, dataFactory.id, 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+        scope: storageAccount
+        properties: {
+          roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+          principalId: dataFactory.identity.principalId
+          principalType: 'ServicePrincipal'
+        }
+      }
+
+      // Grant ADF identity Key Vault Secrets User
+      resource adfKvRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+        name: guid(keyVault.id, dataFactory.id, '4633458b-17de-408a-b874-0445c86b69e6')
+        scope: keyVault
+        properties: {
+          roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
+          principalId: dataFactory.identity.principalId
+          principalType: 'ServicePrincipal'
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.DataFactory/factories/managedVirtualNetworks@2018-06-01"
+        name: "default"
+        description: "Managed VNet for ADF to enable managed private endpoints"
+      - type: "Microsoft.DataFactory/factories/integrationRuntimes@2018-06-01"
+        name: "ManagedVNetIR"
+        description: "Managed VNet integration runtime — all data movement stays on Azure backbone"
+      - type: "Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints@2018-06-01"
+        name: "mpe-sql"
+        description: "Managed private endpoint from ADF to SQL Database"
+      - type: "Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints@2018-06-01"
+        name: "mpe-storage"
+        description: "Managed private endpoint from ADF to Storage Account"
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "adf-storage-contributor"
+        description: "Storage Blob Data Contributor role for ADF managed identity"
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "adf-kv-secrets-user"
+        description: "Key Vault Secrets User role (4633458b) for ADF managed identity"
+    prohibitions:
+      - "NEVER store credentials (passwords, connection strings, SAS tokens) in ADF linked service definitions — use managed identity or Key Vault references"
+      - "NEVER use the default Azure IR without managed VNet — data flows over public internet"
+      - "NEVER grant Key Vault Administrator to ADF — use least-privilege Secrets User role (4633458b)"
+      - "NEVER use self-hosted IR when managed VNet IR with managed private endpoints is sufficient"
+    template_check:
+      when_services_present: [data-factory, azure-sql]
+      require_service: [key-vault]
+      severity: warning
+      error_message: "Data Factory + SQL template must include Key Vault for secret management in linked services"
+
+  - id: DP-INT-002
+    severity: required
+    description: "Configure Synapse Workspace with ADLS Gen2 default data lake using managed identity and managed private endpoints"
+    rationale: "Synapse requires a default data lake for workspace artifacts; managed identity eliminates storage account keys in configuration"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    terraform_pattern: |
+      # ADLS Gen2 storage account for Synapse default data lake
+      resource "azapi_resource" "synapse_adls" {
+        type      = "Microsoft.Storage/storageAccounts@2023-05-01"
+        name      = var.synapse_storage_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          sku = {
+            name = "Standard_LRS"
+          }
+          kind = "StorageV2"
+          properties = {
+            isHnsEnabled           = true      # CRITICAL: Hierarchical namespace for ADLS Gen2
+            publicNetworkAccess    = "Disabled"
+            minimumTlsVersion      = "TLS1_2"
+            allowBlobPublicAccess  = false
+            networkAcls = {
+              defaultAction = "Deny"
+              bypass        = "AzureServices"
+            }
+          }
+        }
+      }
+
+      # File system (container) for Synapse workspace data
+      resource "azapi_resource" "synapse_filesystem" {
+        type      = "Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01"
+        name      = var.synapse_filesystem_name
+        parent_id = "${azapi_resource.synapse_adls.id}/blobServices/default"
+        body = {
+          properties = {
+            publicAccess = "None"
+          }
+        }
+      }
+
+      # Synapse workspace pointing to ADLS Gen2 (see SYN-001 for full workspace config)
+      # Key properties for integration:
+      #   defaultDataLakeStorage.accountUrl = "https://<storage>.dfs.core.windows.net"
+      #   defaultDataLakeStorage.filesystem = "<container>"
+      #   defaultDataLakeStorage.resourceId = <storage_account_id>
+      #   managedVirtualNetwork = "default"
+
+      # RBAC: Grant Synapse identity Storage Blob Data Contributor on data lake
+      resource "azapi_resource" "synapse_storage_role" {
+        type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name      = var.synapse_storage_role_name
+        parent_id = azapi_resource.synapse_adls.id
+        body = {
+          properties = {
+            roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe"
+            principalId      = azapi_resource.synapse_workspace.output.identity.principalId
+            principalType    = "ServicePrincipal"
+          }
+        }
+      }
+
+      # Managed private endpoint from Synapse to data lake
+      resource "azapi_resource" "synapse_mpe_dfs" {
+        type      = "Microsoft.Synapse/workspaces/managedVirtualNetworks/managedPrivateEndpoints@2021-06-01"
+        name      = "mpe-datalake-dfs"
+        parent_id = "${azapi_resource.synapse_workspace.id}/managedVirtualNetworks/default"
+        body = {
+          properties = {
+            privateLinkResourceId = azapi_resource.synapse_adls.id
+            groupId               = "dfs"
+            fqdns                 = ["${var.synapse_storage_name}.dfs.core.windows.net"]
+          }
+        }
+      }
+
+      resource "azapi_resource" "synapse_mpe_blob" {
+        type      = "Microsoft.Synapse/workspaces/managedVirtualNetworks/managedPrivateEndpoints@2021-06-01"
+        name      = "mpe-datalake-blob"
+        parent_id = "${azapi_resource.synapse_workspace.id}/managedVirtualNetworks/default"
+        body = {
+          properties = {
+            privateLinkResourceId = azapi_resource.synapse_adls.id
+            groupId               = "blob"
+            fqdns                 = ["${var.synapse_storage_name}.blob.core.windows.net"]
+          }
+        }
+      }
+    bicep_pattern: |
+      // ADLS Gen2 storage account for Synapse default data lake
+      resource synapseAdls 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+        name: synapseStorageName
+        location: location
+        sku: {
+          name: 'Standard_LRS'
+        }
+        kind: 'StorageV2'
+        properties: {
+          isHnsEnabled: true                     // CRITICAL: Hierarchical namespace for ADLS Gen2
+          publicNetworkAccess: 'Disabled'
+          minimumTlsVersion: 'TLS1_2'
+          allowBlobPublicAccess: false
+          networkAcls: {
+            defaultAction: 'Deny'
+            bypass: 'AzureServices'
+          }
+        }
+      }
+
+      // File system for Synapse workspace data
+      resource synapseFilesystem 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+        parent: synapseAdlsBlobService
+        name: synapseFilesystemName
+        properties: {
+          publicAccess: 'None'
+        }
+      }
+
+      // Grant Synapse identity Storage Blob Data Contributor on data lake
+      resource synapseStorageRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+        name: guid(synapseAdls.id, synapseWorkspace.id, 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+        scope: synapseAdls
+        properties: {
+          roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+          principalId: synapseWorkspace.identity.principalId
+          principalType: 'ServicePrincipal'
+        }
+      }
+
+      // Managed private endpoint from Synapse to data lake (DFS)
+      resource synapseMpeDfs 'Microsoft.Synapse/workspaces/managedVirtualNetworks/managedPrivateEndpoints@2021-06-01' = {
+        name: '${synapseWorkspace.name}/default/mpe-datalake-dfs'
+        properties: {
+          privateLinkResourceId: synapseAdls.id
+          groupId: 'dfs'
+          fqdns: ['${synapseStorageName}.dfs.core.windows.net']
+        }
+      }
+
+      // Managed private endpoint from Synapse to data lake (Blob)
+      resource synapseMpeBlob 'Microsoft.Synapse/workspaces/managedVirtualNetworks/managedPrivateEndpoints@2021-06-01' = {
+        name: '${synapseWorkspace.name}/default/mpe-datalake-blob'
+        properties: {
+          privateLinkResourceId: synapseAdls.id
+          groupId: 'blob'
+          fqdns: ['${synapseStorageName}.blob.core.windows.net']
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Storage/storageAccounts@2023-05-01"
+        name: "synapse-data-lake"
+        description: "ADLS Gen2 storage account (isHnsEnabled: true) for Synapse default data lake"
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "synapse-storage-contributor"
+        description: "Storage Blob Data Contributor role for Synapse managed identity on data lake"
+      - type: "Microsoft.Synapse/workspaces/managedVirtualNetworks/managedPrivateEndpoints@2021-06-01"
+        name: "mpe-datalake-dfs"
+        description: "Managed private endpoint for Synapse to access data lake DFS endpoint"
+      - type: "Microsoft.Synapse/workspaces/managedVirtualNetworks/managedPrivateEndpoints@2021-06-01"
+        name: "mpe-datalake-blob"
+        description: "Managed private endpoint for Synapse to access data lake Blob endpoint"
+    prohibitions:
+      - "NEVER use storage account keys for Synapse data lake access — use managed identity with Storage Blob Data Contributor"
+      - "NEVER use a storage account without isHnsEnabled for Synapse default data lake — it requires ADLS Gen2"
+      - "NEVER skip managed private endpoints for data lake access when Synapse managed VNet is enabled"
+      - "NEVER use public endpoints for data movement between Synapse and storage"
+    template_check:
+      when_services_present: [synapse-workspace]
+      require_service: [storage-account]
+      severity: error
+      error_message: "Synapse workspace requires a storage account with ADLS Gen2 (isHnsEnabled) as default data lake"
+
+  - id: DP-INT-003
+    severity: required
+    description: "Configure Databricks workspace with Key Vault-backed secret scope for secure credential access"
+    rationale: "Databricks secret scopes backed by Key Vault centralize secret management; Azure-managed scopes lack audit trail and rotation"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer]
+    terraform_pattern: |
+      # Key Vault for Databricks secret scope
+      # Databricks Key Vault-backed secret scopes are configured via Databricks REST API, not ARM
+      # The IaC role is to provision the Key Vault and grant Databricks access
+
+      # Key Vault with RBAC authorization (required for Databricks KV-backed scopes)
+      resource "azapi_resource" "dbr_key_vault" {
+        type      = "Microsoft.KeyVault/vaults@2023-07-01"
+        name      = var.dbr_kv_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            tenantId                  = var.tenant_id
+            enableRbacAuthorization   = true
+            enableSoftDelete          = true
+            softDeleteRetentionInDays = 90
+            enablePurgeProtection     = true
+            publicNetworkAccess       = "Disabled"
+            sku = {
+              family = "A"
+              name   = "standard"
+            }
+            networkAcls = {
+              defaultAction = "Deny"
+              bypass        = "AzureServices"
+            }
+          }
+        }
+      }
+
+      # Private endpoint for Key Vault
+      resource "azapi_resource" "dbr_kv_pe" {
+        type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+        name      = "pe-${var.dbr_kv_name}"
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            subnet = {
+              id = var.pe_subnet_id
+            }
+            privateLinkServiceConnections = [
+              {
+                name = "kv-connection"
+                properties = {
+                  privateLinkServiceId = azapi_resource.dbr_key_vault.id
+                  groupIds             = ["vault"]
+                }
+              }
+            ]
+          }
+        }
+      }
+
+      # RBAC: Grant Databricks workspace identity Key Vault Secrets User
+      resource "azapi_resource" "dbr_kv_role" {
+        type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name      = var.dbr_kv_role_name
+        parent_id = azapi_resource.dbr_key_vault.id
+        body = {
+          properties = {
+            roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/4633458b-17de-408a-b874-0445c86b69e6"
+            principalId      = var.databricks_workspace_principal_id
+            principalType    = "ServicePrincipal"
+          }
+        }
+      }
+
+      # Post-deployment: Create the KV-backed secret scope via Databricks REST API
+      # POST https://<workspace-url>/api/2.0/secrets/scopes/create
+      # {
+      #   "scope": "kv-scope",
+      #   "scope_backend_type": "AZURE_KEYVAULT",
+      #   "backend_azure_keyvault": {
+      #     "resource_id": "<key-vault-resource-id>",
+      #     "dns_name": "https://<key-vault-name>.vault.azure.net/"
+      #   }
+      # }
+    bicep_pattern: |
+      // Key Vault for Databricks secret scope (RBAC authorization required)
+      resource dbrKeyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+        name: dbrKvName
+        location: location
+        properties: {
+          tenantId: tenantId
+          enableRbacAuthorization: true
+          enableSoftDelete: true
+          softDeleteRetentionInDays: 90
+          enablePurgeProtection: true
+          publicNetworkAccess: 'Disabled'
+          sku: {
+            family: 'A'
+            name: 'standard'
+          }
+          networkAcls: {
+            defaultAction: 'Deny'
+            bypass: 'AzureServices'
+          }
+        }
+      }
+
+      // Private endpoint for Key Vault
+      resource dbrKvPe 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+        name: 'pe-${dbrKvName}'
+        location: location
+        properties: {
+          subnet: {
+            id: peSubnetId
+          }
+          privateLinkServiceConnections: [
+            {
+              name: 'kv-connection'
+              properties: {
+                privateLinkServiceId: dbrKeyVault.id
+                groupIds: ['vault']
+              }
+            }
+          ]
+        }
+      }
+
+      // Grant Databricks identity Key Vault Secrets User
+      resource dbrKvRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+        name: guid(dbrKeyVault.id, databricksWorkspacePrincipalId, '4633458b-17de-408a-b874-0445c86b69e6')
+        scope: dbrKeyVault
+        properties: {
+          roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
+          principalId: databricksWorkspacePrincipalId
+          principalType: 'ServicePrincipal'
+        }
+      }
+
+      // Post-deployment: Create KV-backed secret scope via Databricks REST API
+      // POST https://<workspace-url>/api/2.0/secrets/scopes/create
+      // {
+      //   "scope": "kv-scope",
+      //   "scope_backend_type": "AZURE_KEYVAULT",
+      //   "backend_azure_keyvault": {
+      //     "resource_id": "<key-vault-resource-id>",
+      //     "dns_name": "https://<key-vault-name>.vault.azure.net/"
+      //   }
+      // }
+    companion_resources:
+      - type: "Microsoft.KeyVault/vaults@2023-07-01"
+        name: "dbr-key-vault"
+        description: "Key Vault with RBAC authorization for Databricks secret scope backing store"
+      - type: "Microsoft.Network/privateEndpoints@2024-01-01"
+        name: "pe-dbr-kv"
+        description: "Private endpoint for Key Vault access from Databricks VNet"
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "dbr-kv-secrets-user"
+        description: "Key Vault Secrets User role (4633458b) for Databricks workspace identity"
+    prohibitions:
+      - "NEVER use Databricks-managed secret scopes for production — they lack Key Vault audit trail and centralized rotation"
+      - "NEVER store secrets in Databricks notebooks or cluster init scripts"
+      - "NEVER grant Key Vault Administrator role to Databricks — use Secrets User (read-only)"
+      - "NEVER use access policy-based Key Vault for Databricks secret scopes — use RBAC authorization"
+    template_check:
+      when_services_present: [databricks]
+      require_service: [key-vault]
+      severity: warning
+      error_message: "Databricks template must include Key Vault for Key Vault-backed secret scopes"
+
+  - id: DP-INT-004
+    severity: required
+    description: "Enforce encryption in transit for all cross-service data movement using private endpoints and TLS 1.2+"
+    rationale: "Data in transit between services must be encrypted and routed privately to prevent interception and exfiltration"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, security-reviewer]
+    terraform_pattern: |
+      # Storage Account: enforce HTTPS and TLS 1.2
+      # (see SA policy for full pattern — key properties for data pipeline integration)
+      resource "azapi_resource" "pipeline_storage" {
+        type      = "Microsoft.Storage/storageAccounts@2023-05-01"
+        name      = var.pipeline_storage_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          sku = {
+            name = "Standard_LRS"
+          }
+          kind = "StorageV2"
+          properties = {
+            supportsHttpsTrafficOnly = true     # CRITICAL: enforce HTTPS
+            minimumTlsVersion        = "TLS1_2"
+            publicNetworkAccess      = "Disabled"
+            allowBlobPublicAccess    = false
+            networkAcls = {
+              defaultAction = "Deny"
+              bypass        = "AzureServices"
+            }
+          }
+        }
+      }
+
+      # SQL Server: enforce TLS 1.2 and disable public access
+      resource "azapi_resource" "pipeline_sql_server" {
+        type      = "Microsoft.Sql/servers@2023-08-01-preview"
+        name      = var.sql_server_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        identity {
+          type = "SystemAssigned"
+        }
+        body = {
+          properties = {
+            minimalTlsVersion    = "1.2"
+            publicNetworkAccess  = "Disabled"
+            administrators = {
+              azureADOnlyAuthentication = true
+              administratorType         = "ActiveDirectory"
+              login                     = var.sql_admin_name
+              sid                       = var.sql_admin_object_id
+              tenantId                  = var.tenant_id
+            }
+          }
+        }
+      }
+
+      # Private endpoint for SQL Server
+      resource "azapi_resource" "pe_sql" {
+        type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+        name      = "pe-${var.sql_server_name}"
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            subnet = {
+              id = var.pe_subnet_id
+            }
+            privateLinkServiceConnections = [
+              {
+                name = "sql-connection"
+                properties = {
+                  privateLinkServiceId = azapi_resource.pipeline_sql_server.id
+                  groupIds             = ["sqlServer"]
+                }
+              }
+            ]
+          }
+        }
+      }
+
+      # Private endpoint for Storage Account
+      resource "azapi_resource" "pe_storage" {
+        type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+        name      = "pe-${var.pipeline_storage_name}"
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            subnet = {
+              id = var.pe_subnet_id
+            }
+            privateLinkServiceConnections = [
+              {
+                name = "storage-connection"
+                properties = {
+                  privateLinkServiceId = azapi_resource.pipeline_storage.id
+                  groupIds             = ["blob"]
+                }
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      // Storage Account: enforce HTTPS and TLS 1.2
+      resource pipelineStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+        name: pipelineStorageName
+        location: location
+        sku: {
+          name: 'Standard_LRS'
+        }
+        kind: 'StorageV2'
+        properties: {
+          supportsHttpsTrafficOnly: true        // CRITICAL: enforce HTTPS
+          minimumTlsVersion: 'TLS1_2'
+          publicNetworkAccess: 'Disabled'
+          allowBlobPublicAccess: false
+          networkAcls: {
+            defaultAction: 'Deny'
+            bypass: 'AzureServices'
+          }
+        }
+      }
+
+      // SQL Server: enforce TLS 1.2 and disable public access
+      resource pipelineSqlServer 'Microsoft.Sql/servers@2023-08-01-preview' = {
+        name: sqlServerName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          minimalTlsVersion: '1.2'
+          publicNetworkAccess: 'Disabled'
+          administrators: {
+            azureADOnlyAuthentication: true
+            administratorType: 'ActiveDirectory'
+            login: sqlAdminName
+            sid: sqlAdminObjectId
+            tenantId: tenantId
+          }
+        }
+      }
+
+      // Private endpoint for SQL Server
+      resource peSql 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+        name: 'pe-${sqlServerName}'
+        location: location
+        properties: {
+          subnet: {
+            id: peSubnetId
+          }
+          privateLinkServiceConnections: [
+            {
+              name: 'sql-connection'
+              properties: {
+                privateLinkServiceId: pipelineSqlServer.id
+                groupIds: ['sqlServer']
+              }
+            }
+          ]
+        }
+      }
+
+      // Private endpoint for Storage Account
+      resource peStorage 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+        name: 'pe-${pipelineStorageName}'
+        location: location
+        properties: {
+          subnet: {
+            id: peSubnetId
+          }
+          privateLinkServiceConnections: [
+            {
+              name: 'storage-connection'
+              properties: {
+                privateLinkServiceId: pipelineStorage.id
+                groupIds: ['blob']
+              }
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Network/privateEndpoints@2024-01-01"
+        name: "pe-sql"
+        description: "Private endpoint for SQL Server with groupId 'sqlServer'"
+      - type: "Microsoft.Network/privateEndpoints@2024-01-01"
+        name: "pe-storage"
+        description: "Private endpoint for Storage Account with groupId 'blob'"
+      - type: "Microsoft.Network/privateDnsZones@2024-06-01"
+        name: "privatelink.database.windows.net"
+        description: "Private DNS zone for SQL Server private endpoint resolution"
+      - type: "Microsoft.Network/privateDnsZones@2024-06-01"
+        name: "privatelink.blob.core.windows.net"
+        description: "Private DNS zone for Storage Account blob private endpoint resolution"
+    prohibitions:
+      - "NEVER use public endpoints for data movement between pipeline services — use private endpoints or managed private endpoints"
+      - "NEVER allow TLS versions below 1.2 on any service in the data pipeline"
+      - "NEVER set supportsHttpsTrafficOnly to false on storage accounts — HTTP allows unencrypted data transfer"
+      - "NEVER use SQL authentication (passwords) for pipeline connections — use Entra-only authentication"
+      - "NEVER set publicNetworkAccess to Enabled on data pipeline services"
+
+patterns:
+  - name: "Data Factory to SQL and Storage with managed identity"
+    description: "ADF with managed VNet IR, managed private endpoints to SQL and Storage, Key Vault for secrets"
+  - name: "Synapse with ADLS Gen2 data lake"
+    description: "Synapse workspace with ADLS Gen2 default storage, managed private endpoints, and Storage Blob Data Contributor role"
+  - name: "Databricks with Key Vault secret scope"
+    description: "Databricks Premium workspace with Key Vault-backed secret scope via REST API, RBAC authorization"
+
+anti_patterns:
+  - description: "Do not store credentials in Data Factory or Synapse linked service definitions"
+    instead: "Use managed identity with RBAC roles or Key Vault references for all data source connections"
+  - description: "Do not use public endpoints for data movement between services"
+    instead: "Use managed private endpoints (ADF/Synapse) or private endpoints with private DNS zones"
+  - description: "Do not use Databricks-managed secret scopes in production"
+    instead: "Use Key Vault-backed secret scopes with RBAC authorization and audit logging"
+
+references:
+  - title: "Data Factory managed private endpoints"
+    url: "https://learn.microsoft.com/azure/data-factory/managed-virtual-network-private-endpoint"
+  - title: "Synapse managed private endpoints"
+    url: "https://learn.microsoft.com/azure/synapse-analytics/security/synapse-workspace-managed-private-endpoints"
+  - title: "Databricks Key Vault-backed secret scopes"
+    url: "https://learn.microsoft.com/azure/databricks/security/secrets/secret-scopes"
+  - title: "Data Factory identity-based authentication"
+    url: "https://learn.microsoft.com/azure/data-factory/connector-azure-blob-storage#managed-identity"

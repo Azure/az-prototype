@@ -1,0 +1,376 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: databricks
+  category: azure
+  services: [databricks]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: DBR-001
+    severity: required
+    description: "Deploy Databricks workspace with Premium SKU, VNet injection, and public access disabled"
+    rationale: "Premium SKU provides RBAC, audit logging, and CMK; VNet injection isolates cluster traffic"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "databricks_workspace" {
+        type      = "Microsoft.Databricks/workspaces@2024-05-01"
+        name      = var.dbr_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          sku = {
+            name = "premium"
+          }
+          properties = {
+            managedResourceGroupId = "/subscriptions/${var.subscription_id}/resourceGroups/${var.managed_rg_name}"
+            publicNetworkAccess    = "Disabled"
+            requiredNsgRules       = "AllRules"
+            parameters = {
+              customVirtualNetworkId = {
+                value = var.vnet_id
+              }
+              customPublicSubnetName = {
+                value = var.public_subnet_name
+              }
+              customPrivateSubnetName = {
+                value = var.private_subnet_name
+              }
+              enableNoPublicIp = {
+                value = true
+              }
+              prepareEncryption = {
+                value = true
+              }
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource databricksWorkspace 'Microsoft.Databricks/workspaces@2024-05-01' = {
+        name: dbrName
+        location: location
+        sku: {
+          name: 'premium'
+        }
+        properties: {
+          managedResourceGroupId: '/subscriptions/${subscriptionId}/resourceGroups/${managedRgName}'
+          publicNetworkAccess: 'Disabled'
+          requiredNsgRules: 'AllRules'
+          parameters: {
+            customVirtualNetworkId: {
+              value: vnetId
+            }
+            customPublicSubnetName: {
+              value: publicSubnetName
+            }
+            customPrivateSubnetName: {
+              value: privateSubnetName
+            }
+            enableNoPublicIp: {
+              value: true
+            }
+            prepareEncryption: {
+              value: true
+            }
+          }
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/virtualNetworks/subnets (two delegated subnets for Databricks: public and private)"
+      - "Microsoft.Network/networkSecurityGroups (NSG with Databricks-required rules on both subnets)"
+      - "Microsoft.Network/privateEndpoints (private endpoints for databricks_ui_api and browser_authentication)"
+      - "Microsoft.Network/privateDnsZones (privatelink.azuredatabricks.net)"
+      - "Microsoft.Insights/diagnosticSettings (route diagnostic logs to Log Analytics)"
+    prohibitions:
+      - "Do not use Standard SKU — it lacks RBAC, audit logging, and CMK support"
+      - "Do not enable publicNetworkAccess — use private endpoints for workspace access"
+      - "Do not set enableNoPublicIp to false — cluster nodes should not have public IPs"
+      - "Do not deploy Databricks without VNet injection"
+
+  - id: DBR-002
+    severity: required
+    description: "Create two dedicated subnets delegated to Databricks with required NSG rules"
+    rationale: "Databricks requires separate public and private subnets with specific NSG rules for cluster communication"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "dbr_public_subnet" {
+        type      = "Microsoft.Network/virtualNetworks/subnets@2024-01-01"
+        name      = var.dbr_public_subnet_name
+        parent_id = azapi_resource.vnet.id
+        body = {
+          properties = {
+            addressPrefix = var.dbr_public_prefix
+            networkSecurityGroup = {
+              id = azapi_resource.dbr_nsg.id
+            }
+            delegations = [
+              {
+                name = "databricks-public"
+                properties = {
+                  serviceName = "Microsoft.Databricks/workspaces"
+                }
+              }
+            ]
+          }
+        }
+      }
+
+      resource "azapi_resource" "dbr_private_subnet" {
+        type      = "Microsoft.Network/virtualNetworks/subnets@2024-01-01"
+        name      = var.dbr_private_subnet_name
+        parent_id = azapi_resource.vnet.id
+        body = {
+          properties = {
+            addressPrefix = var.dbr_private_prefix
+            networkSecurityGroup = {
+              id = azapi_resource.dbr_nsg.id
+            }
+            delegations = [
+              {
+                name = "databricks-private"
+                properties = {
+                  serviceName = "Microsoft.Databricks/workspaces"
+                }
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource dbrPublicSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-01-01' = {
+        parent: vnet
+        name: dbrPublicSubnetName
+        properties: {
+          addressPrefix: dbrPublicPrefix
+          networkSecurityGroup: {
+            id: dbrNsg.id
+          }
+          delegations: [
+            {
+              name: 'databricks-public'
+              properties: {
+                serviceName: 'Microsoft.Databricks/workspaces'
+              }
+            }
+          ]
+        }
+      }
+
+      resource dbrPrivateSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-01-01' = {
+        parent: vnet
+        name: dbrPrivateSubnetName
+        properties: {
+          addressPrefix: dbrPrivatePrefix
+          networkSecurityGroup: {
+            id: dbrNsg.id
+          }
+          delegations: [
+            {
+              name: 'databricks-private'
+              properties: {
+                serviceName: 'Microsoft.Databricks/workspaces'
+              }
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/networkSecurityGroups (NSG with required Databricks rules)"
+    prohibitions:
+      - "Do not share Databricks subnets with other resources"
+      - "Do not use subnets smaller than /26 — Databricks needs IP space for cluster nodes"
+
+  - id: DBR-003
+    severity: recommended
+    description: "Create private endpoints for workspace UI/API and browser authentication"
+    rationale: "Private endpoints ensure all workspace access stays on the private network"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "dbr_pe_ui_api" {
+        type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+        name      = "${var.dbr_name}-pe-ui-api"
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            subnet = {
+              id = var.pe_subnet_id
+            }
+            privateLinkServiceConnections = [
+              {
+                name = "${var.dbr_name}-ui-api"
+                properties = {
+                  privateLinkServiceId = azapi_resource.databricks_workspace.id
+                  groupIds             = ["databricks_ui_api"]
+                }
+              }
+            ]
+          }
+        }
+      }
+
+      resource "azapi_resource" "dbr_pe_browser" {
+        type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+        name      = "${var.dbr_name}-pe-browser"
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            subnet = {
+              id = var.pe_subnet_id
+            }
+            privateLinkServiceConnections = [
+              {
+                name = "${var.dbr_name}-browser"
+                properties = {
+                  privateLinkServiceId = azapi_resource.databricks_workspace.id
+                  groupIds             = ["browser_authentication"]
+                }
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource dbrPeUiApi 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+        name: '${dbrName}-pe-ui-api'
+        location: location
+        properties: {
+          subnet: {
+            id: peSubnetId
+          }
+          privateLinkServiceConnections: [
+            {
+              name: '${dbrName}-ui-api'
+              properties: {
+                privateLinkServiceId: databricksWorkspace.id
+                groupIds: ['databricks_ui_api']
+              }
+            }
+          ]
+        }
+      }
+
+      resource dbrPeBrowser 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+        name: '${dbrName}-pe-browser'
+        location: location
+        properties: {
+          subnet: {
+            id: peSubnetId
+          }
+          privateLinkServiceConnections: [
+            {
+              name: '${dbrName}-browser'
+              properties: {
+                privateLinkServiceId: databricksWorkspace.id
+                groupIds: ['browser_authentication']
+              }
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/privateDnsZones (privatelink.azuredatabricks.net)"
+      - "Microsoft.Network/privateEndpoints/privateDnsZoneGroups (DNS registration)"
+    prohibitions:
+      - "Do not skip the browser_authentication private endpoint — web UI access requires it"
+
+  - id: DBR-004
+    severity: recommended
+    description: "Enable diagnostic settings for Databricks workspace"
+    rationale: "Track workspace access, job runs, cluster events, and notebook executions"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "dbr_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-databricks"
+        parent_id = azapi_resource.databricks_workspace.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "dbfs"
+                enabled  = true
+              },
+              {
+                category = "clusters"
+                enabled  = true
+              },
+              {
+                category = "accounts"
+                enabled  = true
+              },
+              {
+                category = "jobs"
+                enabled  = true
+              },
+              {
+                category = "notebook"
+                enabled  = true
+              },
+              {
+                category = "workspace"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource dbrDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-databricks'
+        scope: databricksWorkspace
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
+            {
+              category: 'dbfs'
+              enabled: true
+            }
+            {
+              category: 'clusters'
+              enabled: true
+            }
+            {
+              category: 'accounts'
+              enabled: true
+            }
+            {
+              category: 'jobs'
+              enabled: true
+            }
+            {
+              category: 'notebook'
+              enabled: true
+            }
+            {
+              category: 'workspace'
+              enabled: true
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.OperationalInsights/workspaces (Log Analytics workspace)"
+    prohibitions:
+      - "Do not omit accounts logs — they track authentication and authorization events"
+
+patterns:
+  - name: "Databricks Premium with VNet injection and private endpoints"
+    description: "Fully isolated Databricks workspace with no public IPs and workspace-level encryption"
+    example: |
+      # See DBR-001 through DBR-004 for complete azapi_resource patterns
+
+anti_patterns:
+  - description: "Do not deploy Databricks without VNet injection"
+    instead: "Use customVirtualNetworkId parameter with dedicated subnets"
+  - description: "Do not use Standard SKU for production"
+    instead: "Use Premium SKU for RBAC, audit logging, and CMK support"
+
+references:
+  - title: "Databricks VNet injection"
+    url: "https://learn.microsoft.com/azure/databricks/administration-guide/cloud-configurations/azure/vnet-inject"
+  - title: "Databricks security best practices"
+    url: "https://learn.microsoft.com/azure/databricks/security/best-practices"

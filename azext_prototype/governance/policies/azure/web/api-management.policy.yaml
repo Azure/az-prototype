@@ -1,0 +1,276 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: api-management
+  category: azure
+  services: [api-management]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: APIM-001
+    severity: required
+    description: "Deploy API Management with managed identity, VNet integration, and TLS 1.2+ enforcement"
+    rationale: "APIM is the gateway for all backend APIs; it must enforce transport security and use managed identity for backend auth"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "apim" {
+        type      = "Microsoft.ApiManagement/service@2023-09-01-preview"
+        name      = var.apim_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          sku = {
+            name     = var.sku_name      # "Developer", "Basic", "Standard", "Premium"
+            capacity = var.sku_capacity   # 1+
+          }
+          properties = {
+            publisherEmail          = var.publisher_email
+            publisherName           = var.publisher_name
+            virtualNetworkType      = "Internal"
+            virtualNetworkConfiguration = {
+              subnetResourceId = var.apim_subnet_id
+            }
+            customProperties = {
+              "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls10" = "false"
+              "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls11" = "false"
+              "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Ssl30" = "false"
+              "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Tls10" = "false"
+              "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Tls11" = "false"
+              "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Ssl30" = "false"
+              "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Ciphers.TripleDes168"    = "false"
+            }
+            publicNetworkAccess = "Disabled"
+            disableGateway      = false
+          }
+        }
+      }
+    bicep_pattern: |
+      resource apim 'Microsoft.ApiManagement/service@2023-09-01-preview' = {
+        name: apimName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: skuName
+          capacity: skuCapacity
+        }
+        properties: {
+          publisherEmail: publisherEmail
+          publisherName: publisherName
+          virtualNetworkType: 'Internal'
+          virtualNetworkConfiguration: {
+            subnetResourceId: apimSubnetId
+          }
+          customProperties: {
+            'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls10': 'false'
+            'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls11': 'false'
+            'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Ssl30': 'false'
+            'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Tls10': 'false'
+            'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Tls11': 'false'
+            'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Ssl30': 'false'
+            'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Ciphers.TripleDes168': 'false'
+          }
+          publicNetworkAccess: 'Disabled'
+          disableGateway: false
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Network/privateEndpoints@2024-01-01"
+        name: "pe-apim"
+        description: "Private endpoint for APIM management plane access"
+        terraform_pattern: |
+          resource "azapi_resource" "pe_apim" {
+            type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+            name      = "pe-${var.apim_name}"
+            location  = var.location
+            parent_id = var.resource_group_id
+
+            body = {
+              properties = {
+                subnet = {
+                  id = var.pe_subnet_id
+                }
+                privateLinkServiceConnections = [
+                  {
+                    name = "apim-connection"
+                    properties = {
+                      privateLinkServiceId = azapi_resource.apim.id
+                      groupIds             = ["Gateway"]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource peApim 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+            name: 'pe-${apimName}'
+            location: location
+            properties: {
+              subnet: {
+                id: peSubnetId
+              }
+              privateLinkServiceConnections: [
+                {
+                  name: 'apim-connection'
+                  properties: {
+                    privateLinkServiceId: apim.id
+                    groupIds: ['Gateway']
+                  }
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Network/privateDnsZones@2024-06-01"
+        name: "privatelink.azure-api.net"
+        description: "Private DNS zone for APIM gateway private endpoint resolution"
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name: "diag-apim"
+        description: "Diagnostic settings for gateway logs, request/response logging to Log Analytics"
+        terraform_pattern: |
+          resource "azapi_resource" "diag_apim" {
+            type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+            name      = "diag-${var.apim_name}"
+            parent_id = azapi_resource.apim.id
+
+            body = {
+              properties = {
+                workspaceId = var.log_analytics_workspace_id
+                logs = [
+                  {
+                    categoryGroup = "allLogs"
+                    enabled       = true
+                  }
+                ]
+                metrics = [
+                  {
+                    category = "AllMetrics"
+                    enabled  = true
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource diagApim 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+            name: 'diag-${apimName}'
+            scope: apim
+            properties: {
+              workspaceId: logAnalyticsWorkspaceId
+              logs: [
+                {
+                  categoryGroup: 'allLogs'
+                  enabled: true
+                }
+              ]
+              metrics: [
+                {
+                  category: 'AllMetrics'
+                  enabled: true
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.ApiManagement/service/namedValues@2023-09-01-preview"
+        name: "Key Vault named values"
+        description: "Named values backed by Key Vault secrets — never store secrets as plain text named values"
+    prohibitions:
+      - "Never hardcode API keys, certificates, or secrets in APIM policies or named values"
+      - "Never enable TLS 1.0, TLS 1.1, or SSL 3.0 on gateway or backend"
+      - "Never use Triple DES 168 cipher"
+      - "Never set virtualNetworkType to None for production — use Internal or External"
+      - "Never store plain-text secrets in named values — use Key Vault references"
+      - "Never expose management API endpoint publicly without IP restrictions"
+
+  - id: APIM-002
+    severity: required
+    description: "Use subscription keys or OAuth 2.0 for API authentication — never expose APIs without auth"
+    rationale: "Unauthenticated APIs allow unrestricted access and abuse"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+
+  - id: APIM-003
+    severity: recommended
+    description: "Implement rate limiting and quota policies on all API products"
+    rationale: "Rate limiting prevents abuse and ensures fair usage across consumers"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+  - id: APIM-004
+    severity: recommended
+    description: "Use managed identity for backend service authentication"
+    rationale: "Eliminates credential management between APIM and backend services"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+
+  - id: APIM-005
+    severity: recommended
+    description: "Enable zone redundancy for Premium tier APIM instances"
+    rationale: "WAF Reliability: Zone redundancy ensures resiliency during a datacenter outage within a region; API traffic continues through remaining units in other zones"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    terraform_pattern: |
+      # Add zones to the APIM resource in APIM-001:
+      #   body = {
+      #     zones = ["1", "2", "3"]
+      #   }
+    bicep_pattern: |
+      // Add zones to the APIM resource in APIM-001:
+      //   zones: ['1', '2', '3']
+
+  - id: APIM-006
+    severity: recommended
+    description: "Enable autoscaling or deploy multiple units to handle traffic spikes"
+    rationale: "WAF Reliability/Performance: Sufficient gateway units guarantee resources to meet demand from API clients, preventing failures from insufficient capacity"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+
+  - id: APIM-007
+    severity: recommended
+    description: "Use Defender for APIs for threat detection and API security insights"
+    rationale: "WAF Security: Defender for APIs provides security insights, recommendations, and threat detection for APIs hosted in APIM"
+    applies_to: [cloud-architect, security-reviewer]
+
+  - id: APIM-008
+    severity: recommended
+    description: "Implement validate-jwt, validate-content, and validate-headers policies for API security"
+    rationale: "WAF Security: Delegating security checks to API policies at the gateway reduces nonlegitimate traffic reaching backend services, protecting integrity and availability"
+    applies_to: [cloud-architect, app-developer, terraform-agent, bicep-agent]
+
+  - id: APIM-009
+    severity: recommended
+    description: "Use built-in cache or external Redis-compatible cache for frequently accessed API responses"
+    rationale: "WAF Performance/Cost: Caching reduces backend load and response latency; built-in cache avoids the cost of maintaining an external cache"
+    applies_to: [cloud-architect, app-developer]
+
+  - id: APIM-010
+    severity: recommended
+    description: "Disable the direct management REST API"
+    rationale: "WAF Security: The direct management API is a legacy control plane access point that increases the attack surface"
+    applies_to: [cloud-architect, security-reviewer]
+
+patterns:
+  - name: "APIM with VNet integration and Key Vault"
+    description: "Internal APIM deployment with VNet injection, TLS enforcement, and Key Vault-backed secrets"
+
+anti_patterns:
+  - description: "Do not store secrets as plain-text named values"
+    instead: "Use Key Vault-backed named values with managed identity access"
+  - description: "Do not expose APIs without authentication policies"
+    instead: "Configure subscription key validation or OAuth 2.0 validation in inbound policies"
+  - description: "Do not deploy APIM without VNet integration"
+    instead: "Use Internal or External virtualNetworkType with dedicated subnet"
+
+references:
+  - title: "API Management security baseline"
+    url: "https://learn.microsoft.com/azure/api-management/security-baseline"
+  - title: "API Management VNet integration"
+    url: "https://learn.microsoft.com/azure/api-management/virtual-network-concepts"
+  - title: "WAF: API Management service guide"
+    url: "https://learn.microsoft.com/azure/well-architected/service-guides/azure-api-management"
+  - title: "Defender for APIs"
+    url: "https://learn.microsoft.com/azure/defender-for-cloud/defender-for-apis-introduction"
+  - title: "API Management autoscaling"
+    url: "https://learn.microsoft.com/azure/api-management/api-management-howto-autoscale"

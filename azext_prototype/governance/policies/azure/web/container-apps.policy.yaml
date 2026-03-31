@@ -1,0 +1,274 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: container-apps
+  category: azure
+  services: [container-apps]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: CA-001
+    severity: required
+    description: "Create Container Apps Environment with VNet integration and Log Analytics"
+    rationale: "Network isolation is mandatory; environment-level logging enables centralized observability"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "container_app_env" {
+        type      = "Microsoft.App/managedEnvironments@2024-03-01"
+        name      = var.container_app_env_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            vnetConfiguration = {
+              infrastructureSubnetId = var.container_app_subnet_id
+              internal               = true
+            }
+            appLogsConfiguration = {
+              destination = "log-analytics"
+              logAnalyticsConfiguration = {
+                customerId = var.log_analytics_workspace_id
+                sharedKey  = var.log_analytics_shared_key
+              }
+            }
+            zoneRedundant = false
+          }
+        }
+      }
+    bicep_pattern: |
+      resource containerAppEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
+        name: containerAppEnvName
+        location: location
+        properties: {
+          vnetConfiguration: {
+            infrastructureSubnetId: containerAppSubnetId
+            internal: true
+          }
+          appLogsConfiguration: {
+            destination: 'log-analytics'
+            logAnalyticsConfiguration: {
+              customerId: logAnalyticsWorkspaceId
+              sharedKey: logAnalyticsSharedKey
+            }
+          }
+          zoneRedundant: false
+        }
+      }
+    template_check:
+      when_services_present: [container-apps]
+      require_service: [virtual-network]
+      error_message: "Template with container-apps must include a virtual-network service for VNet integration"
+
+  - id: CA-002
+    severity: required
+    description: "Create Container App with user-assigned managed identity, health probes, and Key Vault secret references"
+    rationale: "User-assigned identity enables shared identity across services; probes ensure reliability; Key Vault refs eliminate secret sprawl"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "container_app" {
+        type      = "Microsoft.App/containerApps@2024-03-01"
+        name      = var.container_app_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        identity {
+          type         = "UserAssigned"
+          identity_ids = [azapi_resource.user_assigned_identity.id]
+        }
+
+        body = {
+          properties = {
+            managedEnvironmentId = azapi_resource.container_app_env.id
+            configuration = {
+              ingress = {
+                external   = true
+                targetPort = 8080
+                transport  = "http"
+              }
+              registries = [
+                {
+                  server   = var.acr_login_server
+                  identity = azapi_resource.user_assigned_identity.id
+                }
+              ]
+              secrets = [
+                {
+                  name        = "db-connection"
+                  keyVaultUrl = "https://${var.key_vault_name}.vault.azure.net/secrets/db-connection"
+                  identity    = azapi_resource.user_assigned_identity.id
+                }
+              ]
+            }
+            template = {
+              containers = [
+                {
+                  name  = var.container_app_name
+                  image = "${var.acr_login_server}/${var.image_name}:${var.image_tag}"
+                  resources = {
+                    cpu    = 0.5
+                    memory = "1Gi"
+                  }
+                  env = [
+                    {
+                      name      = "DB_CONNECTION"
+                      secretRef = "db-connection"
+                    }
+                  ]
+                  probes = [
+                    {
+                      type = "liveness"
+                      httpGet = {
+                        path = "/healthz"
+                        port = 8080
+                      }
+                      initialDelaySeconds = 5
+                      periodSeconds       = 10
+                    },
+                    {
+                      type = "readiness"
+                      httpGet = {
+                        path = "/ready"
+                        port = 8080
+                      }
+                      initialDelaySeconds = 3
+                      periodSeconds       = 5
+                    }
+                  ]
+                }
+              ]
+              scale = {
+                minReplicas = 0
+                maxReplicas = 10
+              }
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
+        name: containerAppName
+        location: location
+        identity: {
+          type: 'UserAssigned'
+          userAssignedIdentities: {
+            '${userAssignedIdentity.id}': {}
+          }
+        }
+        properties: {
+          managedEnvironmentId: containerAppEnv.id
+          configuration: {
+            ingress: {
+              external: true
+              targetPort: 8080
+              transport: 'http'
+            }
+            registries: [
+              {
+                server: acrLoginServer
+                identity: userAssignedIdentity.id
+              }
+            ]
+            secrets: [
+              {
+                name: 'db-connection'
+                keyVaultUrl: 'https://${keyVaultName}.vault.azure.net/secrets/db-connection'
+                identity: userAssignedIdentity.id
+              }
+            ]
+          }
+          template: {
+            containers: [
+              {
+                name: containerAppName
+                image: '${acrLoginServer}/${imageName}:${imageTag}'
+                resources: {
+                  cpu: json('0.5')
+                  memory: '1Gi'
+                }
+                env: [
+                  {
+                    name: 'DB_CONNECTION'
+                    secretRef: 'db-connection'
+                  }
+                ]
+                probes: [
+                  {
+                    type: 'Liveness'
+                    httpGet: {
+                      path: '/healthz'
+                      port: 8080
+                    }
+                    initialDelaySeconds: 5
+                    periodSeconds: 10
+                  }
+                  {
+                    type: 'Readiness'
+                    httpGet: {
+                      path: '/ready'
+                      port: 8080
+                    }
+                    initialDelaySeconds: 3
+                    periodSeconds: 5
+                  }
+                ]
+              }
+            ]
+            scale: {
+              minReplicas: 0
+              maxReplicas: 10
+            }
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER use admin credentials (adminUserEnabled) for ACR access — use managed identity with AcrPull role"
+      - "NEVER put secrets directly in environment variables — use Key Vault references via the secrets array with keyVaultUrl"
+      - "NEVER deploy Container Apps without health probes — always include liveness and readiness probes"
+      - "NEVER use container registry password in registries config — use identity-based auth"
+      - "NEVER use identity type 'SystemAssigned' when a user-assigned managed identity stage exists in the plan. Reference the shared identity from the prior stage via remote state."
+    template_check:
+      scope: [container-apps]
+      require_config: [identity]
+      error_message: "Service '{service_name}' ({service_type}) missing managed identity configuration"
+
+  - id: CA-003
+    severity: recommended
+    description: "Use consumption plan for dev/test, dedicated for production"
+    rationale: "Cost optimization without sacrificing production reliability"
+    applies_to: [cloud-architect, cost-analyst]
+
+  - id: CA-004
+    severity: recommended
+    description: "Set min replicas to 0 for non-critical services in dev"
+    rationale: "Avoids unnecessary spend during idle periods"
+    applies_to: [terraform-agent, bicep-agent, cost-analyst]
+
+  - id: CA-005
+    severity: recommended
+    description: "Enable Container Apps system logs and console logs via environment logging"
+    rationale: "Container Apps require explicit log configuration for stdout/stderr capture"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, monitoring-agent]
+
+patterns:
+  - name: "Container App with Key Vault references"
+    description: "Use Key Vault references for secrets instead of environment variables"
+  - name: "Container App with health probes"
+    description: "Always configure liveness and readiness probes for reliability"
+
+anti_patterns:
+  - description: "Do not store secrets in environment variables or app settings"
+    instead: "Use Key Vault references with managed identity via the secrets array"
+  - description: "Do not use admin credentials for container registry"
+    instead: "Use managed identity with AcrPull role assignment"
+  - description: "Do not deploy Container Apps without VNet integration"
+    instead: "Always deploy in a VNet-integrated managed environment"
+
+references:
+  - title: "Container Apps landing zone accelerator"
+    url: "https://learn.microsoft.com/azure/container-apps/landing-zone-accelerator"
+  - title: "Container Apps networking"
+    url: "https://learn.microsoft.com/azure/container-apps/networking"
+  - title: "Container Apps health probes"
+    url: "https://learn.microsoft.com/azure/container-apps/health-probes"

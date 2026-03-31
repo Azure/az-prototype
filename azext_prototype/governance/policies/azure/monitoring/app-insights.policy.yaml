@@ -1,0 +1,104 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: app-insights
+  category: azure
+  services: [application-insights]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: AI-001
+    severity: required
+    description: "Create Application Insights linked to Log Analytics Workspace with workspace-based mode"
+    rationale: "Workspace-based Application Insights is the current model; classic mode is deprecated. WorkspaceResourceId links telemetry to Log Analytics for unified querying"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "app_insights" {
+        type      = "Microsoft.Insights/components@2020-02-02"
+        name      = var.app_insights_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          kind = "web"
+          properties = {
+            Application_Type    = "web"
+            WorkspaceResourceId = azapi_resource.log_analytics_workspace.id
+            SamplingPercentage  = 100
+          }
+        }
+      }
+
+      output "app_insights_connection_string" {
+        value     = azapi_resource.app_insights.output.properties.ConnectionString
+        sensitive = true
+      }
+
+      output "app_insights_instrumentation_key" {
+        value     = azapi_resource.app_insights.output.properties.InstrumentationKey
+        sensitive = true
+      }
+    bicep_pattern: |
+      resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
+        name: appInsightsName
+        location: location
+        kind: 'web'
+        properties: {
+          Application_Type: 'web'
+          WorkspaceResourceId: logAnalyticsWorkspace.id
+          SamplingPercentage: 100
+        }
+      }
+
+      output appInsightsConnectionString string = appInsights.properties.ConnectionString
+      output appInsightsInstrumentationKey string = appInsights.properties.InstrumentationKey
+    prohibitions:
+      - "NEVER use API version 2024-03-01 — it does not exist for Microsoft.Insights/components"
+      - "NEVER create classic (non-workspace-based) Application Insights — always set WorkspaceResourceId"
+      - "NEVER include publicNetworkAccessForIngestion or publicNetworkAccessForQuery on Microsoft.Insights/components@2020-02-02 — these properties are NOT supported on this API version"
+      - "NEVER use InstrumentationKey for new integrations — use ConnectionString instead"
+
+  - id: AI-002
+    severity: required
+    description: "Link Application Insights to Log Analytics Workspace via WorkspaceResourceId"
+    rationale: "Without WorkspaceResourceId, Application Insights creates in classic mode which is deprecated and lacks unified query support"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    template_check:
+      when_services_present: [app-service, functions, container-apps]
+      require_service: [application-insights]
+      error_message: "Template with compute services should include application-insights for observability"
+
+  - id: AI-003
+    severity: recommended
+    description: "Set SamplingPercentage to 100 for POC, reduce for high-traffic production"
+    rationale: "Full sampling captures all telemetry for debugging; reduce to 10-50% for high-volume production to control costs"
+    applies_to: [cloud-architect, monitoring-agent, cost-analyst]
+
+  - id: AI-004
+    severity: recommended
+    description: "Output ConnectionString for downstream app configuration"
+    rationale: "Compute resources need the connection string to send telemetry; prefer ConnectionString over InstrumentationKey"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+patterns:
+  - name: "Application Insights linked to Log Analytics"
+    description: "Workspace-based Application Insights with connection string output for app configuration"
+
+anti_patterns:
+  - description: "Do not create classic Application Insights without WorkspaceResourceId"
+    instead: "Always set WorkspaceResourceId to link to Log Analytics Workspace"
+  - description: "Do not use API version 2024-03-01 for Microsoft.Insights/components"
+    instead: "Use API version 2020-02-02 which is the current stable version"
+  - description: "Do not include publicNetworkAccess properties on Application Insights 2020-02-02"
+    instead: "Control network access via the linked Log Analytics Workspace and Azure Monitor Private Link Scope"
+  - description: "Do not use InstrumentationKey for new integrations"
+    instead: "Use ConnectionString which includes the ingestion endpoint and is forward-compatible"
+
+references:
+  - title: "Application Insights overview"
+    url: "https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview"
+  - title: "Workspace-based Application Insights"
+    url: "https://learn.microsoft.com/azure/azure-monitor/app/create-workspace-resource"
+  - title: "Application Insights sampling"
+    url: "https://learn.microsoft.com/azure/azure-monitor/app/sampling-classic-api"

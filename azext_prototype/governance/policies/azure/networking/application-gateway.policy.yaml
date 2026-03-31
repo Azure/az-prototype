@@ -1,0 +1,422 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: application-gateway
+  category: azure
+  services: [application-gateway]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: AGW-001
+    severity: required
+    description: "Deploy Application Gateway v2 with WAF_v2 SKU for web application protection"
+    rationale: "v2 SKU provides autoscaling, zone redundancy, and WAF v2 includes OWASP CRS and bot protection"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "app_gateway" {
+        type      = "Microsoft.Network/applicationGateways@2024-01-01"
+        name      = var.agw_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          zones = ["1", "2", "3"]
+          properties = {
+            sku = {
+              name = "WAF_v2"
+              tier = "WAF_v2"
+            }
+            autoscaleConfiguration = {
+              minCapacity = 1
+              maxCapacity = 10
+            }
+            gatewayIPConfigurations = [
+              {
+                name = "appGatewayIpConfig"
+                properties = {
+                  subnet = {
+                    id = var.agw_subnet_id
+                  }
+                }
+              }
+            ]
+            frontendIPConfigurations = [
+              {
+                name = "appGatewayFrontendIp"
+                properties = {
+                  publicIPAddress = {
+                    id = azapi_resource.agw_pip.id
+                  }
+                }
+              }
+            ]
+            frontendPorts = [
+              {
+                name = "port_443"
+                properties = {
+                  port = 443
+                }
+              }
+            ]
+            sslPolicy = {
+              policyType = "Predefined"
+              policyName = "AppGwSslPolicy20220101S"
+            }
+            enableHttp2 = true
+          }
+        }
+      }
+    bicep_pattern: |
+      resource appGateway 'Microsoft.Network/applicationGateways@2024-01-01' = {
+        name: agwName
+        location: location
+        zones: ['1', '2', '3']
+        properties: {
+          sku: {
+            name: 'WAF_v2'
+            tier: 'WAF_v2'
+          }
+          autoscaleConfiguration: {
+            minCapacity: 1
+            maxCapacity: 10
+          }
+          gatewayIPConfigurations: [
+            {
+              name: 'appGatewayIpConfig'
+              properties: {
+                subnet: {
+                  id: agwSubnetId
+                }
+              }
+            }
+          ]
+          frontendIPConfigurations: [
+            {
+              name: 'appGatewayFrontendIp'
+              properties: {
+                publicIPAddress: {
+                  id: agwPip.id
+                }
+              }
+            }
+          ]
+          frontendPorts: [
+            {
+              name: 'port_443'
+              properties: {
+                port: 443
+              }
+            }
+          ]
+          sslPolicy: {
+            policyType: 'Predefined'
+            policyName: 'AppGwSslPolicy20220101S'
+          }
+          enableHttp2: true
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/publicIPAddresses (Standard SKU static for AGW frontend)"
+      - "Microsoft.Network/virtualNetworks/subnets (dedicated subnet, /24 recommended)"
+      - "Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies (WAF policy)"
+      - "Microsoft.Insights/diagnosticSettings (access logs and WAF logs to Log Analytics)"
+      - "Microsoft.ManagedIdentity/userAssignedIdentities (for Key Vault SSL certificate access)"
+    prohibitions:
+      - "Do not use v1 SKU — it lacks autoscaling, zone redundancy, and advanced WAF"
+      - "Do not use Standard_v2 without WAF unless WAF is handled upstream by a CDN/Front Door"
+      - "Do not deploy without zone redundancy in production"
+
+  - id: AGW-002
+    severity: required
+    description: "Configure WAF policy in Prevention mode with OWASP 3.2 ruleset"
+    rationale: "Detection mode only logs; Prevention mode blocks attacks. OWASP 3.2 is the latest stable ruleset"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+    terraform_pattern: |
+      resource "azapi_resource" "waf_policy" {
+        type      = "Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies@2024-01-01"
+        name      = var.waf_policy_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            policySettings = {
+              state                  = "Enabled"
+              mode                   = "Prevention"
+              requestBodyCheck       = true
+              maxRequestBodySizeInKb = 128
+              fileUploadLimitInMb    = 100
+            }
+            managedRules = {
+              managedRuleSets = [
+                {
+                  ruleSetType    = "OWASP"
+                  ruleSetVersion = "3.2"
+                }
+              ]
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource wafPolicy 'Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies@2024-01-01' = {
+        name: wafPolicyName
+        location: location
+        properties: {
+          policySettings: {
+            state: 'Enabled'
+            mode: 'Prevention'
+            requestBodyCheck: true
+            maxRequestBodySizeInKb: 128
+            fileUploadLimitInMb: 100
+          }
+          managedRules: {
+            managedRuleSets: [
+              {
+                ruleSetType: 'OWASP'
+                ruleSetVersion: '3.2'
+              }
+            ]
+          }
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/applicationGateways (associate WAF policy with AGW)"
+    prohibitions:
+      - "Do not use Detection mode in production — it only logs and does not block attacks"
+      - "Do not disable requestBodyCheck — it leaves the application vulnerable to body-based attacks"
+      - "Do not use OWASP 2.x rulesets — they are outdated"
+
+  - id: AGW-003
+    severity: required
+    description: "Enforce TLS 1.2+ with strong SSL policy for all HTTPS listeners"
+    rationale: "Older TLS versions and weak cipher suites are vulnerable to downgrade attacks"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+    terraform_pattern: |
+      # Configure sslPolicy in the Application Gateway resource
+      # See AGW-001 terraform_pattern — sslPolicy section
+      # Use AppGwSslPolicy20220101S or custom policy with TLS 1.2+ only
+    bicep_pattern: |
+      // Configure sslPolicy in the Application Gateway resource
+      // See AGW-001 bicep_pattern — sslPolicy section
+      // Use AppGwSslPolicy20220101S or custom policy with TLS 1.2+ only
+    companion_resources:
+      - "Microsoft.KeyVault/vaults (store SSL certificates)"
+    prohibitions:
+      - "Do not use AppGwSslPolicy20150501 or older policies — they allow TLS 1.0/1.1"
+      - "Do not use self-signed certificates in production"
+      - "Do not hardcode SSL certificate passwords in templates"
+
+  - id: AGW-004
+    severity: recommended
+    description: "Enable diagnostic settings for access logs, performance logs, and WAF logs"
+    rationale: "Access logs are essential for troubleshooting; WAF logs track blocked requests"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "agw_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-app-gateway"
+        parent_id = azapi_resource.app_gateway.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "ApplicationGatewayAccessLog"
+                enabled  = true
+              },
+              {
+                category = "ApplicationGatewayPerformanceLog"
+                enabled  = true
+              },
+              {
+                category = "ApplicationGatewayFirewallLog"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource agwDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-app-gateway'
+        scope: appGateway
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
+            {
+              category: 'ApplicationGatewayAccessLog'
+              enabled: true
+            }
+            {
+              category: 'ApplicationGatewayPerformanceLog'
+              enabled: true
+            }
+            {
+              category: 'ApplicationGatewayFirewallLog'
+              enabled: true
+            }
+          ]
+          metrics: [
+            {
+              category: 'AllMetrics'
+              enabled: true
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.OperationalInsights/workspaces (Log Analytics workspace)"
+    prohibitions:
+      - "Do not omit ApplicationGatewayFirewallLog when WAF is enabled"
+
+  - id: AGW-005
+    severity: recommended
+    description: "Configure autoscaling with appropriate minimum and maximum instance counts"
+    rationale: "WAF Performance/Reliability: Autoscaling takes 3-5 minutes to provision new instances; setting a minimum based on average compute units prevents transient latency during traffic spikes"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    terraform_pattern: |
+      # In AGW-001, the autoscaleConfiguration is already present.
+      # WAF guidance: set minCapacity based on peak compute units / 10
+      # Set maxCapacity to 125 (maximum possible) to handle surge traffic
+      #   autoscaleConfiguration = {
+      #     minCapacity = var.agw_min_capacity  # e.g. 2-3 based on baseline
+      #     maxCapacity = 125
+      #   }
+    bicep_pattern: |
+      // In AGW-001, the autoscaleConfiguration is already present.
+      // WAF guidance: set minCapacity based on peak compute units / 10
+      // Set maxCapacity to 125 (maximum possible) to handle surge traffic
+      //   autoscaleConfiguration: {
+      //     minCapacity: agwMinCapacity  // e.g. 2-3 based on baseline
+      //     maxCapacity: 125
+      //   }
+
+  - id: AGW-006
+    severity: recommended
+    description: "Integrate Application Gateway with Key Vault for SSL/TLS certificate management"
+    rationale: "WAF Security: Key Vault provides stronger security, role separation, managed certificate support, and automatic renewal/rotation for SSL certificates"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, security-reviewer]
+    terraform_pattern: |
+      # Add identity and sslCertificates referencing Key Vault to AGW:
+      #   identity = {
+      #     type         = "UserAssigned"
+      #     identity_ids = [azapi_resource.agw_identity.id]
+      #   }
+      #   sslCertificates = [
+      #     {
+      #       name = "ssl-cert"
+      #       properties = {
+      #         keyVaultSecretId = var.key_vault_secret_id
+      #       }
+      #     }
+      #   ]
+    bicep_pattern: |
+      // Add identity and sslCertificates referencing Key Vault to AGW:
+      //   identity: {
+      //     type: 'UserAssigned'
+      //     userAssignedIdentities: {
+      //       '${agwIdentity.id}': {}
+      //     }
+      //   }
+      //   sslCertificates: [
+      //     {
+      //       name: 'ssl-cert'
+      //       properties: {
+      //         keyVaultSecretId: keyVaultSecretId
+      //       }
+      //     }
+      //   ]
+
+  - id: AGW-007
+    severity: recommended
+    description: "Configure connection draining on backend HTTP settings"
+    rationale: "WAF Reliability: Connection draining ensures graceful removal of backend pool members during planned updates, draining existing connections before taking the backend out of rotation"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    terraform_pattern: |
+      # Add to backendHttpSettingsCollection in AGW:
+      #   connectionDraining = {
+      #     enabled           = true
+      #     drainTimeoutInSec = 30
+      #   }
+    bicep_pattern: |
+      // Add to backendHttpSettingsCollection in AGW:
+      //   connectionDraining: {
+      //     enabled: true
+      //     drainTimeoutInSec: 30
+      //   }
+
+  - id: AGW-008
+    severity: recommended
+    description: "Use HTTPS backend health probes with valid certificates"
+    rationale: "HTTP probes send health check data in plaintext; HTTPS ensures backend communication is encrypted"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # Add to Application Gateway properties
+      probes = [
+        {
+          name = "https-health-probe"
+          properties = {
+            protocol                          = "Https"
+            host                              = var.backend_host
+            path                              = "/health"
+            interval                          = 30
+            timeout                           = 30
+            unhealthyThreshold                = 3
+            pickHostNameFromBackendHttpSettings = false
+            match = {
+              statusCodes = ["200-399"]
+            }
+          }
+        }
+      ]
+    bicep_pattern: |
+      // Add to Application Gateway properties
+      probes: [
+        {
+          name: 'https-health-probe'
+          properties: {
+            protocol: 'Https'
+            host: backendHost
+            path: '/health'
+            interval: 30
+            timeout: 30
+            unhealthyThreshold: 3
+            pickHostNameFromBackendHttpSettings: false
+            match: {
+              statusCodes: ['200-399']
+            }
+          }
+        }
+      ]
+    companion_resources: []
+    prohibitions:
+      - "Do not use HTTP probes for backends that support HTTPS"
+
+patterns:
+  - name: "Application Gateway WAF v2 with HTTPS and zone redundancy"
+    description: "Full WAF_v2 deployment with autoscaling, WAF policy, and diagnostics"
+    example: |
+      # See AGW-001 through AGW-008 for complete azapi_resource patterns
+
+anti_patterns:
+  - description: "Do not deploy Application Gateway v1"
+    instead: "Use v2 SKU with WAF for autoscaling, zone redundancy, and web protection"
+  - description: "Do not run WAF in Detection mode for production"
+    instead: "Use Prevention mode to actively block malicious requests"
+
+references:
+  - title: "Application Gateway documentation"
+    url: "https://learn.microsoft.com/azure/application-gateway/overview"
+  - title: "WAF on Application Gateway"
+    url: "https://learn.microsoft.com/azure/web-application-firewall/ag/ag-overview"
+  - title: "WAF: Application Gateway service guide"
+    url: "https://learn.microsoft.com/azure/well-architected/service-guides/azure-application-gateway"
+  - title: "Application Gateway autoscaling"
+    url: "https://learn.microsoft.com/azure/application-gateway/application-gateway-autoscaling-zone-redundant"
+  - title: "Application Gateway Key Vault integration"
+    url: "https://learn.microsoft.com/azure/application-gateway/key-vault-certs"

@@ -1,0 +1,254 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: stream-analytics
+  category: azure
+  services: [stream-analytics]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: ASA-001
+    severity: required
+    description: "Deploy Stream Analytics job with Standard SKU, managed identity, and secure networking"
+    rationale: "Managed identity eliminates connection strings; Standard SKU supports production workloads"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "stream_analytics_job" {
+        type      = "Microsoft.StreamAnalytics/streamingjobs@2021-10-01-preview"
+        name      = var.asa_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        identity {
+          type = "SystemAssigned"
+        }
+        body = {
+          properties = {
+            sku = {
+              name = "Standard"
+            }
+            compatibilityLevel              = "1.2"
+            dataLocale                      = "en-US"
+            eventsLateArrivalMaxDelayInSeconds   = 5
+            eventsOutOfOrderMaxDelayInSeconds    = 0
+            eventsOutOfOrderPolicy          = "Adjust"
+            outputErrorPolicy               = "Stop"
+            contentStoragePolicy            = "JobStorageAccount"
+            jobStorageAccount = {
+              authenticationMode = "Msi"
+              accountName        = var.storage_account_name
+              accountKey         = null
+            }
+            cluster = var.asa_cluster_id != null ? {
+              id = var.asa_cluster_id
+            } : null
+          }
+        }
+      }
+    bicep_pattern: |
+      resource streamAnalyticsJob 'Microsoft.StreamAnalytics/streamingjobs@2021-10-01-preview' = {
+        name: asaName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          sku: {
+            name: 'Standard'
+          }
+          compatibilityLevel: '1.2'
+          dataLocale: 'en-US'
+          eventsLateArrivalMaxDelayInSeconds: 5
+          eventsOutOfOrderMaxDelayInSeconds: 0
+          eventsOutOfOrderPolicy: 'Adjust'
+          outputErrorPolicy: 'Stop'
+          contentStoragePolicy: 'JobStorageAccount'
+          jobStorageAccount: {
+            authenticationMode: 'Msi'
+            accountName: storageAccountName
+            accountKey: null
+          }
+        }
+      }
+    companion_resources:
+      - "Microsoft.Storage/storageAccounts (job storage account for checkpointing)"
+      - "Microsoft.StreamAnalytics/streamingjobs/inputs (input bindings)"
+      - "Microsoft.StreamAnalytics/streamingjobs/outputs (output bindings)"
+      - "Microsoft.StreamAnalytics/clusters (dedicated cluster for VNet isolation)"
+      - "Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)"
+    prohibitions:
+      - "Do not use connection strings with account keys — use managed identity authentication"
+      - "Do not set outputErrorPolicy to Drop in production — errors should halt processing for investigation"
+      - "Do not use compatibility level below 1.2"
+
+  - id: ASA-002
+    severity: required
+    description: "Use managed identity for all input and output connections"
+    rationale: "Connection strings with keys are insecure and hard to rotate; managed identity is zero-credential"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      resource "azapi_resource" "asa_input" {
+        type      = "Microsoft.StreamAnalytics/streamingjobs/inputs@2021-10-01-preview"
+        name      = var.input_name
+        parent_id = azapi_resource.stream_analytics_job.id
+        body = {
+          properties = {
+            type = "Stream"
+            datasource = {
+              type = "Microsoft.EventHub/EventHub"
+              properties = {
+                serviceBusNamespace   = var.eh_namespace
+                eventHubName          = var.eventhub_name
+                consumerGroupName     = var.consumer_group
+                authenticationMode    = "Msi"
+              }
+            }
+            serialization = {
+              type = "Json"
+              properties = {
+                encoding = "UTF8"
+              }
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource asaInput 'Microsoft.StreamAnalytics/streamingjobs/inputs@2021-10-01-preview' = {
+        parent: streamAnalyticsJob
+        name: inputName
+        properties: {
+          type: 'Stream'
+          datasource: {
+            type: 'Microsoft.EventHub/EventHub'
+            properties: {
+              serviceBusNamespace: ehNamespace
+              eventHubName: eventhubName
+              consumerGroupName: consumerGroup
+              authenticationMode: 'Msi'
+            }
+          }
+          serialization: {
+            type: 'Json'
+            properties: {
+              encoding: 'UTF8'
+            }
+          }
+        }
+      }
+    companion_resources:
+      - "Microsoft.Authorization/roleAssignments (appropriate data reader/sender roles for ASA identity)"
+    prohibitions:
+      - "Do not use ConnectionString authentication mode — use Msi"
+      - "Do not store Event Hub or Service Bus connection strings in job configuration"
+
+  - id: ASA-003
+    severity: recommended
+    description: "Deploy Stream Analytics in a dedicated cluster for VNet isolation"
+    rationale: "Dedicated clusters support private endpoints and VNet integration for network isolation"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "asa_cluster" {
+        type      = "Microsoft.StreamAnalytics/clusters@2020-03-01"
+        name      = var.cluster_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          sku = {
+            name     = "Default"
+            capacity = 36
+          }
+          properties = {}
+        }
+      }
+    bicep_pattern: |
+      resource asaCluster 'Microsoft.StreamAnalytics/clusters@2020-03-01' = {
+        name: clusterName
+        location: location
+        sku: {
+          name: 'Default'
+          capacity: 36
+        }
+        properties: {}
+      }
+    companion_resources:
+      - "Microsoft.Network/privateEndpoints (private endpoints for cluster inputs/outputs)"
+    prohibitions:
+      - "Do not set capacity below 36 SUs — minimum for dedicated cluster"
+
+  - id: ASA-004
+    severity: recommended
+    description: "Enable diagnostic settings for Stream Analytics job metrics and logs"
+    rationale: "Monitor watermark delay, input/output events, and runtime errors"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "asa_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-stream-analytics"
+        parent_id = azapi_resource.stream_analytics_job.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "Execution"
+                enabled  = true
+              },
+              {
+                category = "Authoring"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource asaDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-stream-analytics'
+        scope: streamAnalyticsJob
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
+            {
+              category: 'Execution'
+              enabled: true
+            }
+            {
+              category: 'Authoring'
+              enabled: true
+            }
+          ]
+          metrics: [
+            {
+              category: 'AllMetrics'
+              enabled: true
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.OperationalInsights/workspaces (Log Analytics workspace)"
+    prohibitions:
+      - "Do not omit Execution logs — they track runtime errors and processing issues"
+
+patterns:
+  - name: "Stream Analytics job with managed identity and diagnostics"
+    description: "Production ASA job using managed identity for all connections"
+    example: |
+      # See ASA-001 through ASA-004 for complete azapi_resource patterns
+
+anti_patterns:
+  - description: "Do not use connection strings for input/output authentication"
+    instead: "Use managed identity (authenticationMode: Msi) for all data connections"
+  - description: "Do not set outputErrorPolicy to Drop without explicit error handling"
+    instead: "Use Stop policy and configure alerts on error metrics"
+
+references:
+  - title: "Stream Analytics documentation"
+    url: "https://learn.microsoft.com/azure/stream-analytics/stream-analytics-introduction"
+  - title: "Stream Analytics managed identity"
+    url: "https://learn.microsoft.com/azure/stream-analytics/stream-analytics-managed-identities-overview"

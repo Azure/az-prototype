@@ -1,0 +1,828 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: scaling
+  category: cost
+  services:
+    - app-service
+    - container-apps
+    - virtual-machines
+    - vmss
+    - cosmos-db
+    - sql-database
+    - aks
+    - functions
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: SCALE-001
+    severity: required
+    description: "Configure App Service autoscale with CPU-based rules — scale out at >70%, scale in at <30%, with cooldown periods"
+    rationale: "Autoscale prevents both over-provisioning (cost waste) and under-provisioning (performance degradation). Cooldown prevents flapping"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
+    terraform_pattern: |
+      # === App Service Autoscale (requires Standard S1+ or Premium plan) ===
+      resource "azapi_resource" "app_service_autoscale" {
+        type      = "Microsoft.Insights/autoscalesettings@2022-10-01"
+        name      = "autoscale-${var.app_service_plan_name}"
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            enabled = true
+            targetResourceUri = azapi_resource.app_service_plan.id
+            profiles = [
+              {
+                name = "default"
+                capacity = {
+                  minimum = "1"         # Dev/POC: 1 instance minimum
+                  maximum = "3"         # Dev/POC: 3 instances maximum (cap costs)
+                  default = "1"
+                }
+                rules = [
+                  {
+                    metricTrigger = {
+                      metricName        = "CpuPercentage"
+                      metricResourceUri = azapi_resource.app_service_plan.id
+                      operator          = "GreaterThan"
+                      threshold         = 70          # Scale out when CPU > 70%
+                      timeGrain         = "PT1M"
+                      timeWindow        = "PT5M"      # Average over 5 minutes
+                      timeAggregation   = "Average"
+                      statistic         = "Average"
+                    }
+                    scaleAction = {
+                      direction = "Increase"
+                      type      = "ChangeCount"
+                      value     = "1"
+                      cooldown  = "PT10M"             # 10-minute cooldown after scale-out
+                    }
+                  },
+                  {
+                    metricTrigger = {
+                      metricName        = "CpuPercentage"
+                      metricResourceUri = azapi_resource.app_service_plan.id
+                      operator          = "LessThan"
+                      threshold         = 30          # Scale in when CPU < 30%
+                      timeGrain         = "PT1M"
+                      timeWindow        = "PT10M"     # Average over 10 minutes (longer for scale-in)
+                      timeAggregation   = "Average"
+                      statistic         = "Average"
+                    }
+                    scaleAction = {
+                      direction = "Decrease"
+                      type      = "ChangeCount"
+                      value     = "1"
+                      cooldown  = "PT15M"             # 15-minute cooldown after scale-in
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      // === App Service Autoscale (requires Standard S1+ or Premium plan) ===
+      resource appServiceAutoscale 'Microsoft.Insights/autoscalesettings@2022-10-01' = {
+        name: 'autoscale-${appServicePlanName}'
+        location: location
+        properties: {
+          enabled: true
+          targetResourceUri: appServicePlan.id
+          profiles: [
+            {
+              name: 'default'
+              capacity: {
+                minimum: '1'          // Dev/POC: 1 instance minimum
+                maximum: '3'          // Dev/POC: 3 instances maximum
+                default: '1'
+              }
+              rules: [
+                {
+                  metricTrigger: {
+                    metricName: 'CpuPercentage'
+                    metricResourceUri: appServicePlan.id
+                    operator: 'GreaterThan'
+                    threshold: 70           // Scale out at >70% CPU
+                    timeGrain: 'PT1M'
+                    timeWindow: 'PT5M'
+                    timeAggregation: 'Average'
+                    statistic: 'Average'
+                  }
+                  scaleAction: {
+                    direction: 'Increase'
+                    type: 'ChangeCount'
+                    value: '1'
+                    cooldown: 'PT10M'       // 10-minute cooldown
+                  }
+                }
+                {
+                  metricTrigger: {
+                    metricName: 'CpuPercentage'
+                    metricResourceUri: appServicePlan.id
+                    operator: 'LessThan'
+                    threshold: 30           // Scale in at <30% CPU
+                    timeGrain: 'PT1M'
+                    timeWindow: 'PT10M'
+                    timeAggregation: 'Average'
+                    statistic: 'Average'
+                  }
+                  scaleAction: {
+                    direction: 'Decrease'
+                    type: 'ChangeCount'
+                    value: '1'
+                    cooldown: 'PT15M'       // 15-minute cooldown
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    prohibitions:
+      - "NEVER set autoscale maximum > 5 instances for dev/POC — cap costs with reasonable limits"
+      - "NEVER use scale-out threshold below 60% — premature scaling wastes compute"
+      - "NEVER use scale-in threshold above 40% — aggressive scale-in causes instability"
+      - "NEVER set cooldown below PT5M — short cooldowns cause flapping"
+      - "NEVER omit scale-in rules — scale-out without scale-in causes permanent cost increase"
+
+  - id: SCALE-002
+    severity: required
+    description: "Configure Container Apps scaling rules with appropriate min/max replicas and HTTP/custom scaling triggers"
+    rationale: "Container Apps scaling is per-app; proper configuration prevents idle costs in dev and ensures availability in production"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
+    terraform_pattern: |
+      # === Container App: Dev/POC (scale to zero) ===
+      resource "azapi_resource" "container_app_dev" {
+        type      = "Microsoft.App/containerApps@2024-03-01"
+        name      = var.container_app_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            managedEnvironmentId = azapi_resource.container_app_env.id
+            configuration = {
+              ingress = {
+                external   = true
+                targetPort = 8080
+              }
+            }
+            template = {
+              containers = [
+                {
+                  name  = var.container_name
+                  image = var.container_image
+                  resources = {
+                    cpu    = 0.25          # Dev/POC: quarter vCPU
+                    memory = "0.5Gi"
+                  }
+                }
+              ]
+              scale = {
+                minReplicas = 0            # Dev/POC: scale to zero when idle — no cost
+                maxReplicas = 3
+                rules = [
+                  {
+                    name = "http-scaling"
+                    http = {
+                      metadata = {
+                        concurrentRequests = "50"    # Scale at 50 concurrent requests per replica
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+
+      # === Container App: Production (always-on) ===
+      resource "azapi_resource" "container_app_prod" {
+        type      = "Microsoft.App/containerApps@2024-03-01"
+        name      = var.container_app_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            managedEnvironmentId = azapi_resource.container_app_env.id
+            configuration = {
+              ingress = {
+                external   = true
+                targetPort = 8080
+              }
+            }
+            template = {
+              containers = [
+                {
+                  name  = var.container_name
+                  image = var.container_image
+                  resources = {
+                    cpu    = 1.0
+                    memory = "2Gi"
+                  }
+                }
+              ]
+              scale = {
+                minReplicas = 2            # Production: always 2+ replicas for availability
+                maxReplicas = 10
+                rules = [
+                  {
+                    name = "http-scaling"
+                    http = {
+                      metadata = {
+                        concurrentRequests = "100"
+                      }
+                    }
+                  },
+                  {
+                    name = "cpu-scaling"
+                    custom = {
+                      type = "cpu"
+                      metadata = {
+                        type  = "Utilization"
+                        value = "70"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Container App: Dev/POC (scale to zero) ===
+      resource containerAppDev 'Microsoft.App/containerApps@2024-03-01' = {
+        name: containerAppName
+        location: location
+        properties: {
+          managedEnvironmentId: containerAppEnv.id
+          configuration: {
+            ingress: {
+              external: true
+              targetPort: 8080
+            }
+          }
+          template: {
+            containers: [
+              {
+                name: containerName
+                image: containerImage
+                resources: {
+                  cpu: json('0.25')
+                  memory: '0.5Gi'
+                }
+              }
+            ]
+            scale: {
+              minReplicas: 0             // Dev/POC: scale to zero
+              maxReplicas: 3
+              rules: [
+                {
+                  name: 'http-scaling'
+                  http: {
+                    metadata: {
+                      concurrentRequests: '50'
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+
+      // === Container App: Production (always-on) ===
+      resource containerAppProd 'Microsoft.App/containerApps@2024-03-01' = {
+        name: containerAppName
+        location: location
+        properties: {
+          managedEnvironmentId: containerAppEnv.id
+          configuration: {
+            ingress: {
+              external: true
+              targetPort: 8080
+            }
+          }
+          template: {
+            containers: [
+              {
+                name: containerName
+                image: containerImage
+                resources: {
+                  cpu: json('1.0')
+                  memory: '2Gi'
+                }
+              }
+            ]
+            scale: {
+              minReplicas: 2             // Production: always 2+ replicas
+              maxReplicas: 10
+              rules: [
+                {
+                  name: 'http-scaling'
+                  http: {
+                    metadata: {
+                      concurrentRequests: '100'
+                    }
+                  }
+                }
+                {
+                  name: 'cpu-scaling'
+                  custom: {
+                    type: 'cpu'
+                    metadata: {
+                      type: 'Utilization'
+                      value: '70'
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER set minReplicas > 1 for dev/POC Container Apps — use 0 to enable scale-to-zero"
+      - "NEVER set maxReplicas > 5 for dev/POC — cap costs"
+      - "NEVER omit scaling rules — Container Apps defaults to 0-10 replicas with no trigger"
+      - "NEVER use minReplicas = 0 for production — cold starts impact availability"
+
+  - id: SCALE-003
+    severity: required
+    description: "Configure VMSS autoscale profiles with CPU-based rules and scheduled profiles for predictable workloads"
+    rationale: "VMSS without autoscale runs at fixed capacity; autoscale adapts to demand and reduces off-hours costs"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
+    terraform_pattern: |
+      # === VMSS Autoscale ===
+      resource "azapi_resource" "vmss_autoscale" {
+        type      = "Microsoft.Insights/autoscalesettings@2022-10-01"
+        name      = "autoscale-${var.vmss_name}"
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            enabled = true
+            targetResourceUri = azapi_resource.vmss.id
+            profiles = [
+              {
+                name = "default"
+                capacity = {
+                  minimum = "2"
+                  maximum = "10"
+                  default = "2"
+                }
+                rules = [
+                  {
+                    metricTrigger = {
+                      metricName        = "Percentage CPU"
+                      metricResourceUri = azapi_resource.vmss.id
+                      operator          = "GreaterThan"
+                      threshold         = 75
+                      timeGrain         = "PT1M"
+                      timeWindow        = "PT5M"
+                      timeAggregation   = "Average"
+                      statistic         = "Average"
+                    }
+                    scaleAction = {
+                      direction = "Increase"
+                      type      = "ChangeCount"
+                      value     = "1"
+                      cooldown  = "PT10M"
+                    }
+                  },
+                  {
+                    metricTrigger = {
+                      metricName        = "Percentage CPU"
+                      metricResourceUri = azapi_resource.vmss.id
+                      operator          = "LessThan"
+                      threshold         = 25
+                      timeGrain         = "PT1M"
+                      timeWindow        = "PT10M"
+                      timeAggregation   = "Average"
+                      statistic         = "Average"
+                    }
+                    scaleAction = {
+                      direction = "Decrease"
+                      type      = "ChangeCount"
+                      value     = "1"
+                      cooldown  = "PT15M"
+                    }
+                  }
+                ]
+              },
+              {
+                name = "off-hours"
+                capacity = {
+                  minimum = "1"
+                  maximum = "3"
+                  default = "1"
+                }
+                recurrence = {
+                  frequency = "Week"
+                  schedule = {
+                    timeZone = "UTC"
+                    days     = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+                    hours    = [19]
+                    minutes  = [0]
+                  }
+                }
+                rules = []
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      // === VMSS Autoscale ===
+      resource vmssAutoscale 'Microsoft.Insights/autoscalesettings@2022-10-01' = {
+        name: 'autoscale-${vmssName}'
+        location: location
+        properties: {
+          enabled: true
+          targetResourceUri: vmss.id
+          profiles: [
+            {
+              name: 'default'
+              capacity: {
+                minimum: '2'
+                maximum: '10'
+                default: '2'
+              }
+              rules: [
+                {
+                  metricTrigger: {
+                    metricName: 'Percentage CPU'
+                    metricResourceUri: vmss.id
+                    operator: 'GreaterThan'
+                    threshold: 75
+                    timeGrain: 'PT1M'
+                    timeWindow: 'PT5M'
+                    timeAggregation: 'Average'
+                    statistic: 'Average'
+                  }
+                  scaleAction: {
+                    direction: 'Increase'
+                    type: 'ChangeCount'
+                    value: '1'
+                    cooldown: 'PT10M'
+                  }
+                }
+                {
+                  metricTrigger: {
+                    metricName: 'Percentage CPU'
+                    metricResourceUri: vmss.id
+                    operator: 'LessThan'
+                    threshold: 25
+                    timeGrain: 'PT1M'
+                    timeWindow: 'PT10M'
+                    timeAggregation: 'Average'
+                    statistic: 'Average'
+                  }
+                  scaleAction: {
+                    direction: 'Decrease'
+                    type: 'ChangeCount'
+                    value: '1'
+                    cooldown: 'PT15M'
+                  }
+                }
+              ]
+            }
+            {
+              name: 'off-hours'
+              capacity: {
+                minimum: '1'
+                maximum: '3'
+                default: '1'
+              }
+              recurrence: {
+                frequency: 'Week'
+                schedule: {
+                  timeZone: 'UTC'
+                  days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+                  hours: [19]
+                  minutes: [0]
+                }
+              }
+              rules: []
+            }
+          ]
+        }
+      }
+    prohibitions:
+      - "NEVER deploy VMSS without autoscale settings in any environment"
+      - "NEVER set VMSS minimum instances > 3 for dev/POC"
+      - "NEVER omit off-hours scaling profile for dev/POC workloads — schedule scale-down to save costs"
+      - "NEVER set scale-out threshold below 60% for VMSS — VM boot time is 2-5 minutes"
+
+  - id: SCALE-004
+    severity: required
+    description: "Configure database autoscale — Cosmos DB autoscale maxThroughput for production, SQL elastic pools for multi-database workloads"
+    rationale: "Database scaling directly impacts both cost and performance; autoscale prevents over-provisioning while handling spikes"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
+    terraform_pattern: |
+      # === Cosmos DB Container with Autoscale ===
+      resource "azapi_resource" "cosmos_container_autoscale" {
+        type      = "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15"
+        name      = var.cosmos_container_name
+        parent_id = azapi_resource.cosmos_sql_database.id
+
+        body = {
+          properties = {
+            resource = {
+              id           = var.cosmos_container_name
+              partitionKey = {
+                paths = ["/tenantId"]
+                kind  = "Hash"
+                version = 2
+              }
+            }
+            options = {
+              autoscaleSettings = {
+                maxThroughput = 4000       # Autoscale range: 400-4000 RU/s (10% min)
+              }
+            }
+          }
+        }
+      }
+
+      # === SQL Elastic Pool (multi-database workloads) ===
+      resource "azapi_resource" "sql_elastic_pool" {
+        type      = "Microsoft.Sql/servers/elasticPools@2023-08-01-preview"
+        name      = var.elastic_pool_name
+        location  = var.location
+        parent_id = azapi_resource.sql_server.id
+
+        body = {
+          sku = {
+            name     = "GP_Gen5"          # General Purpose Gen5
+            tier     = "GeneralPurpose"
+            family   = "Gen5"
+            capacity = 2                  # 2 vCores shared across databases
+          }
+          properties = {
+            perDatabaseSettings = {
+              minCapacity = 0             # Allow databases to consume 0 vCores when idle
+              maxCapacity = 2             # Cap per-database at pool capacity
+            }
+            maxSizeBytes = 107374182400   # 100 GB pool storage
+            zoneRedundant = false
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Cosmos DB Container with Autoscale ===
+      resource cosmosContainerAutoscale 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15' = {
+        parent: cosmosSqlDatabase
+        name: cosmosContainerName
+        properties: {
+          resource: {
+            id: cosmosContainerName
+            partitionKey: {
+              paths: ['/tenantId']
+              kind: 'Hash'
+              version: 2
+            }
+          }
+          options: {
+            autoscaleSettings: {
+              maxThroughput: 4000        // Autoscale: 400-4000 RU/s
+            }
+          }
+        }
+      }
+
+      // === SQL Elastic Pool (multi-database workloads) ===
+      resource sqlElasticPool 'Microsoft.Sql/servers/elasticPools@2023-08-01-preview' = {
+        parent: sqlServer
+        name: elasticPoolName
+        location: location
+        sku: {
+          name: 'GP_Gen5'
+          tier: 'GeneralPurpose'
+          family: 'Gen5'
+          capacity: 2
+        }
+        properties: {
+          perDatabaseSettings: {
+            minCapacity: json('0')
+            maxCapacity: json('2')
+          }
+          maxSizeBytes: 107374182400
+          zoneRedundant: false
+        }
+      }
+    prohibitions:
+      - "NEVER use manual (fixed) throughput on Cosmos DB in production — always use autoscale"
+      - "NEVER set Cosmos DB autoscale maxThroughput above 10000 RU/s for dev/POC"
+      - "NEVER use individual databases when 3+ databases share a SQL server — use elastic pools"
+      - "NEVER set elastic pool perDatabaseSettings.minCapacity > 0 for dev databases — allow idle databases to release vCores"
+
+  - id: SCALE-005
+    severity: required
+    description: "Configure AKS cluster autoscaler with appropriate node pool settings — spot nodes for dev, on-demand for production"
+    rationale: "AKS cluster autoscaler adjusts node count automatically; spot VMs provide up to 90% savings for interruptible workloads"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
+    terraform_pattern: |
+      # === AKS: Dev/POC with autoscaler and spot nodes ===
+      resource "azapi_resource" "aks_dev" {
+        type      = "Microsoft.ContainerService/managedClusters@2024-06-02-preview"
+        name      = var.aks_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          properties = {
+            agentPoolProfiles = [
+              {
+                name                = "system"
+                count               = 1
+                vmSize              = "Standard_B2s"     # Dev: burstable for system pool
+                mode                = "System"
+                enableAutoScaling   = true
+                minCount            = 1
+                maxCount            = 3
+                osType              = "Linux"
+                osSKU               = "AzureLinux"
+              },
+              {
+                name                = "spotpool"
+                count               = 0
+                vmSize              = "Standard_D4s_v5"
+                mode                = "User"
+                enableAutoScaling   = true
+                minCount            = 0
+                maxCount            = 5
+                scaleSetPriority    = "Spot"              # Spot VMs: up to 90% discount
+                scaleSetEvictionPolicy = "Delete"
+                spotMaxPrice        = -1                  # Pay up to on-demand price
+                osType              = "Linux"
+                osSKU               = "AzureLinux"
+                nodeTaints          = ["kubernetes.azure.com/scalesetpriority=spot:NoSchedule"]
+              }
+            ]
+          }
+        }
+      }
+
+      # === AKS: Production with autoscaler ===
+      resource "azapi_resource" "aks_prod" {
+        type      = "Microsoft.ContainerService/managedClusters@2024-06-02-preview"
+        name      = var.aks_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          properties = {
+            agentPoolProfiles = [
+              {
+                name                = "system"
+                count               = 3
+                vmSize              = "Standard_D4s_v5"  # Production: D-series for system pool
+                mode                = "System"
+                enableAutoScaling   = true
+                minCount            = 3
+                maxCount            = 5
+                availabilityZones   = ["1", "2", "3"]
+                osType              = "Linux"
+                osSKU               = "AzureLinux"
+              },
+              {
+                name                = "userpool"
+                count               = 2
+                vmSize              = "Standard_D4s_v5"
+                mode                = "User"
+                enableAutoScaling   = true
+                minCount            = 2
+                maxCount            = 20
+                availabilityZones   = ["1", "2", "3"]
+                osType              = "Linux"
+                osSKU               = "AzureLinux"
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      // === AKS: Dev/POC with autoscaler and spot nodes ===
+      resource aksDev 'Microsoft.ContainerService/managedClusters@2024-06-02-preview' = {
+        name: aksName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          agentPoolProfiles: [
+            {
+              name: 'system'
+              count: 1
+              vmSize: 'Standard_B2s'         // Dev: burstable
+              mode: 'System'
+              enableAutoScaling: true
+              minCount: 1
+              maxCount: 3
+              osType: 'Linux'
+              osSKU: 'AzureLinux'
+            }
+            {
+              name: 'spotpool'
+              count: 0
+              vmSize: 'Standard_D4s_v5'
+              mode: 'User'
+              enableAutoScaling: true
+              minCount: 0
+              maxCount: 5
+              scaleSetPriority: 'Spot'        // Spot: up to 90% discount
+              scaleSetEvictionPolicy: 'Delete'
+              spotMaxPrice: json('-1')
+              osType: 'Linux'
+              osSKU: 'AzureLinux'
+              nodeTaints: ['kubernetes.azure.com/scalesetpriority=spot:NoSchedule']
+            }
+          ]
+        }
+      }
+
+      // === AKS: Production with autoscaler ===
+      resource aksProd 'Microsoft.ContainerService/managedClusters@2024-06-02-preview' = {
+        name: aksName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          agentPoolProfiles: [
+            {
+              name: 'system'
+              count: 3
+              vmSize: 'Standard_D4s_v5'     // Production: D-series
+              mode: 'System'
+              enableAutoScaling: true
+              minCount: 3
+              maxCount: 5
+              availabilityZones: ['1', '2', '3']
+              osType: 'Linux'
+              osSKU: 'AzureLinux'
+            }
+            {
+              name: 'userpool'
+              count: 2
+              vmSize: 'Standard_D4s_v5'
+              mode: 'User'
+              enableAutoScaling: true
+              minCount: 2
+              maxCount: 20
+              availabilityZones: ['1', '2', '3']
+              osType: 'Linux'
+              osSKU: 'AzureLinux'
+            }
+          ]
+        }
+      }
+    prohibitions:
+      - "NEVER deploy AKS without cluster autoscaler enabled — fixed node counts waste resources"
+      - "NEVER set AKS system pool minCount > 3 for dev/POC"
+      - "NEVER use D-series or larger VMs for AKS system pools in dev/POC — use B-series burstable"
+      - "NEVER use spot VMs for production system pools — spot VMs can be evicted at any time"
+      - "NEVER set maxCount > 10 for dev/POC node pools"
+
+patterns:
+  - name: "Environment-aware autoscale configuration"
+    description: "Dev/POC uses aggressive scale-down with low maximums; production uses higher minimums with zone-redundant capacity"
+  - name: "Spot VM cost optimization"
+    description: "Use spot VMs for interruptible workloads in dev/POC to achieve up to 90% cost savings"
+
+anti_patterns:
+  - description: "Do not deploy compute resources with fixed instance counts"
+    instead: "Configure autoscale with appropriate min/max and metrics-based scaling rules"
+  - description: "Do not use the same scale configuration for dev and production"
+    instead: "Use lower minimums, lower maximums, and scale-to-zero where possible in dev"
+  - description: "Do not scale on a single metric"
+    instead: "Use CPU as the primary trigger; add memory, queue depth, or HTTP connections as secondary triggers"
+
+references:
+  - title: "Azure Autoscale overview"
+    url: "https://learn.microsoft.com/azure/azure-monitor/autoscale/autoscale-overview"
+  - title: "Container Apps scaling"
+    url: "https://learn.microsoft.com/azure/container-apps/scale-app"
+  - title: "AKS cluster autoscaler"
+    url: "https://learn.microsoft.com/azure/aks/cluster-autoscaler"
+  - title: "Cosmos DB autoscale throughput"
+    url: "https://learn.microsoft.com/azure/cosmos-db/provision-throughput-autoscale"
+  - title: "SQL elastic pools"
+    url: "https://learn.microsoft.com/azure/azure-sql/database/elastic-pool-overview"

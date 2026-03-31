@@ -21,7 +21,7 @@ Azure OpenAI is the preferred path for enterprise AI workloads. It provides the 
 | Model deployment | Separate resource | CRITICAL: Model deployments are separate from the account |
 | Default model | gpt-4o | Best balance of capability and cost for POC |
 | Embeddings model | text-embedding-ada-002 | Or text-embedding-3-small for newer workloads |
-| Public network access | Enabled (POC) | Flag private endpoint as production backlog item |
+| Public network access | Disabled (unless user overrides) | Flag private endpoint as production backlog item |
 | Local auth | Disabled | Use AAD authentication via managed identity |
 
 **CRITICAL:** Model deployments are **separate resources** from the Cognitive Services account. Creating the account alone does not give you a usable model -- you must also deploy one or more models.
@@ -40,7 +40,7 @@ resource "azurerm_cognitive_account" "this" {
   kind                          = "OpenAI"
   sku_name                      = "S0"
   custom_subdomain_name         = var.name  # Required for token-based auth
-  public_network_access_enabled = true      # Set false when using private endpoint
+  public_network_access_enabled = false  # Unless told otherwise, disabled per governance policy
   local_auth_enabled            = false     # CRITICAL: Disable key-based auth
 
   identity {
@@ -174,7 +174,7 @@ resource openai 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
   properties: {
     customSubDomainName: name
-    publicNetworkAccess: 'Enabled'  // Set 'Disabled' when using private endpoint
+    publicNetworkAccess: 'Disabled'  // Unless told otherwise, disabled per governance policy
     disableLocalAuth: true  // CRITICAL: Disable key-based auth
   }
 }

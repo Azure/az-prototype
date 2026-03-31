@@ -114,7 +114,7 @@ resource "azurerm_role_assignment" "contributor" {
 # Private access is achieved via Azure Monitor Private Link Scope (AMPLS),
 # which is shared with Log Analytics.
 # See log-analytics.md for the AMPLS pattern.
-# For POC, public ingestion endpoints are acceptable.
+# Unless told otherwise, public access is disabled per governance policy — use AMPLS for private ingestion.
 ```
 
 ## Bicep Patterns

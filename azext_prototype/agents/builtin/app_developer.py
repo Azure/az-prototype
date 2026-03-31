@@ -11,7 +11,7 @@ class AppDeveloperAgent(BaseAgent):
     """
 
     _temperature = 0.3
-    _max_tokens = 8192
+    _max_tokens = 102400
     _enable_web_search = True
     _knowledge_role = "developer"
     _keywords = [

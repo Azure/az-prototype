@@ -1,0 +1,234 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: postgresql-flexible
+  category: azure
+  services: [postgresql-flexible]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: PG-001
+    severity: required
+    description: "Deploy PostgreSQL Flexible Server with Microsoft Entra authentication, VNet integration, and TLS 1.2"
+    rationale: "Entra auth centralizes identity; VNet integration eliminates public exposure; TLS 1.2 prevents downgrade attacks"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "pg_flexible" {
+        type      = "Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01"
+        name      = var.pg_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        identity {
+          type = "SystemAssigned"
+        }
+        body = {
+          sku = {
+            name = var.sku_name
+            tier = "GeneralPurpose"
+          }
+          properties = {
+            version = "16"
+            administratorLogin         = var.admin_login
+            administratorLoginPassword = var.admin_password
+            authConfig = {
+              activeDirectoryAuth = "Enabled"
+              passwordAuth        = "Disabled"
+              tenantId            = var.tenant_id
+            }
+            storage = {
+              storageSizeGB = var.storage_size_gb
+              autoGrow      = "Enabled"
+              tier          = "P30"
+            }
+            backup = {
+              backupRetentionDays  = 35
+              geoRedundantBackup   = "Enabled"
+            }
+            highAvailability = {
+              mode = "ZoneRedundant"
+            }
+            network = {
+              delegatedSubnetResourceId = var.delegated_subnet_id
+              privateDnsZoneArmResourceId = var.private_dns_zone_id
+              publicNetworkAccess       = "Disabled"
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource pgFlexible 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
+        name: pgName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: skuName
+          tier: 'GeneralPurpose'
+        }
+        properties: {
+          version: '16'
+          administratorLogin: adminLogin
+          administratorLoginPassword: adminPassword
+          authConfig: {
+            activeDirectoryAuth: 'Enabled'
+            passwordAuth: 'Disabled'
+            tenantId: tenantId
+          }
+          storage: {
+            storageSizeGB: storageSizeGb
+            autoGrow: 'Enabled'
+            tier: 'P30'
+          }
+          backup: {
+            backupRetentionDays: 35
+            geoRedundantBackup: 'Enabled'
+          }
+          highAvailability: {
+            mode: 'ZoneRedundant'
+          }
+          network: {
+            delegatedSubnetResourceId: delegatedSubnetId
+            privateDnsZoneArmResourceId: privateDnsZoneId
+            publicNetworkAccess: 'Disabled'
+          }
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/virtualNetworks/subnets (delegated subnet with Microsoft.DBforPostgreSQL/flexibleServers delegation)"
+      - "Microsoft.Network/privateDnsZones (privatelink.postgres.database.azure.com)"
+      - "Microsoft.Network/privateDnsZones/virtualNetworkLinks (link DNS zone to VNet)"
+      - "Microsoft.DBforPostgreSQL/flexibleServers/administrators (Entra admin assignment)"
+      - "Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)"
+    prohibitions:
+      - "Do not enable publicNetworkAccess — use VNet integration or private endpoints"
+      - "Do not hardcode administratorLoginPassword in templates — use Key Vault references"
+      - "Do not use passwordAuth Enabled when Entra auth is available"
+      - "Do not use Burstable tier for production workloads requiring HA"
+
+  - id: PG-002
+    severity: required
+    description: "Configure Entra admin for PostgreSQL Flexible Server"
+    rationale: "Entra admin is required for Entra authentication to function"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "pg_entra_admin" {
+        type      = "Microsoft.DBforPostgreSQL/flexibleServers/administrators@2024-08-01"
+        name      = var.entra_admin_object_id
+        parent_id = azapi_resource.pg_flexible.id
+        body = {
+          properties = {
+            principalName = var.entra_admin_name
+            principalType = "Group"
+            tenantId      = var.tenant_id
+          }
+        }
+      }
+    bicep_pattern: |
+      resource pgEntraAdmin 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2024-08-01' = {
+        parent: pgFlexible
+        name: entraAdminObjectId
+        properties: {
+          principalName: entraAdminName
+          principalType: 'Group'
+          tenantId: tenantId
+        }
+      }
+    companion_resources:
+      - "Microsoft.DBforPostgreSQL/flexibleServers (parent server with authConfig.activeDirectoryAuth Enabled)"
+    prohibitions:
+      - "Do not use individual user accounts as Entra admin — use a security group"
+
+  - id: PG-003
+    severity: required
+    description: "Enable diagnostic settings for PostgreSQL audit and slow query logs"
+    rationale: "PostgreSQL logs track queries, connections, and errors for troubleshooting and compliance"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "pg_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-postgresql"
+        parent_id = azapi_resource.pg_flexible.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "PostgreSQLLogs"
+                enabled  = true
+              },
+              {
+                category = "PostgreSQLFlexSessions"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource pgDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-postgresql'
+        scope: pgFlexible
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
+            {
+              category: 'PostgreSQLLogs'
+              enabled: true
+            }
+            {
+              category: 'PostgreSQLFlexSessions'
+              enabled: true
+            }
+          ]
+          metrics: [
+            {
+              category: 'AllMetrics'
+              enabled: true
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.OperationalInsights/workspaces (Log Analytics workspace)"
+    prohibitions:
+      - "Do not disable PostgreSQLLogs in production"
+
+  - id: PG-004
+    severity: recommended
+    description: "Enable zone-redundant high availability for production databases"
+    rationale: "Zone-redundant HA provides automatic failover with near-zero data loss across zones"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # Set highAvailability.mode = "ZoneRedundant" in server properties
+      # See PG-001 terraform_pattern for full example
+    bicep_pattern: |
+      // Set highAvailability.mode: 'ZoneRedundant' in server properties
+      // See PG-001 bicep_pattern for full example
+    companion_resources: []
+    prohibitions:
+      - "Do not use SameZone HA for production — it does not protect against zone failures"
+
+patterns:
+  - name: "PostgreSQL Flexible Server with Entra auth and VNet integration"
+    description: "Production PostgreSQL with Entra-only auth, VNet integration, HA, and diagnostics"
+    example: |
+      # See PG-001 through PG-004 for complete azapi_resource patterns
+
+anti_patterns:
+  - description: "Do not expose PostgreSQL to the public internet"
+    instead: "Use VNet integration with delegated subnet or private endpoints"
+  - description: "Do not use password authentication when Entra auth is available"
+    instead: "Set passwordAuth to Disabled and use Entra authentication"
+
+references:
+  - title: "PostgreSQL Flexible Server documentation"
+    url: "https://learn.microsoft.com/azure/postgresql/flexible-server/overview"
+  - title: "Entra authentication for PostgreSQL"
+    url: "https://learn.microsoft.com/azure/postgresql/flexible-server/concepts-azure-ad-authentication"

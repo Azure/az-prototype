@@ -1,0 +1,100 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: fabric
+  category: azure
+  services: [fabric]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: FAB-001
+    severity: required
+    description: "Deploy Microsoft Fabric capacity with managed identity and appropriate SKU sizing"
+    rationale: "Fabric capacity is the compute foundation; proper sizing prevents over-provisioning and cost overruns"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "fabric_capacity" {
+        type      = "Microsoft.Fabric/capacities@2023-11-01"
+        name      = var.fabric_capacity_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        body = {
+          sku = {
+            name = var.sku_name  # "F2", "F4", "F8", "F16", "F32", "F64", "F128", "F256", "F512", "F1024", "F2048"
+            tier = "Fabric"
+          }
+          properties = {
+            administration = {
+              members = var.capacity_admin_upns
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource fabricCapacity 'Microsoft.Fabric/capacities@2023-11-01' = {
+        name: fabricCapacityName
+        location: location
+        sku: {
+          name: skuName
+          tier: 'Fabric'
+        }
+        properties: {
+          administration: {
+            members: capacityAdminUpns
+          }
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name: "diag-fabric"
+        description: "Diagnostic settings for Fabric capacity operation logs"
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "Fabric Capacity Contributor"
+        description: "RBAC role assignment for Fabric capacity management — separate from workspace permissions"
+    prohibitions:
+      - "Never over-provision Fabric capacity SKU — start with smallest SKU and scale up based on CU consumption"
+      - "Never grant capacity admin to broad groups — limit to dedicated administrators"
+      - "Never skip Fabric tenant settings configuration — data exfiltration and sharing controls are tenant-level"
+      - "Never hardcode admin UPNs — use variables for environment-specific configuration"
+
+  - id: FAB-002
+    severity: required
+    description: "Configure Fabric tenant settings for data exfiltration prevention and guest access control"
+    rationale: "Tenant settings control data sharing, export, and external collaboration — misconfiguration leads to data leakage"
+    applies_to: [cloud-architect, security-reviewer]
+
+  - id: FAB-003
+    severity: required
+    description: "Enable Fabric audit logging and route to Log Analytics"
+    rationale: "Audit logs track data access, sharing, and workspace changes for compliance and security monitoring"
+    applies_to: [cloud-architect, security-reviewer, monitoring-agent]
+
+  - id: FAB-004
+    severity: recommended
+    description: "Configure auto-pause and auto-resume for cost optimization"
+    rationale: "Fabric capacities incur cost even when idle; auto-pause reduces spend during off-hours"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
+
+  - id: FAB-005
+    severity: recommended
+    description: "Use managed private endpoints for secure data source connectivity"
+    rationale: "Managed private endpoints eliminate public exposure of on-premises and Azure data sources"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+patterns:
+  - name: "Fabric capacity with admin governance"
+    description: "Fabric capacity with limited administrators, audit logging, and cost controls"
+
+anti_patterns:
+  - description: "Do not over-provision Fabric capacity"
+    instead: "Start with smallest SKU (F2 for dev, F64+ for production) and scale based on CU utilization"
+  - description: "Do not leave tenant settings at defaults"
+    instead: "Explicitly configure data export restrictions, guest access, and sharing controls"
+
+references:
+  - title: "Microsoft Fabric documentation"
+    url: "https://learn.microsoft.com/fabric/get-started/microsoft-fabric-overview"
+  - title: "Fabric administration and governance"
+    url: "https://learn.microsoft.com/fabric/admin/admin-overview"

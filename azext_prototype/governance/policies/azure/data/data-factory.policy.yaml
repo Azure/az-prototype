@@ -1,0 +1,241 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: data-factory
+  category: azure
+  services: [data-factory]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: ADF-001
+    severity: required
+    description: "Deploy Data Factory with managed identity, managed VNet integration, and public access disabled"
+    rationale: "Managed VNet isolates integration runtime traffic; managed identity eliminates stored credentials"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "data_factory" {
+        type      = "Microsoft.DataFactory/factories@2018-06-01"
+        name      = var.adf_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        identity {
+          type = "SystemAssigned"
+        }
+        body = {
+          properties = {
+            publicNetworkAccess = "Disabled"
+            purviewConfiguration = {}
+            globalParameters     = {}
+          }
+        }
+      }
+    bicep_pattern: |
+      resource dataFactory 'Microsoft.DataFactory/factories@2018-06-01' = {
+        name: adfName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          publicNetworkAccess: 'Disabled'
+          purviewConfiguration: {}
+          globalParameters: {}
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/privateEndpoints (private endpoint with groupId 'dataFactory')"
+      - "Microsoft.Network/privateDnsZones (privatelink.datafactory.azure.net)"
+      - "Microsoft.Network/privateDnsZones (privatelink.adf.azure.com for portal)"
+      - "Microsoft.DataFactory/factories/managedVirtualNetworks (managed VNet for IR)"
+      - "Microsoft.DataFactory/factories/integrationRuntimes (managed VNet integration runtime)"
+      - "Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)"
+    prohibitions:
+      - "Do not enable publicNetworkAccess — use private endpoints"
+      - "Do not store credentials in linked services — use managed identity or Key Vault references"
+      - "Do not use self-hosted IR when managed VNet IR is sufficient"
+
+  - id: ADF-002
+    severity: required
+    description: "Configure managed virtual network for integration runtime"
+    rationale: "Managed VNet ensures all data movement traffic stays within Azure backbone and supports managed private endpoints"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "adf_managed_vnet" {
+        type      = "Microsoft.DataFactory/factories/managedVirtualNetworks@2018-06-01"
+        name      = "default"
+        parent_id = azapi_resource.data_factory.id
+        body = {
+          properties = {}
+        }
+      }
+
+      resource "azapi_resource" "adf_managed_ir" {
+        type      = "Microsoft.DataFactory/factories/integrationRuntimes@2018-06-01"
+        name      = "AutoResolveIntegrationRuntime"
+        parent_id = azapi_resource.data_factory.id
+        body = {
+          properties = {
+            type = "Managed"
+            managedVirtualNetwork = {
+              referenceName = "default"
+              type          = "ManagedVirtualNetworkReference"
+            }
+            typeProperties = {
+              computeProperties = {
+                location = "AutoResolve"
+              }
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource adfManagedVnet 'Microsoft.DataFactory/factories/managedVirtualNetworks@2018-06-01' = {
+        parent: dataFactory
+        name: 'default'
+        properties: {}
+      }
+
+      resource adfManagedIr 'Microsoft.DataFactory/factories/integrationRuntimes@2018-06-01' = {
+        parent: dataFactory
+        name: 'AutoResolveIntegrationRuntime'
+        properties: {
+          type: 'Managed'
+          managedVirtualNetwork: {
+            referenceName: 'default'
+            type: 'ManagedVirtualNetworkReference'
+          }
+          typeProperties: {
+            computeProperties: {
+              location: 'AutoResolve'
+            }
+          }
+        }
+      }
+    companion_resources:
+      - "Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints (for data source access)"
+    prohibitions:
+      - "Do not use the default Azure IR without managed VNet — data traffic flows over public internet"
+
+  - id: ADF-003
+    severity: required
+    description: "Use Key Vault linked service for all secrets and connection strings"
+    rationale: "Storing credentials in ADF linked services is insecure; Key Vault centralizes secret management"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # Configure Key Vault linked service in ADF (typically done via ADF JSON definition)
+      # Grant ADF managed identity Key Vault Secrets User role
+      resource "azapi_resource" "adf_kv_role" {
+        type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name      = var.role_assignment_name
+        parent_id = var.key_vault_id
+        body = {
+          properties = {
+            roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/4633458b-17de-408a-b874-0445c86b69e6"
+            principalId      = azapi_resource.data_factory.identity[0].principal_id
+            principalType    = "ServicePrincipal"
+          }
+        }
+      }
+    bicep_pattern: |
+      // Grant ADF managed identity Key Vault Secrets User role
+      resource adfKvRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+        name: guid(keyVault.id, dataFactory.id, '4633458b-17de-408a-b874-0445c86b69e6')
+        scope: keyVault
+        properties: {
+          roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
+          principalId: dataFactory.identity.principalId
+          principalType: 'ServicePrincipal'
+        }
+      }
+    companion_resources:
+      - "Microsoft.KeyVault/vaults (Key Vault with secrets)"
+    prohibitions:
+      - "Do not store passwords or connection strings directly in linked service definitions"
+      - "Do not grant Key Vault Administrator to ADF — use least-privilege Secrets User role"
+
+  - id: ADF-004
+    severity: recommended
+    description: "Enable diagnostic settings for pipeline runs and activity logs"
+    rationale: "Monitor pipeline execution, trigger events, and integration runtime status for operational insight"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "adf_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-data-factory"
+        parent_id = azapi_resource.data_factory.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "PipelineRuns"
+                enabled  = true
+              },
+              {
+                category = "ActivityRuns"
+                enabled  = true
+              },
+              {
+                category = "TriggerRuns"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource adfDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-data-factory'
+        scope: dataFactory
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
+            {
+              category: 'PipelineRuns'
+              enabled: true
+            }
+            {
+              category: 'ActivityRuns'
+              enabled: true
+            }
+            {
+              category: 'TriggerRuns'
+              enabled: true
+            }
+          ]
+          metrics: [
+            {
+              category: 'AllMetrics'
+              enabled: true
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.OperationalInsights/workspaces (Log Analytics workspace)"
+    prohibitions:
+      - "Do not omit PipelineRuns and ActivityRuns logs — they are essential for debugging ETL failures"
+
+patterns:
+  - name: "Data Factory with managed VNet and Key Vault integration"
+    description: "Production ADF with managed IR, private endpoints, and Key Vault for secrets"
+    example: |
+      # See ADF-001 through ADF-004 for complete azapi_resource patterns
+
+anti_patterns:
+  - description: "Do not store credentials in Data Factory linked service definitions"
+    instead: "Use Key Vault linked service with managed identity for all secrets"
+  - description: "Do not use the public Azure IR for production data movement"
+    instead: "Configure managed virtual network integration runtime"
+
+references:
+  - title: "Data Factory documentation"
+    url: "https://learn.microsoft.com/azure/data-factory/introduction"
+  - title: "Data Factory managed virtual network"
+    url: "https://learn.microsoft.com/azure/data-factory/managed-virtual-network-private-endpoint"

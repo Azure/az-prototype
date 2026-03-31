@@ -1,0 +1,916 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: fault-tolerance
+  category: reliability
+  services:
+    - container-apps
+    - app-service
+    - functions
+    - aks
+    - api-management
+    - service-bus
+    - event-hubs
+    - redis-cache
+    - cosmos-db
+    - sql-database
+    - load-balancer
+    - application-gateway
+  last_reviewed: "2026-03-27"
+
+rules:
+  # ------------------------------------------------------------------ #
+  # FT-001: Circuit breaker pattern (WAF RE-02)
+  # ------------------------------------------------------------------ #
+  - id: FT-001
+    severity: required
+    description: >-
+      Implement the circuit breaker pattern for ALL external service calls.
+      Circuit breakers prevent cascading failures by stopping calls to
+      a failing dependency after a threshold of consecutive errors.  Use
+      Dapr resiliency policies for Container Apps, Polly for .NET
+      applications, resilience4j for Java, and APIM circuit breaker
+      policy for API gateway-level protection.  Every circuit breaker
+      MUST define: failure threshold, open duration (timeout), and
+      half-open probe count.
+    rationale: >-
+      Without circuit breakers, a single failing dependency causes all
+      callers to block on timeout, exhausting connection pools and thread
+      pools, which cascades failure to the entire system.  Circuit
+      breakers fail fast, preserve resources, and allow recovery.
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # === Dapr Resiliency Policy for Container Apps ===
+      # Deploy as a Dapr component in the Container Apps Environment.
+      resource "azapi_resource" "dapr_resiliency" {
+        type      = "Microsoft.App/managedEnvironments/daprComponents@2024-03-01"
+        name      = "resiliency-policy"
+        parent_id = azapi_resource.container_app_env.id
+
+        body = {
+          properties = {
+            componentType = "state.resiliency"
+            version       = "v1"
+            metadata = [
+              {
+                name  = "circuitBreakerScope"
+                value = "component"
+              },
+              {
+                name  = "circuitBreakerTrip"
+                value = "consecutiveFailures > 5"   # Open after 5 consecutive failures
+              },
+              {
+                name  = "circuitBreakerTimeout"
+                value = "30s"    # Stay open for 30 seconds before half-open probe
+              },
+              {
+                name  = "circuitBreakerMaxRequests"
+                value = "1"      # Allow 1 request in half-open state
+              }
+            ]
+          }
+        }
+      }
+
+      # === APIM Circuit Breaker Policy ===
+      # Apply circuit breaker at the API gateway level for backend protection.
+      # This is configured via APIM policy XML, deployed as a named value
+      # or inline policy. Example Terraform for APIM backend with circuit breaker:
+      resource "azapi_resource" "apim_backend" {
+        type      = "Microsoft.ApiManagement/service/backends@2023-09-01-preview"
+        name      = var.backend_name
+        parent_id = azapi_resource.apim.id
+
+        body = {
+          properties = {
+            url      = var.backend_url
+            protocol = "http"
+            circuitBreaker = {
+              rules = [
+                {
+                  name               = "default-breaker"
+                  failureCondition = {
+                    count            = 5
+                    interval         = "PT1M"    # 5 failures within 1 minute
+                    statusCodeRanges = [
+                      { min = 500, max = 599 }
+                    ]
+                  }
+                  tripDuration       = "PT30S"   # Open for 30 seconds
+                  acceptRetryAfter   = true
+                }
+              ]
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Dapr Resiliency Policy for Container Apps ===
+      resource daprResiliency 'Microsoft.App/managedEnvironments/daprComponents@2024-03-01' = {
+        parent: containerAppEnv
+        name: 'resiliency-policy'
+        properties: {
+          componentType: 'state.resiliency'
+          version: 'v1'
+          metadata: [
+            {
+              name: 'circuitBreakerScope'
+              value: 'component'
+            }
+            {
+              name: 'circuitBreakerTrip'
+              value: 'consecutiveFailures > 5'
+            }
+            {
+              name: 'circuitBreakerTimeout'
+              value: '30s'
+            }
+            {
+              name: 'circuitBreakerMaxRequests'
+              value: '1'
+            }
+          ]
+        }
+      }
+
+      // === APIM Circuit Breaker Policy ===
+      resource apimBackend 'Microsoft.ApiManagement/service/backends@2023-09-01-preview' = {
+        parent: apim
+        name: backendName
+        properties: {
+          url: backendUrl
+          protocol: 'http'
+          circuitBreaker: {
+            rules: [
+              {
+                name: 'default-breaker'
+                failureCondition: {
+                  count: 5
+                  interval: 'PT1M'
+                  statusCodeRanges: [
+                    { min: 500, max: 599 }
+                  ]
+                }
+                tripDuration: 'PT30S'
+                acceptRetryAfter: true
+              }
+            ]
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER call external services without a circuit breaker — cascading failures will take down the entire system"
+      - "NEVER set circuit breaker trip threshold to 1 — single transient failures will open the circuit prematurely"
+      - "NEVER set circuit breaker timeout (open duration) longer than 5 minutes — stuck-open circuits cause prolonged outages"
+      - "NEVER use circuit breakers without also configuring retry with backoff — they complement each other"
+
+  # ------------------------------------------------------------------ #
+  # FT-002: Retry with exponential backoff (WAF RE-02)
+  # ------------------------------------------------------------------ #
+  - id: FT-002
+    severity: required
+    description: >-
+      Configure retry policies with exponential backoff and jitter for
+      ALL external service calls.  Azure SDK clients have built-in retry
+      policies — configure them explicitly rather than relying on defaults.
+      For custom HTTP calls, implement exponential backoff with jitter
+      to avoid thundering herd effects.  Maximum retry count MUST be
+      bounded (3-5 retries).  Base delay MUST start at 1-2 seconds.
+      Jitter MUST be added to prevent synchronized retries.
+    rationale: >-
+      Transient failures (network glitches, throttling, brief service
+      restarts) are inevitable in distributed systems.  Without retry,
+      every transient failure becomes a user-visible error.  Without
+      backoff, rapid retries overwhelm the recovering service.  Without
+      jitter, synchronized retries from multiple clients create load
+      spikes.
+    applies_to: [cloud-architect, app-developer]
+    terraform_pattern: |
+      # === Retry policies are APPLICATION-LEVEL configuration ===
+      # Configure in application code, NOT in Terraform/Bicep.
+      #
+      # .NET (Polly / Microsoft.Extensions.Http.Resilience):
+      # -------------------------------------------------------
+      # builder.Services.AddHttpClient("external-api")
+      #     .AddStandardResilienceHandler(options => {
+      #         options.Retry = new HttpRetryStrategyOptions {
+      #             MaxRetryAttempts = 3,
+      #             Delay = TimeSpan.FromSeconds(1),
+      #             BackoffType = DelayBackoffType.ExponentialWithJitter,
+      #             UseJitter = true,
+      #             ShouldHandle = new PredicateBuilder<HttpResponseMessage>()
+      #                 .Handle<HttpRequestException>()
+      #                 .HandleResult(r => r.StatusCode == HttpStatusCode.TooManyRequests
+      #                     || r.StatusCode >= HttpStatusCode.InternalServerError)
+      #         };
+      #         options.CircuitBreaker = new HttpCircuitBreakerStrategyOptions {
+      #             SamplingDuration = TimeSpan.FromSeconds(30),
+      #             FailureRatio = 0.5,
+      #             MinimumThroughput = 10,
+      #             BreakDuration = TimeSpan.FromSeconds(15)
+      #         };
+      #         options.AttemptTimeout = new HttpTimeoutStrategyOptions {
+      #             Timeout = TimeSpan.FromSeconds(10)
+      #         };
+      #         options.TotalRequestTimeout = new HttpTimeoutStrategyOptions {
+      #             Timeout = TimeSpan.FromSeconds(60)
+      #         };
+      #     });
+      #
+      # Python (tenacity):
+      # -------------------
+      # from tenacity import retry, stop_after_attempt, wait_exponential_jitter
+      #
+      # @retry(
+      #     stop=stop_after_attempt(3),
+      #     wait=wait_exponential_jitter(initial=1, max=30, jitter=2),
+      #     retry=retry_if_exception_type((ConnectionError, TimeoutError))
+      # )
+      # def call_external_service():
+      #     response = httpx.get(url, timeout=10)
+      #     response.raise_for_status()
+      #     return response.json()
+      #
+      # Node.js (p-retry):
+      # -------------------
+      # import pRetry from 'p-retry';
+      #
+      # const result = await pRetry(
+      #     () => fetch(url).then(r => {
+      #         if (r.status >= 500) throw new Error(`Server error: ${r.status}`);
+      #         return r.json();
+      #     }),
+      #     {
+      #         retries: 3,
+      #         minTimeout: 1000,  // 1 second base delay
+      #         factor: 2,         // Exponential multiplier
+      #         randomize: true    // Add jitter
+      #     }
+      # );
+      #
+      # Azure SDK retry configuration (all languages):
+      # ------------------------------------------------
+      # Azure SDK clients have built-in retry — configure explicitly:
+      # .NET:   new CosmosClientOptions { MaxRetryAttemptsOnRateLimitedRequests = 9, MaxRetryWaitTimeOnRateLimitedRequests = TimeSpan.FromSeconds(30) }
+      # Python: from azure.core.pipeline.policies import RetryPolicy; RetryPolicy(retry_total=3, retry_backoff_factor=1)
+      # Node:   new CosmosClient(endpoint, key, { connectionPolicy: { retryOptions: { maxRetryAttemptCount: 9, maxWaitTimeInSeconds: 30 } } })
+    bicep_pattern: |
+      // Retry policies are APPLICATION-LEVEL configuration — not infrastructure.
+      // See terraform_pattern for code examples in .NET, Python, and Node.js.
+      //
+      // For APIM-level retry, configure in the API policy XML:
+      //
+      // <retry condition="@(context.Response.StatusCode >= 500)"
+      //        count="3"
+      //        interval="1"
+      //        max-interval="30"
+      //        delta="2"
+      //        first-fast-retry="false">
+      //     <forward-request buffer-request-body="true" />
+      // </retry>
+    prohibitions:
+      - "NEVER make external calls without retry logic — transient failures are guaranteed in distributed systems"
+      - "NEVER use fixed-interval retry — use exponential backoff to avoid overwhelming recovering services"
+      - "NEVER retry without jitter — synchronized retries from multiple clients create thundering herd effects"
+      - "NEVER retry indefinitely — cap retries at 3-5 attempts to prevent resource exhaustion"
+      - "NEVER retry non-idempotent operations (POST creating resources) without idempotency keys"
+      - "NEVER retry on 4xx client errors (except 429 Too Many Requests) — they will never succeed"
+
+  # ------------------------------------------------------------------ #
+  # FT-003: Bulkhead isolation (WAF RE-02)
+  # ------------------------------------------------------------------ #
+  - id: FT-003
+    severity: required
+    description: >-
+      Implement bulkhead isolation to prevent a single failing component
+      from consuming all system resources.  Container Apps and AKS MUST
+      have resource limits (CPU/memory) per container.  AKS MUST have
+      Pod Disruption Budgets (PDBs) to ensure minimum availability during
+      voluntary disruptions.  Thread pools and connection pools MUST be
+      bounded.  Separate critical and non-critical workloads into
+      different compute instances.
+    rationale: >-
+      Without bulkhead isolation, a single runaway process can consume
+      all CPU/memory, starving healthy workloads.  Connection pool
+      exhaustion from one dependency blocks all other outbound calls.
+      PDBs prevent Kubernetes evictions from violating availability
+      requirements.
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # === Container Apps: Resource limits per container ===
+      resource "azapi_resource" "container_app_with_limits" {
+        type      = "Microsoft.App/containerApps@2024-03-01"
+        name      = var.container_app_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          properties = {
+            managedEnvironmentId = azapi_resource.container_app_env.id
+            template = {
+              containers = [
+                {
+                  name  = "api"
+                  image = var.api_image
+                  resources = {
+                    cpu    = 0.5      # Hard CPU limit — prevents CPU starvation of other containers
+                    memory = "1Gi"    # Hard memory limit — OOM kill prevents memory exhaustion
+                  }
+                }
+              ]
+              scale = {
+                minReplicas = 2      # Minimum 2 replicas for availability
+                maxReplicas = 10     # Cap to prevent runaway scaling
+                rules = [
+                  {
+                    name = "http-scaling"
+                    http = {
+                      metadata = {
+                        concurrentRequests = "50"    # Scale at 50 concurrent requests per replica
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+
+      # === AKS: Pod Disruption Budget ===
+      # PDBs are Kubernetes resources — deploy via deploy.sh or Helm chart.
+      # Terraform deploys the AKS cluster; PDBs go in the Kubernetes manifests.
+      #
+      # deploy.sh example:
+      # kubectl apply -f - <<EOF
+      # apiVersion: policy/v1
+      # kind: PodDisruptionBudget
+      # metadata:
+      #   name: api-pdb
+      #   namespace: ${NAMESPACE}
+      # spec:
+      #   minAvailable: 2          # OR maxUnavailable: 1
+      #   selector:
+      #     matchLabels:
+      #       app: api
+      # EOF
+      #
+      # Resource Quotas per namespace:
+      # kubectl apply -f - <<EOF
+      # apiVersion: v1
+      # kind: ResourceQuota
+      # metadata:
+      #   name: compute-quota
+      #   namespace: ${NAMESPACE}
+      # spec:
+      #   hard:
+      #     requests.cpu: "4"
+      #     requests.memory: "8Gi"
+      #     limits.cpu: "8"
+      #     limits.memory: "16Gi"
+      #     pods: "20"
+      # EOF
+      #
+      # LimitRange for default container limits:
+      # kubectl apply -f - <<EOF
+      # apiVersion: v1
+      # kind: LimitRange
+      # metadata:
+      #   name: default-limits
+      #   namespace: ${NAMESPACE}
+      # spec:
+      #   limits:
+      #   - default:
+      #       cpu: "500m"
+      #       memory: "512Mi"
+      #     defaultRequest:
+      #       cpu: "100m"
+      #       memory: "128Mi"
+      #     type: Container
+      # EOF
+    bicep_pattern: |
+      // === Container Apps: Resource limits per container ===
+      resource containerAppWithLimits 'Microsoft.App/containerApps@2024-03-01' = {
+        name: containerAppName
+        location: location
+        properties: {
+          managedEnvironmentId: containerAppEnv.id
+          template: {
+            containers: [
+              {
+                name: 'api'
+                image: apiImage
+                resources: {
+                  cpu: json('0.5')
+                  memory: '1Gi'
+                }
+              }
+            ]
+            scale: {
+              minReplicas: 2
+              maxReplicas: 10
+              rules: [
+                {
+                  name: 'http-scaling'
+                  http: {
+                    metadata: {
+                      concurrentRequests: '50'
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+
+      // AKS Pod Disruption Budgets, Resource Quotas, and LimitRanges
+      // are Kubernetes resources — deploy via deploy.sh post-deployment script.
+      // See terraform_pattern for kubectl manifest examples.
+    prohibitions:
+      - "NEVER deploy containers without CPU and memory limits — unlimited containers can starve the entire node"
+      - "NEVER set Container Apps maxReplicas to 0 or unbounded — cap scaling to prevent runaway cost and resource exhaustion"
+      - "NEVER deploy AKS workloads without Pod Disruption Budgets — voluntary disruptions (upgrades, scaling) may take down all replicas"
+      - "NEVER deploy AKS namespaces without ResourceQuotas — a single tenant can exhaust cluster resources"
+      - "NEVER use unbounded connection pools — set maximum connections per dependency"
+      - "NEVER set minReplicas to 0 for production services — cold start latency causes request failures"
+
+  # ------------------------------------------------------------------ #
+  # FT-004: Graceful degradation (WAF RE-02, RE-05)
+  # ------------------------------------------------------------------ #
+  - id: FT-004
+    severity: recommended
+    description: >-
+      Implement graceful degradation patterns so that partial failures
+      do not cause total service unavailability.  Use feature flags to
+      disable non-critical features when dependencies fail.  Configure
+      fallback endpoints and cached responses.  Implement degraded mode
+      that serves stale data or reduced functionality rather than
+      returning errors.  Azure App Configuration with feature filters
+      provides centralized feature flag management.
+    rationale: >-
+      Users prefer a degraded experience over a complete outage.  If the
+      recommendation engine fails, the e-commerce site should still show
+      products without recommendations — not return a 500 error.
+      Feature flags enable instant degradation without redeployment.
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # === Azure App Configuration for Feature Flags ===
+      resource "azapi_resource" "app_configuration" {
+        type      = "Microsoft.AppConfiguration/configurationStores@2023-03-01"
+        name      = var.app_config_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          sku = {
+            name = "standard"    # Standard required for feature flags and private endpoints
+          }
+          properties = {
+            publicNetworkAccess = "Disabled"
+            disableLocalAuth    = true
+            softDeleteRetentionInDays = 7
+            enablePurgeProtection     = true
+          }
+        }
+      }
+
+      # === Feature Flag: Graceful degradation toggle ===
+      resource "azapi_resource" "feature_flag_recommendations" {
+        type      = "Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01"
+        name      = ".appconfig.featureflag~2Frecommendations-enabled"
+        parent_id = azapi_resource.app_configuration.id
+
+        body = {
+          properties = {
+            value       = jsonencode({
+              id          = "recommendations-enabled"
+              description = "Enable product recommendations — disable when recommendation service is degraded"
+              enabled     = true
+              conditions  = {
+                client_filters = []
+              }
+            })
+            contentType = "application/vnd.microsoft.appconfig.ff+json;charset=utf-8"
+          }
+        }
+      }
+
+      # === Feature Flag: Non-critical analytics ===
+      resource "azapi_resource" "feature_flag_analytics" {
+        type      = "Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01"
+        name      = ".appconfig.featureflag~2Fanalytics-tracking"
+        parent_id = azapi_resource.app_configuration.id
+
+        body = {
+          properties = {
+            value       = jsonencode({
+              id          = "analytics-tracking"
+              description = "Enable analytics tracking — disable to reduce latency during peak load"
+              enabled     = true
+              conditions  = {
+                client_filters = []
+              }
+            })
+            contentType = "application/vnd.microsoft.appconfig.ff+json;charset=utf-8"
+          }
+        }
+      }
+
+      # === RBAC: App Configuration Data Reader for application identity ===
+      resource "azapi_resource" "app_config_role" {
+        type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name      = var.app_config_role_name
+        parent_id = azapi_resource.app_configuration.id
+
+        body = {
+          properties = {
+            roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/516239f1-63e1-4d78-a4de-a74fb236a071"  # App Configuration Data Reader
+            principalId      = var.app_identity_principal_id
+            principalType    = "ServicePrincipal"
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Azure App Configuration for Feature Flags ===
+      resource appConfiguration 'Microsoft.AppConfiguration/configurationStores@2023-03-01' = {
+        name: appConfigName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: 'standard'
+        }
+        properties: {
+          publicNetworkAccess: 'Disabled'
+          disableLocalAuth: true
+          softDeleteRetentionInDays: 7
+          enablePurgeProtection: true
+        }
+      }
+
+      // === Feature Flag: Graceful degradation toggle ===
+      resource featureFlagRecommendations 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
+        parent: appConfiguration
+        name: '.appconfig.featureflag~2Frecommendations-enabled'
+        properties: {
+          value: '{"id":"recommendations-enabled","description":"Enable product recommendations","enabled":true,"conditions":{"client_filters":[]}}'
+          contentType: 'application/vnd.microsoft.appconfig.ff+json;charset=utf-8'
+        }
+      }
+
+      // === Feature Flag: Non-critical analytics ===
+      resource featureFlagAnalytics 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
+        parent: appConfiguration
+        name: '.appconfig.featureflag~2Fanalytics-tracking'
+        properties: {
+          value: '{"id":"analytics-tracking","description":"Enable analytics tracking","enabled":true,"conditions":{"client_filters":[]}}'
+          contentType: 'application/vnd.microsoft.appconfig.ff+json;charset=utf-8'
+        }
+      }
+
+      // === RBAC: App Configuration Data Reader ===
+      resource appConfigRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+        name: guid(appConfiguration.id, appIdentityPrincipalId, 'app-config-data-reader')
+        scope: appConfiguration
+        properties: {
+          roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '516239f1-63e1-4d78-a4de-a74fb236a071')
+          principalId: appIdentityPrincipalId
+          principalType: 'ServicePrincipal'
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Network/privateEndpoints@2023-11-01"
+        description: "Private endpoint for App Configuration (groupId: configurationStores)"
+      - type: "Microsoft.Network/privateDnsZones@2020-06-01"
+        description: "Private DNS zone privatelink.azconfig.io for App Configuration private endpoint"
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        description: "Diagnostic settings for App Configuration audit and request logs"
+    prohibitions:
+      - "NEVER return 500 errors when a non-critical dependency fails — serve degraded content or cached responses"
+      - "NEVER hardcode feature flags in application code — use Azure App Configuration for centralized management"
+      - "NEVER deploy App Configuration without disableLocalAuth and managed identity — use RBAC for authentication"
+      - "NEVER couple critical path operations to non-critical dependencies — use async processing for non-essential features"
+
+  # ------------------------------------------------------------------ #
+  # FT-005: Queue-based load leveling (WAF RE-02, RE-05)
+  # ------------------------------------------------------------------ #
+  - id: FT-005
+    severity: required
+    description: >-
+      Use queue-based load leveling for all workloads with variable or
+      bursty traffic patterns.  Place Service Bus queues or Event Hubs
+      between producers and consumers to absorb traffic spikes and
+      decouple processing rate from arrival rate.  Service Bus Premium
+      tier provides zone redundancy, large message support, and FIFO
+      ordering.  Event Hubs is for high-throughput streaming (millions
+      of events/sec).  NEVER process high-volume workloads synchronously
+      without a buffer.
+    rationale: >-
+      Synchronous processing of bursty traffic causes cascading failures
+      when arrival rate exceeds processing capacity.  Queues absorb
+      spikes, enable independent scaling of producers and consumers,
+      and provide at-least-once delivery guarantees.  Without queues,
+      every traffic spike risks service overload and data loss.
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # === Service Bus Queue for Load Leveling ===
+      resource "azapi_resource" "service_bus_namespace" {
+        type      = "Microsoft.ServiceBus/namespaces@2024-01-01"
+        name      = var.service_bus_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          sku = {
+            name     = "Premium"
+            tier     = "Premium"
+            capacity = 1
+          }
+          properties = {
+            zoneRedundant       = true
+            minimumTlsVersion   = "1.2"
+            publicNetworkAccess = "Disabled"
+            disableLocalAuth    = true     # Managed identity only
+          }
+        }
+      }
+
+      resource "azapi_resource" "service_bus_queue" {
+        type      = "Microsoft.ServiceBus/namespaces/queues@2024-01-01"
+        name      = var.queue_name
+        parent_id = azapi_resource.service_bus_namespace.id
+
+        body = {
+          properties = {
+            maxSizeInMegabytes                = 5120       # 5 GB queue size
+            maxDeliveryCount                  = 10         # Max delivery attempts before dead-letter
+            lockDuration                      = "PT5M"     # 5 minute lock — long enough for processing
+            enablePartitioning                = false      # Disable for Premium tier (auto-partitioned)
+            deadLetteringOnMessageExpiration  = true       # Dead-letter expired messages
+            defaultMessageTimeToLive          = "P14D"     # 14-day TTL
+            requiresDuplicateDetection        = true       # Enable duplicate detection
+            duplicateDetectionHistoryTimeWindow = "PT10M"  # 10-minute dedup window
+            requiresSession                   = false      # Enable for FIFO ordering
+          }
+        }
+      }
+
+      # === Event Hub for High-Throughput Streaming ===
+      resource "azapi_resource" "event_hub_namespace" {
+        type      = "Microsoft.EventHub/namespaces@2024-01-01"
+        name      = var.event_hub_namespace_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          sku = {
+            name     = "Premium"
+            tier     = "Premium"
+            capacity = 1
+          }
+          properties = {
+            isAutoInflateEnabled   = false    # Premium uses Processing Units, not throughput units
+            zoneRedundant          = true
+            minimumTlsVersion      = "1.2"
+            publicNetworkAccess    = "Disabled"
+            disableLocalAuth       = true
+          }
+        }
+      }
+
+      resource "azapi_resource" "event_hub" {
+        type      = "Microsoft.EventHub/namespaces/eventhubs@2024-01-01"
+        name      = var.event_hub_name
+        parent_id = azapi_resource.event_hub_namespace.id
+
+        body = {
+          properties = {
+            partitionCount       = 8         # Scale with consumer parallelism
+            messageRetentionInDays = 7       # Retain messages for 7 days
+            retentionDescription = {
+              cleanupPolicy      = "Delete"
+              retentionTimeInHours = 168     # 7 days in hours
+            }
+          }
+        }
+      }
+
+      # === RBAC: Service Bus Data Sender/Receiver ===
+      resource "azapi_resource" "sb_sender_role" {
+        type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name      = var.sb_sender_role_name
+        parent_id = azapi_resource.service_bus_namespace.id
+
+        body = {
+          properties = {
+            roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/69a216fc-b8fb-44d8-bc22-1f3c2cd27a39"  # Azure Service Bus Data Sender
+            principalId      = var.producer_identity_principal_id
+            principalType    = "ServicePrincipal"
+          }
+        }
+      }
+
+      resource "azapi_resource" "sb_receiver_role" {
+        type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name      = var.sb_receiver_role_name
+        parent_id = azapi_resource.service_bus_namespace.id
+
+        body = {
+          properties = {
+            roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0"  # Azure Service Bus Data Receiver
+            principalId      = var.consumer_identity_principal_id
+            principalType    = "ServicePrincipal"
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Service Bus Queue for Load Leveling ===
+      resource serviceBusNamespace 'Microsoft.ServiceBus/namespaces@2024-01-01' = {
+        name: serviceBusName
+        location: location
+        sku: {
+          name: 'Premium'
+          tier: 'Premium'
+          capacity: 1
+        }
+        properties: {
+          zoneRedundant: true
+          minimumTlsVersion: '1.2'
+          publicNetworkAccess: 'Disabled'
+          disableLocalAuth: true
+        }
+      }
+
+      resource serviceBusQueue 'Microsoft.ServiceBus/namespaces/queues@2024-01-01' = {
+        parent: serviceBusNamespace
+        name: queueName
+        properties: {
+          maxSizeInMegabytes: 5120
+          maxDeliveryCount: 10
+          lockDuration: 'PT5M'
+          enablePartitioning: false
+          deadLetteringOnMessageExpiration: true
+          defaultMessageTimeToLive: 'P14D'
+          requiresDuplicateDetection: true
+          duplicateDetectionHistoryTimeWindow: 'PT10M'
+          requiresSession: false
+        }
+      }
+
+      // === Event Hub for High-Throughput Streaming ===
+      resource eventHubNamespace 'Microsoft.EventHub/namespaces@2024-01-01' = {
+        name: eventHubNamespaceName
+        location: location
+        sku: {
+          name: 'Premium'
+          tier: 'Premium'
+          capacity: 1
+        }
+        properties: {
+          isAutoInflateEnabled: false
+          zoneRedundant: true
+          minimumTlsVersion: '1.2'
+          publicNetworkAccess: 'Disabled'
+          disableLocalAuth: true
+        }
+      }
+
+      resource eventHub 'Microsoft.EventHub/namespaces/eventhubs@2024-01-01' = {
+        parent: eventHubNamespace
+        name: eventHubName
+        properties: {
+          partitionCount: 8
+          messageRetentionInDays: 7
+          retentionDescription: {
+            cleanupPolicy: 'Delete'
+            retentionTimeInHours: 168
+          }
+        }
+      }
+
+      // === RBAC: Service Bus Data Sender ===
+      resource sbSenderRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+        name: guid(serviceBusNamespace.id, producerIdentityPrincipalId, 'sb-data-sender')
+        scope: serviceBusNamespace
+        properties: {
+          roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '69a216fc-b8fb-44d8-bc22-1f3c2cd27a39')
+          principalId: producerIdentityPrincipalId
+          principalType: 'ServicePrincipal'
+        }
+      }
+
+      // === RBAC: Service Bus Data Receiver ===
+      resource sbReceiverRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+        name: guid(serviceBusNamespace.id, consumerIdentityPrincipalId, 'sb-data-receiver')
+        scope: serviceBusNamespace
+        properties: {
+          roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0')
+          principalId: consumerIdentityPrincipalId
+          principalType: 'ServicePrincipal'
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.ServiceBus/namespaces/queues@2024-01-01"
+        description: "Dead-letter queue (automatic sub-queue) — monitor for poison messages"
+      - type: "Microsoft.Network/privateEndpoints@2023-11-01"
+        description: "Private endpoint for Service Bus / Event Hub namespace"
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        description: "Diagnostic settings for queue depth, dead-letter count, and throughput metrics"
+    prohibitions:
+      - "NEVER process high-volume or bursty workloads synchronously without a queue buffer — overload causes cascading failures"
+      - "NEVER use Service Bus connection strings — use managed identity with disableLocalAuth = true"
+      - "NEVER deploy Service Bus Standard tier for production — Premium tier is required for zone redundancy and large messages"
+      - "NEVER set maxDeliveryCount above 20 — poison messages must reach dead-letter queue quickly"
+      - "NEVER ignore dead-letter queues — monitor and alert on dead-letter queue depth"
+      - "NEVER set lockDuration below 1 minute — short locks cause duplicate processing when consumers are slow"
+
+patterns:
+  - name: "Circuit breaker with retry composition"
+    description: >-
+      Compose circuit breaker and retry policies correctly: retry wraps
+      the circuit breaker, so transient failures are retried but
+      sustained failures trip the circuit.
+    example: |
+      // .NET: Correct composition order
+      builder.Services.AddHttpClient("api")
+          .AddResilienceHandler("pipeline", builder => {
+              builder.AddRetry(new HttpRetryStrategyOptions {
+                  MaxRetryAttempts = 3,
+                  BackoffType = DelayBackoffType.ExponentialWithJitter
+              });
+              builder.AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions {
+                  FailureRatio = 0.5,
+                  SamplingDuration = TimeSpan.FromSeconds(30),
+                  BreakDuration = TimeSpan.FromSeconds(15)
+              });
+              builder.AddTimeout(TimeSpan.FromSeconds(10));
+          });
+
+  - name: "Competing consumers pattern"
+    description: >-
+      Scale consumers independently from producers using queue-based
+      load leveling.  Multiple consumers process from the same queue
+      concurrently, each handling one message at a time.
+    example: |
+      // Container Apps: Scale consumers based on queue depth
+      // Use KEDA Service Bus scaler
+      resource containerAppConsumer 'Microsoft.App/containerApps@2024-03-01' = {
+        properties: {
+          template: {
+            scale: {
+              minReplicas: 1
+              maxReplicas: 10
+              rules: [
+                {
+                  name: 'queue-scaling'
+                  custom: {
+                    type: 'azure-servicebus'
+                    metadata: {
+                      queueName: 'orders'
+                      namespace: serviceBusNamespace.name
+                      messageCount: '5'  // Scale when 5+ messages per replica
+                    }
+                    identity: userAssignedIdentity.id
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+
+anti_patterns:
+  - description: "Making synchronous calls to external services without timeout or circuit breaker"
+    instead: "Wrap all external calls with circuit breaker + retry + timeout using Polly, resilience4j, or Dapr"
+  - description: "Deploying containers without CPU and memory resource limits"
+    instead: "Set explicit CPU and memory limits on every container to prevent resource starvation"
+  - description: "Processing bursty workloads synchronously without a message queue"
+    instead: "Use Service Bus or Event Hub as a buffer between producers and consumers"
+  - description: "Hardcoding feature flags in application code"
+    instead: "Use Azure App Configuration for centralized feature flag management with instant toggle capability"
+  - description: "Using Service Bus connection strings instead of managed identity"
+    instead: "Disable local auth (disableLocalAuth: true) and use RBAC with managed identity"
+  - description: "Deploying AKS workloads without Pod Disruption Budgets"
+    instead: "Create PDBs with minAvailable or maxUnavailable to protect availability during voluntary disruptions"
+
+references:
+  - title: "Azure Well-Architected Framework — Design for resilience"
+    url: "https://learn.microsoft.com/azure/well-architected/reliability/design-resiliency"
+  - title: "Circuit breaker pattern"
+    url: "https://learn.microsoft.com/azure/architecture/patterns/circuit-breaker"
+  - title: "Retry pattern with exponential backoff"
+    url: "https://learn.microsoft.com/azure/architecture/patterns/retry"
+  - title: "Bulkhead pattern"
+    url: "https://learn.microsoft.com/azure/architecture/patterns/bulkhead"
+  - title: "Queue-based load leveling pattern"
+    url: "https://learn.microsoft.com/azure/architecture/patterns/queue-based-load-leveling"
+  - title: "Graceful degradation pattern"
+    url: "https://learn.microsoft.com/azure/architecture/patterns/graceful-degradation"

@@ -126,7 +126,7 @@ class TUIAdapter:
         console renders colored output.
         """
         if self._shutdown.is_set():
-            return
+            raise ShutdownRequested()
 
         msg = str(message)
 
@@ -149,7 +149,7 @@ class TUIAdapter:
     def response_fn(self, content: str) -> None:
         """Render an agent response as colored Markdown — full content, no pagination."""
         if self._shutdown.is_set():
-            return
+            raise ShutdownRequested()
         try:
 
             def _render():
@@ -233,7 +233,7 @@ class TUIAdapter:
             ``"tokens"`` — replace the timer/elapsed text with token usage.
         """
         if self._shutdown.is_set():
-            return
+            raise ShutdownRequested()
 
         if event == "start":
 

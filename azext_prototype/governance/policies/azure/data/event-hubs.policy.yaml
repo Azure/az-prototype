@@ -1,0 +1,303 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: event-hubs
+  category: azure
+  services: [event-hubs]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: EH-001
+    severity: required
+    description: "Deploy Event Hubs namespace with Standard or Premium SKU, TLS 1.2, and local auth disabled"
+    rationale: "Basic SKU lacks consumer groups and capture; local auth bypass Entra RBAC controls"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "eventhub_namespace" {
+        type      = "Microsoft.EventHub/namespaces@2024-01-01"
+        name      = var.eh_namespace_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        identity {
+          type = "SystemAssigned"
+        }
+        body = {
+          sku = {
+            name     = "Standard"
+            tier     = "Standard"
+            capacity = var.throughput_units
+          }
+          properties = {
+            isAutoInflateEnabled   = true
+            maximumThroughputUnits = var.max_throughput_units
+            minimumTlsVersion      = "1.2"
+            publicNetworkAccess    = "Disabled"
+            disableLocalAuth       = true
+            zoneRedundant          = true
+            kafkaEnabled           = true
+          }
+        }
+      }
+    bicep_pattern: |
+      resource eventhubNamespace 'Microsoft.EventHub/namespaces@2024-01-01' = {
+        name: ehNamespaceName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: 'Standard'
+          tier: 'Standard'
+          capacity: throughputUnits
+        }
+        properties: {
+          isAutoInflateEnabled: true
+          maximumThroughputUnits: maxThroughputUnits
+          minimumTlsVersion: '1.2'
+          publicNetworkAccess: 'Disabled'
+          disableLocalAuth: true
+          zoneRedundant: true
+          kafkaEnabled: true
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/privateEndpoints (private endpoint with groupId 'namespace')"
+      - "Microsoft.Network/privateDnsZones (privatelink.servicebus.windows.net)"
+      - "Microsoft.Authorization/roleAssignments (Azure Event Hubs Data Sender/Receiver roles)"
+      - "Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)"
+    prohibitions:
+      - "Do not use Basic SKU — it lacks consumer groups, capture, and partitioned consumers"
+      - "Do not enable publicNetworkAccess — use private endpoints"
+      - "Do not enable local auth (SAS keys) — use Entra RBAC"
+      - "Do not allow TLS versions below 1.2"
+
+  - id: EH-002
+    severity: required
+    description: "Create Event Hubs with appropriate partition count and message retention"
+    rationale: "Partition count determines parallelism and cannot be changed after creation; retention affects data availability"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "eventhub" {
+        type      = "Microsoft.EventHub/namespaces/eventhubs@2024-01-01"
+        name      = var.eventhub_name
+        parent_id = azapi_resource.eventhub_namespace.id
+        body = {
+          properties = {
+            partitionCount         = var.partition_count
+            messageRetentionInDays = 7
+            status                 = "Active"
+          }
+        }
+      }
+    bicep_pattern: |
+      resource eventhub 'Microsoft.EventHub/namespaces/eventhubs@2024-01-01' = {
+        parent: eventhubNamespace
+        name: eventhubName
+        properties: {
+          partitionCount: partitionCount
+          messageRetentionInDays: 7
+          status: 'Active'
+        }
+      }
+    companion_resources:
+      - "Microsoft.EventHub/namespaces/eventhubs/consumergroups (consumer groups for each application)"
+    prohibitions:
+      - "Do not set partitionCount to 1 for production — it eliminates parallelism"
+      - "Do not use the $Default consumer group for production applications"
+
+  - id: EH-003
+    severity: required
+    description: "Create dedicated consumer groups for each consuming application"
+    rationale: "Shared consumer groups cause checkpoint conflicts and message loss between applications"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      resource "azapi_resource" "consumer_group" {
+        type      = "Microsoft.EventHub/namespaces/eventhubs/consumergroups@2024-01-01"
+        name      = var.consumer_group_name
+        parent_id = azapi_resource.eventhub.id
+        body = {
+          properties = {
+            userMetadata = var.consumer_description
+          }
+        }
+      }
+    bicep_pattern: |
+      resource consumerGroup 'Microsoft.EventHub/namespaces/eventhubs/consumergroups@2024-01-01' = {
+        parent: eventhub
+        name: consumerGroupName
+        properties: {
+          userMetadata: consumerDescription
+        }
+      }
+    companion_resources: []
+    prohibitions:
+      - "Do not use the $Default consumer group for production workloads"
+      - "Do not share consumer groups between different applications"
+
+  - id: EH-004
+    severity: recommended
+    description: "Enable Event Hubs Capture for cold-path analytics"
+    rationale: "WAF Reliability/Operational Excellence: Capture automatically delivers streaming data to Azure Blob Storage or Data Lake, providing a durable copy of events for replay and analytics"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "eventhub_with_capture" {
+        type      = "Microsoft.EventHub/namespaces/eventhubs@2024-01-01"
+        name      = var.eventhub_name
+        parent_id = azapi_resource.eventhub_namespace.id
+        body = {
+          properties = {
+            partitionCount         = var.partition_count
+            messageRetentionInDays = 7
+            captureDescription = {
+              enabled            = true
+              encoding           = "Avro"
+              intervalInSeconds  = 300
+              sizeLimitInBytes   = 314572800
+              destination = {
+                name = "EventHubArchive.AzureBlockBlob"
+                properties = {
+                  storageAccountResourceId = var.capture_storage_account_id
+                  blobContainer            = var.capture_container_name
+                  archiveNameFormat        = "{Namespace}/{EventHub}/{PartitionId}/{Year}/{Month}/{Day}/{Hour}/{Minute}/{Second}"
+                }
+              }
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource eventhubWithCapture 'Microsoft.EventHub/namespaces/eventhubs@2024-01-01' = {
+        parent: eventhubNamespace
+        name: eventhubName
+        properties: {
+          partitionCount: partitionCount
+          messageRetentionInDays: 7
+          captureDescription: {
+            enabled: true
+            encoding: 'Avro'
+            intervalInSeconds: 300
+            sizeLimitInBytes: 314572800
+            destination: {
+              name: 'EventHubArchive.AzureBlockBlob'
+              properties: {
+                storageAccountResourceId: captureStorageAccountId
+                blobContainer: captureContainerName
+                archiveNameFormat: '{Namespace}/{EventHub}/{PartitionId}/{Year}/{Month}/{Day}/{Hour}/{Minute}/{Second}'
+              }
+            }
+          }
+        }
+      }
+
+  - id: EH-005
+    severity: recommended
+    description: "Enable geo-disaster recovery pairing for critical namespaces"
+    rationale: "WAF Reliability: Geo-DR creates a metadata-only pairing to a secondary namespace in another region, enabling failover of namespace metadata during regional outages"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+
+  - id: EH-006
+    severity: recommended
+    description: "Use schema registry for event schema management and evolution"
+    rationale: "WAF Operational Excellence: Schema registry provides a centralized repository for event schemas, enabling schema validation and versioned evolution across producers and consumers"
+    applies_to: [cloud-architect, app-developer]
+
+  - id: EH-007
+    severity: recommended
+    description: "Enable diagnostic settings for Event Hubs namespace"
+    rationale: "Monitor throughput, errors, and throttled requests for capacity planning"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "eh_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-eventhubs"
+        parent_id = azapi_resource.eventhub_namespace.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "ArchiveLogs"
+                enabled  = true
+              },
+              {
+                category = "OperationalLogs"
+                enabled  = true
+              },
+              {
+                category = "AutoScaleLogs"
+                enabled  = true
+              },
+              {
+                category = "RuntimeAuditLogs"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource ehDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-eventhubs'
+        scope: eventhubNamespace
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
+            {
+              category: 'ArchiveLogs'
+              enabled: true
+            }
+            {
+              category: 'OperationalLogs'
+              enabled: true
+            }
+            {
+              category: 'AutoScaleLogs'
+              enabled: true
+            }
+            {
+              category: 'RuntimeAuditLogs'
+              enabled: true
+            }
+          ]
+          metrics: [
+            {
+              category: 'AllMetrics'
+              enabled: true
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.OperationalInsights/workspaces (Log Analytics workspace)"
+    prohibitions:
+      - "Do not omit RuntimeAuditLogs — they track authentication and authorization events"
+
+patterns:
+  - name: "Event Hubs namespace with Entra RBAC and private endpoint"
+    description: "Standard namespace with local auth disabled, private endpoint, and diagnostics"
+    example: |
+      # See EH-001 through EH-004 for complete azapi_resource patterns
+
+anti_patterns:
+  - description: "Do not use SAS keys for Event Hub authentication"
+    instead: "Disable local auth and use Entra RBAC with managed identity"
+  - description: "Do not share consumer groups between applications"
+    instead: "Create a dedicated consumer group per consuming application"
+
+references:
+  - title: "Event Hubs documentation"
+    url: "https://learn.microsoft.com/azure/event-hubs/event-hubs-about"
+  - title: "Event Hubs security"
+    url: "https://learn.microsoft.com/azure/event-hubs/event-hubs-security-controls"
+  - title: "WAF: Event Hubs service guide"
+    url: "https://learn.microsoft.com/azure/well-architected/service-guides/event-hubs"
+  - title: "Event Hubs Capture"
+    url: "https://learn.microsoft.com/azure/event-hubs/event-hubs-capture-overview"
+  - title: "Event Hubs geo-disaster recovery"
+    url: "https://learn.microsoft.com/azure/event-hubs/event-hubs-geo-dr"

@@ -1,0 +1,176 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: ddos-protection
+  category: azure
+  services: [ddos-protection]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: DDOS-001
+    severity: required
+    description: "Deploy DDoS Protection Plan and associate with all VNets containing public-facing resources"
+    rationale: "DDoS Network Protection provides enhanced mitigation beyond Azure's basic infrastructure protection"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "ddos_plan" {
+        type      = "Microsoft.Network/ddosProtectionPlans@2024-01-01"
+        name      = var.ddos_plan_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        body = {
+          properties = {}
+        }
+      }
+    bicep_pattern: |
+      resource ddosPlan 'Microsoft.Network/ddosProtectionPlans@2024-01-01' = {
+        name: ddosPlanName
+        location: location
+        properties: {}
+      }
+    companion_resources:
+      - type: "Microsoft.Network/virtualNetworks@2024-01-01"
+        name: "VNet DDoS association"
+        description: "Associate the DDoS Protection Plan with VNets that have public IP addresses"
+        terraform_pattern: |
+          resource "azapi_resource" "vnet" {
+            type      = "Microsoft.Network/virtualNetworks@2024-01-01"
+            name      = var.vnet_name
+            location  = var.location
+            parent_id = var.resource_group_id
+
+            body = {
+              properties = {
+                addressSpace = {
+                  addressPrefixes = var.address_prefixes
+                }
+                ddosProtectionPlan = {
+                  id = azapi_resource.ddos_plan.id
+                }
+                enableDdosProtection = true
+                subnets = var.subnets
+              }
+            }
+          }
+        bicep_pattern: |
+          resource vnet 'Microsoft.Network/virtualNetworks@2024-01-01' = {
+            name: vnetName
+            location: location
+            properties: {
+              addressSpace: {
+                addressPrefixes: addressPrefixes
+              }
+              ddosProtectionPlan: {
+                id: ddosPlan.id
+              }
+              enableDdosProtection: true
+              subnets: subnets
+            }
+          }
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name: "diag-ddos"
+        description: "Diagnostic settings for DDoS mitigation flow logs and attack analytics"
+      - type: "Microsoft.Insights/metricAlerts@2018-03-01"
+        name: "alert-ddos"
+        description: "Metric alert for DDoS attack notifications on public IP addresses"
+        terraform_pattern: |
+          resource "azapi_resource" "ddos_alert" {
+            type      = "Microsoft.Insights/metricAlerts@2018-03-01"
+            name      = "alert-ddos-${var.pip_name}"
+            location  = "global"
+            parent_id = var.resource_group_id
+
+            body = {
+              properties = {
+                severity    = 1
+                enabled     = true
+                scopes      = [var.public_ip_id]
+                evaluationFrequency = "PT1M"
+                windowSize          = "PT5M"
+                criteria = {
+                  "odata.type" = "Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria"
+                  allOf = [
+                    {
+                      name            = "DDoSAttack"
+                      metricName      = "IfUnderDDoSAttack"
+                      metricNamespace = "Microsoft.Network/publicIPAddresses"
+                      operator        = "GreaterThan"
+                      threshold       = 0
+                      timeAggregation = "Maximum"
+                      criterionType   = "StaticThresholdCriterion"
+                    }
+                  ]
+                }
+                actions = [
+                  {
+                    actionGroupId = var.action_group_id
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource ddosAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
+            name: 'alert-ddos-${pipName}'
+            location: 'global'
+            properties: {
+              severity: 1
+              enabled: true
+              scopes: [publicIpId]
+              evaluationFrequency: 'PT1M'
+              windowSize: 'PT5M'
+              criteria: {
+                'odata.type': 'Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria'
+                allOf: [
+                  {
+                    name: 'DDoSAttack'
+                    metricName: 'IfUnderDDoSAttack'
+                    metricNamespace: 'Microsoft.Network/publicIPAddresses'
+                    operator: 'GreaterThan'
+                    threshold: 0
+                    timeAggregation: 'Maximum'
+                    criterionType: 'StaticThresholdCriterion'
+                  }
+                ]
+              }
+              actions: [
+                {
+                  actionGroupId: actionGroupId
+                }
+              ]
+            }
+          }
+    prohibitions:
+      - "Never deploy public-facing VNets without DDoS Protection Plan association"
+      - "Never set enableDdosProtection to false on VNets with public IP addresses"
+      - "Never skip DDoS attack metric alerts — immediate notification is critical"
+
+  - id: DDOS-002
+    severity: required
+    description: "Configure DDoS attack metric alerts on all public IP addresses"
+    rationale: "Immediate notification of DDoS attacks enables rapid response and mitigation tuning"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+
+  - id: DDOS-003
+    severity: recommended
+    description: "Enable DDoS diagnostic logging for attack analytics and post-incident review"
+    rationale: "Diagnostic logs provide attack vectors, dropped packets, and mitigation reports for forensics"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+
+patterns:
+  - name: "DDoS Protection with VNet association and alerts"
+    description: "DDoS plan associated with VNets, metric alerts on public IPs, and diagnostic logging"
+
+anti_patterns:
+  - description: "Do not deploy public-facing services without DDoS Protection"
+    instead: "Create a DDoS Protection Plan and associate with all VNets containing public IPs"
+  - description: "Do not skip attack notification alerts"
+    instead: "Configure metric alerts on IfUnderDDoSAttack for all public IP addresses"
+
+references:
+  - title: "Azure DDoS Protection overview"
+    url: "https://learn.microsoft.com/azure/ddos-protection/ddos-protection-overview"
+  - title: "Configure DDoS diagnostic logging"
+    url: "https://learn.microsoft.com/azure/ddos-protection/diagnostic-logging"

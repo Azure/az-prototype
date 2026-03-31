@@ -20,8 +20,8 @@ from azext_prototype.ai.provider import AIResponse
 # ======================================================================
 
 
-def _make_response(content: str = "Mock response") -> AIResponse:
-    return AIResponse(content=content, model="gpt-4o", usage={})
+def _make_response(content: str = "Mock response", finish_reason: str = "stop") -> AIResponse:
+    return AIResponse(content=content, model="gpt-4o", usage={}, finish_reason=finish_reason)
 
 
 def _make_file_response(filename: str = "main.tf", code: str = "# placeholder") -> AIResponse:
@@ -702,8 +702,8 @@ class TestBuildSession:
         session = BuildSession(build_context, build_registry)
 
         stages = session._fallback_deployment_plan([])
-        assert len(stages) >= 2  # Foundation + Documentation at minimum
-        assert stages[0]["name"] == "Foundation"
+        assert len(stages) >= 2  # Managed Identity + Documentation at minimum
+        assert stages[0]["name"] == "Managed Identity"
         assert stages[-1]["name"] == "Documentation"
 
     def test_template_matching_web_app(self, project_with_design, sample_config):
@@ -3701,34 +3701,37 @@ class TestCollectStageFileContentEdgeCases:
 
         assert "could not read file" in result
 
-    def test_large_file_truncated(self, build_context, build_registry):
+    def test_large_file_not_truncated(self, build_context, build_registry):
+        """QA must see the full file — no per-file truncation."""
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
 
-        # Create a large file
         file_path = Path(build_context.project_dir) / "big.tf"
-        file_path.write_text("x" * 10000, encoding="utf-8")
+        file_path.write_text("x" * 20000, encoding="utf-8")
 
         stage = {"files": ["big.tf"]}
         result = session._collect_stage_file_content(stage)
 
-        assert "truncated" in result
+        assert "truncated" not in result
+        assert "x" * 20000 in result
 
-    def test_size_cap_stops_reading(self, build_context, build_registry):
+    def test_many_files_all_included(self, build_context, build_registry):
+        """QA must see all files — no total size cap."""
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
 
-        # Create several files
         for i in range(10):
             f = Path(build_context.project_dir) / f"file{i}.tf"
-            f.write_text("x" * 5000, encoding="utf-8")
+            f.write_text(f"content_{i}" * 500, encoding="utf-8")
 
         stage = {"files": [f"file{i}.tf" for i in range(10)]}
-        result = session._collect_stage_file_content(stage, max_bytes=10000)
+        result = session._collect_stage_file_content(stage)
 
-        assert "omitted" in result
+        assert "omitted" not in result
+        for i in range(10):
+            assert f"file{i}.tf" in result
 
     def test_no_files_returns_empty(self, build_context, build_registry):
         from azext_prototype.stages.build_session import BuildSession

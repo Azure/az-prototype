@@ -672,7 +672,7 @@ class TestBuiltinPolicies:
         names = [p.name for p in policies]
         assert "container-apps" in names
         assert "key-vault" in names
-        assert "sql-database" in names
+        assert "azure-sql" in names
         assert "cosmos-db" in names
         assert "managed-identity" in names
         assert "network-isolation" in names

@@ -20,7 +20,7 @@ Choose Data Factory over Fabric Data Pipelines when you need ARM-level control, 
 | Data flow compute | General Purpose, 8 cores | Minimum for mapping data flows |
 | Git integration | Disabled (POC) | Enable for production CI/CD |
 | Managed VNet | Disabled (POC) | Flag as production backlog item |
-| Public network access | Enabled (POC) | Flag private endpoint as production backlog item |
+| Public network access | Disabled (unless user overrides) | Flag private endpoint as production backlog item |
 
 ## Terraform Patterns
 
@@ -36,7 +36,7 @@ resource "azurerm_data_factory" "this" {
     type = "SystemAssigned"
   }
 
-  public_network_enabled = true  # Set false when using private endpoint
+  public_network_enabled = false  # Unless told otherwise, disabled per governance policy
 
   tags = var.tags
 }
@@ -167,7 +167,7 @@ resource adf 'Microsoft.DataFactory/factories@2018-06-01' = {
     type: 'SystemAssigned'
   }
   properties: {
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: 'Disabled'  // Unless told otherwise, disabled per governance policy
   }
 }
 

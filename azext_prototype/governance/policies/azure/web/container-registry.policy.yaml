@@ -1,0 +1,332 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: container-registry
+  category: azure
+  services: [container-registry]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: ACR-001
+    severity: required
+    description: "Create Container Registry with Premium SKU, admin user disabled, and public access disabled. ALWAYS use Premium SKU — it is required for private endpoints, retention policies, and geo-replication. NEVER use Basic or Standard SKU."
+    rationale: "Admin credentials are a shared secret that cannot be scoped or audited; public access exposes the registry to the internet; Premium SKU is required for private endpoint support"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "container_registry" {
+        type      = "Microsoft.ContainerRegistry/registries@2023-11-01-preview"
+        name      = var.acr_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "Premium"
+          }
+          properties = {
+            adminUserEnabled    = false
+            publicNetworkAccess = "Disabled"
+            networkRuleBypassOptions = "AzureServices"
+            policies = {
+              quarantinePolicy = {
+                status = "disabled"
+              }
+              retentionPolicy = {
+                days   = 7
+                status = "enabled"
+              }
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' = {
+        name: acrName
+        location: location
+        sku: {
+          name: 'Premium'
+        }
+        properties: {
+          adminUserEnabled: false
+          publicNetworkAccess: 'Disabled'
+          networkRuleBypassOptions: 'AzureServices'
+          policies: {
+            quarantinePolicy: {
+              status: 'disabled'
+            }
+            retentionPolicy: {
+              days: 7
+              status: 'enabled'
+            }
+          }
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Network/privateEndpoints@2024-01-01"
+        description: "Private endpoint for Container Registry — required when publicNetworkAccess is Disabled (requires Premium SKU)"
+        terraform_pattern: |
+          resource "azapi_resource" "acr_private_endpoint" {
+            type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+            name      = "pe-${var.acr_name}"
+            location  = var.location
+            parent_id = azapi_resource.resource_group.id
+
+            body = {
+              properties = {
+                subnet = {
+                  id = var.private_endpoint_subnet_id
+                }
+                privateLinkServiceConnections = [
+                  {
+                    name = "pe-${var.acr_name}"
+                    properties = {
+                      privateLinkServiceId = azapi_resource.container_registry.id
+                      groupIds             = ["registry"]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource acrPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+            name: 'pe-${acrName}'
+            location: location
+            properties: {
+              subnet: {
+                id: privateEndpointSubnetId
+              }
+              privateLinkServiceConnections: [
+                {
+                  name: 'pe-${acrName}'
+                  properties: {
+                    privateLinkServiceId: containerRegistry.id
+                    groupIds: [
+                      'registry'
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Network/privateDnsZones@2020-06-01"
+        description: "Private DNS zone for Container Registry private endpoint resolution"
+        terraform_pattern: |
+          resource "azapi_resource" "acr_dns_zone" {
+            type      = "Microsoft.Network/privateDnsZones@2020-06-01"
+            name      = "privatelink.azurecr.io"
+            location  = "global"
+            parent_id = azapi_resource.resource_group.id
+          }
+
+          resource "azapi_resource" "acr_dns_zone_link" {
+            type      = "Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01"
+            name      = "link-${var.vnet_name}"
+            location  = "global"
+            parent_id = azapi_resource.acr_dns_zone.id
+
+            body = {
+              properties = {
+                virtualNetwork = {
+                  id = var.vnet_id
+                }
+                registrationEnabled = false
+              }
+            }
+          }
+
+          resource "azapi_resource" "acr_pe_dns_group" {
+            type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-01-01"
+            name      = "default"
+            parent_id = azapi_resource.acr_private_endpoint.id
+
+            body = {
+              properties = {
+                privateDnsZoneConfigs = [
+                  {
+                    name = "privatelink-azurecr-io"
+                    properties = {
+                      privateDnsZoneId = azapi_resource.acr_dns_zone.id
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource acrDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+            name: 'privatelink.azurecr.io'
+            location: 'global'
+          }
+
+          resource acrDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+            parent: acrDnsZone
+            name: 'link-${vnetName}'
+            location: 'global'
+            properties: {
+              virtualNetwork: {
+                id: vnetId
+              }
+              registrationEnabled: false
+            }
+          }
+
+          resource acrPeDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-01-01' = {
+            parent: acrPrivateEndpoint
+            name: 'default'
+            properties: {
+              privateDnsZoneConfigs: [
+                {
+                  name: 'privatelink-azurecr-io'
+                  properties: {
+                    privateDnsZoneId: acrDnsZone.id
+                  }
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "AcrPull"
+        description: "AcrPull role (7f951dda-4ed3-4680-a7ca-43fe172d538d) for pulling images — assign to compute identity"
+        terraform_pattern: |
+          resource "azapi_resource" "acr_pull_role" {
+            type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+            name      = var.acr_pull_role_name
+            parent_id = azapi_resource.container_registry.id
+
+            body = {
+              properties = {
+                roleDefinitionId = "${var.subscription_resource_id}/providers/Microsoft.Authorization/roleDefinitions/7f951dda-4ed3-4680-a7ca-43fe172d538d"
+                principalId      = var.app_identity_principal_id
+                principalType    = "ServicePrincipal"
+              }
+            }
+          }
+        bicep_pattern: |
+          resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+            scope: containerRegistry
+            name: acrPullRoleName
+            properties: {
+              roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
+              principalId: appIdentityPrincipalId
+              principalType: 'ServicePrincipal'
+            }
+          }
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "AcrPush"
+        description: "AcrPush role (8311e382-0749-4cb8-b61a-304f252e45ec) for pushing images — assign to CI/CD identity"
+        terraform_pattern: |
+          resource "azapi_resource" "acr_push_role" {
+            type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+            name      = var.acr_push_role_name
+            parent_id = azapi_resource.container_registry.id
+
+            body = {
+              properties = {
+                roleDefinitionId = "${var.subscription_resource_id}/providers/Microsoft.Authorization/roleDefinitions/8311e382-0749-4cb8-b61a-304f252e45ec"
+                principalId      = var.cicd_identity_principal_id
+                principalType    = "ServicePrincipal"
+              }
+            }
+          }
+        bicep_pattern: |
+          resource acrPushRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+            scope: containerRegistry
+            name: acrPushRoleName
+            properties: {
+              roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '8311e382-0749-4cb8-b61a-304f252e45ec')
+              principalId: cicdIdentityPrincipalId
+              principalType: 'ServicePrincipal'
+            }
+          }
+    prohibitions:
+      - "NEVER set adminUserEnabled to true — use managed identity with AcrPull/AcrPush roles"
+      - "NEVER set publicNetworkAccess to Enabled"
+      - "NEVER use Basic or Standard SKU when private endpoints are required — Premium is required for private endpoints"
+      - "NEVER use admin credentials in container runtime configuration — use identity-based registry authentication"
+
+  - id: ACR-002
+    severity: required
+    description: "Use Premium SKU when private endpoints are required"
+    rationale: "Private endpoints are only available on Premium SKU; Basic and Standard do not support private link"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+  - id: ACR-003
+    severity: recommended
+    description: "Enable retention policy for untagged manifests"
+    rationale: "Prevents unbounded storage growth from untagged images; 7-day retention is a good default"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
+
+  - id: ACR-004
+    severity: recommended
+    description: "Enable diagnostic settings to Log Analytics workspace"
+    rationale: "Audit trail for image pull/push operations and repository events"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    companion_resources:
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        description: "Diagnostic settings for Container Registry to Log Analytics"
+        terraform_pattern: |
+          resource "azapi_resource" "acr_diagnostics" {
+            type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+            name      = "diag-${var.acr_name}"
+            parent_id = azapi_resource.container_registry.id
+
+            body = {
+              properties = {
+                workspaceId = var.log_analytics_workspace_id
+                logs = [
+                  {
+                    categoryGroup = "allLogs"
+                    enabled       = true
+                  }
+                ]
+                metrics = [
+                  {
+                    category = "AllMetrics"
+                    enabled  = true
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource acrDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+            scope: containerRegistry
+            name: 'diag-${acrName}'
+            properties: {
+              workspaceId: logAnalyticsWorkspaceId
+              logs: [
+                {
+                  categoryGroup: 'allLogs'
+                  enabled: true
+                }
+              ]
+              metrics: [
+                {
+                  category: 'AllMetrics'
+                  enabled: true
+                }
+              ]
+            }
+          }
+
+patterns:
+  - name: "Container Registry with private endpoint and RBAC"
+    description: "Complete Container Registry deployment with admin disabled, Premium SKU, private endpoint, DNS, and AcrPull/AcrPush role assignments"
+
+anti_patterns:
+  - description: "Do not use admin credentials for container registry access"
+    instead: "Use managed identity with AcrPull role for pulling and AcrPush role for pushing"
+  - description: "Do not use Basic or Standard SKU when private endpoints are needed"
+    instead: "Use Premium SKU which supports private link, retention policies, and geo-replication"
+  - description: "Do not store ACR admin password in application configuration"
+    instead: "Use identity-based authentication — no credentials needed"
+
+references:
+  - title: "Container Registry best practices"
+    url: "https://learn.microsoft.com/azure/container-registry/container-registry-best-practices"
+  - title: "Container Registry private link"
+    url: "https://learn.microsoft.com/azure/container-registry/container-registry-private-link"
+  - title: "Container Registry authentication"
+    url: "https://learn.microsoft.com/azure/container-registry/container-registry-authentication"

@@ -879,8 +879,7 @@ class BuildSession:
                 template_context += "\n"
 
         phase1_task = (
-            "Analyze this architecture and produce a deployment MAP.\n\n"
-            f"## Architecture\n{architecture}\n\n"
+            "Analyze this architecture and produce a deployment MAP.\n\n" f"## Architecture\n{architecture}\n\n"
         )
         if template_context:
             phase1_task += f"## Template Starting Points\n{template_context}\n\n"
@@ -958,9 +957,7 @@ class BuildSession:
             all_service_names.extend(stage.get("services", []))
 
         # Resolve governance policies for ALL services in the plan
-        policy_text = self._resolve_service_policies(
-            [{"name": s} for s in all_service_names]
-        )
+        policy_text = self._resolve_service_policies([{"name": s} for s in all_service_names])
 
         naming_instructions = self._naming.to_prompt_instructions()
 
@@ -1038,12 +1035,14 @@ class BuildSession:
             self._ensure_networking_in_map(stages)
             # Ensure Documentation stage is always present
             if not any(s.get("category") == "docs" for s in stages):
-                stages.append({
-                    "stage": len(stages) + 1,
-                    "name": "Documentation",
-                    "category": "docs",
-                    "services": ["architecture-doc", "deployment-guide"],
-                })
+                stages.append(
+                    {
+                        "stage": len(stages) + 1,
+                        "name": "Documentation",
+                        "category": "docs",
+                        "services": ["architecture-doc", "deployment-guide"],
+                    }
+                )
             # Renumber stages sequentially
             for idx, s in enumerate(stages, start=1):
                 s["stage"] = idx
@@ -1078,12 +1077,15 @@ class BuildSession:
         # Default to position 2 if no monitoring stages found
         insert_idx = max(insert_idx, min(2, len(stages)))
 
-        stages.insert(insert_idx, {
-            "stage": insert_idx + 1,
-            "name": "Networking",
-            "category": "infra",
-            "services": ["virtual-network", "private-endpoints", "private-dns-zones"],
-        })
+        stages.insert(
+            insert_idx,
+            {
+                "stage": insert_idx + 1,
+                "name": "Networking",
+                "category": "infra",
+                "services": ["virtual-network", "private-endpoints", "private-dns-zones"],
+            },
+        )
 
     def _parse_deployment_plan(self, content: str) -> list[dict]:
         """Parse deployment plan JSON from architect response.

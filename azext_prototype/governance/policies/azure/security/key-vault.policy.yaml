@@ -1,0 +1,322 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: key-vault
+  category: azure
+  services: [key-vault]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: KV-001
+    severity: required
+    description: "Create Key Vault with RBAC authorization, soft-delete, purge protection, and public access disabled"
+    rationale: "RBAC is the recommended authorization model; soft-delete and purge protection prevent accidental permanent deletion; private access only"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "key_vault" {
+        type      = "Microsoft.KeyVault/vaults@2023-07-01"
+        name      = var.key_vault_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            tenantId                  = var.tenant_id
+            sku = {
+              family = "A"
+              name   = "standard"
+            }
+            enableRbacAuthorization   = true
+            enableSoftDelete          = true
+            softDeleteRetentionInDays = 90
+            enablePurgeProtection     = true
+            publicNetworkAccess       = "Disabled"
+            networkAcls = {
+              defaultAction = "Deny"
+              bypass        = "AzureServices"
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+        name: keyVaultName
+        location: location
+        properties: {
+          tenantId: tenant().tenantId
+          sku: {
+            family: 'A'
+            name: 'standard'
+          }
+          enableRbacAuthorization: true
+          enableSoftDelete: true
+          softDeleteRetentionInDays: 90
+          enablePurgeProtection: true
+          publicNetworkAccess: 'Disabled'
+          networkAcls: {
+            defaultAction: 'Deny'
+            bypass: 'AzureServices'
+          }
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Network/privateEndpoints@2024-01-01"
+        description: "Private endpoint for Key Vault — required when publicNetworkAccess is Disabled"
+        terraform_pattern: |
+          resource "azapi_resource" "kv_private_endpoint" {
+            type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+            name      = "pe-${var.key_vault_name}"
+            location  = var.location
+            parent_id = azapi_resource.resource_group.id
+
+            body = {
+              properties = {
+                subnet = {
+                  id = var.private_endpoint_subnet_id
+                }
+                privateLinkServiceConnections = [
+                  {
+                    name = "pe-${var.key_vault_name}"
+                    properties = {
+                      privateLinkServiceId = azapi_resource.key_vault.id
+                      groupIds             = ["vault"]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource kvPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+            name: 'pe-${keyVaultName}'
+            location: location
+            properties: {
+              subnet: {
+                id: privateEndpointSubnetId
+              }
+              privateLinkServiceConnections: [
+                {
+                  name: 'pe-${keyVaultName}'
+                  properties: {
+                    privateLinkServiceId: keyVault.id
+                    groupIds: [
+                      'vault'
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Network/privateDnsZones@2020-06-01"
+        description: "Private DNS zone for Key Vault private endpoint resolution"
+        terraform_pattern: |
+          resource "azapi_resource" "kv_dns_zone" {
+            type      = "Microsoft.Network/privateDnsZones@2020-06-01"
+            name      = "privatelink.vaultcore.azure.net"
+            location  = "global"
+            parent_id = azapi_resource.resource_group.id
+          }
+
+          resource "azapi_resource" "kv_dns_zone_link" {
+            type      = "Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01"
+            name      = "link-${var.vnet_name}"
+            location  = "global"
+            parent_id = azapi_resource.kv_dns_zone.id
+
+            body = {
+              properties = {
+                virtualNetwork = {
+                  id = var.vnet_id
+                }
+                registrationEnabled = false
+              }
+            }
+          }
+
+          resource "azapi_resource" "kv_pe_dns_group" {
+            type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-01-01"
+            name      = "default"
+            parent_id = azapi_resource.kv_private_endpoint.id
+
+            body = {
+              properties = {
+                privateDnsZoneConfigs = [
+                  {
+                    name = "privatelink-vaultcore-azure-net"
+                    properties = {
+                      privateDnsZoneId = azapi_resource.kv_dns_zone.id
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource kvDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+            name: 'privatelink.vaultcore.azure.net'
+            location: 'global'
+          }
+
+          resource kvDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+            parent: kvDnsZone
+            name: 'link-${vnetName}'
+            location: 'global'
+            properties: {
+              virtualNetwork: {
+                id: vnetId
+              }
+              registrationEnabled: false
+            }
+          }
+
+          resource kvPeDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-01-01' = {
+            parent: kvPrivateEndpoint
+            name: 'default'
+            properties: {
+              privateDnsZoneConfigs: [
+                {
+                  name: 'privatelink-vaultcore-azure-net'
+                  properties: {
+                    privateDnsZoneId: kvDnsZone.id
+                  }
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        description: "Diagnostic settings for Key Vault to Log Analytics — audit trail for secret access and key operations"
+        terraform_pattern: |
+          resource "azapi_resource" "kv_diagnostics" {
+            type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+            name      = "diag-${var.key_vault_name}"
+            parent_id = azapi_resource.key_vault.id
+
+            body = {
+              properties = {
+                workspaceId = var.log_analytics_workspace_id
+                logs = [
+                  {
+                    categoryGroup = "allLogs"
+                    enabled       = true
+                  }
+                ]
+                metrics = [
+                  {
+                    category = "AllMetrics"
+                    enabled  = true
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource kvDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+            scope: keyVault
+            name: 'diag-${keyVaultName}'
+            properties: {
+              workspaceId: logAnalyticsWorkspaceId
+              logs: [
+                {
+                  categoryGroup: 'allLogs'
+                  enabled: true
+                }
+              ]
+              metrics: [
+                {
+                  category: 'AllMetrics'
+                  enabled: true
+                }
+              ]
+            }
+          }
+    prohibitions:
+      - "NEVER set enableRbacAuthorization to false — do not use access policies"
+      - "NEVER set enableSoftDelete to false"
+      - "NEVER set enablePurgeProtection to false"
+      - "NEVER set publicNetworkAccess to Enabled"
+      - "NEVER use service principal secrets to access Key Vault — use managed identity"
+    template_check:
+      scope: [key-vault]
+      require_config: [rbac_authorization, soft_delete, purge_protection]
+      error_message: "Service '{service_name}' ({service_type}) missing {config_key}: true"
+
+  - id: KV-002
+    severity: required
+    description: "Assign Key Vault RBAC roles to application identities"
+    rationale: "Least-privilege access via built-in roles replaces broad access policies"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    companion_resources:
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        description: "Key Vault Secrets User role (4633458b-17de-408a-b874-0445c86b69e6) for reading secrets"
+        terraform_pattern: |
+          resource "azapi_resource" "kv_secrets_user_role" {
+            type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+            name      = var.kv_secrets_user_role_name
+            parent_id = azapi_resource.key_vault.id
+
+            body = {
+              properties = {
+                roleDefinitionId = "${var.subscription_resource_id}/providers/Microsoft.Authorization/roleDefinitions/4633458b-17de-408a-b874-0445c86b69e6"
+                principalId      = var.app_identity_principal_id
+                principalType    = "ServicePrincipal"
+              }
+            }
+          }
+        bicep_pattern: |
+          resource kvSecretsUserRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+            scope: keyVault
+            name: kvSecretsUserRoleName
+            properties: {
+              roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
+              principalId: appIdentityPrincipalId
+              principalType: 'ServicePrincipal'
+            }
+          }
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "Key Vault Crypto User"
+        description: "Key Vault Crypto User role (12338af0-0e69-4776-bea7-57ae8d297424) for cryptographic operations"
+        terraform_pattern: |
+          resource "azapi_resource" "kv_crypto_user_role" {
+            type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+            name      = var.kv_crypto_user_role_name
+            parent_id = azapi_resource.key_vault.id
+
+            body = {
+              properties = {
+                roleDefinitionId = "${var.subscription_resource_id}/providers/Microsoft.Authorization/roleDefinitions/12338af0-0e69-4776-bea7-57ae8d297424"
+                principalId      = var.app_identity_principal_id
+                principalType    = "ServicePrincipal"
+              }
+            }
+          }
+        bicep_pattern: |
+          resource kvCryptoUserRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+            scope: keyVault
+            name: kvCryptoUserRoleName
+            properties: {
+              roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '12338af0-0e69-4776-bea7-57ae8d297424')
+              principalId: appIdentityPrincipalId
+              principalType: 'ServicePrincipal'
+            }
+          }
+
+patterns:
+  - name: "Key Vault with RBAC and private endpoint"
+    description: "Complete Key Vault deployment with RBAC authorization, soft-delete, purge protection, private endpoint, diagnostics, and role assignments"
+
+anti_patterns:
+  - description: "Do not use access policies for authorization"
+    instead: "Set enableRbacAuthorization = true and use role assignments"
+  - description: "Do not disable soft-delete or purge protection"
+    instead: "Keep both enabled with at least 90-day retention"
+  - description: "Do not use service principal secrets to access Key Vault"
+    instead: "Use managed identity with Key Vault RBAC roles"
+
+references:
+  - title: "Key Vault best practices"
+    url: "https://learn.microsoft.com/azure/key-vault/general/best-practices"
+  - title: "Key Vault RBAC"
+    url: "https://learn.microsoft.com/azure/key-vault/general/rbac-guide"
+  - title: "Key Vault private endpoints"
+    url: "https://learn.microsoft.com/azure/key-vault/general/private-link-service"

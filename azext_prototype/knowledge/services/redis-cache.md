@@ -21,7 +21,7 @@ Prefer Redis over Cosmos DB when data is ephemeral, latency-sensitive, and does 
 | AAD auth | Enabled | `aad_auth_enabled = true` in redis_configuration |
 | Access keys | Disabled (preview) | Prefer AAD auth; set `access_key_authentication_disabled = true` |
 | TLS | 1.2 minimum | `minimum_tls_version = "1.2"` |
-| Public network access | Allowed (POC) | Flag private endpoint as production backlog item |
+| Public network access | Disabled (unless user overrides) | Flag private endpoint as production backlog item |
 
 ## Terraform Patterns
 
@@ -36,7 +36,7 @@ resource "azurerm_redis_cache" "this" {
   family                        = "C"
   sku_name                      = "Basic"
   minimum_tls_version           = "1.2"
-  public_network_access_enabled = true  # Set false when using private endpoint
+  public_network_access_enabled = false  # Unless told otherwise, disabled per governance policy
 
   # CRITICAL: Enable AAD authentication
   redis_configuration {
@@ -129,7 +129,7 @@ resource redis 'Microsoft.Cache/redis@2024-03-01' = {
     }
     enableNonSslPort: false
     minimumTlsVersion: '1.2'
-    publicNetworkAccess: 'Enabled'  // Set 'Disabled' when using private endpoint
+    publicNetworkAccess: 'Disabled'  // Unless told otherwise, disabled per governance policy
     redisConfiguration: {
       'aad-enabled': 'true'
     }

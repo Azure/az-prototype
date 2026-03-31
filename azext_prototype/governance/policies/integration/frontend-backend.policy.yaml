@@ -1,0 +1,824 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: frontend-backend
+  category: integration
+  services: [static-web-apps, app-service, container-apps, front-door]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: FB-001
+    severity: required
+    description: "Configure Static Web App with linked backend API for managed API routing and authentication passthrough"
+    rationale: "Linked backends provide managed routing from SWA to API backends; authentication context is automatically forwarded"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer]
+    terraform_pattern: |
+      # Static Web App with Standard SKU (required for linked backends)
+      resource "azapi_resource" "static_web_app" {
+        type      = "Microsoft.Web/staticSites@2023-12-01"
+        name      = var.swa_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          sku = {
+            name = "Standard"
+            tier = "Standard"
+          }
+          properties = {
+            stagingEnvironmentPolicy = "Enabled"
+            allowConfigFileUpdates   = true
+            enterpriseGradeCdnStatus = "Enabled"
+          }
+        }
+      }
+
+      # Container App backend (internal only — SWA handles external traffic)
+      resource "azapi_resource" "api_backend" {
+        type      = "Microsoft.App/containerApps@2024-03-01"
+        name      = "${var.project_name}-api"
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type         = "UserAssigned"
+          identity_ids = [azapi_resource.api_identity.id]
+        }
+
+        body = {
+          properties = {
+            managedEnvironmentId = azapi_resource.container_app_env.id
+            configuration = {
+              ingress = {
+                external   = true       # Must be external for SWA linked backend to reach it
+                targetPort = 8080
+                transport  = "http"
+              }
+            }
+            template = {
+              containers = [
+                {
+                  name  = "api"
+                  image = "${var.acr_login_server}/api:${var.image_tag}"
+                  resources = {
+                    cpu    = 0.5
+                    memory = "1Gi"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+
+      # Linked backend: SWA routes /api/* to Container App
+      resource "azapi_resource" "swa_linked_backend" {
+        type      = "Microsoft.Web/staticSites/linkedBackends@2023-12-01"
+        name      = "api-backend"
+        parent_id = azapi_resource.static_web_app.id
+
+        body = {
+          properties = {
+            backendResourceId = azapi_resource.api_backend.id
+            region            = var.location
+          }
+        }
+      }
+    bicep_pattern: |
+      // Static Web App with Standard SKU (required for linked backends)
+      resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
+        name: swaName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: 'Standard'
+          tier: 'Standard'
+        }
+        properties: {
+          stagingEnvironmentPolicy: 'Enabled'
+          allowConfigFileUpdates: true
+          enterpriseGradeCdnStatus: 'Enabled'
+        }
+      }
+
+      // Container App backend (SWA handles external traffic)
+      resource apiBackend 'Microsoft.App/containerApps@2024-03-01' = {
+        name: '${projectName}-api'
+        location: location
+        identity: {
+          type: 'UserAssigned'
+          userAssignedIdentities: {
+            '${apiIdentity.id}': {}
+          }
+        }
+        properties: {
+          managedEnvironmentId: containerAppEnv.id
+          configuration: {
+            ingress: {
+              external: true          // Must be external for SWA linked backend
+              targetPort: 8080
+              transport: 'http'
+            }
+          }
+          template: {
+            containers: [
+              {
+                name: 'api'
+                image: '${acrLoginServer}/api:${imageTag}'
+                resources: {
+                  cpu: json('0.5')
+                  memory: '1Gi'
+                }
+              }
+            ]
+          }
+        }
+      }
+
+      // Linked backend: SWA routes /api/* to Container App
+      resource swaLinkedBackend 'Microsoft.Web/staticSites/linkedBackends@2023-12-01' = {
+        parent: staticWebApp
+        name: 'api-backend'
+        properties: {
+          backendResourceId: apiBackend.id
+          region: location
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Web/staticSites/linkedBackends@2023-12-01"
+        name: "api-backend"
+        description: "Linked backend routing /api/* requests from SWA to Container App or Functions"
+      - type: "Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31"
+        name: "id-api"
+        description: "User-assigned managed identity for the API backend"
+    prohibitions:
+      - "NEVER use SWA Free tier with linked backends — Standard SKU is required"
+      - "NEVER hardcode backend URLs in frontend JavaScript — use SWA linked backend for automatic /api/* routing"
+      - "NEVER expose API backend directly to the internet when SWA linked backend is configured — use SWA as the entry point"
+      - "NEVER store API keys or secrets in staticwebapp.config.json — use linked backend auth passthrough"
+    template_check:
+      when_services_present: [static-web-apps, container-apps]
+      require_config: [linked_backend]
+      severity: warning
+      error_message: "Static Web App + Container Apps template should use linked backend for API routing"
+
+  - id: FB-002
+    severity: required
+    description: "Configure CORS with explicit allowed origins on all API backends serving browser-based frontends"
+    rationale: "CORS misconfiguration either blocks legitimate frontends or exposes APIs to cross-origin attacks"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer]
+    terraform_pattern: |
+      # App Service CORS configuration
+      resource "azapi_resource" "app_service_with_cors" {
+        type      = "Microsoft.Web/sites@2023-12-01"
+        name      = var.app_service_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          kind = "app,linux"
+          properties = {
+            serverFarmId = azapi_resource.app_service_plan.id
+            httpsOnly    = true
+            siteConfig = {
+              minTlsVersion = "1.2"
+              cors = {
+                allowedOrigins = var.cors_allowed_origins    # e.g., ["https://myapp.azurestaticapps.net"]
+                supportCredentials = true
+              }
+              linuxFxVersion = var.linux_fx_version
+            }
+          }
+        }
+      }
+
+      # Container App CORS (handled at application level — no platform-level CORS config)
+      # For Container Apps behind APIM: configure CORS in APIM policy (see INT-006)
+      # For standalone Container Apps: configure CORS in application code
+      # Environment variable to pass allowed origins to application
+      resource "azapi_resource" "container_app_cors" {
+        type      = "Microsoft.App/containerApps@2024-03-01"
+        name      = var.container_app_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        body = {
+          properties = {
+            managedEnvironmentId = azapi_resource.container_app_env.id
+            configuration = {
+              ingress = {
+                external          = false
+                targetPort        = 8080
+                corsPolicy = {
+                  allowedOrigins    = var.cors_allowed_origins
+                  allowedMethods    = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+                  allowedHeaders    = ["Authorization", "Content-Type", "Accept"]
+                  exposeHeaders     = ["X-RateLimit-Remaining"]
+                  maxAge            = 300
+                  allowCredentials  = true
+                }
+              }
+            }
+            template = {
+              containers = [
+                {
+                  name  = var.container_app_name
+                  image = "${var.acr_login_server}/${var.container_app_name}:${var.image_tag}"
+                  resources = {
+                    cpu    = 0.5
+                    memory = "1Gi"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // App Service CORS configuration
+      resource appServiceWithCors 'Microsoft.Web/sites@2023-12-01' = {
+        name: appServiceName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        kind: 'app,linux'
+        properties: {
+          serverFarmId: appServicePlan.id
+          httpsOnly: true
+          siteConfig: {
+            minTlsVersion: '1.2'
+            cors: {
+              allowedOrigins: corsAllowedOrigins     // e.g., ['https://myapp.azurestaticapps.net']
+              supportCredentials: true
+            }
+            linuxFxVersion: linuxFxVersion
+          }
+        }
+      }
+
+      // Container App with platform-level CORS policy
+      resource containerAppCors 'Microsoft.App/containerApps@2024-03-01' = {
+        name: containerAppName
+        location: location
+        properties: {
+          managedEnvironmentId: containerAppEnv.id
+          configuration: {
+            ingress: {
+              external: false
+              targetPort: 8080
+              corsPolicy: {
+                allowedOrigins: corsAllowedOrigins
+                allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+                allowedHeaders: ['Authorization', 'Content-Type', 'Accept']
+                exposeHeaders: ['X-RateLimit-Remaining']
+                maxAge: 300
+                allowCredentials: true
+              }
+            }
+          }
+          template: {
+            containers: [
+              {
+                name: containerAppName
+                image: '${acrLoginServer}/${containerAppName}:${imageTag}'
+                resources: {
+                  cpu: json('0.5')
+                  memory: '1Gi'
+                }
+              }
+            ]
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER use wildcard (*) for allowedOrigins in production — enumerate specific frontend origins"
+      - "NEVER set supportCredentials/allowCredentials to true with wildcard origins — browsers reject this"
+      - "NEVER serve APIs without CORS restrictions when they are consumed by browser-based frontends"
+      - "NEVER expose Set-Cookie or Authorization in exposeHeaders"
+      - "NEVER omit maxAge/preflight-result-max-age — every request will trigger a preflight OPTIONS call"
+
+  - id: FB-003
+    severity: required
+    description: "Configure Azure Front Door or CDN with origin groups for frontend + API backend routing"
+    rationale: "Front Door provides global load balancing, WAF protection, and edge caching; origin groups separate static and API traffic"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    terraform_pattern: |
+      # Front Door Premium profile (see AFD-001 for full profile config)
+
+      # Origin group for static frontend (SWA or Storage)
+      resource "azapi_resource" "afd_frontend_origin_group" {
+        type      = "Microsoft.Cdn/profiles/originGroups@2024-02-01"
+        name      = "og-frontend"
+        parent_id = azapi_resource.front_door.id
+
+        body = {
+          properties = {
+            loadBalancingSettings = {
+              sampleSize                = 4
+              successfulSamplesRequired = 3
+              additionalLatencyInMilliseconds = 50
+            }
+            healthProbeSettings = {
+              probePath              = "/"
+              probeRequestType       = "HEAD"
+              probeProtocol          = "Https"
+              probeIntervalInSeconds = 30
+            }
+            sessionAffinityState = "Disabled"
+          }
+        }
+      }
+
+      # Frontend origin (SWA)
+      resource "azapi_resource" "afd_frontend_origin" {
+        type      = "Microsoft.Cdn/profiles/originGroups/origins@2024-02-01"
+        name      = "origin-swa"
+        parent_id = azapi_resource.afd_frontend_origin_group.id
+
+        body = {
+          properties = {
+            hostName                   = azapi_resource.static_web_app.output.properties.defaultHostname
+            httpPort                   = 80
+            httpsPort                  = 443
+            originHostHeader           = azapi_resource.static_web_app.output.properties.defaultHostname
+            priority                   = 1
+            weight                     = 1000
+            enabledState               = "Enabled"
+            enforceCertificateNameCheck = true
+          }
+        }
+      }
+
+      # Origin group for API backend
+      resource "azapi_resource" "afd_api_origin_group" {
+        type      = "Microsoft.Cdn/profiles/originGroups@2024-02-01"
+        name      = "og-api"
+        parent_id = azapi_resource.front_door.id
+
+        body = {
+          properties = {
+            loadBalancingSettings = {
+              sampleSize                = 4
+              successfulSamplesRequired = 3
+              additionalLatencyInMilliseconds = 50
+            }
+            healthProbeSettings = {
+              probePath              = "/healthz"
+              probeRequestType       = "GET"
+              probeProtocol          = "Https"
+              probeIntervalInSeconds = 30
+            }
+            sessionAffinityState = "Disabled"
+          }
+        }
+      }
+
+      # API origin (Container App or App Service via private link)
+      resource "azapi_resource" "afd_api_origin" {
+        type      = "Microsoft.Cdn/profiles/originGroups/origins@2024-02-01"
+        name      = "origin-api"
+        parent_id = azapi_resource.afd_api_origin_group.id
+
+        body = {
+          properties = {
+            hostName                   = azapi_resource.api_backend.output.properties.configuration.ingress.fqdn
+            httpPort                   = 80
+            httpsPort                  = 443
+            originHostHeader           = azapi_resource.api_backend.output.properties.configuration.ingress.fqdn
+            priority                   = 1
+            weight                     = 1000
+            enabledState               = "Enabled"
+            enforceCertificateNameCheck = true
+            sharedPrivateLinkResource = {
+              privateLink = {
+                id = azapi_resource.api_backend.id
+              }
+              groupId            = "managedEnvironments"
+              privateLinkLocation = var.location
+              requestMessage      = "Front Door private link to API backend"
+              status              = "Approved"
+            }
+          }
+        }
+      }
+
+      # Route for frontend (/*) to SWA origin group
+      resource "azapi_resource" "afd_frontend_route" {
+        type      = "Microsoft.Cdn/profiles/afdEndpoints/routes@2024-02-01"
+        name      = "route-frontend"
+        parent_id = azapi_resource.afd_endpoint.id
+
+        body = {
+          properties = {
+            originGroup = {
+              id = azapi_resource.afd_frontend_origin_group.id
+            }
+            patternsToMatch      = ["/*"]
+            supportedProtocols   = ["Https"]
+            httpsRedirect        = "Enabled"
+            forwardingProtocol   = "HttpsOnly"
+            linkToDefaultDomain  = "Enabled"
+            cacheConfiguration = {
+              queryStringCachingBehavior = "UseQueryString"
+              compressionSettings = {
+                isCompressionEnabled = true
+                contentTypesToCompress = [
+                  "text/html",
+                  "text/css",
+                  "application/javascript",
+                  "application/json"
+                ]
+              }
+            }
+          }
+        }
+      }
+
+      # Route for API (/api/*) to API origin group — no caching
+      resource "azapi_resource" "afd_api_route" {
+        type      = "Microsoft.Cdn/profiles/afdEndpoints/routes@2024-02-01"
+        name      = "route-api"
+        parent_id = azapi_resource.afd_endpoint.id
+
+        body = {
+          properties = {
+            originGroup = {
+              id = azapi_resource.afd_api_origin_group.id
+            }
+            patternsToMatch      = ["/api/*"]
+            supportedProtocols   = ["Https"]
+            httpsRedirect        = "Enabled"
+            forwardingProtocol   = "HttpsOnly"
+            linkToDefaultDomain  = "Enabled"
+          }
+        }
+      }
+    bicep_pattern: |
+      // Origin group for static frontend
+      resource afdFrontendOriginGroup 'Microsoft.Cdn/profiles/originGroups@2024-02-01' = {
+        parent: frontDoor
+        name: 'og-frontend'
+        properties: {
+          loadBalancingSettings: {
+            sampleSize: 4
+            successfulSamplesRequired: 3
+            additionalLatencyInMilliseconds: 50
+          }
+          healthProbeSettings: {
+            probePath: '/'
+            probeRequestType: 'HEAD'
+            probeProtocol: 'Https'
+            probeIntervalInSeconds: 30
+          }
+          sessionAffinityState: 'Disabled'
+        }
+      }
+
+      // Frontend origin (SWA)
+      resource afdFrontendOrigin 'Microsoft.Cdn/profiles/originGroups/origins@2024-02-01' = {
+        parent: afdFrontendOriginGroup
+        name: 'origin-swa'
+        properties: {
+          hostName: staticWebApp.properties.defaultHostname
+          httpPort: 80
+          httpsPort: 443
+          originHostHeader: staticWebApp.properties.defaultHostname
+          priority: 1
+          weight: 1000
+          enabledState: 'Enabled'
+          enforceCertificateNameCheck: true
+        }
+      }
+
+      // Origin group for API backend
+      resource afdApiOriginGroup 'Microsoft.Cdn/profiles/originGroups@2024-02-01' = {
+        parent: frontDoor
+        name: 'og-api'
+        properties: {
+          loadBalancingSettings: {
+            sampleSize: 4
+            successfulSamplesRequired: 3
+            additionalLatencyInMilliseconds: 50
+          }
+          healthProbeSettings: {
+            probePath: '/healthz'
+            probeRequestType: 'GET'
+            probeProtocol: 'Https'
+            probeIntervalInSeconds: 30
+          }
+          sessionAffinityState: 'Disabled'
+        }
+      }
+
+      // API origin with private link (Container App)
+      resource afdApiOrigin 'Microsoft.Cdn/profiles/originGroups/origins@2024-02-01' = {
+        parent: afdApiOriginGroup
+        name: 'origin-api'
+        properties: {
+          hostName: apiBackend.properties.configuration.ingress.fqdn
+          httpPort: 80
+          httpsPort: 443
+          originHostHeader: apiBackend.properties.configuration.ingress.fqdn
+          priority: 1
+          weight: 1000
+          enabledState: 'Enabled'
+          enforceCertificateNameCheck: true
+          sharedPrivateLinkResource: {
+            privateLink: {
+              id: apiBackend.id
+            }
+            groupId: 'managedEnvironments'
+            privateLinkLocation: location
+            requestMessage: 'Front Door private link to API backend'
+            status: 'Approved'
+          }
+        }
+      }
+
+      // Route for frontend (/*) with caching
+      resource afdFrontendRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2024-02-01' = {
+        parent: afdEndpoint
+        name: 'route-frontend'
+        properties: {
+          originGroup: {
+            id: afdFrontendOriginGroup.id
+          }
+          patternsToMatch: ['/*']
+          supportedProtocols: ['Https']
+          httpsRedirect: 'Enabled'
+          forwardingProtocol: 'HttpsOnly'
+          linkToDefaultDomain: 'Enabled'
+          cacheConfiguration: {
+            queryStringCachingBehavior: 'UseQueryString'
+            compressionSettings: {
+              isCompressionEnabled: true
+              contentTypesToCompress: [
+                'text/html'
+                'text/css'
+                'application/javascript'
+                'application/json'
+              ]
+            }
+          }
+        }
+      }
+
+      // Route for API (/api/*) — no caching
+      resource afdApiRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2024-02-01' = {
+        parent: afdEndpoint
+        name: 'route-api'
+        properties: {
+          originGroup: {
+            id: afdApiOriginGroup.id
+          }
+          patternsToMatch: ['/api/*']
+          supportedProtocols: ['Https']
+          httpsRedirect: 'Enabled'
+          forwardingProtocol: 'HttpsOnly'
+          linkToDefaultDomain: 'Enabled'
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Cdn/profiles/originGroups@2024-02-01"
+        name: "og-frontend"
+        description: "Origin group for static frontend with health probes"
+      - type: "Microsoft.Cdn/profiles/originGroups@2024-02-01"
+        name: "og-api"
+        description: "Origin group for API backend with /healthz probe"
+      - type: "Microsoft.Cdn/profiles/afdEndpoints/routes@2024-02-01"
+        name: "route-frontend"
+        description: "Route for /* to frontend origin group with caching enabled"
+      - type: "Microsoft.Cdn/profiles/afdEndpoints/routes@2024-02-01"
+        name: "route-api"
+        description: "Route for /api/* to API origin group without caching"
+      - type: "Microsoft.Cdn/profiles/securityPolicies@2024-02-01"
+        name: "waf-policy"
+        description: "WAF security policy applied to the Front Door endpoint"
+    prohibitions:
+      - "NEVER expose backend APIs directly without Front Door or CDN in front — backends must not be the public entry point"
+      - "NEVER enable caching on API routes (/api/*) — API responses contain dynamic, user-specific data"
+      - "NEVER skip health probes on origin groups — unhealthy origins will receive traffic"
+      - "NEVER use HTTP for origin connections — set forwardingProtocol to HttpsOnly"
+      - "NEVER deploy Front Door without WAF security policy association"
+
+  - id: FB-004
+    severity: required
+    description: "Configure authentication using Easy Auth (App Service/Functions) or MSAL (SPA) with Entra ID"
+    rationale: "Authentication must be enforced at the platform or application level; Easy Auth handles token validation without application code changes"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer]
+    terraform_pattern: |
+      # App Service / Functions Easy Auth v2 configuration (Entra ID)
+      resource "azapi_resource" "app_auth_settings" {
+        type      = "Microsoft.Web/sites/config@2023-12-01"
+        name      = "authsettingsV2"
+        parent_id = azapi_resource.app_service.id
+
+        body = {
+          properties = {
+            platform = {
+              enabled        = true
+              runtimeVersion = "~2"
+            }
+            globalValidation = {
+              requireAuthentication       = true
+              unauthenticatedClientAction = "RedirectToLoginPage"
+              redirectToProvider          = "azureactivedirectory"
+            }
+            identityProviders = {
+              azureActiveDirectory = {
+                enabled = true
+                registration = {
+                  openIdIssuer             = "https://login.microsoftonline.com/${var.tenant_id}/v2.0"
+                  clientId                 = var.auth_client_id
+                  clientSecretSettingName   = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
+                }
+                validation = {
+                  allowedAudiences = [
+                    "api://${var.auth_client_id}"
+                  ]
+                  defaultAuthorizationPolicy = {
+                    allowedPrincipals = {}
+                  }
+                }
+              }
+            }
+            login = {
+              tokenStore = {
+                enabled = true
+              }
+              preserveUrlFragmentsForLogins = true
+            }
+          }
+        }
+      }
+
+      # SWA custom authentication configuration (staticwebapp.config.json)
+      # Deployed as part of the app, not via ARM — but the app registration is via ARM
+
+      # App registration for SWA custom auth (client ID provisioned externally)
+      # SWA config references the custom auth provider in staticwebapp.config.json:
+      # {
+      #   "auth": {
+      #     "identityProviders": {
+      #       "customOpenIdConnectProviders": {
+      #         "entraId": {
+      #           "registration": {
+      #             "clientIdSettingName": "ENTRA_CLIENT_ID",
+      #             "clientCredential": {
+      #               "clientSecretSettingName": "ENTRA_CLIENT_SECRET"
+      #             },
+      #             "openIdConnectConfiguration": {
+      #               "wellKnownOpenIdConfiguration": "https://login.microsoftonline.com/<tenant>/v2.0/.well-known/openid-configuration"
+      #             }
+      #           }
+      #         }
+      #       }
+      #     }
+      #   },
+      #   "routes": [
+      #     { "route": "/api/*", "allowedRoles": ["authenticated"] }
+      #   ]
+      # }
+
+      # Store auth client secret in SWA app settings (references Key Vault)
+      resource "azapi_resource" "swa_auth_settings" {
+        type      = "Microsoft.Web/staticSites/config@2023-12-01"
+        name      = "appsettings"
+        parent_id = azapi_resource.static_web_app.id
+
+        body = {
+          properties = {
+            "ENTRA_CLIENT_ID"     = var.auth_client_id
+            "ENTRA_CLIENT_SECRET" = "@Microsoft.KeyVault(SecretUri=https://${var.key_vault_name}.vault.azure.net/secrets/entra-client-secret/)"
+          }
+        }
+      }
+    bicep_pattern: |
+      // App Service / Functions Easy Auth v2 configuration (Entra ID)
+      resource appAuthSettings 'Microsoft.Web/sites/config@2023-12-01' = {
+        parent: appService
+        name: 'authsettingsV2'
+        properties: {
+          platform: {
+            enabled: true
+            runtimeVersion: '~2'
+          }
+          globalValidation: {
+            requireAuthentication: true
+            unauthenticatedClientAction: 'RedirectToLoginPage'
+            redirectToProvider: 'azureactivedirectory'
+          }
+          identityProviders: {
+            azureActiveDirectory: {
+              enabled: true
+              registration: {
+                openIdIssuer: 'https://login.microsoftonline.com/${tenantId}/v2.0'
+                clientId: authClientId
+                clientSecretSettingName: 'MICROSOFT_PROVIDER_AUTHENTICATION_SECRET'
+              }
+              validation: {
+                allowedAudiences: [
+                  'api://${authClientId}'
+                ]
+                defaultAuthorizationPolicy: {
+                  allowedPrincipals: {}
+                }
+              }
+            }
+          }
+          login: {
+            tokenStore: {
+              enabled: true
+            }
+            preserveUrlFragmentsForLogins: true
+          }
+        }
+      }
+
+      // Store auth secrets in SWA app settings
+      resource swaAuthSettings 'Microsoft.Web/staticSites/config@2023-12-01' = {
+        parent: staticWebApp
+        name: 'appsettings'
+        properties: {
+          ENTRA_CLIENT_ID: authClientId
+          ENTRA_CLIENT_SECRET: '@Microsoft.KeyVault(SecretUri=https://${keyVaultName}.vault.azure.net/secrets/entra-client-secret/)'
+        }
+      }
+
+      // SWA custom auth is configured in staticwebapp.config.json (deployed with app):
+      // {
+      //   "auth": {
+      //     "identityProviders": {
+      //       "customOpenIdConnectProviders": {
+      //         "entraId": {
+      //           "registration": {
+      //             "clientIdSettingName": "ENTRA_CLIENT_ID",
+      //             "clientCredential": {
+      //               "clientSecretSettingName": "ENTRA_CLIENT_SECRET"
+      //             },
+      //             "openIdConnectConfiguration": {
+      //               "wellKnownOpenIdConfiguration": "https://login.microsoftonline.com/{tenantId}/v2.0/.well-known/openid-configuration"
+      //             }
+      //           }
+      //         }
+      //       }
+      //     }
+      //   },
+      //   "routes": [
+      //     { "route": "/api/*", "allowedRoles": ["authenticated"] }
+      //   ]
+      // }
+    companion_resources:
+      - type: "Microsoft.Web/sites/config@2023-12-01"
+        name: "authsettingsV2"
+        description: "Easy Auth v2 configuration for App Service with Entra ID provider"
+      - type: "Microsoft.Web/staticSites/config@2023-12-01"
+        name: "appsettings"
+        description: "SWA app settings containing auth client ID and Key Vault-backed client secret"
+    prohibitions:
+      - "NEVER deploy frontend+backend applications without authentication — unauthenticated APIs allow unrestricted access"
+      - "NEVER hardcode client secrets in application code or config files — use Key Vault references"
+      - "NEVER use Easy Auth v1 (authsettings) — use v2 (authsettingsV2) which supports OpenID Connect"
+      - "NEVER set unauthenticatedClientAction to AllowAnonymous on API endpoints that require auth"
+      - "NEVER rely on client-side auth alone — always validate tokens server-side or via Easy Auth"
+      - "NEVER use default GitHub auth for enterprise SWA applications — configure custom Entra ID provider"
+
+patterns:
+  - name: "SWA with linked Container App backend"
+    description: "Static Web App routing /api/* to Container App via linked backend with auth passthrough"
+  - name: "Front Door with split frontend/API routing"
+    description: "Front Door with separate origin groups for SWA frontend (cached) and API backend (uncached, private link)"
+  - name: "Easy Auth with Entra ID"
+    description: "Platform-level authentication via Easy Auth v2 with Entra ID OpenID Connect provider"
+
+anti_patterns:
+  - description: "Do not serve APIs without CORS restrictions from browser-based frontends"
+    instead: "Configure explicit allowed origins matching the frontend domain"
+  - description: "Do not expose backend services directly without CDN or gateway"
+    instead: "Use Front Door or SWA linked backend for frontend-to-API routing"
+  - description: "Do not use default GitHub auth for enterprise applications"
+    instead: "Configure custom Entra ID authentication via Easy Auth or MSAL"
+
+references:
+  - title: "Static Web Apps linked backends"
+    url: "https://learn.microsoft.com/azure/static-web-apps/apis-container-apps"
+  - title: "Front Door origin groups"
+    url: "https://learn.microsoft.com/azure/frontdoor/origin"
+  - title: "App Service Easy Auth"
+    url: "https://learn.microsoft.com/azure/app-service/overview-authentication-authorization"
+  - title: "Static Web Apps custom authentication"
+    url: "https://learn.microsoft.com/azure/static-web-apps/authentication-custom"
+  - title: "Container Apps CORS policy"
+    url: "https://learn.microsoft.com/azure/container-apps/cors"

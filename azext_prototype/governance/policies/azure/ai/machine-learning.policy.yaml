@@ -1,0 +1,269 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: machine-learning
+  category: azure
+  services: [machine-learning]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: ML-001
+    severity: required
+    description: "Deploy Azure Machine Learning workspace with managed identity, high business impact, and no public access"
+    rationale: "ML workspaces handle sensitive training data and models; managed identity eliminates credential sprawl"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "ml_workspace" {
+        type      = "Microsoft.MachineLearningServices/workspaces@2024-04-01"
+        name      = var.ml_workspace_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          sku = {
+            name = "Basic"
+            tier = "Basic"
+          }
+          properties = {
+            friendlyName           = var.ml_workspace_name
+            storageAccount         = var.storage_account_id
+            keyVault               = var.key_vault_id
+            applicationInsights    = var.app_insights_id
+            containerRegistry      = var.container_registry_id
+            publicNetworkAccess    = "Disabled"
+            hbiWorkspace           = true
+            managedNetwork = {
+              isolationMode = "AllowOnlyApprovedOutbound"
+            }
+            encryption = {
+              status    = "Enabled"
+              keyVaultProperties = {
+                keyVaultArmId = var.key_vault_id
+                keyIdentifier = var.cmk_key_id
+              }
+            }
+            v1LegacyMode = false
+          }
+        }
+      }
+    bicep_pattern: |
+      resource mlWorkspace 'Microsoft.MachineLearningServices/workspaces@2024-04-01' = {
+        name: mlWorkspaceName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: 'Basic'
+          tier: 'Basic'
+        }
+        properties: {
+          friendlyName: mlWorkspaceName
+          storageAccount: storageAccountId
+          keyVault: keyVaultId
+          applicationInsights: appInsightsId
+          containerRegistry: containerRegistryId
+          publicNetworkAccess: 'Disabled'
+          hbiWorkspace: true
+          managedNetwork: {
+            isolationMode: 'AllowOnlyApprovedOutbound'
+          }
+          encryption: {
+            status: 'Enabled'
+            keyVaultProperties: {
+              keyVaultArmId: keyVaultId
+              keyIdentifier: cmkKeyId
+            }
+          }
+          v1LegacyMode: false
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Network/privateEndpoints@2024-01-01"
+        name: "pe-ml-workspace"
+        description: "Private endpoint for ML workspace to eliminate public network exposure"
+        terraform_pattern: |
+          resource "azapi_resource" "pe_ml" {
+            type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+            name      = "pe-${var.ml_workspace_name}"
+            location  = var.location
+            parent_id = var.resource_group_id
+
+            body = {
+              properties = {
+                subnet = {
+                  id = var.subnet_id
+                }
+                privateLinkServiceConnections = [
+                  {
+                    name = "ml-connection"
+                    properties = {
+                      privateLinkServiceId = azapi_resource.ml_workspace.id
+                      groupIds             = ["amlworkspace"]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource peMl 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+            name: 'pe-${mlWorkspaceName}'
+            location: location
+            properties: {
+              subnet: {
+                id: subnetId
+              }
+              privateLinkServiceConnections: [
+                {
+                  name: 'ml-connection'
+                  properties: {
+                    privateLinkServiceId: mlWorkspace.id
+                    groupIds: ['amlworkspace']
+                  }
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Network/privateDnsZones@2024-06-01"
+        name: "privatelink.api.azureml.ms"
+        description: "Private DNS zone for ML workspace API endpoint"
+      - type: "Microsoft.Network/privateDnsZones@2024-06-01"
+        name: "privatelink.notebooks.azure.net"
+        description: "Private DNS zone for ML workspace notebook endpoint"
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name: "diag-ml-workspace"
+        description: "Diagnostic settings to route ML workspace activity logs to Log Analytics"
+        terraform_pattern: |
+          resource "azapi_resource" "diag_ml" {
+            type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+            name      = "diag-${var.ml_workspace_name}"
+            parent_id = azapi_resource.ml_workspace.id
+
+            body = {
+              properties = {
+                workspaceId = var.log_analytics_workspace_id
+                logs = [
+                  {
+                    categoryGroup = "allLogs"
+                    enabled       = true
+                  }
+                ]
+                metrics = [
+                  {
+                    category = "AllMetrics"
+                    enabled  = true
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource diagMl 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+            name: 'diag-${mlWorkspaceName}'
+            scope: mlWorkspace
+            properties: {
+              workspaceId: logAnalyticsWorkspaceId
+              logs: [
+                {
+                  categoryGroup: 'allLogs'
+                  enabled: true
+                }
+              ]
+              metrics: [
+                {
+                  category: 'AllMetrics'
+                  enabled: true
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "AzureML Data Scientist / Compute Operator"
+        description: "RBAC role assignments for data scientists and compute operators"
+    prohibitions:
+      - "Never hardcode storage account keys or workspace secrets in IaC"
+      - "Never set publicNetworkAccess to Enabled without managed network isolation"
+      - "Never disable hbiWorkspace when processing sensitive/regulated data"
+      - "Never use v1LegacyMode — always use v2 APIs"
+      - "Never create compute instances without managed identity"
+      - "Never skip associated Key Vault, Storage Account, or Application Insights dependencies"
+
+  - id: ML-002
+    severity: required
+    description: "Deploy compute instances and clusters with managed identity and no public IP"
+    rationale: "Compute resources with public IPs and no identity create attack surface and credential risk"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "ml_compute" {
+        type      = "Microsoft.MachineLearningServices/workspaces/computes@2024-04-01"
+        name      = var.compute_name
+        parent_id = azapi_resource.ml_workspace.id
+        location  = var.location
+
+        body = {
+          properties = {
+            computeType = "ComputeInstance"
+            properties = {
+              vmSize                        = var.vm_size
+              enableNodePublicIp            = false
+              idleTimeBeforeShutdown        = "PT30M"
+              setupScripts                  = null
+              personalComputeInstanceSettings = null
+            }
+          }
+          identity = {
+            type = "SystemAssigned"
+          }
+        }
+      }
+    bicep_pattern: |
+      resource mlCompute 'Microsoft.MachineLearningServices/workspaces/computes@2024-04-01' = {
+        name: computeName
+        parent: mlWorkspace
+        location: location
+        properties: {
+          computeType: 'ComputeInstance'
+          properties: {
+            vmSize: vmSize
+            enableNodePublicIp: false
+            idleTimeBeforeShutdown: 'PT30M'
+          }
+        }
+        identity: {
+          type: 'SystemAssigned'
+        }
+      }
+    prohibitions:
+      - "Never set enableNodePublicIp to true"
+      - "Never create compute without managed identity"
+      - "Never skip idle shutdown configuration — set idleTimeBeforeShutdown to avoid cost waste"
+
+  - id: ML-003
+    severity: recommended
+    description: "Use managed online endpoints with managed identity for model serving"
+    rationale: "Managed endpoints handle scaling, versioning, and traffic splitting; managed identity secures model access"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+
+patterns:
+  - name: "ML workspace with managed network and CMK"
+    description: "Secure ML workspace with network isolation, CMK encryption, and associated resources"
+
+anti_patterns:
+  - description: "Do not deploy ML workspace without associated Key Vault, Storage, and App Insights"
+    instead: "Always provision the four required dependency resources before workspace creation"
+  - description: "Do not use workspace access keys for programmatic access"
+    instead: "Use managed identity and RBAC role assignments (AzureML Data Scientist)"
+  - description: "Do not deploy compute with public IPs"
+    instead: "Set enableNodePublicIp=false and use managed network isolation"
+
+references:
+  - title: "Azure Machine Learning security baseline"
+    url: "https://learn.microsoft.com/azure/machine-learning/security-baseline"
+  - title: "Configure managed network isolation"
+    url: "https://learn.microsoft.com/azure/machine-learning/how-to-managed-network"

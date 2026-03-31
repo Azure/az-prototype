@@ -1,0 +1,250 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: redis-cache
+  category: azure
+  services: [redis-cache]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: RED-001
+    severity: required
+    description: "Deploy Azure Cache for Redis with Premium or Enterprise SKU, TLS 1.2, and public access disabled"
+    rationale: "Premium/Enterprise SKUs support VNet injection, clustering, and data persistence; TLS 1.2 secures in-transit data"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "redis_cache" {
+        type      = "Microsoft.Cache/redis@2024-03-01"
+        name      = var.redis_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        identity {
+          type = "SystemAssigned"
+        }
+        body = {
+          properties = {
+            sku = {
+              name     = "Premium"
+              family   = "P"
+              capacity = var.redis_capacity
+            }
+            enableNonSslPort    = false
+            minimumTlsVersion   = "1.2"
+            publicNetworkAccess = "Disabled"
+            redisVersion        = "6.0"
+            redisConfiguration = {
+              "aad-enabled"                    = "true"
+              "maxmemory-policy"               = "volatile-lru"
+              "maxfragmentationmemory-reserved" = "125"
+              "maxmemory-reserved"             = "125"
+            }
+            replicasPerMaster   = 1
+            replicasPerPrimary  = 1
+          }
+          zones = ["1", "2", "3"]
+        }
+      }
+    bicep_pattern: |
+      resource redisCache 'Microsoft.Cache/redis@2024-03-01' = {
+        name: redisName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        zones: ['1', '2', '3']
+        properties: {
+          sku: {
+            name: 'Premium'
+            family: 'P'
+            capacity: redisCapacity
+          }
+          enableNonSslPort: false
+          minimumTlsVersion: '1.2'
+          publicNetworkAccess: 'Disabled'
+          redisVersion: '6.0'
+          redisConfiguration: {
+            'maxmemory-policy': 'volatile-lru'
+            'maxfragmentationmemory-reserved': '125'
+            'maxmemory-reserved': '125'
+          }
+          replicasPerMaster: 1
+          replicasPerPrimary: 1
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/privateEndpoints (private endpoint with groupId 'redisCache')"
+      - "Microsoft.Network/privateDnsZones (privatelink.redis.cache.windows.net)"
+      - "Microsoft.Insights/diagnosticSettings (route metrics to Log Analytics)"
+      - type: "Microsoft.Cache/redis/accessPolicyAssignments@2024-03-01"
+        name: "worker-data-access"
+        description: "Data-plane access policy assignment for managed identity (NOT standard RBAC)"
+        terraform_pattern: |
+          resource "azapi_resource" "redis_data_access_policy" {
+            type      = "Microsoft.Cache/redis/accessPolicyAssignments@2024-03-01"
+            name      = "worker-data-access"
+            parent_id = azapi_resource.redis_cache.id
+            body = {
+              properties = {
+                accessPolicyName = "Data Owner"
+                objectId         = var.managed_identity_principal_id
+                objectIdAlias    = "worker-identity"
+              }
+            }
+          }
+    prohibitions:
+      - "Do not use Basic or Standard SKU for production — they lack clustering, persistence, and VNet support"
+      - "Do not enable the non-SSL port (6379) — all connections must use TLS"
+      - "Do not enable publicNetworkAccess — use private endpoints"
+      - "Do not allow TLS versions below 1.2"
+      - "Do not use access keys for application authentication when Microsoft Entra is available"
+      - "When Microsoft Entra (AAD) auth is enabled, accessKeys are NOT available. NEVER output or reference redis access keys or connection strings."
+      - "NEVER use Microsoft.Authorization/roleAssignments for Redis data-plane access — use Microsoft.Cache/redis/accessPolicyAssignments instead"
+
+  - id: RED-002
+    severity: required
+    description: "Disable the non-SSL port and enforce TLS 1.2 for all connections"
+    rationale: "Port 6379 sends data in plaintext; all Redis traffic must be encrypted in transit"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+    terraform_pattern: |
+      # Set enableNonSslPort = false and minimumTlsVersion = "1.2"
+      # See RED-001 terraform_pattern for full example
+    bicep_pattern: |
+      // Set enableNonSslPort: false and minimumTlsVersion: '1.2'
+      // See RED-001 bicep_pattern for full example
+    companion_resources: []
+    prohibitions:
+      - "Do not set enableNonSslPort to true"
+      - "Do not set minimumTlsVersion below 1.2"
+
+  - id: RED-003
+    severity: recommended
+    description: "Use Microsoft Entra authentication instead of access keys"
+    rationale: "Entra auth eliminates shared key management and supports fine-grained RBAC"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # Entra auth is configured via redisConfiguration and RBAC
+      # Set aad-enabled = "true" in redisConfiguration
+      resource "azapi_resource" "redis_entra" {
+        type      = "Microsoft.Cache/redis@2024-03-01"
+        name      = var.redis_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        identity {
+          type = "SystemAssigned"
+        }
+        body = {
+          properties = {
+            sku = {
+              name     = "Premium"
+              family   = "P"
+              capacity = var.redis_capacity
+            }
+            enableNonSslPort    = false
+            minimumTlsVersion   = "1.2"
+            publicNetworkAccess = "Disabled"
+            redisConfiguration = {
+              "aad-enabled"       = "true"
+              "maxmemory-policy"  = "volatile-lru"
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // Set aad-enabled to true in redisConfiguration
+      resource redisEntra 'Microsoft.Cache/redis@2024-03-01' = {
+        name: redisName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          sku: {
+            name: 'Premium'
+            family: 'P'
+            capacity: redisCapacity
+          }
+          enableNonSslPort: false
+          minimumTlsVersion: '1.2'
+          publicNetworkAccess: 'Disabled'
+          redisConfiguration: {
+            'aad-enabled': 'true'
+            'maxmemory-policy': 'volatile-lru'
+          }
+        }
+      }
+    companion_resources:
+      - "Microsoft.Cache/redis/accessPolicyAssignments@2024-03-01 (Data Owner or Data Contributor access policy — NOT Microsoft.Authorization/roleAssignments)"
+    prohibitions:
+      - "Do not distribute Redis access keys to applications — use Entra authentication"
+      - "NEVER use Microsoft.Authorization/roleAssignments for Redis data-plane access — use Microsoft.Cache/redis/accessPolicyAssignments instead"
+
+  - id: RED-004
+    severity: recommended
+    description: "Enable diagnostic settings for Redis cache metrics and connection logs"
+    rationale: "Monitor cache hit ratio, connected clients, memory usage, and server load"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "redis_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-redis"
+        parent_id = azapi_resource.redis_cache.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "ConnectedClientList"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource redisDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-redis'
+        scope: redisCache
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
+            {
+              category: 'ConnectedClientList'
+              enabled: true
+            }
+          ]
+          metrics: [
+            {
+              category: 'AllMetrics'
+              enabled: true
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.OperationalInsights/workspaces (Log Analytics workspace)"
+    prohibitions:
+      - "Do not omit AllMetrics — cache hit ratio and memory usage are critical for performance tuning"
+
+patterns:
+  - name: "Premium Redis with private endpoint and Entra auth"
+    description: "Zone-redundant Premium Redis with TLS 1.2, private endpoint, and Entra authentication"
+    example: |
+      # See RED-001 through RED-004 for complete azapi_resource patterns
+
+anti_patterns:
+  - description: "Do not use Basic or Standard SKU for production workloads"
+    instead: "Use Premium or Enterprise SKU for clustering, persistence, and VNet support"
+  - description: "Do not enable the non-SSL port"
+    instead: "Set enableNonSslPort: false and enforce TLS 1.2"
+
+references:
+  - title: "Azure Cache for Redis documentation"
+    url: "https://learn.microsoft.com/azure/azure-cache-for-redis/cache-overview"
+  - title: "Redis security best practices"
+    url: "https://learn.microsoft.com/azure/azure-cache-for-redis/cache-best-practices-security"

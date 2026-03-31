@@ -1,0 +1,366 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: synapse-workspace
+  category: azure
+  services: [synapse-workspace]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: SYN-001
+    severity: required
+    description: "Deploy Synapse Workspace with managed VNet, managed identity, and public access disabled"
+    rationale: "Managed VNet isolates Spark/pipeline traffic; managed identity eliminates credential management"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "synapse_workspace" {
+        type      = "Microsoft.Synapse/workspaces@2021-06-01"
+        name      = var.synapse_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        identity {
+          type = "SystemAssigned"
+        }
+        body = {
+          properties = {
+            defaultDataLakeStorage = {
+              accountUrl = "https://${var.storage_account_name}.dfs.core.windows.net"
+              filesystem = var.filesystem_name
+              resourceId = var.storage_account_id
+            }
+            managedVirtualNetwork          = "default"
+            managedResourceGroupName       = var.managed_rg_name
+            publicNetworkAccess            = "Disabled"
+            preventDataExfiltration        = true
+            sqlAdministratorLogin          = var.sql_admin_login
+            sqlAdministratorLoginPassword   = var.sql_admin_password
+            managedVirtualNetworkSettings = {
+              preventDataExfiltration = true
+              allowedAadTenantIdsForLinking = [var.tenant_id]
+            }
+            encryption = {
+              cmk = {
+                key = {
+                  name     = "default"
+                  keyVaultUrl = var.cmk_key_url
+                }
+              }
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource synapseWorkspace 'Microsoft.Synapse/workspaces@2021-06-01' = {
+        name: synapseName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          defaultDataLakeStorage: {
+            accountUrl: 'https://${storageAccountName}.dfs.core.windows.net'
+            filesystem: filesystemName
+            resourceId: storageAccountId
+          }
+          managedVirtualNetwork: 'default'
+          managedResourceGroupName: managedRgName
+          publicNetworkAccess: 'Disabled'
+          preventDataExfiltration: true
+          sqlAdministratorLogin: sqlAdminLogin
+          sqlAdministratorLoginPassword: sqlAdminPassword
+          managedVirtualNetworkSettings: {
+            preventDataExfiltration: true
+            allowedAadTenantIdsForLinking: [tenantId]
+          }
+          encryption: {
+            cmk: {
+              key: {
+                name: 'default'
+                keyVaultUrl: cmkKeyUrl
+              }
+            }
+          }
+        }
+      }
+    companion_resources:
+      - "Microsoft.Storage/storageAccounts (ADLS Gen2 for default data lake)"
+      - "Microsoft.Network/privateEndpoints (private endpoints for SQL, Dev, and SqlOnDemand)"
+      - "Microsoft.Network/privateDnsZones (privatelink.sql.azuresynapse.net, privatelink.dev.azuresynapse.net, privatelink.azuresynapse.net)"
+      - "Microsoft.KeyVault/vaults (Key Vault for CMK encryption)"
+      - "Microsoft.Insights/diagnosticSettings (route audit logs to Log Analytics)"
+    prohibitions:
+      - "Do not enable publicNetworkAccess — use private endpoints"
+      - "Do not disable preventDataExfiltration — it allows data to leave the managed VNet"
+      - "Do not hardcode sqlAdministratorLoginPassword in templates — use Key Vault references"
+      - "Do not skip managed VNet configuration — pipelines and Spark will use public internet"
+
+  - id: SYN-002
+    severity: required
+    description: "Configure Entra-only authentication for Synapse SQL pools"
+    rationale: "SQL auth with passwords is less secure than Entra identity-based authentication"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "synapse_aad_admin" {
+        type      = "Microsoft.Synapse/workspaces/azureADOnlyAuthentications@2021-06-01"
+        name      = "default"
+        parent_id = azapi_resource.synapse_workspace.id
+        body = {
+          properties = {
+            azureADOnlyAuthentication = true
+          }
+        }
+      }
+    bicep_pattern: |
+      resource synapseAadAdmin 'Microsoft.Synapse/workspaces/azureADOnlyAuthentications@2021-06-01' = {
+        parent: synapseWorkspace
+        name: 'default'
+        properties: {
+          azureADOnlyAuthentication: true
+        }
+      }
+    companion_resources:
+      - "Microsoft.Synapse/workspaces/administrators (Entra admin assignment)"
+    prohibitions:
+      - "Do not use SQL authentication in production — use Entra-only auth"
+
+  - id: SYN-003
+    severity: required
+    description: "Create private endpoints for all Synapse endpoints (SQL, SqlOnDemand, Dev)"
+    rationale: "Synapse has three endpoints that all need private connectivity for full isolation"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "synapse_pe_sql" {
+        type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+        name      = "${var.synapse_name}-pe-sql"
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            subnet = {
+              id = var.pe_subnet_id
+            }
+            privateLinkServiceConnections = [
+              {
+                name = "${var.synapse_name}-sql"
+                properties = {
+                  privateLinkServiceId = azapi_resource.synapse_workspace.id
+                  groupIds             = ["Sql"]
+                }
+              }
+            ]
+          }
+        }
+      }
+
+      resource "azapi_resource" "synapse_pe_sqlondemand" {
+        type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+        name      = "${var.synapse_name}-pe-sqlondemand"
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            subnet = {
+              id = var.pe_subnet_id
+            }
+            privateLinkServiceConnections = [
+              {
+                name = "${var.synapse_name}-sqlondemand"
+                properties = {
+                  privateLinkServiceId = azapi_resource.synapse_workspace.id
+                  groupIds             = ["SqlOnDemand"]
+                }
+              }
+            ]
+          }
+        }
+      }
+
+      resource "azapi_resource" "synapse_pe_dev" {
+        type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+        name      = "${var.synapse_name}-pe-dev"
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            subnet = {
+              id = var.pe_subnet_id
+            }
+            privateLinkServiceConnections = [
+              {
+                name = "${var.synapse_name}-dev"
+                properties = {
+                  privateLinkServiceId = azapi_resource.synapse_workspace.id
+                  groupIds             = ["Dev"]
+                }
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource synapsePeSql 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+        name: '${synapseName}-pe-sql'
+        location: location
+        properties: {
+          subnet: {
+            id: peSubnetId
+          }
+          privateLinkServiceConnections: [
+            {
+              name: '${synapseName}-sql'
+              properties: {
+                privateLinkServiceId: synapseWorkspace.id
+                groupIds: ['Sql']
+              }
+            }
+          ]
+        }
+      }
+
+      resource synapsePeSqlOnDemand 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+        name: '${synapseName}-pe-sqlondemand'
+        location: location
+        properties: {
+          subnet: {
+            id: peSubnetId
+          }
+          privateLinkServiceConnections: [
+            {
+              name: '${synapseName}-sqlondemand'
+              properties: {
+                privateLinkServiceId: synapseWorkspace.id
+                groupIds: ['SqlOnDemand']
+              }
+            }
+          ]
+        }
+      }
+
+      resource synapsePeDev 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+        name: '${synapseName}-pe-dev'
+        location: location
+        properties: {
+          subnet: {
+            id: peSubnetId
+          }
+          privateLinkServiceConnections: [
+            {
+              name: '${synapseName}-dev'
+              properties: {
+                privateLinkServiceId: synapseWorkspace.id
+                groupIds: ['Dev']
+              }
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/privateDnsZones (privatelink.sql.azuresynapse.net)"
+      - "Microsoft.Network/privateDnsZones (privatelink.dev.azuresynapse.net)"
+      - "Microsoft.Network/privateDnsZones (privatelink.azuresynapse.net)"
+      - "Microsoft.Network/privateEndpoints/privateDnsZoneGroups (DNS registration)"
+    prohibitions:
+      - "Do not skip any of the three private endpoints — partial coverage leaves endpoints exposed"
+
+  - id: SYN-004
+    severity: recommended
+    description: "Enable diagnostic settings for Synapse workspace audit logs"
+    rationale: "Audit logs track user activities, SQL queries, and pipeline executions"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "synapse_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-synapse"
+        parent_id = azapi_resource.synapse_workspace.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "SynapseRbacOperations"
+                enabled  = true
+              },
+              {
+                category = "GatewayApiRequests"
+                enabled  = true
+              },
+              {
+                category = "BuiltinSqlReqsEnded"
+                enabled  = true
+              },
+              {
+                category = "IntegrationPipelineRuns"
+                enabled  = true
+              },
+              {
+                category = "IntegrationActivityRuns"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource synapseDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-synapse'
+        scope: synapseWorkspace
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
+            {
+              category: 'SynapseRbacOperations'
+              enabled: true
+            }
+            {
+              category: 'GatewayApiRequests'
+              enabled: true
+            }
+            {
+              category: 'BuiltinSqlReqsEnded'
+              enabled: true
+            }
+            {
+              category: 'IntegrationPipelineRuns'
+              enabled: true
+            }
+            {
+              category: 'IntegrationActivityRuns'
+              enabled: true
+            }
+          ]
+          metrics: [
+            {
+              category: 'AllMetrics'
+              enabled: true
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.OperationalInsights/workspaces (Log Analytics workspace)"
+    prohibitions:
+      - "Do not skip SynapseRbacOperations logs — they track permission changes"
+
+patterns:
+  - name: "Synapse Workspace with managed VNet and private endpoints"
+    description: "Fully isolated Synapse workspace with CMK, managed VNet, and Entra auth"
+    example: |
+      # See SYN-001 through SYN-004 for complete azapi_resource patterns
+
+anti_patterns:
+  - description: "Do not deploy Synapse without managed virtual network"
+    instead: "Enable managedVirtualNetwork to isolate Spark and pipeline traffic"
+  - description: "Do not use SQL authentication for Synapse SQL pools"
+    instead: "Enable Entra-only authentication via azureADOnlyAuthentications"
+
+references:
+  - title: "Synapse Analytics security"
+    url: "https://learn.microsoft.com/azure/synapse-analytics/security/synapse-workspace-managed-vnet"
+  - title: "Synapse private endpoints"
+    url: "https://learn.microsoft.com/azure/synapse-analytics/security/synapse-workspace-managed-private-endpoints"

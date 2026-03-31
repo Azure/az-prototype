@@ -1,0 +1,178 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: notification-hubs
+  category: azure
+  services: [notification-hubs]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: NH-001
+    severity: required
+    description: "Deploy Notification Hubs namespace with Standard SKU, managed identity, and no public access"
+    rationale: "Standard SKU provides SLA, telemetry, and scheduled push; managed identity eliminates SAS key management"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "nh_namespace" {
+        type      = "Microsoft.NotificationHubs/namespaces@2023-10-01-preview"
+        name      = var.nh_namespace_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        body = {
+          sku = {
+            name = "Standard"
+            tier = "Standard"
+          }
+          properties = {
+            zoneRedundancy      = "Enabled"
+            publicNetworkAccess = "Disabled"
+            replicationRegion   = var.replication_region
+            networkAcls = {
+              ipRules = []
+              publicNetworkRule = {
+                rights = []
+              }
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource nhNamespace 'Microsoft.NotificationHubs/namespaces@2023-10-01-preview' = {
+        name: nhNamespaceName
+        location: location
+        sku: {
+          name: 'Standard'
+          tier: 'Standard'
+        }
+        properties: {
+          zoneRedundancy: 'Enabled'
+          publicNetworkAccess: 'Disabled'
+          replicationRegion: replicationRegion
+          networkAcls: {
+            ipRules: []
+            publicNetworkRule: {
+              rights: []
+            }
+          }
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.NotificationHubs/namespaces/notificationHubs@2023-10-01-preview"
+        name: "notification-hub"
+        description: "Notification Hub within the namespace for platform notification service (PNS) integration"
+        terraform_pattern: |
+          resource "azapi_resource" "notification_hub" {
+            type      = "Microsoft.NotificationHubs/namespaces/notificationHubs@2023-10-01-preview"
+            name      = var.hub_name
+            parent_id = azapi_resource.nh_namespace.id
+            location  = var.location
+
+            body = {
+              properties = {
+                name = var.hub_name
+              }
+            }
+          }
+        bicep_pattern: |
+          resource notificationHub 'Microsoft.NotificationHubs/namespaces/notificationHubs@2023-10-01-preview' = {
+            name: hubName
+            parent: nhNamespace
+            location: location
+            properties: {
+              name: hubName
+            }
+          }
+      - type: "Microsoft.Network/privateEndpoints@2024-01-01"
+        name: "pe-nh"
+        description: "Private endpoint for Notification Hubs namespace"
+        terraform_pattern: |
+          resource "azapi_resource" "pe_nh" {
+            type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+            name      = "pe-${var.nh_namespace_name}"
+            location  = var.location
+            parent_id = var.resource_group_id
+
+            body = {
+              properties = {
+                subnet = {
+                  id = var.subnet_id
+                }
+                privateLinkServiceConnections = [
+                  {
+                    name = "nh-connection"
+                    properties = {
+                      privateLinkServiceId = azapi_resource.nh_namespace.id
+                      groupIds             = ["namespace"]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource peNh 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+            name: 'pe-${nhNamespaceName}'
+            location: location
+            properties: {
+              subnet: {
+                id: subnetId
+              }
+              privateLinkServiceConnections: [
+                {
+                  name: 'nh-connection'
+                  properties: {
+                    privateLinkServiceId: nhNamespace.id
+                    groupIds: ['namespace']
+                  }
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Network/privateDnsZones@2024-06-01"
+        name: "privatelink.servicebus.windows.net"
+        description: "Private DNS zone for Notification Hubs private endpoint resolution"
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name: "diag-nh"
+        description: "Diagnostic settings for push notification delivery logs"
+    prohibitions:
+      - "Never hardcode PNS (APNS, FCM, WNS) credentials in IaC — use Key Vault references"
+      - "Never use Free tier for production — it lacks SLA, telemetry, and scheduled push"
+      - "Never distribute full access SAS keys to client applications — use registration-scoped keys"
+      - "Never set publicNetworkAccess to Enabled without IP rules"
+      - "Never embed SAS connection strings in mobile application packages"
+
+  - id: NH-002
+    severity: required
+    description: "Store PNS credentials (APNS certificates, FCM keys) in Key Vault and reference from hub configuration"
+    rationale: "PNS credentials are sensitive and must be rotated; Key Vault provides audited access and rotation"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+
+  - id: NH-003
+    severity: recommended
+    description: "Use installation-based registration for device management"
+    rationale: "Installations provide a newer API, support multiple PNS handles per device, and enable partial updates"
+    applies_to: [cloud-architect, app-developer]
+
+  - id: NH-004
+    severity: recommended
+    description: "Enable zone redundancy for high availability"
+    rationale: "Zone redundancy ensures notification delivery during availability zone failures"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+patterns:
+  - name: "Notification Hubs with private endpoint and zone redundancy"
+    description: "Standard tier namespace with zone redundancy, private endpoints, and Key Vault-backed PNS credentials"
+
+anti_patterns:
+  - description: "Do not embed PNS credentials in IaC templates"
+    instead: "Store APNS certificates, FCM keys, and WNS secrets in Key Vault"
+  - description: "Do not distribute full access SAS keys to clients"
+    instead: "Use listen-only or registration-scoped SAS policies for client applications"
+
+references:
+  - title: "Azure Notification Hubs documentation"
+    url: "https://learn.microsoft.com/azure/notification-hubs/notification-hubs-push-notification-overview"
+  - title: "Notification Hubs security"
+    url: "https://learn.microsoft.com/azure/notification-hubs/notification-hubs-push-notification-security"

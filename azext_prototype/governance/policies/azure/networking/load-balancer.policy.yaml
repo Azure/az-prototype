@@ -1,0 +1,308 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: load-balancer
+  category: azure
+  services: [load-balancer]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: LB-001
+    severity: required
+    description: "Deploy Load Balancer with Standard SKU — Basic SKU is being retired"
+    rationale: "Basic LB lacks zone redundancy, SLA, backend pool flexibility, and will be retired September 2025"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "load_balancer" {
+        type      = "Microsoft.Network/loadBalancers@2024-01-01"
+        name      = var.lb_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          sku = {
+            name = "Standard"
+            tier = "Regional"
+          }
+          properties = {
+            frontendIPConfigurations = [
+              {
+                name = "frontend"
+                properties = {
+                  subnet = {
+                    id = var.frontend_subnet_id
+                  }
+                  privateIPAllocationMethod = "Dynamic"
+                }
+              }
+            ]
+            backendAddressPools = [
+              {
+                name = "backend-pool"
+              }
+            ]
+            probes = [
+              {
+                name = "health-probe"
+                properties = {
+                  protocol            = "Tcp"
+                  port                = 443
+                  intervalInSeconds   = 5
+                  numberOfProbes      = 2
+                  probeThreshold      = 2
+                }
+              }
+            ]
+            loadBalancingRules = [
+              {
+                name = "https-rule"
+                properties = {
+                  frontendIPConfiguration = {
+                    id = "[concat(resourceId('Microsoft.Network/loadBalancers', variables('lbName')), '/frontendIPConfigurations/frontend')]"
+                  }
+                  backendAddressPool = {
+                    id = "[concat(resourceId('Microsoft.Network/loadBalancers', variables('lbName')), '/backendAddressPools/backend-pool')]"
+                  }
+                  probe = {
+                    id = "[concat(resourceId('Microsoft.Network/loadBalancers', variables('lbName')), '/probes/health-probe')]"
+                  }
+                  protocol             = "Tcp"
+                  frontendPort         = 443
+                  backendPort          = 443
+                  enableFloatingIP     = false
+                  idleTimeoutInMinutes = 4
+                  enableTcpReset       = true
+                  disableOutboundSnat  = true
+                }
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource loadBalancer 'Microsoft.Network/loadBalancers@2024-01-01' = {
+        name: lbName
+        location: location
+        sku: {
+          name: 'Standard'
+          tier: 'Regional'
+        }
+        properties: {
+          frontendIPConfigurations: [
+            {
+              name: 'frontend'
+              properties: {
+                subnet: {
+                  id: frontendSubnetId
+                }
+                privateIPAllocationMethod: 'Dynamic'
+              }
+            }
+          ]
+          backendAddressPools: [
+            {
+              name: 'backend-pool'
+            }
+          ]
+          probes: [
+            {
+              name: 'health-probe'
+              properties: {
+                protocol: 'Tcp'
+                port: 443
+                intervalInSeconds: 5
+                numberOfProbes: 2
+                probeThreshold: 2
+              }
+            }
+          ]
+          loadBalancingRules: [
+            {
+              name: 'https-rule'
+              properties: {
+                frontendIPConfiguration: {
+                  id: resourceId('Microsoft.Network/loadBalancers/frontendIPConfigurations', lbName, 'frontend')
+                }
+                backendAddressPool: {
+                  id: resourceId('Microsoft.Network/loadBalancers/backendAddressPools', lbName, 'backend-pool')
+                }
+                probe: {
+                  id: resourceId('Microsoft.Network/loadBalancers/probes', lbName, 'health-probe')
+                }
+                protocol: 'Tcp'
+                frontendPort: 443
+                backendPort: 443
+                enableFloatingIP: false
+                idleTimeoutInMinutes: 4
+                enableTcpReset: true
+                disableOutboundSnat: true
+              }
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/publicIPAddresses (Standard SKU static for public LB, omit for internal LB)"
+      - "Microsoft.Network/networkSecurityGroups (required for Standard LB backends — no default allow)"
+      - "Microsoft.Network/loadBalancers/outboundRules (explicit outbound if disableOutboundSnat is true)"
+      - "Microsoft.Insights/diagnosticSettings (route metrics to Log Analytics)"
+    prohibitions:
+      - "Do not use Basic SKU — it is being retired and lacks SLA"
+      - "Do not mix Basic and Standard SKU resources in the same backend pool"
+      - "Do not leave disableOutboundSnat as false unless you explicitly need implicit SNAT"
+      - "Do not use HTTP probes for health checks unless the backend requires it — prefer Tcp or Https"
+
+  - id: LB-002
+    severity: required
+    description: "Enable TCP reset on idle timeout for all load balancing rules"
+    rationale: "TCP reset on idle prevents half-open connections that cause application errors"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # Set enableTcpReset = true in loadBalancingRules properties
+      # See LB-001 terraform_pattern for full example
+    bicep_pattern: |
+      // Set enableTcpReset: true in loadBalancingRules properties
+      // See LB-001 bicep_pattern for full example
+    companion_resources: []
+    prohibitions:
+      - "Do not set enableTcpReset to false — half-open connections degrade reliability"
+
+  - id: LB-003
+    severity: recommended
+    description: "Use explicit outbound rules instead of implicit SNAT for outbound connectivity"
+    rationale: "Implicit SNAT has port exhaustion risks; explicit outbound rules give control over SNAT ports"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "lb_outbound_rule" {
+        type      = "Microsoft.Network/loadBalancers@2024-01-01"
+        name      = var.lb_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            outboundRules = [
+              {
+                name = "outbound-rule"
+                properties = {
+                  frontendIPConfigurations = [
+                    {
+                      id = var.outbound_frontend_id
+                    }
+                  ]
+                  backendAddressPool = {
+                    id = var.backend_pool_id
+                  }
+                  protocol              = "All"
+                  enableTcpReset        = true
+                  idleTimeoutInMinutes  = 4
+                  allocatedOutboundPorts = 1024
+                }
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      // Add outboundRules to the load balancer properties
+      outboundRules: [
+        {
+          name: 'outbound-rule'
+          properties: {
+            frontendIPConfigurations: [
+              {
+                id: outboundFrontendId
+              }
+            ]
+            backendAddressPool: {
+              id: backendPoolId
+            }
+            protocol: 'All'
+            enableTcpReset: true
+            idleTimeoutInMinutes: 4
+            allocatedOutboundPorts: 1024
+          }
+        }
+      ]
+    companion_resources:
+      - "Microsoft.Network/publicIPAddresses (dedicated outbound public IP)"
+      - "Microsoft.Network/natGateways (alternative — use NAT Gateway instead of outbound rules)"
+    prohibitions:
+      - "Do not rely on implicit SNAT for production workloads"
+
+  - id: LB-004
+    severity: recommended
+    description: "Enable diagnostic settings for Load Balancer health probe and SNAT metrics"
+    rationale: "Monitor backend health, SNAT port utilization, and data path availability"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "lb_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-load-balancer"
+        parent_id = azapi_resource.load_balancer.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "LoadBalancerAlertEvent"
+                enabled  = true
+              },
+              {
+                category = "LoadBalancerProbeHealthStatus"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource lbDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-load-balancer'
+        scope: loadBalancer
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
+            {
+              category: 'LoadBalancerAlertEvent'
+              enabled: true
+            }
+            {
+              category: 'LoadBalancerProbeHealthStatus'
+              enabled: true
+            }
+          ]
+          metrics: [
+            {
+              category: 'AllMetrics'
+              enabled: true
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.OperationalInsights/workspaces (Log Analytics workspace)"
+    prohibitions:
+      - "Do not omit health probe status logs — they are critical for diagnosing backend issues"
+
+patterns:
+  - name: "Internal Standard Load Balancer with health probes"
+    description: "Standard internal LB with TCP health probes and explicit outbound rules"
+    example: |
+      # See LB-001 through LB-004 for complete azapi_resource patterns
+
+anti_patterns:
+  - description: "Do not use Basic Load Balancer for new deployments"
+    instead: "Always use Standard SKU — Basic is being retired"
+  - description: "Do not rely on implicit SNAT for production outbound connectivity"
+    instead: "Use explicit outbound rules or NAT Gateway for deterministic SNAT"
+
+references:
+  - title: "Azure Load Balancer documentation"
+    url: "https://learn.microsoft.com/azure/load-balancer/load-balancer-overview"
+  - title: "Standard Load Balancer and outbound connections"
+    url: "https://learn.microsoft.com/azure/load-balancer/load-balancer-outbound-connections"

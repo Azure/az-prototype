@@ -1,0 +1,715 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: networking-optimization
+  category: performance
+  services:
+    - front-door
+    - cdn
+    - app-service
+    - api-management
+    - traffic-manager
+    - virtual-machines
+    - load-balancer
+    - virtual-network
+    - vpn-gateway
+    - expressroute
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: NETPERF-001
+    severity: required
+    description: "Serve static content through CDN or Front Door — configure origin groups, caching, and compression for optimal delivery"
+    rationale: "Serving static content from origin adds 50-200ms latency per request; CDN/Front Door reduces this to <10ms from edge POPs globally"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # === Front Door with Static Content Origin ===
+      resource "azapi_resource" "fd_profile" {
+        type      = "Microsoft.Cdn/profiles@2024-02-01"
+        name      = var.frontdoor_name
+        location  = "global"
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = var.frontdoor_sku    # "Standard_AzureFrontDoor" or "Premium_AzureFrontDoor"
+          }
+        }
+      }
+
+      # Origin group for static content (Storage Account)
+      resource "azapi_resource" "fd_origin_group_static" {
+        type      = "Microsoft.Cdn/profiles/originGroups@2024-02-01"
+        name      = "static-content"
+        parent_id = azapi_resource.fd_profile.id
+
+        body = {
+          properties = {
+            loadBalancingSettings = {
+              sampleSize                = 4
+              successfulSamplesRequired = 3
+              additionalLatencyInMilliseconds = 50
+            }
+            healthProbeSettings = {
+              probePath              = "/"
+              probeRequestType       = "HEAD"
+              probeProtocol          = "Https"
+              probeIntervalInSeconds = 30
+            }
+          }
+        }
+      }
+
+      resource "azapi_resource" "fd_origin_storage" {
+        type      = "Microsoft.Cdn/profiles/originGroups/origins@2024-02-01"
+        name      = "storage-origin"
+        parent_id = azapi_resource.fd_origin_group_static.id
+
+        body = {
+          properties = {
+            hostName          = "${var.storage_account_name}.blob.core.windows.net"
+            httpPort          = 80
+            httpsPort         = 443
+            originHostHeader  = "${var.storage_account_name}.blob.core.windows.net"
+            priority          = 1
+            weight            = 1000
+            enabledState      = "Enabled"
+          }
+        }
+      }
+
+      # Origin group for API (App Service / Container Apps)
+      resource "azapi_resource" "fd_origin_group_api" {
+        type      = "Microsoft.Cdn/profiles/originGroups@2024-02-01"
+        name      = "api-backend"
+        parent_id = azapi_resource.fd_profile.id
+
+        body = {
+          properties = {
+            loadBalancingSettings = {
+              sampleSize                = 4
+              successfulSamplesRequired = 3
+              additionalLatencyInMilliseconds = 0     # No additional latency tolerance for API
+            }
+            healthProbeSettings = {
+              probePath              = "/healthz"
+              probeRequestType       = "GET"
+              probeProtocol          = "Https"
+              probeIntervalInSeconds = 15             # Frequent probes for API health
+            }
+          }
+        }
+      }
+
+      # Endpoint with routes
+      resource "azapi_resource" "fd_endpoint" {
+        type      = "Microsoft.Cdn/profiles/afdEndpoints@2024-02-01"
+        name      = var.frontdoor_endpoint_name
+        location  = "global"
+        parent_id = azapi_resource.fd_profile.id
+
+        body = {
+          properties = {
+            enabledState = "Enabled"
+          }
+        }
+      }
+
+      # Route: Static content → Storage origin
+      resource "azapi_resource" "fd_route_static" {
+        type      = "Microsoft.Cdn/profiles/afdEndpoints/routes@2024-02-01"
+        name      = "static-route"
+        parent_id = azapi_resource.fd_endpoint.id
+
+        body = {
+          properties = {
+            originGroup = {
+              id = azapi_resource.fd_origin_group_static.id
+            }
+            patternsToMatch   = ["/static/*", "/assets/*", "/images/*", "/*.css", "/*.js"]
+            forwardingProtocol = "HttpsOnly"
+            httpsRedirect      = "Enabled"
+            linkToDefaultDomain = "Enabled"
+            cacheConfiguration = {
+              queryStringCachingBehavior = "IgnoreQueryString"
+              compressionSettings = {
+                isCompressionEnabled = true
+                contentTypesToCompress = [
+                  "text/html", "text/css", "text/javascript", "application/javascript",
+                  "application/json", "application/xml", "image/svg+xml", "font/woff2"
+                ]
+              }
+            }
+          }
+        }
+      }
+
+      # Route: API → App Service origin
+      resource "azapi_resource" "fd_route_api" {
+        type      = "Microsoft.Cdn/profiles/afdEndpoints/routes@2024-02-01"
+        name      = "api-route"
+        parent_id = azapi_resource.fd_endpoint.id
+
+        body = {
+          properties = {
+            originGroup = {
+              id = azapi_resource.fd_origin_group_api.id
+            }
+            patternsToMatch    = ["/api/*"]
+            forwardingProtocol = "HttpsOnly"
+            httpsRedirect      = "Enabled"
+            linkToDefaultDomain = "Enabled"
+            cacheConfiguration = {
+              queryStringCachingBehavior = "UseQueryString"    # Include query params in cache key
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Front Door with Static Content Origin ===
+      resource fdProfile 'Microsoft.Cdn/profiles@2024-02-01' = {
+        name: frontDoorName
+        location: 'global'
+        sku: {
+          name: frontDoorSku
+        }
+      }
+
+      // Static content origin group (Storage Account)
+      resource fdOriginGroupStatic 'Microsoft.Cdn/profiles/originGroups@2024-02-01' = {
+        parent: fdProfile
+        name: 'static-content'
+        properties: {
+          loadBalancingSettings: {
+            sampleSize: 4
+            successfulSamplesRequired: 3
+            additionalLatencyInMilliseconds: 50
+          }
+          healthProbeSettings: {
+            probePath: '/'
+            probeRequestType: 'HEAD'
+            probeProtocol: 'Https'
+            probeIntervalInSeconds: 30
+          }
+        }
+      }
+
+      resource fdOriginStorage 'Microsoft.Cdn/profiles/originGroups/origins@2024-02-01' = {
+        parent: fdOriginGroupStatic
+        name: 'storage-origin'
+        properties: {
+          hostName: '${storageAccountName}.blob.core.windows.net'
+          httpPort: 80
+          httpsPort: 443
+          originHostHeader: '${storageAccountName}.blob.core.windows.net'
+          priority: 1
+          weight: 1000
+          enabledState: 'Enabled'
+        }
+      }
+
+      // API origin group
+      resource fdOriginGroupApi 'Microsoft.Cdn/profiles/originGroups@2024-02-01' = {
+        parent: fdProfile
+        name: 'api-backend'
+        properties: {
+          loadBalancingSettings: {
+            sampleSize: 4
+            successfulSamplesRequired: 3
+            additionalLatencyInMilliseconds: 0
+          }
+          healthProbeSettings: {
+            probePath: '/healthz'
+            probeRequestType: 'GET'
+            probeProtocol: 'Https'
+            probeIntervalInSeconds: 15
+          }
+        }
+      }
+
+      // Endpoint
+      resource fdEndpoint 'Microsoft.Cdn/profiles/afdEndpoints@2024-02-01' = {
+        parent: fdProfile
+        name: frontDoorEndpointName
+        location: 'global'
+        properties: {
+          enabledState: 'Enabled'
+        }
+      }
+
+      // Static route with compression
+      resource fdRouteStatic 'Microsoft.Cdn/profiles/afdEndpoints/routes@2024-02-01' = {
+        parent: fdEndpoint
+        name: 'static-route'
+        properties: {
+          originGroup: {
+            id: fdOriginGroupStatic.id
+          }
+          patternsToMatch: ['/static/*', '/assets/*', '/images/*', '/*.css', '/*.js']
+          forwardingProtocol: 'HttpsOnly'
+          httpsRedirect: 'Enabled'
+          linkToDefaultDomain: 'Enabled'
+          cacheConfiguration: {
+            queryStringCachingBehavior: 'IgnoreQueryString'
+            compressionSettings: {
+              isCompressionEnabled: true
+              contentTypesToCompress: [
+                'text/html', 'text/css', 'text/javascript', 'application/javascript'
+                'application/json', 'application/xml', 'image/svg+xml', 'font/woff2'
+              ]
+            }
+          }
+        }
+      }
+
+      // API route
+      resource fdRouteApi 'Microsoft.Cdn/profiles/afdEndpoints/routes@2024-02-01' = {
+        parent: fdEndpoint
+        name: 'api-route'
+        properties: {
+          originGroup: {
+            id: fdOriginGroupApi.id
+          }
+          patternsToMatch: ['/api/*']
+          forwardingProtocol: 'HttpsOnly'
+          httpsRedirect: 'Enabled'
+          linkToDefaultDomain: 'Enabled'
+          cacheConfiguration: {
+            queryStringCachingBehavior: 'UseQueryString'
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER serve static content directly from App Service or Container Apps — always use CDN/Front Door"
+      - "NEVER disable compression for text-based content types — it reduces transfer size by 60-80%"
+      - "NEVER use IgnoreQueryString for API routes — query parameters affect response content"
+      - "NEVER set health probe interval > 60 seconds for production origins — slow detection delays failover"
+      - "NEVER expose App Service directly to the internet when using Front Door — restrict access via Front Door ID header"
+
+  - id: NETPERF-002
+    severity: recommended
+    description: "Configure connection keep-alive and HTTP/2 for App Service and API Management to reduce connection overhead"
+    rationale: "Each new TCP+TLS connection adds 50-150ms overhead; keep-alive reuses connections and HTTP/2 multiplexes requests on a single connection"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # === App Service with HTTP/2 and Keep-Alive ===
+      resource "azapi_resource" "app_service_perf" {
+        type      = "Microsoft.Web/sites@2023-12-01"
+        name      = var.app_service_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            siteConfig = {
+              http20Enabled           = true      # Enable HTTP/2 (multiplexing, header compression)
+              webSocketsEnabled       = false     # Disable if not needed — saves resources
+              alwaysOn                = true      # Prevent idle unloading (Standard+ plans)
+              minTlsVersion           = "1.2"
+              requestTracingEnabled   = true
+              httpLoggingEnabled      = true
+            }
+          }
+        }
+      }
+
+      # === API Management with Connection Pooling ===
+      # APIM backend connection settings are configured via API policy:
+      # <policies>
+      #   <inbound>
+      #     <set-backend-service base-url="https://api-backend.azurewebsites.net" />
+      #   </inbound>
+      #   <backend>
+      #     <forward-request timeout="30"
+      #                      follow-redirects="false"
+      #                      buffer-request-body="false"
+      #                      fail-on-error-status-code="true" />
+      #   </backend>
+      # </policies>
+      #
+      # Connection pooling is automatic in APIM for backend connections.
+      # Key settings:
+      #   - timeout="30": 30-second backend timeout (prevent cascading failures)
+      #   - buffer-request-body="false": Stream large payloads instead of buffering
+    bicep_pattern: |
+      // === App Service with HTTP/2 and Keep-Alive ===
+      resource appService 'Microsoft.Web/sites@2023-12-01' = {
+        name: appServiceName
+        location: location
+        properties: {
+          siteConfig: {
+            http20Enabled: true            // HTTP/2: multiplexing, header compression
+            webSocketsEnabled: false       // Disable if not used
+            alwaysOn: true                 // Prevent idle unload (Standard+)
+            minTlsVersion: '1.2'
+          }
+        }
+      }
+
+      // APIM connection pooling is automatic via backend policy.
+      // Configure timeout and streaming in API policy XML.
+    prohibitions:
+      - "NEVER disable HTTP/2 unless specifically required for compatibility — it provides significant performance improvements"
+      - "NEVER disable alwaysOn on Standard or higher plans — cold starts add 5-30 seconds to first request"
+      - "NEVER set backend timeout > 120 seconds in APIM — long timeouts cause cascading failures"
+      - "NEVER enable WebSockets unless the application requires bidirectional communication — it consumes persistent connections"
+
+  - id: NETPERF-003
+    severity: recommended
+    description: "Configure multi-region deployment with Traffic Manager or Front Door for latency-sensitive production workloads"
+    rationale: "Single-region deployment adds 50-300ms latency for users in distant regions; multi-region deployment ensures <50ms latency globally"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # === Traffic Manager for Multi-Region Routing ===
+      resource "azapi_resource" "traffic_manager" {
+        type      = "Microsoft.Network/trafficManagerProfiles@2022-04-01-preview"
+        name      = var.traffic_manager_name
+        location  = "global"
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            trafficRoutingMethod = "Performance"    # Route to closest region by latency
+            dnsConfig = {
+              relativeName = var.traffic_manager_dns_name
+              ttl          = 60                      # 60-second DNS TTL for fast failover
+            }
+            monitorConfig = {
+              protocol                  = "HTTPS"
+              port                      = 443
+              path                      = "/healthz"
+              intervalInSeconds         = 10         # Check every 10 seconds
+              timeoutInSeconds          = 5
+              toleratedNumberOfFailures = 3          # Failover after 3 consecutive failures
+            }
+          }
+        }
+      }
+
+      # Primary region endpoint
+      resource "azapi_resource" "tm_endpoint_primary" {
+        type      = "Microsoft.Network/trafficManagerProfiles/azureEndpoints@2022-04-01-preview"
+        name      = "primary-${var.primary_location}"
+        parent_id = azapi_resource.traffic_manager.id
+
+        body = {
+          properties = {
+            targetResourceId = azapi_resource.app_service_primary.id
+            endpointStatus   = "Enabled"
+            priority         = 1
+            weight           = 100
+          }
+        }
+      }
+
+      # Secondary region endpoint
+      resource "azapi_resource" "tm_endpoint_secondary" {
+        type      = "Microsoft.Network/trafficManagerProfiles/azureEndpoints@2022-04-01-preview"
+        name      = "secondary-${var.secondary_location}"
+        parent_id = azapi_resource.traffic_manager.id
+
+        body = {
+          properties = {
+            targetResourceId = azapi_resource.app_service_secondary.id
+            endpointStatus   = "Enabled"
+            priority         = 2
+            weight           = 100
+          }
+        }
+      }
+
+      # Multi-region guidance:
+      # - Use "Performance" routing for latency optimization
+      # - Use "Priority" routing for active-passive failover
+      # - Use "Weighted" routing for gradual rollout (canary deployments)
+      # - DNS TTL of 60s balances failover speed vs DNS cache hits
+    bicep_pattern: |
+      // === Traffic Manager for Multi-Region Routing ===
+      resource trafficManager 'Microsoft.Network/trafficManagerProfiles@2022-04-01-preview' = {
+        name: trafficManagerName
+        location: 'global'
+        properties: {
+          trafficRoutingMethod: 'Performance'     // Route to closest region
+          dnsConfig: {
+            relativeName: trafficManagerDnsName
+            ttl: 60
+          }
+          monitorConfig: {
+            protocol: 'HTTPS'
+            port: 443
+            path: '/healthz'
+            intervalInSeconds: 10
+            timeoutInSeconds: 5
+            toleratedNumberOfFailures: 3
+          }
+        }
+      }
+
+      resource tmEndpointPrimary 'Microsoft.Network/trafficManagerProfiles/azureEndpoints@2022-04-01-preview' = {
+        parent: trafficManager
+        name: 'primary-${primaryLocation}'
+        properties: {
+          targetResourceId: appServicePrimary.id
+          endpointStatus: 'Enabled'
+          priority: 1
+          weight: 100
+        }
+      }
+
+      resource tmEndpointSecondary 'Microsoft.Network/trafficManagerProfiles/azureEndpoints@2022-04-01-preview' = {
+        parent: trafficManager
+        name: 'secondary-${secondaryLocation}'
+        properties: {
+          targetResourceId: appServiceSecondary.id
+          endpointStatus: 'Enabled'
+          priority: 2
+          weight: 100
+        }
+      }
+    prohibitions:
+      - "NEVER deploy production latency-sensitive applications in a single region without explicit justification"
+      - "NEVER set DNS TTL > 300 seconds for multi-region deployments — slow DNS failover causes extended outages"
+      - "NEVER use Weighted routing for latency optimization — use Performance routing"
+      - "NEVER deploy multi-region without data replication strategy — compute failover without data failover is incomplete"
+      - "NEVER skip health probes on Traffic Manager endpoints — unhealthy origins must be removed from rotation"
+
+  - id: NETPERF-004
+    severity: recommended
+    description: "Enable accelerated networking for production VMs and VMSS to reduce latency and increase throughput"
+    rationale: "Accelerated networking bypasses the host virtual switch, reducing latency by 50% and increasing throughput by 2-5x. Available on D/E/F/M-series VMs"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # === NIC with Accelerated Networking ===
+      resource "azapi_resource" "nic_accelerated" {
+        type      = "Microsoft.Network/networkInterfaces@2024-01-01"
+        name      = var.nic_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            enableAcceleratedNetworking = true     # SR-IOV: bypass host virtual switch
+            ipConfigurations = [
+              {
+                name = "ipconfig1"
+                properties = {
+                  subnet = {
+                    id = var.subnet_id
+                  }
+                  privateIPAllocationMethod = "Dynamic"
+                }
+              }
+            ]
+          }
+        }
+      }
+
+      # === VMSS with Accelerated Networking ===
+      resource "azapi_resource" "vmss_accelerated" {
+        type      = "Microsoft.Compute/virtualMachineScaleSets@2024-03-01"
+        name      = var.vmss_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name     = "Standard_D4s_v5"     # Must be accelerated networking-compatible
+            capacity = 2
+          }
+          properties = {
+            virtualMachineProfile = {
+              networkProfile = {
+                networkInterfaceConfigurations = [
+                  {
+                    name = "nic-config"
+                    properties = {
+                      primary                       = true
+                      enableAcceleratedNetworking    = true
+                      ipConfigurations = [
+                        {
+                          name = "ipconfig1"
+                          properties = {
+                            subnet = {
+                              id = var.subnet_id
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+
+      # Supported VM sizes for Accelerated Networking:
+      # D-series: D2s_v5+, D4s_v5+, D8s_v5+
+      # E-series: E2s_v5+, E4s_v5+
+      # F-series: F2s_v2+, F4s_v2+
+      # NOT supported: B-series (burstable), A-series (legacy)
+    bicep_pattern: |
+      // === NIC with Accelerated Networking ===
+      resource nicAccelerated 'Microsoft.Network/networkInterfaces@2024-01-01' = {
+        name: nicName
+        location: location
+        properties: {
+          enableAcceleratedNetworking: true       // SR-IOV bypass
+          ipConfigurations: [
+            {
+              name: 'ipconfig1'
+              properties: {
+                subnet: {
+                  id: subnetId
+                }
+                privateIPAllocationMethod: 'Dynamic'
+              }
+            }
+          ]
+        }
+      }
+
+      // === VMSS with Accelerated Networking ===
+      resource vmssAccelerated 'Microsoft.Compute/virtualMachineScaleSets@2024-03-01' = {
+        name: vmssName
+        location: location
+        sku: {
+          name: 'Standard_D4s_v5'
+          capacity: 2
+        }
+        properties: {
+          virtualMachineProfile: {
+            networkProfile: {
+              networkInterfaceConfigurations: [
+                {
+                  name: 'nic-config'
+                  properties: {
+                    primary: true
+                    enableAcceleratedNetworking: true
+                    ipConfigurations: [
+                      {
+                        name: 'ipconfig1'
+                        properties: {
+                          subnet: {
+                            id: subnetId
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER deploy production VMs without accelerated networking on supported VM sizes"
+      - "NEVER enable accelerated networking on B-series (burstable) VMs — they do not support it"
+      - "NEVER enable accelerated networking on VMs with fewer than 2 vCPUs — minimum 2 vCPU required"
+
+  - id: NETPERF-005
+    severity: recommended
+    description: "Select ExpressRoute over VPN Gateway for production workloads requiring predictable latency, high throughput, or private network connectivity"
+    rationale: "VPN Gateway traffic traverses the public internet with variable latency; ExpressRoute provides dedicated private connectivity with guaranteed bandwidth and SLA"
+    applies_to: [cloud-architect, cost-analyst, terraform-agent, bicep-agent]
+    terraform_pattern: |
+      # === ExpressRoute vs VPN Decision Framework ===
+      #
+      # Use VPN Gateway when:
+      #   - Budget is constrained (VPN: ~$140-350/mo vs ExpressRoute: ~$250+/mo + provider fees)
+      #   - Bandwidth < 1 Gbps is sufficient
+      #   - Latency variability (10-50ms jitter) is acceptable
+      #   - Dev/POC environments
+      #
+      # Use ExpressRoute when:
+      #   - Predictable latency is required (< 10ms to Azure region)
+      #   - Bandwidth > 1 Gbps is needed
+      #   - Data sovereignty or compliance requires private connectivity
+      #   - Production workloads with SLA requirements
+      #   - Large data transfers (> 100 GB/month) — egress through ExpressRoute is cheaper
+      #
+      # ExpressRoute tiers:
+      #   Local:    Free egress, connects to nearest Azure region only
+      #   Standard: Connects to all regions in same geopolitical area
+      #   Premium:  Global connectivity across all Azure regions
+
+      # === ExpressRoute Circuit (Production) ===
+      resource "azapi_resource" "expressroute_circuit" {
+        type      = "Microsoft.Network/expressRouteCircuits@2024-01-01"
+        name      = var.expressroute_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name   = "Standard_MeteredData"      # Standard tier, metered data
+            tier   = "Standard"
+            family = "MeteredData"
+          }
+          properties = {
+            serviceProviderProperties = {
+              serviceProviderName = var.expressroute_provider
+              peeringLocation     = var.peering_location
+              bandwidthInMbps     = 1000           # 1 Gbps circuit
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // === ExpressRoute vs VPN Decision Framework ===
+      // VPN: ~$140-350/mo, variable latency, public internet
+      // ExpressRoute: ~$250+/mo + provider, predictable latency, private
+
+      // === ExpressRoute Circuit (Production) ===
+      resource expressRouteCircuit 'Microsoft.Network/expressRouteCircuits@2024-01-01' = {
+        name: expressRouteName
+        location: location
+        sku: {
+          name: 'Standard_MeteredData'
+          tier: 'Standard'
+          family: 'MeteredData'
+        }
+        properties: {
+          serviceProviderProperties: {
+            serviceProviderName: expressRouteProvider
+            peeringLocation: peeringLocation
+            bandwidthInMbps: 1000
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER use VPN Gateway for production workloads requiring < 10ms latency to Azure — use ExpressRoute"
+      - "NEVER use ExpressRoute for dev/POC — VPN Gateway is sufficient and significantly cheaper"
+      - "NEVER deploy ExpressRoute without redundant circuits — single circuit is a single point of failure"
+      - "NEVER use Basic VPN Gateway SKU for production — it lacks active-active and zone-redundancy"
+
+patterns:
+  - name: "Edge-optimized content delivery"
+    description: "Front Door/CDN for static content + API routing, with separate origin groups for static (Storage) and dynamic (App Service) content"
+  - name: "Multi-region active-active"
+    description: "Traffic Manager Performance routing with health probes for automatic failover to closest healthy region"
+
+anti_patterns:
+  - description: "Do not serve static content from application servers"
+    instead: "Host static content in Storage Account and serve through Front Door/CDN with edge caching"
+  - description: "Do not deploy production applications in a single region"
+    instead: "Use multi-region deployment with Traffic Manager or Front Door for latency and availability"
+  - description: "Do not use VPN Gateway for latency-sensitive production workloads"
+    instead: "Use ExpressRoute for predictable, low-latency private connectivity"
+  - description: "Do not skip accelerated networking for production VMs"
+    instead: "Enable enableAcceleratedNetworking on all D/E/F/M-series VM NICs"
+
+references:
+  - title: "Azure Front Door routing"
+    url: "https://learn.microsoft.com/azure/frontdoor/front-door-routing-architecture"
+  - title: "Traffic Manager routing methods"
+    url: "https://learn.microsoft.com/azure/traffic-manager/traffic-manager-routing-methods"
+  - title: "Accelerated Networking"
+    url: "https://learn.microsoft.com/azure/virtual-network/accelerated-networking-overview"
+  - title: "ExpressRoute overview"
+    url: "https://learn.microsoft.com/azure/expressroute/expressroute-introduction"
+  - title: "Multi-region web application"
+    url: "https://learn.microsoft.com/azure/architecture/reference-architectures/app-service-web-app/multi-region"

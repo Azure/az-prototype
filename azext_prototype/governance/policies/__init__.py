@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 SUPPORTED_API_VERSIONS = ("v1",)
 SUPPORTED_KINDS = ("policy",)
 VALID_SEVERITIES = ("required", "recommended", "optional")
-VALID_CATEGORIES = ("azure", "security", "integration", "cost", "data", "general")
+VALID_CATEGORIES = ("azure", "security", "integration", "cost", "performance", "reliability", "data", "general")
 
 # Required top-level keys that every policy file must contain
 _REQUIRED_TOP_KEYS = {"metadata"}
@@ -39,6 +39,17 @@ _REQUIRED_RULE_KEYS = {"id", "severity", "description", "applies_to"}
 
 
 @dataclass
+class CompanionResource:
+    """A resource that must accompany the primary resource."""
+
+    type: str
+    description: str
+    name: str = ""
+    terraform_pattern: str = ""
+    bicep_pattern: str = ""
+
+
+@dataclass
 class PolicyRule:
     """A single governance rule."""
 
@@ -47,6 +58,10 @@ class PolicyRule:
     description: str
     rationale: str = ""
     applies_to: list[str] = field(default_factory=list)
+    terraform_pattern: str = ""
+    bicep_pattern: str = ""
+    companion_resources: list[CompanionResource] = field(default_factory=list)
+    prohibitions: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -394,6 +409,91 @@ class PolicyEngine:
 
         return "\n".join(sections)
 
+    def resolve_for_stage(
+        self,
+        services: list[str],
+        iac_tool: str,
+        agent_name: str = "",
+    ) -> str:
+        """Resolve and format deterministic policies for a stage's services.
+
+        Uses **exact service matching** (not embeddings) to find all
+        policies that apply to the named services.  Returns a formatted
+        brief with the IaC-specific code patterns (terraform or bicep),
+        companion resources, and prohibitions.
+        """
+        if not self._loaded:
+            self.load()
+
+        if not services:
+            return ""
+
+        svc_set = {s.lower() for s in services}
+        matched_policies = []
+        for p in self._policies:
+            policy_svcs = set(p.services)
+            overlap = policy_svcs & svc_set
+            if not overlap:
+                continue
+            # Only include if the majority of the policy's services are in the stage,
+            # OR the policy is service-specific (1-2 services).
+            # This prevents cross-cutting policies (listing 5+ services) from
+            # dumping irrelevant content when only 1 service overlaps.
+            if len(policy_svcs) <= 2 or len(overlap) >= len(policy_svcs) / 2:
+                matched_policies.append(p)
+        if not matched_policies:
+            return ""
+
+        pattern_key = "terraform_pattern" if iac_tool == "terraform" else "bicep_pattern"
+        sections: list[str] = []
+
+        for policy in matched_policies:
+            rules = [
+                r
+                for r in policy.rules
+                if r.severity == "required" and (not agent_name or not r.applies_to or agent_name in r.applies_to)
+            ]
+            if not rules:
+                continue
+
+            sections.append(f"### {policy.name}")
+
+            for rule in rules:
+                sections.append(f"\n**[{rule.id}] {rule.description}**")
+                if rule.rationale:
+                    sections.append(f"Rationale: {rule.rationale}")
+
+                pattern = getattr(rule, pattern_key, "") or ""
+                if pattern.strip():
+                    sections.append(f"```\n{pattern.strip()}\n```")
+
+                for cr in rule.companion_resources:
+                    sections.append(f"\nCOMPANION RESOURCE: {cr.description}")
+                    cr_pattern = getattr(cr, pattern_key, "") or ""
+                    if cr_pattern.strip():
+                        sections.append(f"```\n{cr_pattern.strip()}\n```")
+
+                if rule.prohibitions:
+                    for p in rule.prohibitions:
+                        sections.append(f"- NEVER: {p}")
+
+            sections.append("")
+
+        if not sections:
+            return ""
+
+        header = (
+            "## MANDATORY RESOURCE POLICIES\n\n"
+            "The following policies define the REQUIRED baseline configuration for each resource.\n"
+            "You MUST include all properties, companion resources, and patterns specified below.\n"
+            "You MAY add additional properties required by the architecture (SKUs, database names,\n"
+            "app settings, etc.), but you must NEVER omit or contradict a policy directive.\n\n"
+            'If a policy says "NEVER use X", do not use X under any circumstances.\n'
+            "If a policy provides exact code, use it as your starting template and extend as needed.\n"
+        )
+
+        return header + "\n".join(sections)
+
     def list_policies(self) -> list[Policy]:
         """Return all loaded policies."""
         if not self._loaded:
@@ -416,6 +516,18 @@ class PolicyEngine:
         for r in data.get("rules", []):
             if not isinstance(r, dict):
                 continue
+            companions = []
+            for cr in r.get("companion_resources", []):
+                if isinstance(cr, dict):
+                    companions.append(
+                        CompanionResource(
+                            type=str(cr.get("type", "")),
+                            description=str(cr.get("description", "")),
+                            name=str(cr.get("name", "")),
+                            terraform_pattern=str(cr.get("terraform_pattern", "")),
+                            bicep_pattern=str(cr.get("bicep_pattern", "")),
+                        )
+                    )
             rules.append(
                 PolicyRule(
                     id=str(r.get("id", "")),
@@ -423,6 +535,10 @@ class PolicyEngine:
                     description=str(r.get("description", "")),
                     rationale=str(r.get("rationale", "")),
                     applies_to=r.get("applies_to", []),
+                    terraform_pattern=str(r.get("terraform_pattern", "")),
+                    bicep_pattern=str(r.get("bicep_pattern", "")),
+                    companion_resources=companions,
+                    prohibitions=r.get("prohibitions", []),
                 )
             )
 

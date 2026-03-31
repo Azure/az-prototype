@@ -1,0 +1,1281 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: high-availability
+  category: reliability
+  services:
+    - sql-database
+    - cosmos-db
+    - storage
+    - aks
+    - container-apps
+    - redis-cache
+    - service-bus
+    - app-service
+    - functions
+    - virtual-machines
+    - vmss
+    - load-balancer
+    - application-gateway
+    - front-door
+    - traffic-manager
+    - postgresql-flexible
+  last_reviewed: "2026-03-27"
+
+rules:
+  # ------------------------------------------------------------------ #
+  # HA-001: Zone redundancy for production PaaS services (WAF RE-02)
+  # ------------------------------------------------------------------ #
+  - id: HA-001
+    severity: recommended
+    description: >-
+      Enable zone redundancy for ALL production PaaS services.  Every
+      service that supports availability zones MUST be configured with
+      zone-redundant deployment.  This is the single most impactful
+      reliability control — it protects against datacenter-level failures
+      with zero application changes.  Configure the exact zone properties
+      per service type: zoneRedundant for Container Apps and Service Bus
+      Premium; zones for AKS node pools, VMs, and Public IPs; ZRS
+      replication for Storage; zone-redundant HA for SQL and PostgreSQL
+      Flexible; multi-AZ writes for Cosmos DB; zone redundancy for Redis
+      Enterprise.
+    rationale: >-
+      Azure availability zones are physically separated datacenters within
+      a region.  Zone-redundant deployments survive a full datacenter
+      failure (power, cooling, networking).  Without zone redundancy,
+      a single datacenter outage takes down the entire service.  Azure
+      SLA improves from 99.9% to 99.95%-99.99% with zone redundancy.
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # === Zone Redundancy per Service Type (azapi_resource) ===
+      # EVERY production PaaS resource MUST include zone configuration.
+
+      # --- SQL Database: Zone-redundant HA ---
+      resource "azapi_resource" "sql_database" {
+        type      = "Microsoft.Sql/servers/databases@2023-08-01-preview"
+        name      = var.sql_database_name
+        parent_id = azapi_resource.sql_server.id
+        location  = var.location
+
+        body = {
+          sku = {
+            name = "GP_Gen5"
+            tier = "GeneralPurpose"
+            capacity = 2
+          }
+          properties = {
+            zoneRedundant = true    # Zone-redundant HA for General Purpose / Business Critical
+            maxSizeBytes  = 34359738368  # 32 GB
+          }
+        }
+      }
+
+      # --- Cosmos DB: Multi-AZ (zone redundancy per region) ---
+      resource "azapi_resource" "cosmos_account" {
+        type      = "Microsoft.DocumentDB/databaseAccounts@2024-05-15"
+        name      = var.cosmos_account_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          properties = {
+            databaseAccountOfferType = "Standard"
+            locations = [
+              {
+                locationName     = var.location
+                failoverPriority = 0
+                isZoneRedundant  = true    # Enable availability zones for this region
+              }
+            ]
+            consistencyPolicy = {
+              defaultConsistencyLevel = "Session"
+            }
+          }
+        }
+      }
+
+      # --- Storage Account: Zone-Redundant Storage (ZRS) ---
+      resource "azapi_resource" "storage_account" {
+        type      = "Microsoft.Storage/storageAccounts@2023-05-01"
+        name      = var.storage_account_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          sku = {
+            name = "Standard_ZRS"    # Zone-Redundant Storage — 3 copies across 3 zones
+          }
+          kind = "StorageV2"
+          properties = {
+            minimumTlsVersion        = "TLS1_2"
+            supportsHttpsTrafficOnly = true
+            allowBlobPublicAccess    = false
+          }
+        }
+      }
+
+      # --- AKS: Zone-spanning node pools ---
+      resource "azapi_resource" "aks_cluster" {
+        type      = "Microsoft.ContainerService/managedClusters@2024-03-02-preview"
+        name      = var.aks_cluster_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          properties = {
+            agentPoolProfiles = [
+              {
+                name                = "system"
+                mode                = "System"
+                count               = 3
+                vmSize              = "Standard_D2s_v5"
+                osType              = "Linux"
+                availabilityZones   = ["1", "2", "3"]    # Spread across all 3 zones
+                enableAutoScaling   = true
+                minCount            = 3
+                maxCount            = 9
+              }
+            ]
+          }
+        }
+      }
+
+      # --- Container Apps Environment: Zone redundancy ---
+      resource "azapi_resource" "container_app_env" {
+        type      = "Microsoft.App/managedEnvironments@2024-03-01"
+        name      = var.container_app_env_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          properties = {
+            zoneRedundant = true    # Replicas distributed across availability zones
+            vnetConfiguration = {
+              infrastructureSubnetId = var.container_app_subnet_id
+              internal               = true
+            }
+          }
+        }
+      }
+
+      # --- Redis Cache: Zone redundancy (Premium tier required) ---
+      resource "azapi_resource" "redis_cache" {
+        type      = "Microsoft.Cache/redis@2024-03-01"
+        name      = var.redis_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          properties = {
+            sku = {
+              name     = "Premium"
+              family   = "P"
+              capacity = 1
+            }
+            replicasPerPrimary = 1
+            zones              = ["1", "2", "3"]    # Distribute replicas across zones
+            enableNonSslPort   = false
+            minimumTlsVersion  = "1.2"
+          }
+        }
+      }
+
+      # --- Service Bus: Zone redundancy (Premium tier, automatic) ---
+      resource "azapi_resource" "service_bus" {
+        type      = "Microsoft.ServiceBus/namespaces@2024-01-01"
+        name      = var.service_bus_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          sku = {
+            name     = "Premium"
+            tier     = "Premium"
+            capacity = 1
+          }
+          properties = {
+            zoneRedundant          = true    # Premium tier supports zone redundancy
+            minimumTlsVersion      = "1.2"
+            publicNetworkAccess    = "Disabled"
+            disableLocalAuth       = true
+          }
+        }
+      }
+
+      # --- PostgreSQL Flexible: Zone-redundant HA ---
+      resource "azapi_resource" "postgresql_flexible" {
+        type      = "Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01"
+        name      = var.postgresql_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          sku = {
+            name = "Standard_D2ds_v5"
+            tier = "GeneralPurpose"
+          }
+          properties = {
+            version = "16"
+            highAvailability = {
+              mode                    = "ZoneRedundant"    # Standby in different zone
+              standbyAvailabilityZone = "2"
+            }
+            availabilityZone = "1"
+            storage = {
+              storageSizeGB = 128
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Zone Redundancy per Service Type (Bicep) ===
+
+      // --- SQL Database: Zone-redundant HA ---
+      resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
+        parent: sqlServer
+        name: sqlDatabaseName
+        location: location
+        sku: {
+          name: 'GP_Gen5'
+          tier: 'GeneralPurpose'
+          capacity: 2
+        }
+        properties: {
+          zoneRedundant: true
+          maxSizeBytes: 34359738368
+        }
+      }
+
+      // --- Cosmos DB: Multi-AZ ---
+      resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
+        name: cosmosAccountName
+        location: location
+        properties: {
+          databaseAccountOfferType: 'Standard'
+          locations: [
+            {
+              locationName: location
+              failoverPriority: 0
+              isZoneRedundant: true
+            }
+          ]
+          consistencyPolicy: {
+            defaultConsistencyLevel: 'Session'
+          }
+        }
+      }
+
+      // --- Storage Account: ZRS ---
+      resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+        name: storageAccountName
+        location: location
+        sku: {
+          name: 'Standard_ZRS'
+        }
+        kind: 'StorageV2'
+        properties: {
+          minimumTlsVersion: 'TLS1_2'
+          supportsHttpsTrafficOnly: true
+          allowBlobPublicAccess: false
+        }
+      }
+
+      // --- AKS: Zone-spanning node pools ---
+      resource aksCluster 'Microsoft.ContainerService/managedClusters@2024-03-02-preview' = {
+        name: aksClusterName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          agentPoolProfiles: [
+            {
+              name: 'system'
+              mode: 'System'
+              count: 3
+              vmSize: 'Standard_D2s_v5'
+              osType: 'Linux'
+              availabilityZones: ['1', '2', '3']
+              enableAutoScaling: true
+              minCount: 3
+              maxCount: 9
+            }
+          ]
+        }
+      }
+
+      // --- Container Apps Environment: Zone redundancy ---
+      resource containerAppEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
+        name: containerAppEnvName
+        location: location
+        properties: {
+          zoneRedundant: true
+          vnetConfiguration: {
+            infrastructureSubnetId: containerAppSubnetId
+            internal: true
+          }
+        }
+      }
+
+      // --- Redis Cache: Zone redundancy (Premium) ---
+      resource redisCache 'Microsoft.Cache/redis@2024-03-01' = {
+        name: redisName
+        location: location
+        properties: {
+          sku: {
+            name: 'Premium'
+            family: 'P'
+            capacity: 1
+          }
+          replicasPerPrimary: 1
+          zones: ['1', '2', '3']
+          enableNonSslPort: false
+          minimumTlsVersion: '1.2'
+        }
+      }
+
+      // --- Service Bus: Zone redundancy (Premium) ---
+      resource serviceBusNamespace 'Microsoft.ServiceBus/namespaces@2024-01-01' = {
+        name: serviceBusName
+        location: location
+        sku: {
+          name: 'Premium'
+          tier: 'Premium'
+          capacity: 1
+        }
+        properties: {
+          zoneRedundant: true
+          minimumTlsVersion: '1.2'
+          publicNetworkAccess: 'Disabled'
+          disableLocalAuth: true
+        }
+      }
+
+      // --- PostgreSQL Flexible: Zone-redundant HA ---
+      resource postgresqlFlexible 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
+        name: postgresqlName
+        location: location
+        sku: {
+          name: 'Standard_D2ds_v5'
+          tier: 'GeneralPurpose'
+        }
+        properties: {
+          version: '16'
+          highAvailability: {
+            mode: 'ZoneRedundant'
+            standbyAvailabilityZone: '2'
+          }
+          availabilityZone: '1'
+          storage: {
+            storageSizeGB: 128
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER deploy production PaaS services without zone redundancy — a single datacenter failure will cause a full outage"
+      - "NEVER use Standard_LRS for production storage accounts — use Standard_ZRS or Standard_GZRS"
+      - "NEVER deploy AKS node pools without availabilityZones — nodes concentrated in one datacenter are a SPOF"
+      - "NEVER use Basic/Standard tier Redis in production — only Premium tier supports zone redundancy"
+      - "NEVER deploy Service Bus Standard tier for production — Premium tier is required for zone redundancy"
+      - "NEVER set PostgreSQL Flexible highAvailability.mode to SameZone for production — use ZoneRedundant"
+      - "NEVER omit zoneRedundant on Container Apps Environment for production workloads"
+      - "NEVER deploy SQL Database without zoneRedundant = true for General Purpose or Business Critical tiers"
+    template_check:
+      scope: [sql-database, cosmos-db, storage, container-apps, aks, redis-cache, service-bus, postgresql-flexible]
+      require_config: [zone_redundant]
+      error_message: "Service '{service_name}' ({service_type}) must configure zone_redundant for production reliability"
+
+  # ------------------------------------------------------------------ #
+  # HA-002: Multi-region deployment for critical workloads (WAF RE-02)
+  # ------------------------------------------------------------------ #
+  - id: HA-002
+    severity: recommended
+    description: >-
+      Deploy critical workloads across multiple Azure regions using
+      Azure Front Door or Traffic Manager for active-active or
+      active-passive failover.  Front Door is preferred for HTTP
+      workloads (global load balancing with WAF, SSL offload, and
+      sub-second failover).  Traffic Manager is for non-HTTP protocols
+      (DNS-based routing, 30-60s failover).  Each region must be
+      independently deployable with its own data tier.
+    rationale: >-
+      Multi-region deployment protects against region-wide outages
+      (natural disasters, regional Azure incidents).  Azure SLA for
+      multi-region architectures can reach 99.99%+.  Without multi-
+      region, a regional outage causes complete service unavailability.
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # === Multi-Region Active-Active with Azure Front Door ===
+
+      # --- Front Door Profile ---
+      resource "azapi_resource" "front_door" {
+        type      = "Microsoft.Cdn/profiles@2024-02-01"
+        name      = var.front_door_name
+        parent_id = azapi_resource.resource_group.id
+        location  = "global"
+
+        body = {
+          sku = {
+            name = "Premium_AzureFrontDoor"
+          }
+        }
+      }
+
+      # --- Front Door Endpoint ---
+      resource "azapi_resource" "fd_endpoint" {
+        type      = "Microsoft.Cdn/profiles/afdEndpoints@2024-02-01"
+        name      = var.fd_endpoint_name
+        parent_id = azapi_resource.front_door.id
+        location  = "global"
+
+        body = {
+          properties = {
+            enabledState = "Enabled"
+          }
+        }
+      }
+
+      # --- Origin Group with health probing ---
+      resource "azapi_resource" "fd_origin_group" {
+        type      = "Microsoft.Cdn/profiles/originGroups@2024-02-01"
+        name      = "app-origins"
+        parent_id = azapi_resource.front_door.id
+
+        body = {
+          properties = {
+            loadBalancingSettings = {
+              sampleSize                = 4
+              successfulSamplesRequired = 3
+              additionalLatencyInMilliseconds = 50
+            }
+            healthProbeSettings = {
+              probePath              = "/healthz"
+              probeRequestType       = "HEAD"
+              probeProtocol          = "Https"
+              probeIntervalInSeconds = 30
+            }
+            sessionAffinityState = "Disabled"
+          }
+        }
+      }
+
+      # --- Primary region origin ---
+      resource "azapi_resource" "fd_origin_primary" {
+        type      = "Microsoft.Cdn/profiles/originGroups/origins@2024-02-01"
+        name      = "primary-region"
+        parent_id = azapi_resource.fd_origin_group.id
+
+        body = {
+          properties = {
+            hostName          = var.primary_app_hostname
+            httpPort          = 80
+            httpsPort         = 443
+            originHostHeader  = var.primary_app_hostname
+            priority          = 1    # Active — receives traffic first
+            weight            = 1000
+            enabledState      = "Enabled"
+          }
+        }
+      }
+
+      # --- Secondary region origin ---
+      resource "azapi_resource" "fd_origin_secondary" {
+        type      = "Microsoft.Cdn/profiles/originGroups/origins@2024-02-01"
+        name      = "secondary-region"
+        parent_id = azapi_resource.fd_origin_group.id
+
+        body = {
+          properties = {
+            hostName          = var.secondary_app_hostname
+            httpPort          = 80
+            httpsPort         = 443
+            originHostHeader  = var.secondary_app_hostname
+            priority          = 1    # Same priority = active-active (use 2 for active-passive)
+            weight            = 1000
+            enabledState      = "Enabled"
+          }
+        }
+      }
+
+      # --- Route: connect endpoint to origin group ---
+      resource "azapi_resource" "fd_route" {
+        type      = "Microsoft.Cdn/profiles/afdEndpoints/routes@2024-02-01"
+        name      = "default-route"
+        parent_id = azapi_resource.fd_endpoint.id
+
+        body = {
+          properties = {
+            originGroup = {
+              id = azapi_resource.fd_origin_group.id
+            }
+            supportedProtocols   = ["Https"]
+            httpsRedirect        = "Enabled"
+            forwardingProtocol   = "HttpsOnly"
+            patternsToMatch      = ["/*"]
+            linkToDefaultDomain  = "Enabled"
+          }
+        }
+      }
+
+      # === Multi-Region with Traffic Manager (non-HTTP) ===
+      resource "azapi_resource" "traffic_manager" {
+        type      = "Microsoft.Network/trafficmanagerprofiles@2022-04-01"
+        name      = var.traffic_manager_name
+        parent_id = azapi_resource.resource_group.id
+        location  = "global"
+
+        body = {
+          properties = {
+            profileStatus        = "Enabled"
+            trafficRoutingMethod = "Performance"    # Route to closest healthy endpoint
+            dnsConfig = {
+              relativeName = var.traffic_manager_dns_name
+              ttl          = 30
+            }
+            monitorConfig = {
+              protocol                   = "HTTPS"
+              port                       = 443
+              path                       = "/healthz"
+              intervalInSeconds          = 10
+              toleratedNumberOfFailures  = 3
+              timeoutInSeconds           = 5
+            }
+          }
+        }
+      }
+
+      resource "azapi_resource" "tm_endpoint_primary" {
+        type      = "Microsoft.Network/trafficmanagerprofiles/azureEndpoints@2022-04-01"
+        name      = "primary"
+        parent_id = azapi_resource.traffic_manager.id
+
+        body = {
+          properties = {
+            targetResourceId = var.primary_resource_id
+            endpointStatus   = "Enabled"
+            weight           = 100
+            priority         = 1
+          }
+        }
+      }
+
+      resource "azapi_resource" "tm_endpoint_secondary" {
+        type      = "Microsoft.Network/trafficmanagerprofiles/azureEndpoints@2022-04-01"
+        name      = "secondary"
+        parent_id = azapi_resource.traffic_manager.id
+
+        body = {
+          properties = {
+            targetResourceId = var.secondary_resource_id
+            endpointStatus   = "Enabled"
+            weight           = 100
+            priority         = 2
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Multi-Region Active-Active with Azure Front Door ===
+
+      resource frontDoor 'Microsoft.Cdn/profiles@2024-02-01' = {
+        name: frontDoorName
+        location: 'global'
+        sku: {
+          name: 'Premium_AzureFrontDoor'
+        }
+      }
+
+      resource fdEndpoint 'Microsoft.Cdn/profiles/afdEndpoints@2024-02-01' = {
+        parent: frontDoor
+        name: fdEndpointName
+        location: 'global'
+        properties: {
+          enabledState: 'Enabled'
+        }
+      }
+
+      resource fdOriginGroup 'Microsoft.Cdn/profiles/originGroups@2024-02-01' = {
+        parent: frontDoor
+        name: 'app-origins'
+        properties: {
+          loadBalancingSettings: {
+            sampleSize: 4
+            successfulSamplesRequired: 3
+            additionalLatencyInMilliseconds: 50
+          }
+          healthProbeSettings: {
+            probePath: '/healthz'
+            probeRequestType: 'HEAD'
+            probeProtocol: 'Https'
+            probeIntervalInSeconds: 30
+          }
+          sessionAffinityState: 'Disabled'
+        }
+      }
+
+      resource fdOriginPrimary 'Microsoft.Cdn/profiles/originGroups/origins@2024-02-01' = {
+        parent: fdOriginGroup
+        name: 'primary-region'
+        properties: {
+          hostName: primaryAppHostname
+          httpPort: 80
+          httpsPort: 443
+          originHostHeader: primaryAppHostname
+          priority: 1
+          weight: 1000
+          enabledState: 'Enabled'
+        }
+      }
+
+      resource fdOriginSecondary 'Microsoft.Cdn/profiles/originGroups/origins@2024-02-01' = {
+        parent: fdOriginGroup
+        name: 'secondary-region'
+        properties: {
+          hostName: secondaryAppHostname
+          httpPort: 80
+          httpsPort: 443
+          originHostHeader: secondaryAppHostname
+          priority: 1
+          weight: 1000
+          enabledState: 'Enabled'
+        }
+      }
+
+      resource fdRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2024-02-01' = {
+        parent: fdEndpoint
+        name: 'default-route'
+        properties: {
+          originGroup: {
+            id: fdOriginGroup.id
+          }
+          supportedProtocols: ['Https']
+          httpsRedirect: 'Enabled'
+          forwardingProtocol: 'HttpsOnly'
+          patternsToMatch: ['/*']
+          linkToDefaultDomain: 'Enabled'
+        }
+      }
+
+      // === Multi-Region with Traffic Manager (non-HTTP) ===
+      resource trafficManager 'Microsoft.Network/trafficmanagerprofiles@2022-04-01' = {
+        name: trafficManagerName
+        location: 'global'
+        properties: {
+          profileStatus: 'Enabled'
+          trafficRoutingMethod: 'Performance'
+          dnsConfig: {
+            relativeName: trafficManagerDnsName
+            ttl: 30
+          }
+          monitorConfig: {
+            protocol: 'HTTPS'
+            port: 443
+            path: '/healthz'
+            intervalInSeconds: 10
+            toleratedNumberOfFailures: 3
+            timeoutInSeconds: 5
+          }
+        }
+      }
+
+      resource tmEndpointPrimary 'Microsoft.Network/trafficmanagerprofiles/azureEndpoints@2022-04-01' = {
+        parent: trafficManager
+        name: 'primary'
+        properties: {
+          targetResourceId: primaryResourceId
+          endpointStatus: 'Enabled'
+          weight: 100
+          priority: 1
+        }
+      }
+
+      resource tmEndpointSecondary 'Microsoft.Network/trafficmanagerprofiles/azureEndpoints@2022-04-01' = {
+        parent: trafficManager
+        name: 'secondary'
+        properties: {
+          targetResourceId: secondaryResourceId
+          endpointStatus: 'Enabled'
+          weight: 100
+          priority: 2
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Cdn/profiles/securityPolicies@2024-02-01"
+        description: "WAF policy attached to Front Door endpoint for DDoS and bot protection"
+      - type: "Microsoft.Network/privateLinkServices@2023-11-01"
+        description: "Private Link service for Front Door to origin connectivity (Private Link origin)"
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        description: "Diagnostic settings for Front Door access logs and health probe logs"
+    prohibitions:
+      - "NEVER use single-region deployment for workloads requiring SLA > 99.9% — multi-region is required"
+      - "NEVER use Traffic Manager for HTTP workloads — use Front Door for sub-second failover and WAF integration"
+      - "NEVER set both origin priorities to different values for active-active — use same priority with equal weights"
+      - "NEVER omit health probe settings on Front Door origin groups — unhealthy origins must be detected automatically"
+      - "NEVER use Front Door Standard tier for production — Premium tier is required for Private Link origins and WAF"
+
+  # ------------------------------------------------------------------ #
+  # HA-003: Availability zones for VMs (WAF RE-02)
+  # ------------------------------------------------------------------ #
+  - id: HA-003
+    severity: required
+    description: >-
+      Deploy production VMs and VM Scale Sets across availability zones.
+      Single VMs MUST specify a zones property.  VM Scale Sets MUST use
+      zones = ["1", "2", "3"] with max spreading (platformFaultDomainCount = 1)
+      for optimal zone distribution.  Availability sets are legacy — use
+      zones instead for new deployments.
+    rationale: >-
+      VMs without zone placement risk co-location in a single datacenter.
+      Availability zones provide 99.99% SLA vs 99.95% for availability sets.
+      Zone-redundant VMSS automatically balances instances across zones.
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # === VM with Availability Zone Placement ===
+      resource "azapi_resource" "virtual_machine" {
+        type      = "Microsoft.Compute/virtualMachines@2024-03-01"
+        name      = var.vm_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          zones = ["1"]    # Pin to specific zone — use 1, 2, or 3
+          properties = {
+            hardwareProfile = {
+              vmSize = var.vm_size
+            }
+            osProfile = {
+              computerName  = var.vm_name
+              adminUsername  = var.admin_username
+              linuxConfiguration = {
+                disablePasswordAuthentication = true
+                ssh = {
+                  publicKeys = [
+                    {
+                      path    = "/home/${var.admin_username}/.ssh/authorized_keys"
+                      keyData = var.ssh_public_key
+                    }
+                  ]
+                }
+              }
+            }
+            storageProfile = {
+              osDisk = {
+                createOption = "FromImage"
+                managedDisk = {
+                  storageAccountType = "Premium_ZRS"    # Zone-redundant managed disk
+                }
+              }
+              imageReference = {
+                publisher = "Canonical"
+                offer     = "ubuntu-24_04-lts"
+                sku       = "server"
+                version   = "latest"
+              }
+            }
+            networkProfile = {
+              networkInterfaces = [
+                {
+                  id = azapi_resource.nic.id
+                }
+              ]
+            }
+          }
+        }
+      }
+
+      # === VMSS with Zone Spreading ===
+      resource "azapi_resource" "vmss" {
+        type      = "Microsoft.Compute/virtualMachineScaleSets@2024-03-01"
+        name      = var.vmss_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          sku = {
+            name     = var.vm_size
+            tier     = "Standard"
+            capacity = var.instance_count
+          }
+          zones = ["1", "2", "3"]    # Spread across all 3 zones
+          properties = {
+            orchestrationMode             = "Flexible"
+            platformFaultDomainCount      = 1    # Max spreading across zones
+            singlePlacementGroup          = false
+            upgradePolicy = {
+              mode = "Rolling"
+              rollingUpgradePolicy = {
+                maxBatchInstancePercent              = 20
+                maxUnhealthyInstancePercent           = 20
+                maxUnhealthyUpgradedInstancePercent   = 5
+                pauseTimeBetweenBatches               = "PT2S"
+              }
+            }
+            automaticRepairsPolicy = {
+              enabled     = true
+              gracePeriod = "PT10M"
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // === VM with Availability Zone Placement ===
+      resource virtualMachine 'Microsoft.Compute/virtualMachines@2024-03-01' = {
+        name: vmName
+        location: location
+        zones: ['1']
+        properties: {
+          hardwareProfile: {
+            vmSize: vmSize
+          }
+          osProfile: {
+            computerName: vmName
+            adminUsername: adminUsername
+            linuxConfiguration: {
+              disablePasswordAuthentication: true
+              ssh: {
+                publicKeys: [
+                  {
+                    path: '/home/${adminUsername}/.ssh/authorized_keys'
+                    keyData: sshPublicKey
+                  }
+                ]
+              }
+            }
+          }
+          storageProfile: {
+            osDisk: {
+              createOption: 'FromImage'
+              managedDisk: {
+                storageAccountType: 'Premium_ZRS'
+              }
+            }
+            imageReference: {
+              publisher: 'Canonical'
+              offer: 'ubuntu-24_04-lts'
+              sku: 'server'
+              version: 'latest'
+            }
+          }
+          networkProfile: {
+            networkInterfaces: [
+              {
+                id: nic.id
+              }
+            ]
+          }
+        }
+      }
+
+      // === VMSS with Zone Spreading ===
+      resource vmss 'Microsoft.Compute/virtualMachineScaleSets@2024-03-01' = {
+        name: vmssName
+        location: location
+        sku: {
+          name: vmSize
+          tier: 'Standard'
+          capacity: instanceCount
+        }
+        zones: ['1', '2', '3']
+        properties: {
+          orchestrationMode: 'Flexible'
+          platformFaultDomainCount: 1
+          singlePlacementGroup: false
+          upgradePolicy: {
+            mode: 'Rolling'
+            rollingUpgradePolicy: {
+              maxBatchInstancePercent: 20
+              maxUnhealthyInstancePercent: 20
+              maxUnhealthyUpgradedInstancePercent: 5
+              pauseTimeBetweenBatches: 'PT2S'
+            }
+          }
+          automaticRepairsPolicy: {
+            enabled: true
+            gracePeriod: 'PT10M'
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER deploy production VMs without specifying zones — VMs without zones may land in any datacenter"
+      - "NEVER use Standard_LRS managed disks with zonal VMs — use Premium_ZRS or StandardSSD_ZRS for zone resilience"
+      - "NEVER use availability sets for new deployments — availability zones provide superior fault isolation"
+      - "NEVER set platformFaultDomainCount > 1 for zone-spanning VMSS — use 1 for max spreading"
+      - "NEVER disable automatic repairs on production VMSS — unhealthy instances must be replaced automatically"
+
+  # ------------------------------------------------------------------ #
+  # HA-004: Health probes for load-balanced services (WAF RE-04)
+  # ------------------------------------------------------------------ #
+  - id: HA-004
+    severity: required
+    description: >-
+      Configure health probes for ALL load-balanced services.  Every
+      Load Balancer, Application Gateway, and Front Door MUST have
+      health probes that check application-level health (not just TCP
+      connectivity).  Use HTTP/HTTPS probes with a dedicated /healthz
+      endpoint that validates downstream dependencies.  Probes must
+      have appropriate intervals and thresholds to balance detection
+      speed with false-positive avoidance.
+    rationale: >-
+      Health probes are the foundation of automatic failover.  Without
+      application-level health checks, traffic continues flowing to
+      unhealthy backends.  TCP-only probes miss application-level
+      failures (database down, disk full, deadlock).
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # === Load Balancer Health Probe ===
+      resource "azapi_resource" "lb_probe" {
+        type      = "Microsoft.Network/loadBalancers/probes@2023-11-01"
+        name      = "health-probe"
+        parent_id = azapi_resource.load_balancer.id
+
+        body = {
+          properties = {
+            protocol            = "Https"
+            port                = 443
+            requestPath         = "/healthz"
+            intervalInSeconds   = 5       # Check every 5 seconds
+            numberOfProbes      = 2       # Mark unhealthy after 2 consecutive failures
+            probeThreshold      = 2
+          }
+        }
+      }
+
+      # === Application Gateway Health Probe ===
+      # Health probes are defined inline in Application Gateway properties
+      resource "azapi_resource" "app_gateway" {
+        type      = "Microsoft.Network/applicationGateways@2023-11-01"
+        name      = var.app_gateway_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          properties = {
+            probes = [
+              {
+                name = "app-health-probe"
+                properties = {
+                  protocol                          = "Https"
+                  host                              = var.backend_hostname
+                  path                              = "/healthz"
+                  interval                          = 10
+                  timeout                           = 10
+                  unhealthyThreshold                = 3
+                  pickHostNameFromBackendHttpSettings = false
+                  match = {
+                    statusCodes = ["200-299"]
+                  }
+                }
+              }
+            ]
+            # Reference probe in backend HTTP settings
+            backendHttpSettingsCollection = [
+              {
+                name = "app-backend-settings"
+                properties = {
+                  port                  = 443
+                  protocol              = "Https"
+                  cookieBasedAffinity   = "Disabled"
+                  requestTimeout        = 30
+                  probe = {
+                    id = "${azapi_resource.app_gateway.id}/probes/app-health-probe"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+
+      # === Front Door Health Probe (configured on origin group) ===
+      # See HA-002 for full Front Door pattern — health probes are
+      # configured in the origin group's healthProbeSettings block:
+      #   healthProbeSettings = {
+      #     probePath              = "/healthz"
+      #     probeRequestType       = "HEAD"
+      #     probeProtocol          = "Https"
+      #     probeIntervalInSeconds = 30
+      #   }
+    bicep_pattern: |
+      // === Load Balancer Health Probe ===
+      resource lbProbe 'Microsoft.Network/loadBalancers/probes@2023-11-01' = {
+        parent: loadBalancer
+        name: 'health-probe'
+        properties: {
+          protocol: 'Https'
+          port: 443
+          requestPath: '/healthz'
+          intervalInSeconds: 5
+          numberOfProbes: 2
+          probeThreshold: 2
+        }
+      }
+
+      // === Application Gateway Health Probe ===
+      resource appGateway 'Microsoft.Network/applicationGateways@2023-11-01' = {
+        name: appGatewayName
+        location: location
+        properties: {
+          probes: [
+            {
+              name: 'app-health-probe'
+              properties: {
+                protocol: 'Https'
+                host: backendHostname
+                path: '/healthz'
+                interval: 10
+                timeout: 10
+                unhealthyThreshold: 3
+                pickHostNameFromBackendHttpSettings: false
+                match: {
+                  statusCodes: ['200-299']
+                }
+              }
+            }
+          ]
+          backendHttpSettingsCollection: [
+            {
+              name: 'app-backend-settings'
+              properties: {
+                port: 443
+                protocol: 'Https'
+                cookieBasedAffinity: 'Disabled'
+                requestTimeout: 30
+                probe: {
+                  id: '${appGateway.id}/probes/app-health-probe'
+                }
+              }
+            }
+          ]
+        }
+      }
+
+      // Front Door health probes: see HA-002 origin group healthProbeSettings
+    prohibitions:
+      - "NEVER use TCP-only health probes in production — they miss application-level failures (database down, OOM, deadlock)"
+      - "NEVER set health probe intervals longer than 30 seconds — slow detection means prolonged traffic to unhealthy backends"
+      - "NEVER omit health probes on load-balanced services — traffic will continue flowing to failed backends indefinitely"
+      - "NEVER use the root path (/) for health probes — use a dedicated /healthz endpoint that checks downstream dependencies"
+      - "NEVER set unhealthyThreshold to 1 — a single failed probe causes premature removal; use 2-3 for stability"
+
+  # ------------------------------------------------------------------ #
+  # HA-005: Database geo-replication (WAF RE-02, RE-03)
+  # ------------------------------------------------------------------ #
+  - id: HA-005
+    severity: recommended
+    description: >-
+      Configure geo-replication for all production databases.  SQL Database
+      must have active geo-replication or auto-failover groups to a paired
+      region.  Cosmos DB must have multi-region writes enabled with
+      automatic failover.  PostgreSQL Flexible must have read replicas
+      in a secondary region.  Geo-replication provides both read scaling
+      and disaster recovery.
+    rationale: >-
+      Geo-replication protects against region-wide outages and reduces
+      read latency for geographically distributed users.  Without geo-
+      replication, a regional outage causes complete data unavailability
+      with potential data loss up to the last backup (RPO of hours).
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # === SQL Database Auto-Failover Group ===
+      resource "azapi_resource" "sql_failover_group" {
+        type      = "Microsoft.Sql/servers/failoverGroups@2023-08-01-preview"
+        name      = var.failover_group_name
+        parent_id = azapi_resource.sql_server_primary.id
+
+        body = {
+          properties = {
+            partnerServers = [
+              {
+                id = azapi_resource.sql_server_secondary.id
+              }
+            ]
+            readWriteEndpoint = {
+              failoverPolicy                = "Automatic"
+              failoverWithDataLossGracePeriodMinutes = 60
+            }
+            readOnlyEndpoint = {
+              failoverPolicy = "Enabled"    # Read-only endpoint fails over too
+            }
+            databases = [
+              azapi_resource.sql_database.id
+            ]
+          }
+        }
+      }
+
+      # === Cosmos DB Multi-Region Writes ===
+      resource "azapi_resource" "cosmos_multi_region" {
+        type      = "Microsoft.DocumentDB/databaseAccounts@2024-05-15"
+        name      = var.cosmos_account_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.primary_location
+
+        body = {
+          properties = {
+            databaseAccountOfferType = "Standard"
+            enableMultipleWriteLocations = true    # Multi-region writes
+            enableAutomaticFailover      = true    # Automatic failover on region outage
+            locations = [
+              {
+                locationName     = var.primary_location
+                failoverPriority = 0
+                isZoneRedundant  = true
+              },
+              {
+                locationName     = var.secondary_location
+                failoverPriority = 1
+                isZoneRedundant  = true
+              }
+            ]
+            consistencyPolicy = {
+              defaultConsistencyLevel = "Session"
+              maxIntervalInSeconds    = 5
+              maxStalenessPrefix      = 100
+            }
+          }
+        }
+      }
+
+      # === PostgreSQL Flexible Read Replica ===
+      resource "azapi_resource" "postgresql_replica" {
+        type      = "Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01"
+        name      = var.postgresql_replica_name
+        parent_id = azapi_resource.resource_group_secondary.id
+        location  = var.secondary_location
+
+        body = {
+          properties = {
+            createMode       = "Replica"
+            sourceServerResourceId = azapi_resource.postgresql_primary.id
+            availabilityZone = "1"
+          }
+        }
+      }
+    bicep_pattern: |
+      // === SQL Database Auto-Failover Group ===
+      resource sqlFailoverGroup 'Microsoft.Sql/servers/failoverGroups@2023-08-01-preview' = {
+        parent: sqlServerPrimary
+        name: failoverGroupName
+        properties: {
+          partnerServers: [
+            {
+              id: sqlServerSecondary.id
+            }
+          ]
+          readWriteEndpoint: {
+            failoverPolicy: 'Automatic'
+            failoverWithDataLossGracePeriodMinutes: 60
+          }
+          readOnlyEndpoint: {
+            failoverPolicy: 'Enabled'
+          }
+          databases: [
+            sqlDatabase.id
+          ]
+        }
+      }
+
+      // === Cosmos DB Multi-Region Writes ===
+      resource cosmosMultiRegion 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
+        name: cosmosAccountName
+        location: primaryLocation
+        properties: {
+          databaseAccountOfferType: 'Standard'
+          enableMultipleWriteLocations: true
+          enableAutomaticFailover: true
+          locations: [
+            {
+              locationName: primaryLocation
+              failoverPriority: 0
+              isZoneRedundant: true
+            }
+            {
+              locationName: secondaryLocation
+              failoverPriority: 1
+              isZoneRedundant: true
+            }
+          ]
+          consistencyPolicy: {
+            defaultConsistencyLevel: 'Session'
+            maxIntervalInSeconds: 5
+            maxStalenessPrefix: 100
+          }
+        }
+      }
+
+      // === PostgreSQL Flexible Read Replica ===
+      resource postgresqlReplica 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
+        name: postgresqlReplicaName
+        location: secondaryLocation
+        properties: {
+          createMode: 'Replica'
+          sourceServerResourceId: postgresqlPrimary.id
+          availabilityZone: '1'
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Sql/servers@2023-08-01-preview"
+        description: "Secondary SQL Server in paired region for failover group partner"
+      - type: "Microsoft.Network/privateEndpoints@2023-11-01"
+        description: "Private endpoints for secondary region database servers"
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        description: "Diagnostic settings for replication lag monitoring and failover events"
+    prohibitions:
+      - "NEVER deploy production SQL databases without failover groups or active geo-replication — RPO is limited to last backup (hours)"
+      - "NEVER set failoverWithDataLossGracePeriodMinutes below 30 — too aggressive causes unnecessary failovers"
+      - "NEVER disable automatic failover on Cosmos DB with multiple regions — manual failover requires human intervention during outages"
+      - "NEVER use Strong consistency for multi-region Cosmos DB writes — it requires synchronous cross-region replication and dramatically increases latency"
+
+patterns:
+  - name: "Health endpoint pattern"
+    description: >-
+      Implement a /healthz endpoint in every service that checks all
+      downstream dependencies (database connectivity, cache availability,
+      external API reachability) and returns structured health status.
+    example: |
+      // ASP.NET Core health check pattern
+      builder.Services.AddHealthChecks()
+          .AddSqlServer(connectionString, name: "sql", tags: new[] { "ready" })
+          .AddRedis(redisConnectionString, name: "redis", tags: new[] { "ready" })
+          .AddUrlGroup(new Uri(externalApiUrl), name: "external-api", tags: new[] { "ready" });
+
+      app.MapHealthChecks("/healthz", new HealthCheckOptions {
+          Predicate = _ => true,
+          ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+      });
+
+      app.MapHealthChecks("/healthz/live", new HealthCheckOptions {
+          Predicate = _ => false  // Liveness: just check process is running
+      });
+
+      app.MapHealthChecks("/healthz/ready", new HealthCheckOptions {
+          Predicate = check => check.Tags.Contains("ready")
+      });
+
+anti_patterns:
+  - description: "Deploying all resources in a single availability zone without zone redundancy"
+    instead: "Spread resources across availability zones 1, 2, and 3 for datacenter-level fault tolerance"
+  - description: "Using TCP health probes that only check port availability"
+    instead: "Use HTTP/HTTPS health probes with /healthz endpoint that validates application and dependency health"
+  - description: "Relying on single-region deployment for production workloads"
+    instead: "Deploy to at least two regions with Front Door or Traffic Manager for automatic failover"
+  - description: "Using Standard_LRS storage for production data"
+    instead: "Use Standard_ZRS (zone-redundant) or Standard_GZRS (geo-zone-redundant) for production storage"
+  - description: "Deploying databases without geo-replication"
+    instead: "Configure SQL failover groups, Cosmos DB multi-region, or PostgreSQL read replicas for DR"
+
+references:
+  - title: "Azure Well-Architected Framework — Reliability pillar"
+    url: "https://learn.microsoft.com/azure/well-architected/reliability/"
+  - title: "Availability zones and regions"
+    url: "https://learn.microsoft.com/azure/reliability/availability-zones-overview"
+  - title: "Azure Front Door — origins and origin groups"
+    url: "https://learn.microsoft.com/azure/frontdoor/origin"
+  - title: "SQL Database auto-failover groups"
+    url: "https://learn.microsoft.com/azure/azure-sql/database/auto-failover-group-overview"
+  - title: "Health endpoint monitoring pattern"
+    url: "https://learn.microsoft.com/azure/architecture/patterns/health-endpoint-monitoring"

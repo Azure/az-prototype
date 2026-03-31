@@ -21,7 +21,7 @@ Choose PostgreSQL Flexible Server over Azure SQL when the team prefers PostgreSQ
 | High availability | Disabled | POC doesn't need zone-redundant HA |
 | Backup retention | 7 days | Default; sufficient for POC |
 | Authentication | Azure AD + password | AAD for app, password for admin bootstrap |
-| Public network access | Enabled (POC) | Flag private access as production backlog item |
+| Public network access | Disabled (unless user overrides) | Flag private access as production backlog item |
 
 ## Terraform Patterns
 
@@ -38,7 +38,7 @@ resource "azurerm_postgresql_flexible_server" "this" {
   auto_grow_enabled             = true
   backup_retention_days         = 7
   geo_redundant_backup_enabled  = false
-  public_network_access_enabled = true  # Set false when using private access
+  public_network_access_enabled = false  # Unless told otherwise, disabled per governance policy
 
   authentication {
     active_directory_auth_enabled = true

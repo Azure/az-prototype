@@ -1,0 +1,238 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: log-analytics
+  category: azure
+  services: [log-analytics]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: LA-001
+    severity: required
+    description: "Create Log Analytics Workspace with PerGB2018 SKU and appropriate retention"
+    rationale: "PerGB2018 is the standard pricing tier; retention controls cost and compliance requirements"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "log_analytics_workspace" {
+        type      = "Microsoft.OperationalInsights/workspaces@2023-09-01"
+        name      = var.log_analytics_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            sku = {
+              name = "PerGB2018"
+            }
+            retentionInDays                      = 30
+            publicNetworkAccessForIngestion       = "Disabled"
+            publicNetworkAccessForQuery           = "Disabled"
+            features = {
+              enableLogAccessUsingOnlyResourcePermissions = true
+            }
+          }
+        }
+      }
+
+      output "log_analytics_workspace_id" {
+        value = azapi_resource.log_analytics_workspace.id
+      }
+
+      output "log_analytics_customer_id" {
+        value = azapi_resource.log_analytics_workspace.output.properties.customerId
+      }
+    bicep_pattern: |
+      resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+        name: logAnalyticsName
+        location: location
+        properties: {
+          sku: {
+            name: 'PerGB2018'
+          }
+          retentionInDays: 30
+          publicNetworkAccessForIngestion: 'Disabled'
+          publicNetworkAccessForQuery: 'Disabled'
+          features: {
+            enableLogAccessUsingOnlyResourcePermissions: true
+          }
+        }
+      }
+
+      output logAnalyticsWorkspaceId string = logAnalyticsWorkspace.id
+      output logAnalyticsCustomerId string = logAnalyticsWorkspace.properties.customerId
+    companion_resources:
+      - type: "Microsoft.Network/privateEndpoints@2024-01-01"
+        description: "Private endpoint for Log Analytics ingestion — required when publicNetworkAccessForIngestion is Disabled"
+        terraform_pattern: |
+          resource "azapi_resource" "la_private_endpoint" {
+            type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+            name      = "pe-${var.log_analytics_name}"
+            location  = var.location
+            parent_id = azapi_resource.resource_group.id
+
+            body = {
+              properties = {
+                subnet = {
+                  id = var.private_endpoint_subnet_id
+                }
+                privateLinkServiceConnections = [
+                  {
+                    name = "pe-${var.log_analytics_name}"
+                    properties = {
+                      privateLinkServiceId = azapi_resource.log_analytics_workspace.id
+                      groupIds             = ["azuremonitor"]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource laPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+            name: 'pe-${logAnalyticsName}'
+            location: location
+            properties: {
+              subnet: {
+                id: privateEndpointSubnetId
+              }
+              privateLinkServiceConnections: [
+                {
+                  name: 'pe-${logAnalyticsName}'
+                  properties: {
+                    privateLinkServiceId: logAnalyticsWorkspace.id
+                    groupIds: [
+                      'azuremonitor'
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Network/privateDnsZones@2020-06-01"
+        description: "Private DNS zones for Log Analytics private endpoint resolution (requires multiple zones)"
+        terraform_pattern: |
+          locals {
+            monitor_dns_zones = [
+              "privatelink.oms.opinsights.azure.com",
+              "privatelink.ods.opinsights.azure.com",
+              "privatelink.agentsvc.azure-automation.net",
+              "privatelink.monitor.azure.com"
+            ]
+          }
+
+          resource "azapi_resource" "la_dns_zones" {
+            for_each  = toset(local.monitor_dns_zones)
+            type      = "Microsoft.Network/privateDnsZones@2020-06-01"
+            name      = each.value
+            location  = "global"
+            parent_id = azapi_resource.resource_group.id
+          }
+
+          resource "azapi_resource" "la_dns_zone_links" {
+            for_each  = toset(local.monitor_dns_zones)
+            type      = "Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01"
+            name      = "link-${var.vnet_name}"
+            location  = "global"
+            parent_id = azapi_resource.la_dns_zones[each.key].id
+
+            body = {
+              properties = {
+                virtualNetwork = {
+                  id = var.vnet_id
+                }
+                registrationEnabled = false
+              }
+            }
+          }
+
+          resource "azapi_resource" "la_pe_dns_group" {
+            type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-01-01"
+            name      = "default"
+            parent_id = azapi_resource.la_private_endpoint.id
+
+            body = {
+              properties = {
+                privateDnsZoneConfigs = [
+                  for zone in local.monitor_dns_zones : {
+                    name = replace(zone, ".", "-")
+                    properties = {
+                      privateDnsZoneId = azapi_resource.la_dns_zones[zone].id
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          var monitorDnsZones = [
+            'privatelink.oms.opinsights.azure.com'
+            'privatelink.ods.opinsights.azure.com'
+            'privatelink.agentsvc.azure-automation.net'
+            'privatelink.monitor.azure.com'
+          ]
+
+          resource laDnsZones 'Microsoft.Network/privateDnsZones@2020-06-01' = [for zone in monitorDnsZones: {
+            name: zone
+            location: 'global'
+          }]
+
+          resource laDnsZoneLinks 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = [for (zone, i) in monitorDnsZones: {
+            parent: laDnsZones[i]
+            name: 'link-${vnetName}'
+            location: 'global'
+            properties: {
+              virtualNetwork: {
+                id: vnetId
+              }
+              registrationEnabled: false
+            }
+          }]
+
+          resource laPeDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-01-01' = {
+            parent: laPrivateEndpoint
+            name: 'default'
+            properties: {
+              privateDnsZoneConfigs: [for (zone, i) in monitorDnsZones: {
+                name: replace(zone, '.', '-')
+                properties: {
+                  privateDnsZoneId: laDnsZones[i].id
+                }
+              }]
+            }
+          }
+    prohibitions:
+      - "NEVER use Free SKU for production or shared workspaces — use PerGB2018"
+      - "NEVER set retentionInDays below 30 for compliance-sensitive workloads"
+      - "NEVER set publicNetworkAccessForIngestion to Enabled when private endpoints are available"
+      - "NEVER set publicNetworkAccessForQuery to Enabled when private endpoints are available"
+
+  - id: LA-002
+    severity: required
+    description: "Output workspace ID and customer ID for downstream diagnostic settings"
+    rationale: "All PaaS resources need the workspace ID for diagnostic settings; Container Apps need the customer ID"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+  - id: LA-003
+    severity: recommended
+    description: "Set retention to 30 days for POC, 90 days for production"
+    rationale: "Longer retention increases cost; 30 days is sufficient for POC troubleshooting"
+    applies_to: [cloud-architect, cost-analyst]
+
+patterns:
+  - name: "Log Analytics Workspace with private endpoint"
+    description: "Complete Log Analytics deployment with PerGB2018 SKU, private access, and DNS configuration"
+
+anti_patterns:
+  - description: "Do not deploy resources without routing diagnostics to Log Analytics"
+    instead: "Create diagnostic settings on every PaaS resource pointing to the shared workspace"
+  - description: "Do not use Free SKU for shared workspaces"
+    instead: "Use PerGB2018 for predictable pricing and full feature set"
+
+references:
+  - title: "Log Analytics workspace overview"
+    url: "https://learn.microsoft.com/azure/azure-monitor/logs/log-analytics-workspace-overview"
+  - title: "Azure Monitor private link"
+    url: "https://learn.microsoft.com/azure/azure-monitor/logs/private-link-security"
+  - title: "Log Analytics pricing"
+    url: "https://learn.microsoft.com/azure/azure-monitor/logs/cost-logs"

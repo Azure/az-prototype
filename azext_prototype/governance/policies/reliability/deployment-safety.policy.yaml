@@ -1,0 +1,1065 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: deployment-safety
+  category: reliability
+  services:
+    - app-service
+    - container-apps
+    - aks
+    - functions
+    - container-registry
+    - virtual-machines
+    - vmss
+  last_reviewed: "2026-03-27"
+
+rules:
+  # ------------------------------------------------------------------ #
+  # DS-001: Blue-green / canary deployment (WAF RE-05)
+  # ------------------------------------------------------------------ #
+  - id: DS-001
+    severity: required
+    description: >-
+      Implement blue-green or canary deployment for ALL production
+      services.  App Service MUST use deployment slots (staging slot
+      with auto-swap or manual swap).  Container Apps MUST use revision-
+      based traffic splitting (route percentage of traffic to new
+      revision).  AKS MUST use rolling update strategy with max surge
+      and max unavailable.  Functions MUST use deployment slots for
+      premium/dedicated plans.  NEVER deploy directly to production
+      without a staging phase.
+    rationale: >-
+      Direct-to-production deployments are the #1 cause of production
+      incidents.  Blue-green deployment enables zero-downtime releases
+      with instant rollback.  Canary deployment validates changes with
+      a subset of traffic before full rollout.  Without staging, a bad
+      deploy takes down 100% of users immediately.
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # === App Service: Deployment Slot (Blue-Green) ===
+      resource "azapi_resource" "app_service_staging_slot" {
+        type      = "Microsoft.Web/sites/slots@2023-12-01"
+        name      = "staging"
+        parent_id = azapi_resource.app_service.id
+        location  = var.location
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          properties = {
+            httpsOnly = true
+            siteConfig = {
+              minTlsVersion      = "1.2"
+              healthCheckPath    = "/healthz"
+              autoSwapSlotName   = ""    # Leave empty for manual swap; set to "production" for auto-swap
+            }
+          }
+        }
+      }
+
+      # Sticky slot settings — ensure config stays with the slot, not the app
+      resource "azapi_resource" "slot_config_names" {
+        type      = "Microsoft.Web/sites/config@2023-12-01"
+        name      = "slotConfigNames"
+        parent_id = azapi_resource.app_service.id
+
+        body = {
+          properties = {
+            appSettingNames = [
+              "SLOT_NAME",
+              "ASPNETCORE_ENVIRONMENT"
+            ]
+            connectionStringNames = []
+          }
+        }
+      }
+
+      # === Container Apps: Revision-Based Traffic Splitting (Canary) ===
+      resource "azapi_resource" "container_app_canary" {
+        type      = "Microsoft.App/containerApps@2024-03-01"
+        name      = var.container_app_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          properties = {
+            managedEnvironmentId = azapi_resource.container_app_env.id
+            configuration = {
+              activeRevisionsMode = "Multiple"    # Enable multiple active revisions
+              ingress = {
+                external   = true
+                targetPort = 8080
+                traffic = [
+                  {
+                    revisionName = var.current_revision    # Stable revision gets 90%
+                    weight       = 90
+                  },
+                  {
+                    latestRevision = true    # New revision gets 10% (canary)
+                    weight         = 10
+                  }
+                ]
+              }
+            }
+            template = {
+              revisionSuffix = var.revision_suffix    # Explicit suffix for tracking
+              containers = [
+                {
+                  name  = "api"
+                  image = "${var.acr_login_server}/${var.image_name}:${var.image_tag}"
+                  resources = {
+                    cpu    = 0.5
+                    memory = "1Gi"
+                  }
+                  probes = [
+                    {
+                      type = "readiness"
+                      httpGet = {
+                        path = "/healthz"
+                        port = 8080
+                      }
+                      initialDelaySeconds = 5
+                      periodSeconds       = 10
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+
+      # === AKS: Rolling Update Strategy ===
+      # Rolling update strategy is defined in the Kubernetes Deployment manifest.
+      # Deploy via deploy.sh or Helm chart — not Terraform.
+      #
+      # deploy.sh example:
+      # kubectl apply -f - <<EOF
+      # apiVersion: apps/v1
+      # kind: Deployment
+      # metadata:
+      #   name: api
+      #   namespace: ${NAMESPACE}
+      # spec:
+      #   replicas: 3
+      #   strategy:
+      #     type: RollingUpdate
+      #     rollingUpdate:
+      #       maxSurge: 1            # Create 1 extra pod during update
+      #       maxUnavailable: 0      # Zero downtime — never remove old pods before new ones are ready
+      #   selector:
+      #     matchLabels:
+      #       app: api
+      #   template:
+      #     metadata:
+      #       labels:
+      #         app: api
+      #         version: "${IMAGE_TAG}"
+      #     spec:
+      #       containers:
+      #       - name: api
+      #         image: "${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
+      #         ports:
+      #         - containerPort: 8080
+      #         readinessProbe:
+      #           httpGet:
+      #             path: /healthz
+      #             port: 8080
+      #           initialDelaySeconds: 5
+      #           periodSeconds: 5
+      #         livenessProbe:
+      #           httpGet:
+      #             path: /healthz/live
+      #             port: 8080
+      #           initialDelaySeconds: 10
+      #           periodSeconds: 10
+      #         resources:
+      #           requests:
+      #             cpu: 100m
+      #             memory: 128Mi
+      #           limits:
+      #             cpu: 500m
+      #             memory: 512Mi
+      # EOF
+    bicep_pattern: |
+      // === App Service: Deployment Slot (Blue-Green) ===
+      resource appServiceStagingSlot 'Microsoft.Web/sites/slots@2023-12-01' = {
+        parent: appService
+        name: 'staging'
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          httpsOnly: true
+          siteConfig: {
+            minTlsVersion: '1.2'
+            healthCheckPath: '/healthz'
+            autoSwapSlotName: ''
+          }
+        }
+      }
+
+      resource slotConfigNames 'Microsoft.Web/sites/config@2023-12-01' = {
+        parent: appService
+        name: 'slotConfigNames'
+        properties: {
+          appSettingNames: [
+            'SLOT_NAME'
+            'ASPNETCORE_ENVIRONMENT'
+          ]
+          connectionStringNames: []
+        }
+      }
+
+      // === Container Apps: Revision-Based Traffic Splitting (Canary) ===
+      resource containerAppCanary 'Microsoft.App/containerApps@2024-03-01' = {
+        name: containerAppName
+        location: location
+        properties: {
+          managedEnvironmentId: containerAppEnv.id
+          configuration: {
+            activeRevisionsMode: 'Multiple'
+            ingress: {
+              external: true
+              targetPort: 8080
+              traffic: [
+                {
+                  revisionName: currentRevision
+                  weight: 90
+                }
+                {
+                  latestRevision: true
+                  weight: 10
+                }
+              ]
+            }
+          }
+          template: {
+            revisionSuffix: revisionSuffix
+            containers: [
+              {
+                name: 'api'
+                image: '${acrLoginServer}/${imageName}:${imageTag}'
+                resources: {
+                  cpu: json('0.5')
+                  memory: '1Gi'
+                }
+                probes: [
+                  {
+                    type: 'Readiness'
+                    httpGet: {
+                      path: '/healthz'
+                      port: 8080
+                    }
+                    initialDelaySeconds: 5
+                    periodSeconds: 10
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+
+      // AKS rolling update strategy is a Kubernetes manifest —
+      // deploy via deploy.sh. See terraform_pattern for kubectl examples.
+    companion_resources:
+      - type: "Microsoft.Web/sites/slots@2023-12-01"
+        description: "Staging deployment slot for App Service blue-green deployment"
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        description: "Diagnostic settings for deployment slot swap events and health check logs"
+    prohibitions:
+      - "NEVER deploy directly to production without a staging slot or canary revision — bad deploys affect 100% of users"
+      - "NEVER use App Service Basic tier in production — deployment slots require Standard tier or higher"
+      - "NEVER set Container Apps activeRevisionsMode to Single for production — Multiple mode is required for traffic splitting"
+      - "NEVER set AKS rolling update maxUnavailable > 0 without explicit justification — zero-downtime requires maxUnavailable: 0"
+      - "NEVER deploy without readiness probes — new replicas receive traffic before they are ready, causing errors"
+      - "NEVER use 'latest' image tag in production — use explicit version tags for reproducibility and rollback"
+
+  # ------------------------------------------------------------------ #
+  # DS-002: Deployment gates and health validation (WAF RE-04)
+  # ------------------------------------------------------------------ #
+  - id: DS-002
+    severity: required
+    description: >-
+      Validate application health BEFORE shifting production traffic to
+      a new deployment.  App Service slots MUST pass health check
+      validation before swap.  Container Apps canary revisions MUST
+      pass readiness probes before receiving traffic.  AKS deployments
+      MUST have readiness probes that validate application health
+      including downstream dependencies.  Health validation MUST check
+      database connectivity, cache availability, and external API
+      reachability — not just HTTP 200 from the root endpoint.
+    rationale: >-
+      Deploying code that passes build/test but fails at runtime (wrong
+      connection strings, missing config, incompatible schema) is a
+      common failure mode.  Health gates catch these failures before
+      they affect users.  Without gates, the first sign of failure is
+      user-facing errors.
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # === App Service: Health check for slot swap validation ===
+      # Health check path is evaluated before and after swap.
+      # If health check fails, the swap is aborted.
+      resource "azapi_resource" "app_service_health_check" {
+        type      = "Microsoft.Web/sites/config@2023-12-01"
+        name      = "web"
+        parent_id = azapi_resource.app_service.id
+
+        body = {
+          properties = {
+            healthCheckPath = "/healthz"    # Health check endpoint
+            # Instances failing health check are removed from LB rotation.
+            # Azure checks every 1 minute; after 5 consecutive failures,
+            # the instance is replaced.
+          }
+        }
+      }
+
+      # === Container Apps: Readiness probe as deployment gate ===
+      # Readiness probes prevent traffic from reaching unready replicas.
+      # New revisions MUST pass readiness probes before receiving any traffic.
+      #
+      # Container App probes are defined inline in the container spec:
+      #   probes = [
+      #     {
+      #       type = "readiness"
+      #       httpGet = {
+      #         path = "/healthz"
+      #         port = 8080
+      #       }
+      #       initialDelaySeconds = 5     # Wait 5s before first check
+      #       periodSeconds       = 10    # Check every 10s
+      #       failureThreshold    = 3     # Mark unready after 3 failures
+      #       successThreshold    = 1     # Mark ready after 1 success
+      #       timeoutSeconds      = 5     # Probe timeout
+      #     },
+      #     {
+      #       type = "startup"
+      #       httpGet = {
+      #         path = "/healthz/startup"
+      #         port = 8080
+      #       }
+      #       initialDelaySeconds = 0
+      #       periodSeconds       = 5
+      #       failureThreshold    = 30    # Allow up to 150s startup (30 * 5s)
+      #       timeoutSeconds      = 5
+      #     }
+      #   ]
+
+      # === deploy.sh: Pre-swap health validation script ===
+      # Run BEFORE swapping App Service slots or shifting Container Apps traffic.
+      #
+      # #!/bin/bash
+      # set -euo pipefail
+      #
+      # STAGING_URL="${STAGING_SLOT_URL}"
+      # MAX_RETRIES=10
+      # RETRY_DELAY=5
+      #
+      # echo "Validating staging slot health..."
+      # for i in $(seq 1 $MAX_RETRIES); do
+      #     STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${STAGING_URL}/healthz" || echo "000")
+      #     if [ "$STATUS" = "200" ]; then
+      #         echo "Health check passed (attempt $i)"
+      #         break
+      #     fi
+      #     if [ "$i" = "$MAX_RETRIES" ]; then
+      #         echo "ERROR: Staging slot failed health check after $MAX_RETRIES attempts"
+      #         exit 1
+      #     fi
+      #     echo "Health check returned $STATUS, retrying in ${RETRY_DELAY}s (attempt $i/$MAX_RETRIES)..."
+      #     sleep $RETRY_DELAY
+      # done
+      #
+      # echo "Swapping staging slot to production..."
+      # az webapp deployment slot swap -g "$RESOURCE_GROUP" -n "$APP_NAME" -s staging --target-slot production
+      # echo "Swap complete."
+    bicep_pattern: |
+      // === App Service: Health check for slot swap validation ===
+      resource appServiceHealthCheck 'Microsoft.Web/sites/config@2023-12-01' = {
+        parent: appService
+        name: 'web'
+        properties: {
+          healthCheckPath: '/healthz'
+        }
+      }
+
+      // Container Apps readiness probes are defined inline in the container spec.
+      // See DS-001 for the full Container App pattern with probes.
+      //
+      // Startup probes for slow-starting containers:
+      // probes: [
+      //   {
+      //     type: 'Startup'
+      //     httpGet: {
+      //       path: '/healthz/startup'
+      //       port: 8080
+      //     }
+      //     initialDelaySeconds: 0
+      //     periodSeconds: 5
+      //     failureThreshold: 30    // Allow up to 150s startup
+      //     timeoutSeconds: 5
+      //   }
+      //   {
+      //     type: 'Readiness'
+      //     httpGet: {
+      //       path: '/healthz'
+      //       port: 8080
+      //     }
+      //     initialDelaySeconds: 5
+      //     periodSeconds: 10
+      //     failureThreshold: 3
+      //     successThreshold: 1
+      //     timeoutSeconds: 5
+      //   }
+      // ]
+    prohibitions:
+      - "NEVER swap deployment slots without health check validation — unhealthy code reaches production"
+      - "NEVER omit readiness probes on Container App or AKS containers — traffic reaches unready replicas"
+      - "NEVER use the root path (/) as the health check endpoint — it does not validate downstream dependencies"
+      - "NEVER set failureThreshold to 1 for readiness probes — transient failures cause unnecessary traffic removal"
+      - "NEVER skip startup probes for applications with slow initialization — readiness probes will fail and restart the container"
+
+  # ------------------------------------------------------------------ #
+  # DS-003: Rollback capability (WAF RE-03, RE-05)
+  # ------------------------------------------------------------------ #
+  - id: DS-003
+    severity: required
+    description: >-
+      Ensure every production deployment has a tested rollback path.
+      App Service MUST be able to swap back to the previous slot.
+      Container Apps MUST be able to shift 100% traffic back to the
+      previous revision.  AKS MUST have previous deployment revision
+      history preserved.  Container Registry MUST retain previous image
+      versions.  Terraform state MUST be stored remotely with versioning
+      to enable state rollback.  Rollback MUST be executable within
+      5 minutes.
+    rationale: >-
+      Rollback is the emergency brake for deployments.  If a deployment
+      causes issues that health checks miss (performance degradation,
+      data corruption, business logic bugs), rollback is the only way
+      to restore service quickly.  Without rollback, the only option is
+      a forward fix under pressure.
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # === App Service: Slot swap rollback ===
+      # Rollback is simply swapping back — the previous production code
+      # is still running in the staging slot after the original swap.
+      #
+      # deploy.sh rollback:
+      # echo "Rolling back: swapping staging back to production..."
+      # az webapp deployment slot swap -g "$RESOURCE_GROUP" -n "$APP_NAME" \
+      #     -s staging --target-slot production
+      # echo "Rollback complete."
+
+      # === Container Apps: Revision rollback ===
+      # Shift 100% traffic back to the previous stable revision.
+      #
+      # deploy.sh rollback:
+      # echo "Rolling back to previous revision..."
+      # PREVIOUS_REVISION=$(az containerapp revision list \
+      #     -g "$RESOURCE_GROUP" -n "$APP_NAME" \
+      #     --query "[?properties.active && name!='${CURRENT_REVISION}'].name | [0]" -o tsv)
+      #
+      # az containerapp ingress traffic set \
+      #     -g "$RESOURCE_GROUP" -n "$APP_NAME" \
+      #     --revision-weight "${PREVIOUS_REVISION}=100"
+      #
+      # echo "Traffic shifted to ${PREVIOUS_REVISION}"
+
+      # === AKS: Deployment rollback ===
+      # Kubernetes preserves deployment revision history by default.
+      #
+      # deploy.sh rollback:
+      # echo "Rolling back AKS deployment..."
+      # kubectl rollout undo deployment/api -n "$NAMESPACE"
+      # kubectl rollout status deployment/api -n "$NAMESPACE" --timeout=120s
+      # echo "Rollback complete."
+
+      # === Container Registry: Image retention policy ===
+      # Retain previous image versions for rollback.
+      resource "azapi_resource" "acr_retention" {
+        type      = "Microsoft.ContainerRegistry/registries@2023-07-01"
+        name      = var.acr_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          sku = {
+            name = "Premium"    # Premium required for retention policies
+          }
+          properties = {
+            adminUserEnabled = false
+            policies = {
+              retentionPolicy = {
+                days    = 30       # Retain untagged manifests for 30 days
+                status  = "enabled"
+              }
+              trustPolicy = {
+                type   = "Notary"
+                status = "enabled"
+              }
+            }
+          }
+        }
+      }
+
+      # === Terraform State: Remote backend with versioning ===
+      # Store Terraform state in Azure Storage with versioning enabled
+      # for state rollback capability.
+      resource "azapi_resource" "tfstate_storage" {
+        type      = "Microsoft.Storage/storageAccounts@2023-05-01"
+        name      = var.tfstate_storage_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          sku = {
+            name = "Standard_GZRS"    # Geo-zone-redundant for state protection
+          }
+          kind = "StorageV2"
+          properties = {
+            minimumTlsVersion        = "TLS1_2"
+            supportsHttpsTrafficOnly = true
+            allowBlobPublicAccess    = false
+            publicNetworkAccess      = "Disabled"
+          }
+        }
+      }
+
+      resource "azapi_resource" "tfstate_blob_services" {
+        type      = "Microsoft.Storage/storageAccounts/blobServices@2023-05-01"
+        name      = "default"
+        parent_id = azapi_resource.tfstate_storage.id
+
+        body = {
+          properties = {
+            isVersioningEnabled = true    # State versioning for rollback
+            deleteRetentionPolicy = {
+              enabled = true
+              days    = 30
+            }
+            containerDeleteRetentionPolicy = {
+              enabled = true
+              days    = 30
+            }
+          }
+        }
+      }
+
+      resource "azapi_resource" "tfstate_container" {
+        type      = "Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01"
+        name      = "tfstate"
+        parent_id = azapi_resource.tfstate_blob_services.id
+
+        body = {
+          properties = {
+            publicAccess = "None"
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Container Registry: Image retention for rollback ===
+      resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
+        name: acrName
+        location: location
+        sku: {
+          name: 'Premium'
+        }
+        properties: {
+          adminUserEnabled: false
+          policies: {
+            retentionPolicy: {
+              days: 30
+              status: 'enabled'
+            }
+            trustPolicy: {
+              type: 'Notary'
+              status: 'enabled'
+            }
+          }
+        }
+      }
+
+      // === Terraform State Storage with Versioning ===
+      resource tfstateStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+        name: tfstateStorageName
+        location: location
+        sku: {
+          name: 'Standard_GZRS'
+        }
+        kind: 'StorageV2'
+        properties: {
+          minimumTlsVersion: 'TLS1_2'
+          supportsHttpsTrafficOnly: true
+          allowBlobPublicAccess: false
+          publicNetworkAccess: 'Disabled'
+        }
+      }
+
+      resource tfstateBlobServices 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+        parent: tfstateStorage
+        name: 'default'
+        properties: {
+          isVersioningEnabled: true
+          deleteRetentionPolicy: {
+            enabled: true
+            days: 30
+          }
+          containerDeleteRetentionPolicy: {
+            enabled: true
+            days: 30
+          }
+        }
+      }
+
+      resource tfstateContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+        parent: tfstateBlobServices
+        name: 'tfstate'
+        properties: {
+          publicAccess: 'None'
+        }
+      }
+
+      // App Service slot swap, Container Apps revision rollback, and AKS
+      // deployment rollback are operational commands — execute via deploy.sh.
+      // See terraform_pattern for rollback script examples.
+    companion_resources:
+      - type: "Microsoft.ContainerRegistry/registries@2023-07-01"
+        description: "Container Registry with retention policy for image version history"
+      - type: "Microsoft.Storage/storageAccounts@2023-05-01"
+        description: "Storage account with versioning for Terraform state rollback"
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        description: "RBAC for state storage — Storage Blob Data Contributor for deployment identity"
+    prohibitions:
+      - "NEVER deploy without a tested rollback path — forward-fix under pressure is error-prone and slow"
+      - "NEVER delete previous Container App revisions immediately after deployment — retain for rollback"
+      - "NEVER set ACR retention policy below 14 days — previous image versions are needed for rollback"
+      - "NEVER store Terraform state locally — use remote backend with versioning for state protection and rollback"
+      - "NEVER use Standard_LRS for Terraform state storage — state loss requires full infrastructure reimport"
+      - "NEVER overwrite image tags (e.g., latest) in production — use unique version tags for each deployment"
+
+  # ------------------------------------------------------------------ #
+  # DS-004: Infrastructure as Code discipline (WAF RE-05)
+  # ------------------------------------------------------------------ #
+  - id: DS-004
+    severity: required
+    description: >-
+      ALL infrastructure MUST be defined as code (Terraform or Bicep).
+      NEVER make manual changes to production infrastructure — all
+      changes must go through the IaC pipeline.  Terraform state MUST
+      be stored in a remote backend (Azure Storage) with locking
+      (Azure Blob lease).  Enable drift detection to identify manual
+      changes.  Use separate state files per environment (dev, staging,
+      production) to isolate blast radius.
+    rationale: >-
+      Manual infrastructure changes are untraceable, unreproducible, and
+      un-reviewable.  IaC provides version control, peer review, audit
+      trail, and reproducible environments.  Remote state with locking
+      prevents concurrent modifications that corrupt state.
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # === Terraform Remote Backend Configuration ===
+      # Configure in backend.tf — NEVER use local state for shared infrastructure.
+      #
+      # terraform {
+      #   backend "azurerm" {
+      #     resource_group_name  = "rg-terraform-state"
+      #     storage_account_name = "stterraformstate"
+      #     container_name       = "tfstate"
+      #     key                  = "${var.project}-${var.environment}.tfstate"
+      #     use_azuread_auth     = true    # Use Entra ID — not storage account keys
+      #   }
+      # }
+      #
+      # === Environment separation ===
+      # Use separate state files per environment:
+      #   dev:        project-dev.tfstate
+      #   staging:    project-staging.tfstate
+      #   production: project-prod.tfstate
+      #
+      # === Drift detection ===
+      # Run terraform plan in CI on a schedule to detect drift:
+      #
+      # deploy.sh drift check:
+      # #!/bin/bash
+      # set -euo pipefail
+      #
+      # echo "Running drift detection..."
+      # PLAN_OUTPUT=$(terraform plan -detailed-exitcode -out=drift.tfplan 2>&1) || EXIT_CODE=$?
+      #
+      # case ${EXIT_CODE:-0} in
+      #   0) echo "No drift detected." ;;
+      #   1) echo "ERROR: Terraform plan failed." ; exit 1 ;;
+      #   2) echo "WARNING: Drift detected! Review plan output:"
+      #      terraform show drift.tfplan
+      #      # Send alert to team
+      #      ;;
+      # esac
+
+      # === State locking ===
+      # Azure Storage blob leases provide automatic state locking.
+      # No additional configuration needed — the azurerm backend handles it.
+      # Force-unlock is available for stuck locks:
+      #   terraform force-unlock LOCK_ID
+
+      # === State file for remote backend storage ===
+      resource "azapi_resource" "state_storage" {
+        type      = "Microsoft.Storage/storageAccounts@2023-05-01"
+        name      = var.state_storage_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          sku = {
+            name = "Standard_GZRS"
+          }
+          kind = "StorageV2"
+          properties = {
+            minimumTlsVersion        = "TLS1_2"
+            supportsHttpsTrafficOnly = true
+            allowBlobPublicAccess    = false
+            allowSharedKeyAccess     = false    # Entra ID only — no storage keys
+            publicNetworkAccess      = "Disabled"
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Bicep: State management is implicit ===
+      // Bicep/ARM deployments are stateless — Azure Resource Manager tracks
+      // the actual resource state. No separate state file is needed.
+      //
+      // Deployment mode matters:
+      //   - Complete mode: deletes resources not in template (use for full environments)
+      //   - Incremental mode: adds/updates resources, leaves others alone (default, safer)
+      //
+      // Drift detection for Bicep:
+      //   az deployment group what-if \
+      //     -g "$RESOURCE_GROUP" \
+      //     -f main.bicep \
+      //     -p parameters.json
+      //
+      // This shows what WOULD change — use in CI for drift detection.
+
+      // === State storage for Terraform (Bicep deploys the storage account) ===
+      resource stateStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+        name: stateStorageName
+        location: location
+        sku: {
+          name: 'Standard_GZRS'
+        }
+        kind: 'StorageV2'
+        properties: {
+          minimumTlsVersion: 'TLS1_2'
+          supportsHttpsTrafficOnly: true
+          allowBlobPublicAccess: false
+          allowSharedKeyAccess: false
+          publicNetworkAccess: 'Disabled'
+        }
+      }
+    prohibitions:
+      - "NEVER make manual changes to production infrastructure — all changes must go through IaC pipeline"
+      - "NEVER store Terraform state locally for shared infrastructure — use remote backend with locking"
+      - "NEVER use storage account keys for state backend authentication — use Entra ID (use_azuread_auth = true)"
+      - "NEVER share state files across environments — use separate state files per environment"
+      - "NEVER skip drift detection — run terraform plan or az deployment what-if on a regular schedule"
+      - "NEVER use ARM Complete deployment mode without explicit approval — it deletes unmanaged resources"
+
+  # ------------------------------------------------------------------ #
+  # DS-005: Immutable infrastructure (WAF RE-05)
+  # ------------------------------------------------------------------ #
+  - id: DS-005
+    severity: required
+    description: >-
+      Use immutable infrastructure patterns for ALL containerized
+      workloads.  Container images MUST be versioned with unique tags
+      (git SHA, build number, or semantic version) — NEVER use mutable
+      tags like 'latest'.  Images MUST be built once and promoted
+      through environments (dev -> staging -> production) without
+      rebuilding.  NEVER modify running containers in place — deploy
+      new immutable images.  ACR MUST have content trust and image
+      quarantine for production images.
+    rationale: >-
+      Mutable infrastructure (in-place updates, SSH patches, config
+      changes on running servers) causes configuration drift, makes
+      debugging impossible, and prevents reliable rollback.  Immutable
+      infrastructure ensures every deployment is reproducible and
+      traceable to a specific build artifact.
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # === Container Registry: Immutable image management ===
+      resource "azapi_resource" "acr_production" {
+        type      = "Microsoft.ContainerRegistry/registries@2023-07-01"
+        name      = var.acr_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          sku = {
+            name = "Premium"    # Premium for content trust, geo-replication, firewall
+          }
+          properties = {
+            adminUserEnabled = false    # NEVER enable admin user
+            publicNetworkAccess = "Disabled"
+            policies = {
+              retentionPolicy = {
+                days   = 30
+                status = "enabled"
+              }
+              trustPolicy = {
+                type   = "Notary"
+                status = "enabled"    # Content trust — require signed images
+              }
+              quarantinePolicy = {
+                status = "enabled"    # Quarantine new images until scanned
+              }
+              exportPolicy = {
+                status = "enabled"
+              }
+            }
+          }
+        }
+      }
+
+      # === Image versioning best practice ===
+      # Build and tag images with immutable identifiers:
+      #
+      # build.sh:
+      # GIT_SHA=$(git rev-parse --short HEAD)
+      # BUILD_NUMBER="${BUILD_ID:-local}"
+      # IMAGE_TAG="${GIT_SHA}-${BUILD_NUMBER}"
+      #
+      # docker build -t "${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}" .
+      # docker push "${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}"
+      #
+      # # Tag for environment promotion (additive, not replacing):
+      # az acr import --name "${ACR_NAME}" \
+      #   --source "${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}" \
+      #   --image "${IMAGE_NAME}:staging-${IMAGE_TAG}"
+      #
+      # # NEVER do this in production:
+      # # docker build -t myapp:latest .   ← mutable tag, not reproducible
+      # # docker push myapp:latest         ← overwrites previous image
+
+      # === Container App with explicit image version ===
+      resource "azapi_resource" "container_app_immutable" {
+        type      = "Microsoft.App/containerApps@2024-03-01"
+        name      = var.container_app_name
+        parent_id = azapi_resource.resource_group.id
+        location  = var.location
+
+        body = {
+          properties = {
+            managedEnvironmentId = azapi_resource.container_app_env.id
+            configuration = {
+              registries = [
+                {
+                  server   = "${var.acr_name}.azurecr.io"
+                  identity = azapi_resource.user_assigned_identity.id
+                }
+              ]
+            }
+            template = {
+              revisionSuffix = var.image_tag    # Tie revision to image version
+              containers = [
+                {
+                  name  = "api"
+                  image = "${var.acr_name}.azurecr.io/${var.image_name}:${var.image_tag}"    # Explicit version, NEVER :latest
+                  resources = {
+                    cpu    = 0.5
+                    memory = "1Gi"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Container Registry: Immutable image management ===
+      resource acrProduction 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
+        name: acrName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: 'Premium'
+        }
+        properties: {
+          adminUserEnabled: false
+          publicNetworkAccess: 'Disabled'
+          policies: {
+            retentionPolicy: {
+              days: 30
+              status: 'enabled'
+            }
+            trustPolicy: {
+              type: 'Notary'
+              status: 'enabled'
+            }
+            quarantinePolicy: {
+              status: 'enabled'
+            }
+            exportPolicy: {
+              status: 'enabled'
+            }
+          }
+        }
+      }
+
+      // === Container App with explicit image version ===
+      resource containerAppImmutable 'Microsoft.App/containerApps@2024-03-01' = {
+        name: containerAppName
+        location: location
+        properties: {
+          managedEnvironmentId: containerAppEnv.id
+          configuration: {
+            registries: [
+              {
+                server: '${acrName}.azurecr.io'
+                identity: userAssignedIdentity.id
+              }
+            ]
+          }
+          template: {
+            revisionSuffix: imageTag
+            containers: [
+              {
+                name: 'api'
+                image: '${acrName}.azurecr.io/${imageName}:${imageTag}'
+                resources: {
+                  cpu: json('0.5')
+                  memory: '1Gi'
+                }
+              }
+            ]
+          }
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.ContainerRegistry/registries@2023-07-01"
+        description: "Container Registry with Premium SKU for content trust, quarantine, and retention policies"
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        description: "AcrPush role for CI/CD identity, AcrPull role for application identity"
+      - type: "Microsoft.Network/privateEndpoints@2023-11-01"
+        description: "Private endpoint for Container Registry (groupId: registry)"
+    prohibitions:
+      - "NEVER use the 'latest' image tag in production — it is mutable and prevents reliable rollback"
+      - "NEVER enable ACR admin user — use managed identity with AcrPull/AcrPush RBAC roles"
+      - "NEVER modify running containers in place (SSH, exec, file copy) — deploy new immutable images"
+      - "NEVER rebuild images for different environments — build once, promote the same image artifact"
+      - "NEVER deploy unsigned images to production — enable content trust (Notary) on ACR"
+      - "NEVER skip image scanning — enable quarantine policy to hold images until vulnerability scan completes"
+
+patterns:
+  - name: "Slot swap deployment script"
+    description: >-
+      Deploy to staging slot, validate health, swap to production, and
+      provide rollback capability in a single deploy.sh script.
+    example: |
+      #!/bin/bash
+      set -euo pipefail
+
+      RESOURCE_GROUP="${RESOURCE_GROUP}"
+      APP_NAME="${APP_NAME}"
+      STAGING_URL="https://${APP_NAME}-staging.azurewebsites.net"
+
+      # 1. Deploy to staging slot
+      echo "Deploying to staging slot..."
+      az webapp deploy -g "$RESOURCE_GROUP" -n "$APP_NAME" -s staging \
+          --src-path ./dist/app.zip --type zip
+
+      # 2. Warm up staging slot
+      echo "Warming up staging..."
+      curl -s -o /dev/null "${STAGING_URL}/healthz" || true
+      sleep 10
+
+      # 3. Validate health
+      echo "Validating staging health..."
+      STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${STAGING_URL}/healthz")
+      if [ "$STATUS" != "200" ]; then
+          echo "ERROR: Staging health check failed (HTTP $STATUS). Aborting."
+          exit 1
+      fi
+
+      # 4. Swap to production
+      echo "Swapping staging to production..."
+      az webapp deployment slot swap -g "$RESOURCE_GROUP" -n "$APP_NAME" \
+          -s staging --target-slot production
+
+      echo "Deployment complete. To rollback: swap staging back to production."
+
+  - name: "Container Apps canary deployment script"
+    description: >-
+      Deploy a new Container App revision with canary traffic splitting,
+      validate, then shift all traffic.
+    example: |
+      #!/bin/bash
+      set -euo pipefail
+
+      RESOURCE_GROUP="${RESOURCE_GROUP}"
+      APP_NAME="${APP_NAME}"
+      IMAGE="${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}"
+
+      # 1. Deploy new revision (receives 0% traffic initially)
+      echo "Deploying new revision..."
+      az containerapp update -g "$RESOURCE_GROUP" -n "$APP_NAME" \
+          --image "$IMAGE" --revision-suffix "${IMAGE_TAG}"
+
+      NEW_REVISION="${APP_NAME}--${IMAGE_TAG}"
+
+      # 2. Send 10% canary traffic
+      echo "Routing 10% canary traffic to ${NEW_REVISION}..."
+      STABLE=$(az containerapp revision list -g "$RESOURCE_GROUP" -n "$APP_NAME" \
+          --query "[?properties.active && name!='${NEW_REVISION}'].name | [0]" -o tsv)
+      az containerapp ingress traffic set -g "$RESOURCE_GROUP" -n "$APP_NAME" \
+          --revision-weight "${STABLE}=90" "${NEW_REVISION}=10"
+
+      # 3. Monitor canary (check error rate, latency)
+      echo "Monitoring canary for 5 minutes..."
+      sleep 300
+
+      # 4. Promote to 100%
+      echo "Promoting ${NEW_REVISION} to 100% traffic..."
+      az containerapp ingress traffic set -g "$RESOURCE_GROUP" -n "$APP_NAME" \
+          --revision-weight "${NEW_REVISION}=100"
+
+      echo "Deployment complete."
+
+anti_patterns:
+  - description: "Deploying directly to production without a staging phase"
+    instead: "Use deployment slots (App Service), revision traffic splitting (Container Apps), or rolling updates (AKS)"
+  - description: "Using mutable image tags like 'latest' in production"
+    instead: "Tag images with immutable identifiers (git SHA, build number, semantic version)"
+  - description: "Making manual changes to production infrastructure"
+    instead: "Define all infrastructure as code and apply changes through CI/CD pipelines"
+  - description: "Storing Terraform state locally"
+    instead: "Use Azure Storage remote backend with versioning, locking, and Entra ID authentication"
+  - description: "Deploying without rollback capability"
+    instead: "Ensure every deployment has a tested rollback path executable within 5 minutes"
+  - description: "Rebuilding container images for each environment"
+    instead: "Build once, promote the same image artifact through dev, staging, production"
+
+references:
+  - title: "Azure Well-Architected Framework — Keep it simple"
+    url: "https://learn.microsoft.com/azure/well-architected/reliability/simplify"
+  - title: "App Service deployment slots"
+    url: "https://learn.microsoft.com/azure/app-service/deploy-staging-slots"
+  - title: "Container Apps traffic splitting"
+    url: "https://learn.microsoft.com/azure/container-apps/traffic-splitting"
+  - title: "Terraform remote state in Azure"
+    url: "https://learn.microsoft.com/azure/developer/terraform/store-state-in-azure-storage"
+  - title: "Immutable infrastructure pattern"
+    url: "https://learn.microsoft.com/azure/architecture/guide/design-principles/immutable-infrastructure"
+  - title: "Blue-green deployment pattern"
+    url: "https://learn.microsoft.com/azure/architecture/example-scenario/blue-green-spring/blue-green-spring"

@@ -142,7 +142,7 @@ resource "azurerm_kubernetes_cluster" "this" {
 
 Private DNS zone: `privatelink.<region>.azmk8s.io`
 
-**Note:** Private clusters require VPN, ExpressRoute, or a jump box to access the API server. For POC, keep public API server access enabled.
+**Note:** Private clusters require VPN, ExpressRoute, or a jump box to access the API server. Unless told otherwise, public API server access should be disabled per governance policy — use a Bastion host or VPN for access.
 
 ## Bicep Patterns
 

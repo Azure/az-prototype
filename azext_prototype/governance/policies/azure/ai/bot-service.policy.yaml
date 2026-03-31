@@ -1,0 +1,165 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: bot-service
+  category: azure
+  services: [bot-service]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: BOT-001
+    severity: required
+    description: "Deploy Azure Bot Service with managed identity and isolated network configuration"
+    rationale: "Bot Service handles user conversations; managed identity removes credential management for backend connections"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "bot" {
+        type      = "Microsoft.BotService/botServices@2022-09-15"
+        name      = var.bot_name
+        location  = "global"
+        parent_id = var.resource_group_id
+
+        body = {
+          kind = "azurebot"
+          sku = {
+            name = var.sku_name  # "F0" or "S1"
+          }
+          properties = {
+            displayName                    = var.bot_display_name
+            endpoint                       = var.bot_endpoint
+            msaAppId                       = var.msa_app_id
+            msaAppType                     = "UserAssignedMSI"
+            msaAppMSIResourceId            = var.user_assigned_identity_id
+            msaAppTenantId                 = var.tenant_id
+            disableLocalAuth               = true
+            isStreamingSupported           = true
+            publicNetworkAccess            = "Disabled"
+            tenantId                       = var.tenant_id
+          }
+        }
+      }
+    bicep_pattern: |
+      resource bot 'Microsoft.BotService/botServices@2022-09-15' = {
+        name: botName
+        location: 'global'
+        kind: 'azurebot'
+        sku: {
+          name: skuName
+        }
+        properties: {
+          displayName: botDisplayName
+          endpoint: botEndpoint
+          msaAppId: msaAppId
+          msaAppType: 'UserAssignedMSI'
+          msaAppMSIResourceId: userAssignedIdentityId
+          msaAppTenantId: tenantId
+          disableLocalAuth: true
+          isStreamingSupported: true
+          publicNetworkAccess: 'Disabled'
+          tenantId: tenantId
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31"
+        name: "id-bot"
+        description: "User-assigned managed identity for Bot Service MSA authentication"
+        terraform_pattern: |
+          resource "azapi_resource" "bot_identity" {
+            type      = "Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31"
+            name      = "id-${var.bot_name}"
+            location  = var.location
+            parent_id = var.resource_group_id
+          }
+        bicep_pattern: |
+          resource botIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+            name: 'id-${botName}'
+            location: location
+          }
+      - type: "Microsoft.BotService/botServices/channels@2022-09-15"
+        name: "DirectLineChannel"
+        description: "Direct Line channel with enhanced authentication for secure client communication"
+        terraform_pattern: |
+          resource "azapi_resource" "bot_directline" {
+            type      = "Microsoft.BotService/botServices/channels@2022-09-15"
+            name      = "DirectLineChannel"
+            parent_id = azapi_resource.bot.id
+
+            body = {
+              properties = {
+                channelName = "DirectLineChannel"
+                properties = {
+                  sites = [
+                    {
+                      siteName                        = "default"
+                      isEnabled                       = true
+                      isV1Enabled                     = false
+                      isV3Enabled                     = true
+                      isSecureSiteEnabled             = true
+                      isBlockUserUploadEnabled        = false
+                      trustedOrigins                  = var.trusted_origins
+                    }
+                  ]
+                  DirectLineEmbedCode = null
+                }
+              }
+            }
+          }
+        bicep_pattern: |
+          resource botDirectLine 'Microsoft.BotService/botServices/channels@2022-09-15' = {
+            name: 'DirectLineChannel'
+            parent: bot
+            properties: {
+              channelName: 'DirectLineChannel'
+              properties: {
+                sites: [
+                  {
+                    siteName: 'default'
+                    isEnabled: true
+                    isV1Enabled: false
+                    isV3Enabled: true
+                    isSecureSiteEnabled: true
+                    isBlockUserUploadEnabled: false
+                    trustedOrigins: trustedOrigins
+                  }
+                ]
+              }
+            }
+          }
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name: "diag-bot"
+        description: "Diagnostic settings to route bot activity logs to Log Analytics"
+    prohibitions:
+      - "Never hardcode MSA app passwords or client secrets in IaC"
+      - "Never use msaAppType 'SingleTenant' with hardcoded credentials — use UserAssignedMSI"
+      - "Never set disableLocalAuth to false"
+      - "Never enable V1 Direct Line protocol — it lacks enhanced authentication"
+      - "Never leave trustedOrigins empty on Direct Line channels with isSecureSiteEnabled"
+
+  - id: BOT-002
+    severity: required
+    description: "Configure Direct Line channels with enhanced authentication and trusted origins"
+    rationale: "Enhanced authentication prevents token theft and ensures only trusted origins can embed the bot"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+
+  - id: BOT-003
+    severity: recommended
+    description: "Enable Application Insights for bot telemetry and conversation analytics"
+    rationale: "Bot telemetry provides conversation flow analysis, error tracking, and user engagement metrics"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+
+patterns:
+  - name: "Bot Service with managed identity and secure Direct Line"
+    description: "Azure Bot with user-assigned identity, enhanced auth, and trusted origins"
+
+anti_patterns:
+  - description: "Do not use MSA app passwords for bot authentication"
+    instead: "Use msaAppType=UserAssignedMSI with a user-assigned managed identity"
+  - description: "Do not enable Direct Line V1 protocol"
+    instead: "Use V3 with isSecureSiteEnabled=true and configure trustedOrigins"
+
+references:
+  - title: "Azure Bot Service security best practices"
+    url: "https://learn.microsoft.com/azure/bot-service/bot-builder-security-guidelines"
+  - title: "Bot Direct Line enhanced authentication"
+    url: "https://learn.microsoft.com/azure/bot-service/rest-api/bot-framework-rest-direct-line-3-0-authentication"

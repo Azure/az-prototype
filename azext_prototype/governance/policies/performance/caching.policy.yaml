@@ -1,0 +1,618 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: caching
+  category: performance
+  services:
+    - redis-cache
+    - front-door
+    - cdn
+    - api-management
+    - cosmos-db
+    - app-service
+    - container-apps
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: CACHE-001
+    severity: required
+    description: "Configure Azure Cache for Redis with managed identity authentication, connection multiplexing, and appropriate eviction policy"
+    rationale: "Redis is the backbone of distributed caching; misconfigured connections cause connection exhaustion and managed identity eliminates key rotation burden"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # === Redis Cache with Entra Auth and Connection Configuration ===
+      resource "azapi_resource" "redis_cache" {
+        type      = "Microsoft.Cache/redis@2024-03-01"
+        name      = var.redis_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          properties = {
+            sku = {
+              name     = var.redis_sku_name      # "Basic", "Standard", or "Premium"
+              family   = var.redis_sku_family     # "C" for Basic/Standard, "P" for Premium
+              capacity = var.redis_capacity
+            }
+            enableNonSslPort    = false
+            minimumTlsVersion   = "1.2"
+            publicNetworkAccess = "Disabled"
+            redisVersion        = "6.0"
+            redisConfiguration = {
+              "aad-enabled"                       = "true"      # Enable Entra authentication
+              "maxmemory-policy"                  = "volatile-lru"  # Evict keys with TTL first, by LRU
+              "maxmemory-reserved"                = "125"       # Reserve 125 MB for non-cache operations
+              "maxfragmentationmemory-reserved"   = "125"       # Reserve 125 MB for fragmentation
+              "maxclients"                        = "10000"     # Default max connections
+            }
+          }
+        }
+      }
+
+      # === RBAC Role Assignment for Redis ===
+      resource "azapi_resource" "redis_role_assignment" {
+        type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name      = var.redis_role_assignment_name
+        parent_id = azapi_resource.redis_cache.id
+
+        body = {
+          properties = {
+            roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/e12a6453-0767-4e33-9c91-b00f2b9a2e81"  # Redis Cache Data Contributor
+            principalId      = var.app_identity_principal_id
+            principalType    = "ServicePrincipal"
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Redis Cache with Entra Auth ===
+      resource redisCache 'Microsoft.Cache/redis@2024-03-01' = {
+        name: redisName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          sku: {
+            name: redisSkuName
+            family: redisSkuFamily
+            capacity: redisCapacity
+          }
+          enableNonSslPort: false
+          minimumTlsVersion: '1.2'
+          publicNetworkAccess: 'Disabled'
+          redisVersion: '6.0'
+          redisConfiguration: {
+            'aad-enabled': 'true'
+            'maxmemory-policy': 'volatile-lru'
+            'maxmemory-reserved': '125'
+            'maxfragmentationmemory-reserved': '125'
+          }
+        }
+      }
+
+      // === RBAC for Redis ===
+      resource redisRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+        name: guid(redisCache.id, appIdentityPrincipalId, 'redis-data-contributor')
+        scope: redisCache
+        properties: {
+          roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'e12a6453-0767-4e33-9c91-b00f2b9a2e81')
+          principalId: appIdentityPrincipalId
+          principalType: 'ServicePrincipal'
+        }
+      }
+    prohibitions:
+      - "NEVER use access keys for Redis authentication — use Entra (aad-enabled: true) with managed identity"
+      - "NEVER use allkeys-random or noeviction policy — volatile-lru ensures only TTL-bearing keys are evicted"
+      - "NEVER set maxmemory-reserved to 0 — reserve at least 10% of cache size for non-cache operations"
+      - "NEVER create one connection per request — use connection multiplexing (StackExchange.Redis ConnectionMultiplexer or equivalent)"
+      - "NEVER store cache entries without TTL — all cache entries must have explicit expiration"
+
+  - id: CACHE-002
+    severity: required
+    description: "Configure Front Door or CDN caching with appropriate TTL, cache key customization, and compression"
+    rationale: "Edge caching reduces origin load by 70-90% for static content and improves latency from seconds to milliseconds"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # === Front Door Caching Rule Set ===
+      resource "azapi_resource" "fd_rule_set" {
+        type      = "Microsoft.Cdn/profiles/ruleSets@2024-02-01"
+        name      = "CachingRules"
+        parent_id = azapi_resource.front_door.id
+      }
+
+      # Rule 1: Cache static assets aggressively (30 days)
+      resource "azapi_resource" "fd_rule_static" {
+        type      = "Microsoft.Cdn/profiles/ruleSets/rules@2024-02-01"
+        name      = "CacheStaticAssets"
+        parent_id = azapi_resource.fd_rule_set.id
+
+        body = {
+          properties = {
+            order = 1
+            conditions = [
+              {
+                name = "UrlFileExtension"
+                parameters = {
+                  typeName         = "DeliveryRuleUrlFileExtensionMatchConditionParameters"
+                  operator         = "Equal"
+                  matchValues      = ["css", "js", "png", "jpg", "jpeg", "gif", "svg", "woff", "woff2", "ico"]
+                  transforms       = ["Lowercase"]
+                  negateCondition  = false
+                }
+              }
+            ]
+            actions = [
+              {
+                name = "CacheExpiration"
+                parameters = {
+                  typeName      = "DeliveryRuleCacheExpirationActionParameters"
+                  cacheBehavior = "Override"
+                  cacheType     = "All"
+                  cacheDuration = "30.00:00:00"     # 30 days for static assets
+                }
+              },
+              {
+                name = "ModifyResponseHeader"
+                parameters = {
+                  typeName     = "DeliveryRuleHeaderActionParameters"
+                  headerAction = "Overwrite"
+                  headerName   = "Cache-Control"
+                  value        = "public, max-age=2592000, immutable"
+                }
+              }
+            ]
+          }
+        }
+      }
+
+      # Rule 2: Cache API responses briefly (5 minutes)
+      resource "azapi_resource" "fd_rule_api" {
+        type      = "Microsoft.Cdn/profiles/ruleSets/rules@2024-02-01"
+        name      = "CacheApiResponses"
+        parent_id = azapi_resource.fd_rule_set.id
+
+        body = {
+          properties = {
+            order = 2
+            conditions = [
+              {
+                name = "UrlPath"
+                parameters = {
+                  typeName        = "DeliveryRuleUrlPathMatchConditionParameters"
+                  operator        = "BeginsWith"
+                  matchValues     = ["/api/"]
+                  transforms      = ["Lowercase"]
+                  negateCondition = false
+                }
+              },
+              {
+                name = "RequestMethod"
+                parameters = {
+                  typeName    = "DeliveryRuleRequestMethodConditionParameters"
+                  operator    = "Equal"
+                  matchValues = ["GET"]
+                  negateCondition = false
+                }
+              }
+            ]
+            actions = [
+              {
+                name = "CacheExpiration"
+                parameters = {
+                  typeName      = "DeliveryRuleCacheExpirationActionParameters"
+                  cacheBehavior = "Override"
+                  cacheType     = "All"
+                  cacheDuration = "00:05:00"       # 5 minutes for GET API responses
+                }
+              }
+            ]
+          }
+        }
+      }
+
+      # Rule 3: Bypass cache for authenticated/dynamic content
+      resource "azapi_resource" "fd_rule_no_cache" {
+        type      = "Microsoft.Cdn/profiles/ruleSets/rules@2024-02-01"
+        name      = "BypassCacheAuthenticated"
+        parent_id = azapi_resource.fd_rule_set.id
+
+        body = {
+          properties = {
+            order = 0
+            conditions = [
+              {
+                name = "RequestHeader"
+                parameters = {
+                  typeName        = "DeliveryRuleRequestHeaderConditionParameters"
+                  headerName      = "Authorization"
+                  operator        = "Any"
+                  negateCondition = false
+                }
+              }
+            ]
+            actions = [
+              {
+                name = "CacheExpiration"
+                parameters = {
+                  typeName      = "DeliveryRuleCacheExpirationActionParameters"
+                  cacheBehavior = "BypassCache"
+                  cacheType     = "All"
+                }
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Front Door Caching Rule Set ===
+      resource fdRuleSet 'Microsoft.Cdn/profiles/ruleSets@2024-02-01' = {
+        parent: frontDoor
+        name: 'CachingRules'
+      }
+
+      // Rule 1: Cache static assets (30 days)
+      resource fdRuleStatic 'Microsoft.Cdn/profiles/ruleSets/rules@2024-02-01' = {
+        parent: fdRuleSet
+        name: 'CacheStaticAssets'
+        properties: {
+          order: 1
+          conditions: [
+            {
+              name: 'UrlFileExtension'
+              parameters: {
+                typeName: 'DeliveryRuleUrlFileExtensionMatchConditionParameters'
+                operator: 'Equal'
+                matchValues: ['css', 'js', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'woff', 'woff2', 'ico']
+                transforms: ['Lowercase']
+                negateCondition: false
+              }
+            }
+          ]
+          actions: [
+            {
+              name: 'CacheExpiration'
+              parameters: {
+                typeName: 'DeliveryRuleCacheExpirationActionParameters'
+                cacheBehavior: 'Override'
+                cacheType: 'All'
+                cacheDuration: '30.00:00:00'
+              }
+            }
+            {
+              name: 'ModifyResponseHeader'
+              parameters: {
+                typeName: 'DeliveryRuleHeaderActionParameters'
+                headerAction: 'Overwrite'
+                headerName: 'Cache-Control'
+                value: 'public, max-age=2592000, immutable'
+              }
+            }
+          ]
+        }
+      }
+
+      // Rule 2: Cache GET API responses (5 minutes)
+      resource fdRuleApi 'Microsoft.Cdn/profiles/ruleSets/rules@2024-02-01' = {
+        parent: fdRuleSet
+        name: 'CacheApiResponses'
+        properties: {
+          order: 2
+          conditions: [
+            {
+              name: 'UrlPath'
+              parameters: {
+                typeName: 'DeliveryRuleUrlPathMatchConditionParameters'
+                operator: 'BeginsWith'
+                matchValues: ['/api/']
+                transforms: ['Lowercase']
+                negateCondition: false
+              }
+            }
+            {
+              name: 'RequestMethod'
+              parameters: {
+                typeName: 'DeliveryRuleRequestMethodConditionParameters'
+                operator: 'Equal'
+                matchValues: ['GET']
+                negateCondition: false
+              }
+            }
+          ]
+          actions: [
+            {
+              name: 'CacheExpiration'
+              parameters: {
+                typeName: 'DeliveryRuleCacheExpirationActionParameters'
+                cacheBehavior: 'Override'
+                cacheType: 'All'
+                cacheDuration: '00:05:00'
+              }
+            }
+          ]
+        }
+      }
+
+      // Rule 3: Bypass cache for authenticated content
+      resource fdRuleNoCache 'Microsoft.Cdn/profiles/ruleSets/rules@2024-02-01' = {
+        parent: fdRuleSet
+        name: 'BypassCacheAuthenticated'
+        properties: {
+          order: 0
+          conditions: [
+            {
+              name: 'RequestHeader'
+              parameters: {
+                typeName: 'DeliveryRuleRequestHeaderConditionParameters'
+                headerName: 'Authorization'
+                operator: 'Any'
+                negateCondition: false
+              }
+            }
+          ]
+          actions: [
+            {
+              name: 'CacheExpiration'
+              parameters: {
+                typeName: 'DeliveryRuleCacheExpirationActionParameters'
+                cacheBehavior: 'BypassCache'
+                cacheType: 'All'
+              }
+            }
+          ]
+        }
+      }
+    prohibitions:
+      - "NEVER cache responses containing Authorization headers or Set-Cookie headers"
+      - "NEVER set static asset cache TTL below 1 day — use cache-busting filenames (hash in URL) for versioning"
+      - "NEVER cache POST, PUT, DELETE, or PATCH requests"
+      - "NEVER use the same cache TTL for static assets and API responses — static assets should be 30+ days, API responses 1-15 minutes"
+      - "NEVER skip compression for text-based content types (HTML, CSS, JS, JSON, SVG)"
+
+  - id: CACHE-003
+    severity: recommended
+    description: "Implement application-level cache-aside pattern with distributed cache and local memory fallback"
+    rationale: "Cache-aside reduces database load by 80-95% for read-heavy workloads; layered caching (L1 memory + L2 Redis) minimizes network round-trips"
+    applies_to: [app-developer, cloud-architect]
+    terraform_pattern: |
+      # Application-level caching is implemented in application code, not IaC.
+      # However, the infrastructure must support the caching pattern:
+      #
+      # Cache-Aside Pattern Implementation:
+      #   1. Check local (in-memory) cache first — L1 cache (< 1ms)
+      #   2. Check distributed (Redis) cache — L2 cache (1-5ms)
+      #   3. Fetch from database — origin (10-100ms)
+      #   4. Populate both L2 and L1 caches with TTL
+      #
+      # .NET Example (IDistributedCache + IMemoryCache):
+      #   services.AddStackExchangeRedisCache(options => {
+      #       options.Configuration = config.GetConnectionString("Redis");
+      #       options.InstanceName = "app:";
+      #   });
+      #   services.AddMemoryCache(options => {
+      #       options.SizeLimit = 1024;      // Limit L1 cache entries
+      #   });
+      #
+      # Python Example (redis-py + cachetools):
+      #   from cachetools import TTLCache
+      #   from redis import Redis
+      #   l1_cache = TTLCache(maxsize=1024, ttl=60)    # 1-minute L1
+      #   l2_cache = Redis(host=redis_host, port=6380, ssl=True)
+      #
+      # Key TTL Guidelines:
+      #   - User profiles: 15-30 minutes
+      #   - Product catalogs: 1-6 hours
+      #   - Configuration data: 5-15 minutes
+      #   - Session data: 30 minutes (sliding expiration)
+      #   - Search results: 5-10 minutes
+    bicep_pattern: |
+      // Application-level caching is implemented in code, not IaC.
+      // Ensure Redis infrastructure is provisioned (see CACHE-001).
+      //
+      // Cache-Aside Pattern:
+      //   1. L1: In-memory cache (< 1ms, per-instance)
+      //   2. L2: Distributed Redis cache (1-5ms, shared)
+      //   3. Origin: Database query (10-100ms)
+      //
+      // App Settings for cache configuration:
+      resource appService 'Microsoft.Web/sites@2023-12-01' = {
+        name: appServiceName
+        location: location
+        properties: {
+          siteConfig: {
+            appSettings: [
+              {
+                name: 'Cache__L1__MaxSize'
+                value: '1024'
+              }
+              {
+                name: 'Cache__L1__TTLSeconds'
+                value: '60'
+              }
+              {
+                name: 'Cache__L2__InstanceName'
+                value: 'app:'
+              }
+              {
+                name: 'Cache__L2__TTLSeconds'
+                value: '300'
+              }
+            ]
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER cache without TTL — all cached entries must expire"
+      - "NEVER use unbounded in-memory cache — set SizeLimit to prevent OOM"
+      - "NEVER skip cache invalidation strategy — define how cache entries are invalidated on writes"
+      - "NEVER cache sensitive data (PII, credentials, tokens) in shared/distributed cache without encryption"
+      - "NEVER use cache as primary data store — cache is volatile and can be evicted at any time"
+
+  - id: CACHE-004
+    severity: recommended
+    description: "Configure API Management caching policies for frequently accessed API responses"
+    rationale: "APIM built-in cache reduces backend load and latency without application code changes; external Redis cache provides persistence"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # === APIM External Cache (Redis) ===
+      resource "azapi_resource" "apim_external_cache" {
+        type      = "Microsoft.ApiManagement/service/caches@2023-09-01-preview"
+        name      = "redis-cache"
+        parent_id = azapi_resource.apim.id
+
+        body = {
+          properties = {
+            connectionString = "redis-cache-connection-string"   # Use Key Vault reference in practice
+            useFromLocation  = "default"
+            description      = "External Redis cache for APIM"
+          }
+        }
+      }
+
+      # APIM Caching Policy (apply to API operation):
+      # <policies>
+      #   <inbound>
+      #     <cache-lookup vary-by-developer="false"
+      #                   vary-by-developer-groups="false"
+      #                   caching-type="external"
+      #                   downstream-caching-type="public"
+      #                   must-revalidate="true">
+      #       <vary-by-header>Accept</vary-by-header>
+      #       <vary-by-header>Accept-Encoding</vary-by-header>
+      #       <vary-by-query-parameter>page</vary-by-query-parameter>
+      #       <vary-by-query-parameter>pageSize</vary-by-query-parameter>
+      #     </cache-lookup>
+      #   </inbound>
+      #   <outbound>
+      #     <cache-store duration="300" cache-response="true" />
+      #   </outbound>
+      # </policies>
+    bicep_pattern: |
+      // === APIM External Cache (Redis) ===
+      resource apimExternalCache 'Microsoft.ApiManagement/service/caches@2023-09-01-preview' = {
+        parent: apim
+        name: 'redis-cache'
+        properties: {
+          connectionString: 'redis-cache-connection-string'    // Use Key Vault reference
+          useFromLocation: 'default'
+          description: 'External Redis cache for APIM'
+        }
+      }
+
+      // APIM Caching Policy XML (apply via API policy):
+      // <policies>
+      //   <inbound>
+      //     <cache-lookup vary-by-developer="false"
+      //                   vary-by-developer-groups="false"
+      //                   caching-type="external"
+      //                   downstream-caching-type="public"
+      //                   must-revalidate="true">
+      //       <vary-by-header>Accept</vary-by-header>
+      //       <vary-by-header>Accept-Encoding</vary-by-header>
+      //       <vary-by-query-parameter>page</vary-by-query-parameter>
+      //     </cache-lookup>
+      //   </inbound>
+      //   <outbound>
+      //     <cache-store duration="300" cache-response="true" />
+      //   </outbound>
+      // </policies>
+    prohibitions:
+      - "NEVER cache POST/PUT/DELETE/PATCH responses in APIM"
+      - "NEVER use APIM internal cache for production — use external Redis cache for persistence and scale"
+      - "NEVER set cache-store duration > 3600 seconds (1 hour) for API responses — stale data risks outweigh performance gains"
+      - "NEVER omit vary-by-header for Accept and Accept-Encoding — different representations must be cached separately"
+      - "NEVER cache responses with Set-Cookie or Authorization headers"
+
+  - id: CACHE-005
+    severity: recommended
+    description: "Enable Cosmos DB integrated cache for read-heavy workloads to reduce RU consumption"
+    rationale: "Cosmos DB integrated cache provides item and query cache at the gateway level, reducing RU consumption by 50-90% for repeated reads"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      # === Cosmos DB with Dedicated Gateway (Integrated Cache) ===
+      # The integrated cache requires a dedicated gateway provisioned on the account.
+      resource "azapi_resource" "cosmos_dedicated_gateway" {
+        type      = "Microsoft.DocumentDB/databaseAccounts/services@2024-05-15"
+        name      = "SqlDedicatedGateway"
+        parent_id = azapi_resource.cosmos_account.id
+
+        body = {
+          properties = {
+            instanceSize  = "Cosmos.D4s"       # 4 vCores, 16 GB RAM (cache + compute)
+            instanceCount = 1                   # Number of gateway instances
+            serviceType   = "SqlDedicatedGateway"
+          }
+        }
+      }
+
+      # Application connection uses dedicated gateway endpoint:
+      #   Endpoint: https://<account>.sqlx.cosmos.azure.com
+      #   Connection mode: Gateway (NOT Direct)
+      #
+      # SDK configuration (.NET):
+      #   var client = new CosmosClient(
+      #       "https://<account>.sqlx.cosmos.azure.com",
+      #       credential,
+      #       new CosmosClientOptions {
+      #           ConnectionMode = ConnectionMode.Gateway,
+      #           ConsistencyLevel = ConsistencyLevel.Eventual  // Cache requires Eventual or Session
+      #       });
+      #
+      # Cache behavior:
+      #   - Point reads (ReadItemAsync): Cached by item ID + partition key
+      #   - Queries: Cached by query text + parameters
+      #   - Cache TTL: Configurable via DedicatedGatewayRequestOptions.MaxIntegratedCacheStaleness
+      #   - Invalidation: Automatic on write to cached items
+    bicep_pattern: |
+      // === Cosmos DB Dedicated Gateway (Integrated Cache) ===
+      resource cosmosDedicatedGateway 'Microsoft.DocumentDB/databaseAccounts/services@2024-05-15' = {
+        parent: cosmosAccount
+        name: 'SqlDedicatedGateway'
+        properties: {
+          instanceSize: 'Cosmos.D4s'       // 4 vCores, 16 GB RAM
+          instanceCount: 1
+          serviceType: 'SqlDedicatedGateway'
+        }
+      }
+
+      // Application must use dedicated gateway endpoint:
+      //   https://<account>.sqlx.cosmos.azure.com
+      //   Connection mode: Gateway (NOT Direct)
+      //   Consistency: Eventual or Session for cache hits
+    prohibitions:
+      - "NEVER use Cosmos DB integrated cache with Strong consistency — cache requires Eventual or Session"
+      - "NEVER use Direct connection mode with dedicated gateway — only Gateway mode routes through the cache"
+      - "NEVER provision dedicated gateway for serverless Cosmos DB accounts — it is not supported"
+      - "NEVER assume integrated cache handles write-through — it is a read-only cache with automatic invalidation"
+
+patterns:
+  - name: "Layered caching strategy"
+    description: "L1 in-memory cache (per-instance, <1ms) → L2 Redis cache (distributed, 1-5ms) → L3 CDN/Front Door (edge, <10ms) → Origin database"
+  - name: "Cache key design"
+    description: "Use hierarchical cache keys: {service}:{entity}:{id}:{version} — enables selective invalidation by prefix"
+
+anti_patterns:
+  - description: "Do not cache everything — only cache data that is read frequently and changes infrequently"
+    instead: "Apply cache-aside pattern selectively; monitor cache hit ratio to validate effectiveness"
+  - description: "Do not use a single global TTL for all cache entries"
+    instead: "Set TTL based on data freshness requirements: 30 days for static assets, 5-15 minutes for API data, 30 minutes for sessions"
+  - description: "Do not cache without monitoring cache hit ratio"
+    instead: "Track cache hit/miss ratio via Redis INFO command or Application Insights custom metrics; target >80% hit ratio"
+  - description: "Do not serve stale data without a revalidation strategy"
+    instead: "Use stale-while-revalidate pattern: serve stale data while fetching fresh data in background"
+
+references:
+  - title: "Azure Cache for Redis best practices"
+    url: "https://learn.microsoft.com/azure/azure-cache-for-redis/cache-best-practices-development"
+  - title: "Front Door caching"
+    url: "https://learn.microsoft.com/azure/frontdoor/front-door-caching"
+  - title: "APIM caching policies"
+    url: "https://learn.microsoft.com/azure/api-management/api-management-caching-policies"
+  - title: "Cosmos DB integrated cache"
+    url: "https://learn.microsoft.com/azure/cosmos-db/integrated-cache"
+  - title: "Cache-aside pattern"
+    url: "https://learn.microsoft.com/azure/architecture/patterns/cache-aside"

@@ -24,7 +24,7 @@
         },
         "category": {
           "type": "string",
-          "enum": ["azure", "security", "integration", "cost", "data", "general"],
+          "enum": ["azure", "security", "integration", "cost", "performance", "reliability", "data", "general"],
           "description": "Policy category."
         },
         "services": {
@@ -68,6 +68,35 @@
             "items": { "type": "string" },
             "minItems": 1,
             "description": "Agent names this rule applies to."
+          },
+          "terraform_pattern": {
+            "type": "string",
+            "description": "Exact Terraform (azapi) code pattern the agent MUST use as a template for this resource."
+          },
+          "bicep_pattern": {
+            "type": "string",
+            "description": "Exact Bicep code pattern the agent MUST use as a template for this resource."
+          },
+          "companion_resources": {
+            "type": "array",
+            "description": "Resources that MUST be created alongside the primary resource.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string" },
+                "name": { "type": "string" },
+                "description": { "type": "string" },
+                "terraform_pattern": { "type": "string" },
+                "bicep_pattern": { "type": "string" }
+              },
+              "required": ["type", "description"],
+              "additionalProperties": false
+            }
+          },
+          "prohibitions": {
+            "type": "array",
+            "description": "Explicit list of things the agent must NEVER generate.",
+            "items": { "type": "string" }
           },
           "template_check": {
             "type": "object",
@@ -124,8 +153,7 @@
             "additionalProperties": false
           }
         },
-        "required": ["id", "severity", "description", "applies_to"],
-        "additionalProperties": false
+        "required": ["id", "severity", "description", "applies_to"]
       }
     },
     "patterns": {

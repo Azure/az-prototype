@@ -1,0 +1,240 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: expressroute
+  category: azure
+  services: [expressroute]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: ER-001
+    severity: required
+    description: "Deploy ExpressRoute circuit with Premium tier for cross-region connectivity or large route tables"
+    rationale: "Standard tier limits to 4000 routes and single geopolitical region; Premium required for global reach"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "expressroute_circuit" {
+        type      = "Microsoft.Network/expressRouteCircuits@2024-01-01"
+        name      = var.circuit_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          sku = {
+            name   = "Premium_MeteredData"
+            tier   = "Premium"
+            family = "MeteredData"
+          }
+          properties = {
+            serviceProviderProperties = {
+              serviceProviderName = var.provider_name
+              peeringLocation     = var.peering_location
+              bandwidthInMbps     = var.bandwidth_mbps
+            }
+            allowClassicOperations = false
+          }
+        }
+      }
+    bicep_pattern: |
+      resource expressRouteCircuit 'Microsoft.Network/expressRouteCircuits@2024-01-01' = {
+        name: circuitName
+        location: location
+        sku: {
+          name: 'Premium_MeteredData'
+          tier: 'Premium'
+          family: 'MeteredData'
+        }
+        properties: {
+          serviceProviderProperties: {
+            serviceProviderName: providerName
+            peeringLocation: peeringLocation
+            bandwidthInMbps: bandwidthMbps
+          }
+          allowClassicOperations: false
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/virtualNetworkGateways (ExpressRoute gateway with ErGw2AZ or higher)"
+      - "Microsoft.Network/connections (ExpressRoute connection to gateway)"
+      - "Microsoft.Network/expressRouteCircuits/peerings (private peering configuration)"
+      - "Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)"
+    prohibitions:
+      - "Do not enable allowClassicOperations — classic deployment model is deprecated"
+      - "Do not use Standard tier if connecting across geopolitical regions"
+      - "Do not share circuit service keys — treat them as secrets"
+
+  - id: ER-002
+    severity: required
+    description: "Deploy ExpressRoute Gateway with ErGw2AZ or higher SKU for zone redundancy"
+    rationale: "AZ SKUs provide zone redundancy; ErGw1Az has limited throughput for production workloads"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "er_gateway" {
+        type      = "Microsoft.Network/virtualNetworkGateways@2024-01-01"
+        name      = var.er_gateway_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            gatewayType = "ExpressRoute"
+            sku = {
+              name = "ErGw2AZ"
+              tier = "ErGw2AZ"
+            }
+            ipConfigurations = [
+              {
+                name = "erGatewayConfig"
+                properties = {
+                  privateIPAllocationMethod = "Dynamic"
+                  subnet = {
+                    id = var.gateway_subnet_id
+                  }
+                  publicIPAddress = {
+                    id = azapi_resource.er_pip.id
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource erGateway 'Microsoft.Network/virtualNetworkGateways@2024-01-01' = {
+        name: erGatewayName
+        location: location
+        properties: {
+          gatewayType: 'ExpressRoute'
+          sku: {
+            name: 'ErGw2AZ'
+            tier: 'ErGw2AZ'
+          }
+          ipConfigurations: [
+            {
+              name: 'erGatewayConfig'
+              properties: {
+                privateIPAllocationMethod: 'Dynamic'
+                subnet: {
+                  id: gatewaySubnetId
+                }
+                publicIPAddress: {
+                  id: erPip.id
+                }
+              }
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/publicIPAddresses (Standard SKU static for ER gateway)"
+      - "Microsoft.Network/virtualNetworks/subnets (GatewaySubnet with /27 or larger)"
+    prohibitions:
+      - "Do not use non-AZ SKUs for production ExpressRoute gateways"
+      - "Do not colocate VPN and ExpressRoute gateways in the same GatewaySubnet without planning"
+
+  - id: ER-003
+    severity: required
+    description: "Configure private peering with BFD enabled for fast failover"
+    rationale: "BFD detects link failures in sub-second intervals vs BGP hold timer defaults of 180 seconds"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "er_private_peering" {
+        type      = "Microsoft.Network/expressRouteCircuits/peerings@2024-01-01"
+        name      = "AzurePrivatePeering"
+        parent_id = azapi_resource.expressroute_circuit.id
+        body = {
+          properties = {
+            peeringType                = "AzurePrivatePeering"
+            peerASN                    = var.peer_asn
+            primaryPeerAddressPrefix   = var.primary_peer_prefix
+            secondaryPeerAddressPrefix = var.secondary_peer_prefix
+            vlanId                     = var.vlan_id
+          }
+        }
+      }
+    bicep_pattern: |
+      resource erPrivatePeering 'Microsoft.Network/expressRouteCircuits/peerings@2024-01-01' = {
+        parent: expressRouteCircuit
+        name: 'AzurePrivatePeering'
+        properties: {
+          peeringType: 'AzurePrivatePeering'
+          peerASN: peerAsn
+          primaryPeerAddressPrefix: primaryPeerPrefix
+          secondaryPeerAddressPrefix: secondaryPeerPrefix
+          vlanId: vlanId
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/expressRouteCircuits (parent circuit)"
+    prohibitions:
+      - "Do not use Microsoft peering for internal traffic — use private peering"
+      - "Do not use overlapping address prefixes between primary and secondary paths"
+
+  - id: ER-004
+    severity: recommended
+    description: "Enable diagnostic settings for ExpressRoute circuit and gateway"
+    rationale: "Monitor BGP route advertisements, circuit availability, and throughput metrics"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "er_circuit_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-expressroute"
+        parent_id = azapi_resource.expressroute_circuit.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "PeeringRouteLog"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource erCircuitDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-expressroute'
+        scope: expressRouteCircuit
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
+            {
+              category: 'PeeringRouteLog'
+              enabled: true
+            }
+          ]
+          metrics: [
+            {
+              category: 'AllMetrics'
+              enabled: true
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.OperationalInsights/workspaces (Log Analytics workspace)"
+    prohibitions:
+      - "Do not omit PeeringRouteLog — it tracks BGP route changes"
+
+patterns:
+  - name: "ExpressRoute circuit with private peering and gateway"
+    description: "Premium ExpressRoute circuit with private peering and zone-redundant gateway"
+    example: |
+      # See ER-001 through ER-004 for complete azapi_resource patterns
+
+anti_patterns:
+  - description: "Do not use ExpressRoute without a redundant circuit or VPN failover"
+    instead: "Configure a secondary ExpressRoute circuit or S2S VPN as backup"
+  - description: "Do not expose ExpressRoute service keys in source control"
+    instead: "Store service keys in Key Vault and reference via secure parameters"
+
+references:
+  - title: "ExpressRoute documentation"
+    url: "https://learn.microsoft.com/azure/expressroute/expressroute-introduction"
+  - title: "ExpressRoute high availability"
+    url: "https://learn.microsoft.com/azure/expressroute/designing-for-high-availability-with-expressroute"

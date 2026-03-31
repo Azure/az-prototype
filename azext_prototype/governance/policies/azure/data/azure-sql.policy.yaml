@@ -1,0 +1,547 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: azure-sql
+  category: azure
+  services: [sql-database]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: SQL-001
+    severity: required
+    description: "Create SQL Server with AAD-only authentication via separate child resources"
+    rationale: "Centralised identity management via Entra ID; SQL auth passwords are a security liability"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "sql_server" {
+        type      = "Microsoft.Sql/servers@2023-08-01-preview"
+        name      = var.sql_server_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            version                       = "12.0"
+            minimalTlsVersion             = "1.2"
+            publicNetworkAccess           = "Disabled"
+          }
+        }
+      }
+
+      resource "azapi_resource" "sql_server_aad_admin" {
+        type      = "Microsoft.Sql/servers/administrators@2023-08-01-preview"
+        name      = "ActiveDirectory"
+        parent_id = azapi_resource.sql_server.id
+
+        body = {
+          properties = {
+            administratorType = "ActiveDirectory"
+            login             = var.sql_admin_group_name
+            sid               = var.sql_admin_group_object_id
+            tenantId          = var.tenant_id
+          }
+        }
+      }
+
+      resource "azapi_resource" "sql_server_aad_only_auth" {
+        type      = "Microsoft.Sql/servers/azureADOnlyAuthentications@2023-08-01-preview"
+        name      = "Default"
+        parent_id = azapi_resource.sql_server.id
+
+        body = {
+          properties = {
+            azureADOnlyAuthentication = true
+          }
+        }
+
+        depends_on = [azapi_resource.sql_server_aad_admin]
+      }
+    bicep_pattern: |
+      resource sqlServer 'Microsoft.Sql/servers@2023-08-01-preview' = {
+        name: sqlServerName
+        location: location
+        properties: {
+          version: '12.0'
+          minimalTlsVersion: '1.2'
+          publicNetworkAccess: 'Disabled'
+        }
+      }
+
+      resource sqlServerAdAdmin 'Microsoft.Sql/servers/administrators@2023-08-01-preview' = {
+        parent: sqlServer
+        name: 'ActiveDirectory'
+        properties: {
+          administratorType: 'ActiveDirectory'
+          login: sqlAdminGroupName
+          sid: sqlAdminGroupObjectId
+          tenantId: tenant().tenantId
+        }
+      }
+
+      resource sqlServerAadOnlyAuth 'Microsoft.Sql/servers/azureADOnlyAuthentications@2023-08-01-preview' = {
+        parent: sqlServer
+        name: 'Default'
+        properties: {
+          azureADOnlyAuthentication: true
+        }
+        dependsOn: [
+          sqlServerAdAdmin
+        ]
+      }
+    prohibitions:
+      - "NEVER put administrators or azureADOnlyAuthentications inline in the server body — they MUST be separate child resources"
+      - "NEVER set administratorLogin or administratorLoginPassword on the server — these enable SQL auth"
+      - "NEVER use SQL DB Contributor role for data access — use T-SQL contained users (CREATE USER [app-identity] FROM EXTERNAL PROVIDER)"
+      - "NEVER use uuid() for role assignment names — use uuidv5() with deterministic seeds derived from resource IDs"
+    template_check:
+      scope: [sql-database]
+      require_config: [entra_auth_only]
+      error_message: "Service '{service_name}' ({service_type}) missing entra_auth_only: true"
+
+  - id: SQL-002
+    severity: required
+    description: "Create SQL Database with appropriate SKU and settings"
+    rationale: "Databases must be created as child resources of the server with explicit SKU configuration"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "sql_database" {
+        type      = "Microsoft.Sql/servers/databases@2023-08-01-preview"
+        name      = var.sql_database_name
+        location  = var.location
+        parent_id = azapi_resource.sql_server.id
+
+        body = {
+          sku = {
+            name = "GP_S_Gen5_1"
+            tier = "GeneralPurpose"
+          }
+          properties = {
+            collation                   = "SQL_Latin1_General_CP1_CI_AS"
+            maxSizeBytes                = 34359738368
+            autoPauseDelay              = 60
+            minCapacity                 = 0.5
+            zoneRedundant               = false
+            requestedBackupStorageRedundancy = "Local"
+          }
+        }
+      }
+    bicep_pattern: |
+      resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
+        parent: sqlServer
+        name: sqlDatabaseName
+        location: location
+        sku: {
+          name: 'GP_S_Gen5_1'
+          tier: 'GeneralPurpose'
+        }
+        properties: {
+          collation: 'SQL_Latin1_General_CP1_CI_AS'
+          maxSizeBytes: 34359738368
+          autoPauseDelay: 60
+          minCapacity: json('0.5')
+          zoneRedundant: false
+          requestedBackupStorageRedundancy: 'Local'
+        }
+      }
+
+  - id: SQL-003
+    severity: required
+    description: "Enable Transparent Data Encryption (TDE) on every database"
+    rationale: "Data-at-rest encryption is a baseline security requirement"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "sql_tde" {
+        type      = "Microsoft.Sql/servers/databases/transparentDataEncryption@2023-08-01-preview"
+        name      = "current"
+        parent_id = azapi_resource.sql_database.id
+
+        body = {
+          properties = {
+            state = "Enabled"
+          }
+        }
+      }
+    bicep_pattern: |
+      resource sqlTde 'Microsoft.Sql/servers/databases/transparentDataEncryption@2023-08-01-preview' = {
+        parent: sqlDatabase
+        name: 'current'
+        properties: {
+          state: 'Enabled'
+        }
+      }
+    template_check:
+      scope: [sql-database]
+      require_config: [tde_enabled]
+      error_message: "Service '{service_name}' ({service_type}) missing tde_enabled: true"
+
+  - id: SQL-004
+    severity: required
+    description: "Enable Advanced Threat Protection on the SQL Server"
+    rationale: "Detects anomalous database activities indicating potential security threats"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "sql_threat_protection" {
+        type      = "Microsoft.Sql/servers/advancedThreatProtectionSettings@2023-08-01-preview"
+        name      = "Default"
+        parent_id = azapi_resource.sql_server.id
+
+        body = {
+          properties = {
+            state = "Enabled"
+          }
+        }
+      }
+    bicep_pattern: |
+      resource sqlThreatProtection 'Microsoft.Sql/servers/advancedThreatProtectionSettings@2023-08-01-preview' = {
+        parent: sqlServer
+        name: 'Default'
+        properties: {
+          state: 'Enabled'
+        }
+      }
+    template_check:
+      scope: [sql-database]
+      require_config: [threat_protection]
+      error_message: "Service '{service_name}' ({service_type}) missing threat_protection: true"
+
+  - id: SQL-005
+    severity: required
+    description: "Disable public network access and enforce TLS 1.2 minimum"
+    rationale: "Prevents direct internet access; all connections must traverse private endpoints"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    companion_resources:
+      - type: "Microsoft.Network/privateEndpoints@2024-01-01"
+        description: "Private endpoint for SQL Server — required when publicNetworkAccess is Disabled"
+        terraform_pattern: |
+          resource "azapi_resource" "sql_private_endpoint" {
+            type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+            name      = "pe-${var.sql_server_name}"
+            location  = var.location
+            parent_id = azapi_resource.resource_group.id
+
+            body = {
+              properties = {
+                subnet = {
+                  id = var.private_endpoint_subnet_id
+                }
+                privateLinkServiceConnections = [
+                  {
+                    name = "pe-${var.sql_server_name}"
+                    properties = {
+                      privateLinkServiceId = azapi_resource.sql_server.id
+                      groupIds             = ["sqlServer"]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource sqlPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+            name: 'pe-${sqlServerName}'
+            location: location
+            properties: {
+              subnet: {
+                id: privateEndpointSubnetId
+              }
+              privateLinkServiceConnections: [
+                {
+                  name: 'pe-${sqlServerName}'
+                  properties: {
+                    privateLinkServiceId: sqlServer.id
+                    groupIds: [
+                      'sqlServer'
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01"
+        description: "Private DNS zone for SQL Server private endpoint resolution"
+        terraform_pattern: |
+          resource "azapi_resource" "sql_dns_zone" {
+            type      = "Microsoft.Network/privateDnsZones@2020-06-01"
+            name      = "privatelink.database.windows.net"
+            location  = "global"
+            parent_id = azapi_resource.resource_group.id
+          }
+
+          resource "azapi_resource" "sql_dns_zone_link" {
+            type      = "Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01"
+            name      = "link-${var.vnet_name}"
+            location  = "global"
+            parent_id = azapi_resource.sql_dns_zone.id
+
+            body = {
+              properties = {
+                virtualNetwork = {
+                  id = var.vnet_id
+                }
+                registrationEnabled = false
+              }
+            }
+          }
+
+          resource "azapi_resource" "sql_pe_dns_group" {
+            type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-01-01"
+            name      = "default"
+            parent_id = azapi_resource.sql_private_endpoint.id
+
+            body = {
+              properties = {
+                privateDnsZoneConfigs = [
+                  {
+                    name = "privatelink-database-windows-net"
+                    properties = {
+                      privateDnsZoneId = azapi_resource.sql_dns_zone.id
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource sqlDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+            name: 'privatelink.database.windows.net'
+            location: 'global'
+          }
+
+          resource sqlDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+            parent: sqlDnsZone
+            name: 'link-${vnetName}'
+            location: 'global'
+            properties: {
+              virtualNetwork: {
+                id: vnetId
+              }
+              registrationEnabled: false
+            }
+          }
+
+          resource sqlPeDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-01-01' = {
+            parent: sqlPrivateEndpoint
+            name: 'default'
+            properties: {
+              privateDnsZoneConfigs: [
+                {
+                  name: 'privatelink-database-windows-net'
+                  properties: {
+                    privateDnsZoneId: sqlDnsZone.id
+                  }
+                }
+              ]
+            }
+          }
+    prohibitions:
+      - "NEVER set publicNetworkAccess to Enabled"
+      - "NEVER create firewall rules allowing 0.0.0.0-255.255.255.255"
+      - "NEVER set minimalTlsVersion below 1.2"
+
+  - id: SQL-006
+    severity: required
+    description: "Enable diagnostic settings to Log Analytics workspace"
+    rationale: "Audit trail for access, query performance, and security events"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    companion_resources:
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        description: "Diagnostic settings for SQL Database to Log Analytics"
+        terraform_pattern: |
+          resource "azapi_resource" "sql_db_diagnostics" {
+            type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+            name      = "diag-${var.sql_database_name}"
+            parent_id = azapi_resource.sql_database.id
+
+            body = {
+              properties = {
+                workspaceId = var.log_analytics_workspace_id
+                logs = [
+                  {
+                    categoryGroup = "allLogs"
+                    enabled       = true
+                  }
+                ]
+                metrics = [
+                  {
+                    category = "AllMetrics"
+                    enabled  = true
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource sqlDbDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+            scope: sqlDatabase
+            name: 'diag-${sqlDatabaseName}'
+            properties: {
+              workspaceId: logAnalyticsWorkspaceId
+              logs: [
+                {
+                  categoryGroup: 'allLogs'
+                  enabled: true
+                }
+              ]
+              metrics: [
+                {
+                  category: 'AllMetrics'
+                  enabled: true
+                }
+              ]
+            }
+          }
+
+  - id: SQL-007
+    severity: recommended
+    description: "Use serverless tier (GP_S_Gen5) for POC and dev/test workloads"
+    rationale: "Auto-pause reduces costs for intermittent usage patterns"
+    applies_to: [cloud-architect, cost-analyst, terraform-agent, bicep-agent]
+
+  - id: SQL-008
+    severity: required
+    description: "Enable SQL Database auditing on the logical server"
+    rationale: "WAF Security: Auditing tracks database events and writes them to an audit log, maintaining regulatory compliance and providing insight into database activity"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+    terraform_pattern: |
+      resource "azapi_resource" "sql_server_auditing" {
+        type      = "Microsoft.Sql/servers/auditingSettings@2023-08-01-preview"
+        name      = "default"
+        parent_id = azapi_resource.sql_server.id
+
+        body = {
+          properties = {
+            state                       = "Enabled"
+            isAzureMonitorTargetEnabled = true
+            retentionDays               = 90
+          }
+        }
+      }
+    bicep_pattern: |
+      resource sqlServerAuditing 'Microsoft.Sql/servers/auditingSettings@2023-08-01-preview' = {
+        parent: sqlServer
+        name: 'default'
+        properties: {
+          state: 'Enabled'
+          isAzureMonitorTargetEnabled: true
+          retentionDays: 90
+        }
+      }
+
+  - id: SQL-009
+    severity: recommended
+    description: "Enable SQL Vulnerability Assessment on the SQL Server"
+    rationale: "WAF Security: Built-in service that identifies, tracks, and helps remediate potential database vulnerabilities with actionable remediation scripts"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+    terraform_pattern: |
+      resource "azapi_resource" "sql_vulnerability_assessment" {
+        type      = "Microsoft.Sql/servers/sqlVulnerabilityAssessments@2023-08-01-preview"
+        name      = "default"
+        parent_id = azapi_resource.sql_server.id
+
+        body = {
+          properties = {
+            state = "Enabled"
+          }
+        }
+      }
+    bicep_pattern: |
+      resource sqlVulnerabilityAssessment 'Microsoft.Sql/servers/sqlVulnerabilityAssessments@2023-08-01-preview' = {
+        parent: sqlServer
+        name: 'default'
+        properties: {
+          state: 'Enabled'
+        }
+      }
+
+  - id: SQL-010
+    severity: recommended
+    description: "Configure zone redundancy for Business Critical or Premium tier databases"
+    rationale: "WAF Reliability: Zone-redundant availability distributes compute and storage across availability zones, maintaining operations during zone failures"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    prohibitions:
+      - "NEVER disable zone redundancy on Business Critical tier databases in production"
+
+  - id: SQL-011
+    severity: recommended
+    description: "Use failover groups for automatic geo-failover of critical databases"
+    rationale: "WAF Reliability: Failover groups automate failover from primary to secondary with read-write and read-only listener endpoints that remain unchanged during geo-failovers"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "sql_failover_group" {
+        type      = "Microsoft.Sql/servers/failoverGroups@2023-08-01-preview"
+        name      = var.failover_group_name
+        parent_id = azapi_resource.sql_server.id
+
+        body = {
+          properties = {
+            readWriteEndpoint = {
+              failoverPolicy                         = "Automatic"
+              failoverWithDataLossGracePeriodMinutes = 60
+            }
+            readOnlyEndpoint = {
+              failoverPolicy = "Enabled"
+            }
+            partnerServers = [
+              {
+                id = azapi_resource.sql_server_secondary.id
+              }
+            ]
+            databases = [
+              azapi_resource.sql_database.id
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource sqlFailoverGroup 'Microsoft.Sql/servers/failoverGroups@2023-08-01-preview' = {
+        parent: sqlServer
+        name: failoverGroupName
+        properties: {
+          readWriteEndpoint: {
+            failoverPolicy: 'Automatic'
+            failoverWithDataLossGracePeriodMinutes: 60
+          }
+          readOnlyEndpoint: {
+            failoverPolicy: 'Enabled'
+          }
+          partnerServers: [
+            {
+              id: sqlServerSecondary.id
+            }
+          ]
+          databases: [
+            sqlDatabase.id
+          ]
+        }
+      }
+
+patterns:
+  - name: "SQL Server with AAD-only auth and private endpoint"
+    description: "Complete SQL Server deployment with Entra-only authentication, TDE, threat protection, private endpoint, and diagnostics"
+
+anti_patterns:
+  - description: "Do not use SQL authentication with username/password"
+    instead: "Use Microsoft Entra (Azure AD) authentication with managed identity"
+  - description: "Do not set firewall rule 0.0.0.0-255.255.255.255"
+    instead: "Use private endpoints for all connectivity"
+  - description: "Do not put administrators inline in the server body"
+    instead: "Create Microsoft.Sql/servers/administrators and Microsoft.Sql/servers/azureADOnlyAuthentications as separate child resources"
+  - description: "Do not use SQL DB Contributor role for application data access"
+    instead: "Use T-SQL contained users: CREATE USER [app-identity] FROM EXTERNAL PROVIDER"
+
+references:
+  - title: "SQL Database security best practices"
+    url: "https://learn.microsoft.com/azure/azure-sql/database/security-best-practice"
+  - title: "Azure SQL private endpoints"
+    url: "https://learn.microsoft.com/azure/azure-sql/database/private-endpoint-overview"
+  - title: "AAD-only authentication"
+    url: "https://learn.microsoft.com/azure/azure-sql/database/authentication-azure-ad-only-authentication"
+  - title: "WAF: Azure SQL Database service guide"
+    url: "https://learn.microsoft.com/azure/well-architected/service-guides/azure-sql-database"
+  - title: "SQL Database auditing"
+    url: "https://learn.microsoft.com/azure/azure-sql/database/auditing-overview"
+  - title: "SQL vulnerability assessment"
+    url: "https://learn.microsoft.com/azure/azure-sql/database/sql-vulnerability-assessment"
+  - title: "SQL Database failover groups"
+    url: "https://learn.microsoft.com/azure/azure-sql/database/auto-failover-group-overview"

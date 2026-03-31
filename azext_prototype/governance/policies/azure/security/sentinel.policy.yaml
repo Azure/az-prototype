@@ -1,0 +1,180 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: sentinel
+  category: azure
+  services: [sentinel]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: SNTL-001
+    severity: required
+    description: "Deploy Microsoft Sentinel on a dedicated Log Analytics workspace with onboarding state enabled"
+    rationale: "Sentinel requires an onboarded Log Analytics workspace for security event correlation and threat detection"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+    terraform_pattern: |
+      resource "azapi_resource" "log_analytics" {
+        type      = "Microsoft.OperationalInsights/workspaces@2023-09-01"
+        name      = var.log_analytics_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        body = {
+          properties = {
+            sku = {
+              name = "PerGB2018"
+            }
+            retentionInDays = var.retention_days  # Minimum 90 for Sentinel
+            features = {
+              enableDataExport = true
+            }
+          }
+        }
+      }
+
+      resource "azapi_resource" "sentinel" {
+        type      = "Microsoft.SecurityInsights/onboardingStates@2024-03-01"
+        name      = "default"
+        parent_id = azapi_resource.log_analytics.id
+
+        body = {
+          properties = {
+            customerManagedKey = false
+          }
+        }
+      }
+    bicep_pattern: |
+      resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+        name: logAnalyticsName
+        location: location
+        properties: {
+          sku: {
+            name: 'PerGB2018'
+          }
+          retentionInDays: retentionDays
+          features: {
+            enableDataExport: true
+          }
+        }
+      }
+
+      resource sentinel 'Microsoft.SecurityInsights/onboardingStates@2024-03-01' = {
+        name: 'default'
+        scope: logAnalytics
+        properties: {
+          customerManagedKey: false
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.SecurityInsights/dataConnectors@2024-03-01"
+        name: "Azure Activity data connector"
+        description: "Data connector for Azure Activity logs — baseline for subscription-level event monitoring"
+        terraform_pattern: |
+          resource "azapi_resource" "sentinel_azure_activity" {
+            type      = "Microsoft.SecurityInsights/dataConnectors@2024-03-01"
+            name      = var.activity_connector_name
+            parent_id = azapi_resource.log_analytics.id
+
+            body = {
+              kind = "AzureActiveDirectory"
+              properties = {
+                dataTypes = {
+                  alerts = {
+                    state = "Enabled"
+                  }
+                }
+                tenantId = var.tenant_id
+              }
+            }
+          }
+        bicep_pattern: |
+          resource sentinelAzureActivity 'Microsoft.SecurityInsights/dataConnectors@2024-03-01' = {
+            name: activityConnectorName
+            scope: logAnalytics
+            kind: 'AzureActiveDirectory'
+            properties: {
+              dataTypes: {
+                alerts: {
+                  state: 'Enabled'
+                }
+              }
+              tenantId: tenantId
+            }
+          }
+      - type: "Microsoft.SecurityInsights/alertRules@2024-03-01"
+        name: "Fusion alert rule"
+        description: "Built-in Fusion rule for multi-stage attack detection using ML correlation"
+        terraform_pattern: |
+          resource "azapi_resource" "sentinel_fusion" {
+            type      = "Microsoft.SecurityInsights/alertRules@2024-03-01"
+            name      = var.fusion_rule_name
+            parent_id = azapi_resource.log_analytics.id
+
+            body = {
+              kind = "Fusion"
+              properties = {
+                enabled      = true
+                alertRuleTemplateName = "f71aba3d-28fb-450b-b192-4e76a83015c8"
+              }
+            }
+          }
+        bicep_pattern: |
+          resource sentinelFusion 'Microsoft.SecurityInsights/alertRules@2024-03-01' = {
+            name: fusionRuleName
+            scope: logAnalytics
+            kind: 'Fusion'
+            properties: {
+              enabled: true
+              alertRuleTemplateName: 'f71aba3d-28fb-450b-b192-4e76a83015c8'
+            }
+          }
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "Microsoft Sentinel Responder / Reader"
+        description: "RBAC role assignments for SOC analysts and security responders"
+    prohibitions:
+      - "Never deploy Sentinel on a shared operational Log Analytics workspace — use a dedicated security workspace"
+      - "Never set retention below 90 days for Sentinel workspaces"
+      - "Never disable the Fusion alert rule — it is the primary ML-based threat detection mechanism"
+      - "Never hardcode tenant IDs in data connector configurations"
+      - "Never grant Microsoft Sentinel Contributor to analysts — use Responder for incident management"
+
+  - id: SNTL-002
+    severity: required
+    description: "Enable core data connectors for Azure Activity, Entra ID, and Defender for Cloud"
+    rationale: "Data connectors feed Sentinel with security signals; missing connectors create blind spots"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+
+  - id: SNTL-003
+    severity: required
+    description: "Enable the Fusion alert rule for ML-based multi-stage attack detection"
+    rationale: "Fusion uses ML to correlate low-fidelity signals across data sources into high-confidence incidents"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+
+  - id: SNTL-004
+    severity: recommended
+    description: "Configure automation rules for common incident response playbooks"
+    rationale: "Automation rules reduce mean time to respond by executing playbooks on incident creation"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+
+  - id: SNTL-005
+    severity: recommended
+    description: "Set up workspace-level RBAC with Microsoft Sentinel-specific roles"
+    rationale: "Sentinel-specific roles (Reader, Responder, Contributor) provide appropriate access levels for SOC tiers"
+    applies_to: [cloud-architect, security-reviewer]
+
+patterns:
+  - name: "Sentinel with core data connectors and Fusion"
+    description: "Dedicated Sentinel workspace with Azure Activity, Entra ID connectors, and Fusion detection"
+
+anti_patterns:
+  - description: "Do not deploy Sentinel on a shared operational workspace"
+    instead: "Use a dedicated Log Analytics workspace for security monitoring with appropriate retention"
+  - description: "Do not disable built-in Fusion detection"
+    instead: "Keep Fusion enabled as it provides ML-based multi-stage attack correlation"
+
+references:
+  - title: "Microsoft Sentinel documentation"
+    url: "https://learn.microsoft.com/azure/sentinel/overview"
+  - title: "Sentinel data connectors"
+    url: "https://learn.microsoft.com/azure/sentinel/connect-data-sources"

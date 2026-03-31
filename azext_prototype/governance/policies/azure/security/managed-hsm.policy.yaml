@@ -1,0 +1,216 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: managed-hsm
+  category: azure
+  services: [managed-hsm]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: HSM-001
+    severity: required
+    description: "Deploy Managed HSM with multiple administrators, RBAC authorization, and no public access"
+    rationale: "HSM protects the highest-value cryptographic keys; multiple admins prevent lockout, RBAC enables fine-grained control"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+    terraform_pattern: |
+      resource "azapi_resource" "managed_hsm" {
+        type      = "Microsoft.KeyVault/managedHSMs@2023-07-01"
+        name      = var.hsm_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        body = {
+          sku = {
+            name   = "Standard_B1"
+            family = "B"
+          }
+          properties = {
+            tenantId                      = var.tenant_id
+            initialAdminObjectIds         = var.admin_object_ids  # Minimum 3 for quorum
+            enableSoftDelete              = true
+            softDeleteRetentionInDays     = 90
+            enablePurgeProtection         = true
+            publicNetworkAccess           = "Disabled"
+            networkAcls = {
+              bypass        = "None"
+              defaultAction = "Deny"
+              ipRules       = []
+              virtualNetworkRules = []
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource managedHsm 'Microsoft.KeyVault/managedHSMs@2023-07-01' = {
+        name: hsmName
+        location: location
+        sku: {
+          name: 'Standard_B1'
+          family: 'B'
+        }
+        properties: {
+          tenantId: tenantId
+          initialAdminObjectIds: adminObjectIds
+          enableSoftDelete: true
+          softDeleteRetentionInDays: 90
+          enablePurgeProtection: true
+          publicNetworkAccess: 'Disabled'
+          networkAcls: {
+            bypass: 'None'
+            defaultAction: 'Deny'
+            ipRules: []
+            virtualNetworkRules: []
+          }
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Network/privateEndpoints@2024-01-01"
+        name: "pe-hsm"
+        description: "Private endpoint for Managed HSM to secure key operations"
+        terraform_pattern: |
+          resource "azapi_resource" "pe_hsm" {
+            type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+            name      = "pe-${var.hsm_name}"
+            location  = var.location
+            parent_id = var.resource_group_id
+
+            body = {
+              properties = {
+                subnet = {
+                  id = var.subnet_id
+                }
+                privateLinkServiceConnections = [
+                  {
+                    name = "hsm-connection"
+                    properties = {
+                      privateLinkServiceId = azapi_resource.managed_hsm.id
+                      groupIds             = ["managedhsm"]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource peHsm 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+            name: 'pe-${hsmName}'
+            location: location
+            properties: {
+              subnet: {
+                id: subnetId
+              }
+              privateLinkServiceConnections: [
+                {
+                  name: 'hsm-connection'
+                  properties: {
+                    privateLinkServiceId: managedHsm.id
+                    groupIds: ['managedhsm']
+                  }
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Network/privateDnsZones@2024-06-01"
+        name: "privatelink.managedhsm.azure.net"
+        description: "Private DNS zone for Managed HSM private endpoint resolution"
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name: "diag-hsm"
+        description: "Diagnostic settings to route HSM audit logs to Log Analytics for compliance"
+        terraform_pattern: |
+          resource "azapi_resource" "diag_hsm" {
+            type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+            name      = "diag-${var.hsm_name}"
+            parent_id = azapi_resource.managed_hsm.id
+
+            body = {
+              properties = {
+                workspaceId = var.log_analytics_workspace_id
+                logs = [
+                  {
+                    categoryGroup = "allLogs"
+                    enabled       = true
+                  }
+                ]
+                metrics = [
+                  {
+                    category = "AllMetrics"
+                    enabled  = true
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource diagHsm 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+            name: 'diag-${hsmName}'
+            scope: managedHsm
+            properties: {
+              workspaceId: logAnalyticsWorkspaceId
+              logs: [
+                {
+                  categoryGroup: 'allLogs'
+                  enabled: true
+                }
+              ]
+              metrics: [
+                {
+                  category: 'AllMetrics'
+                  enabled: true
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "Managed HSM Crypto User / Officer"
+        description: "RBAC local role assignments for key operations — separate Crypto User from Crypto Officer"
+    prohibitions:
+      - "Never deploy with fewer than 3 initial admin object IDs — prevents lockout"
+      - "Never disable soft delete or purge protection"
+      - "Never set softDeleteRetentionInDays below 90"
+      - "Never set networkAcls bypass to AzureServices unless explicitly required"
+      - "Never set publicNetworkAccess to Enabled"
+      - "Never combine Crypto Officer and Crypto User roles on the same identity"
+      - "Never skip security domain download after initial activation"
+
+  - id: HSM-002
+    severity: required
+    description: "Enable soft delete with 90-day retention and purge protection"
+    rationale: "HSM keys are irrecoverable if permanently deleted; purge protection prevents malicious or accidental permanent deletion"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+
+  - id: HSM-003
+    severity: required
+    description: "Download and securely store the security domain immediately after HSM activation"
+    rationale: "The security domain is required for disaster recovery; without it, the HSM and its keys are permanently lost"
+    applies_to: [cloud-architect, security-reviewer]
+
+  - id: HSM-004
+    severity: required
+    description: "Separate Crypto Officer and Crypto User roles — enforce dual control"
+    rationale: "Dual control prevents any single identity from both creating and using keys, reducing insider threat risk"
+    applies_to: [cloud-architect, security-reviewer]
+
+  - id: HSM-005
+    severity: recommended
+    description: "Enable diagnostic logging for all key operations to Log Analytics"
+    rationale: "HSM audit logs provide compliance evidence and anomaly detection for cryptographic operations"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer, monitoring-agent]
+
+patterns:
+  - name: "Managed HSM with private endpoint and dual control"
+    description: "FIPS 140-2 Level 3 HSM with private access, soft delete, purge protection, and role separation"
+
+anti_patterns:
+  - description: "Do not deploy HSM with a single administrator"
+    instead: "Specify at least 3 initialAdminObjectIds for quorum-based administration"
+  - description: "Do not disable soft delete or purge protection"
+    instead: "Always enable both with softDeleteRetentionInDays set to 90"
+  - description: "Do not combine Crypto Officer and Crypto User on the same identity"
+    instead: "Use separate identities for key management (Officer) and key usage (User)"
+
+references:
+  - title: "Azure Managed HSM documentation"
+    url: "https://learn.microsoft.com/azure/key-vault/managed-hsm/overview"
+  - title: "Managed HSM best practices"
+    url: "https://learn.microsoft.com/azure/key-vault/managed-hsm/best-practices"

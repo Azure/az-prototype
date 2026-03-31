@@ -1,0 +1,651 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: api-patterns
+  category: integration
+  services: [api-management, app-service, container-apps, functions]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: API-001
+    severity: required
+    description: "Implement API versioning using URL path segments in APIM with version sets"
+    rationale: "API versioning prevents breaking changes for existing consumers; URL path versioning is the most discoverable approach"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer]
+    terraform_pattern: |
+      # APIM API version set — groups related API versions
+      resource "azapi_resource" "apim_version_set" {
+        type      = "Microsoft.ApiManagement/service/apiVersionSets@2023-09-01-preview"
+        name      = var.api_version_set_name
+        parent_id = azapi_resource.apim.id
+
+        body = {
+          properties = {
+            displayName      = var.api_display_name
+            versioningScheme  = "Segment"        # URL path versioning: /api/v1/resource
+            # Alternative: "Header" with versionHeaderName = "api-version"
+            # Alternative: "Query" with versionQueryName = "api-version"
+          }
+        }
+      }
+
+      # APIM API v1 — current stable version
+      resource "azapi_resource" "apim_api_v1" {
+        type      = "Microsoft.ApiManagement/service/apis@2023-09-01-preview"
+        name      = "${var.api_name}-v1"
+        parent_id = azapi_resource.apim.id
+
+        body = {
+          properties = {
+            displayName          = "${var.api_display_name} v1"
+            path                 = var.api_path
+            protocols            = ["https"]
+            subscriptionRequired = true
+            apiVersion           = "v1"
+            apiVersionSetId      = azapi_resource.apim_version_set.id
+            serviceUrl           = var.backend_service_url_v1
+            apiType              = "http"
+          }
+        }
+      }
+
+      # APIM API v2 — next version (can coexist with v1)
+      resource "azapi_resource" "apim_api_v2" {
+        type      = "Microsoft.ApiManagement/service/apis@2023-09-01-preview"
+        name      = "${var.api_name}-v2"
+        parent_id = azapi_resource.apim.id
+
+        body = {
+          properties = {
+            displayName          = "${var.api_display_name} v2"
+            path                 = var.api_path
+            protocols            = ["https"]
+            subscriptionRequired = true
+            apiVersion           = "v2"
+            apiVersionSetId      = azapi_resource.apim_version_set.id
+            serviceUrl           = var.backend_service_url_v2
+            apiType              = "http"
+          }
+        }
+      }
+
+      # Version deprecation policy — add sunset header to v1
+      resource "azapi_resource" "apim_v1_deprecation_policy" {
+        type      = "Microsoft.ApiManagement/service/apis/policies@2023-09-01-preview"
+        name      = "policy"
+        parent_id = azapi_resource.apim_api_v1.id
+
+        body = {
+          properties = {
+            format = "xml"
+            value  = <<-XML
+              <policies>
+                <inbound>
+                  <base />
+                </inbound>
+                <outbound>
+                  <base />
+                  <set-header name="Sunset" exists-action="override">
+                    <value>${var.v1_sunset_date}</value>
+                  </set-header>
+                  <set-header name="Deprecation" exists-action="override">
+                    <value>true</value>
+                  </set-header>
+                  <set-header name="Link" exists-action="append">
+                    <value>&lt;${var.migration_guide_url}&gt;; rel="successor-version"</value>
+                  </set-header>
+                </outbound>
+                <on-error>
+                  <base />
+                </on-error>
+              </policies>
+            XML
+          }
+        }
+      }
+    bicep_pattern: |
+      // APIM API version set — groups related API versions
+      resource apimVersionSet 'Microsoft.ApiManagement/service/apiVersionSets@2023-09-01-preview' = {
+        parent: apim
+        name: apiVersionSetName
+        properties: {
+          displayName: apiDisplayName
+          versioningScheme: 'Segment'           // URL path versioning: /api/v1/resource
+        }
+      }
+
+      // APIM API v1 — current stable version
+      resource apimApiV1 'Microsoft.ApiManagement/service/apis@2023-09-01-preview' = {
+        parent: apim
+        name: '${apiName}-v1'
+        properties: {
+          displayName: '${apiDisplayName} v1'
+          path: apiPath
+          protocols: ['https']
+          subscriptionRequired: true
+          apiVersion: 'v1'
+          apiVersionSetId: apimVersionSet.id
+          serviceUrl: backendServiceUrlV1
+          apiType: 'http'
+        }
+      }
+
+      // APIM API v2 — next version (can coexist with v1)
+      resource apimApiV2 'Microsoft.ApiManagement/service/apis@2023-09-01-preview' = {
+        parent: apim
+        name: '${apiName}-v2'
+        properties: {
+          displayName: '${apiDisplayName} v2'
+          path: apiPath
+          protocols: ['https']
+          subscriptionRequired: true
+          apiVersion: 'v2'
+          apiVersionSetId: apimVersionSet.id
+          serviceUrl: backendServiceUrlV2
+          apiType: 'http'
+        }
+      }
+
+      // Version deprecation policy — add sunset header to v1
+      resource apimV1DeprecationPolicy 'Microsoft.ApiManagement/service/apis/policies@2023-09-01-preview' = {
+        parent: apimApiV1
+        name: 'policy'
+        properties: {
+          format: 'xml'
+          value: '''
+            <policies>
+              <inbound>
+                <base />
+              </inbound>
+              <outbound>
+                <base />
+                <set-header name="Sunset" exists-action="override">
+                  <value>{v1SunsetDate}</value>
+                </set-header>
+                <set-header name="Deprecation" exists-action="override">
+                  <value>true</value>
+                </set-header>
+                <set-header name="Link" exists-action="append">
+                  <value>&lt;{migrationGuideUrl}&gt;; rel="successor-version"</value>
+                </set-header>
+              </outbound>
+              <on-error>
+                <base />
+              </on-error>
+            </policies>
+          '''
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.ApiManagement/service/apiVersionSets@2023-09-01-preview"
+        name: "api-version-set"
+        description: "API version set grouping related API versions under a single path"
+      - type: "Microsoft.ApiManagement/service/apis/policies@2023-09-01-preview"
+        name: "deprecation-policy"
+        description: "Outbound policy adding Sunset and Deprecation headers to deprecated API versions"
+    prohibitions:
+      - "NEVER deploy APIs without versioning — unversioned APIs cannot evolve without breaking consumers"
+      - "NEVER remove an API version without a sunset period and migration guide"
+      - "NEVER mix versioning schemes within the same API — pick one (Segment, Header, or Query) and be consistent"
+      - "NEVER use date-based versions (2024-01-01) for REST APIs — use semantic versions (v1, v2)"
+
+  - id: API-002
+    severity: required
+    description: "Configure OAuth 2.0 / JWT validation in APIM inbound policies for all API endpoints"
+    rationale: "APIs without authentication allow unrestricted access; JWT validation at the gateway prevents unauthorized requests from reaching backends"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer]
+    terraform_pattern: |
+      # APIM API policy with JWT validation (Entra ID / OAuth 2.0)
+      resource "azapi_resource" "apim_jwt_policy" {
+        type      = "Microsoft.ApiManagement/service/apis/policies@2023-09-01-preview"
+        name      = "policy"
+        parent_id = azapi_resource.apim_api.id
+
+        body = {
+          properties = {
+            format = "xml"
+            value  = <<-XML
+              <policies>
+                <inbound>
+                  <base />
+                  <validate-jwt header-name="Authorization"
+                                failed-validation-httpcode="401"
+                                failed-validation-error-message="Unauthorized. Access token is missing or invalid."
+                                require-expiration-time="true"
+                                require-signed-tokens="true">
+                    <openid-config url="https://login.microsoftonline.com/${var.tenant_id}/v2.0/.well-known/openid-configuration" />
+                    <audiences>
+                      <audience>${var.api_audience}</audience>
+                    </audiences>
+                    <issuers>
+                      <issuer>https://login.microsoftonline.com/${var.tenant_id}/v2.0</issuer>
+                      <issuer>https://sts.windows.net/${var.tenant_id}/</issuer>
+                    </issuers>
+                    <required-claims>
+                      <claim name="roles" match="any">
+                        <value>${var.required_role}</value>
+                      </claim>
+                    </required-claims>
+                  </validate-jwt>
+                  <set-header name="X-User-Id" exists-action="override">
+                    <value>@(context.Request.Headers.GetValueOrDefault("Authorization","").AsJwt()?.Claims.GetValueOrDefault("oid",""))</value>
+                  </set-header>
+                </inbound>
+                <backend>
+                  <base />
+                </backend>
+                <outbound>
+                  <base />
+                </outbound>
+                <on-error>
+                  <base />
+                </on-error>
+              </policies>
+            XML
+          }
+        }
+      }
+
+      # APIM authorization server registration (for developer portal)
+      resource "azapi_resource" "apim_auth_server" {
+        type      = "Microsoft.ApiManagement/service/authorizationServers@2023-09-01-preview"
+        name      = "entra-id-oauth"
+        parent_id = azapi_resource.apim.id
+
+        body = {
+          properties = {
+            displayName              = "Microsoft Entra ID"
+            clientRegistrationEndpoint = "https://login.microsoftonline.com/${var.tenant_id}/oauth2/v2.0/authorize"
+            authorizationEndpoint    = "https://login.microsoftonline.com/${var.tenant_id}/oauth2/v2.0/authorize"
+            tokenEndpoint            = "https://login.microsoftonline.com/${var.tenant_id}/oauth2/v2.0/token"
+            grantTypes               = ["authorizationCode"]
+            clientId                 = var.apim_app_client_id
+            clientSecret             = var.apim_app_client_secret
+            defaultScope             = "${var.api_audience}/.default"
+            authorizationMethods     = ["GET", "POST"]
+            tokenBodyParameters      = []
+            supportState             = true
+            bearerTokenSendingMethods = ["authorizationHeader"]
+          }
+        }
+      }
+    bicep_pattern: |
+      // APIM API policy with JWT validation (Entra ID / OAuth 2.0)
+      resource apimJwtPolicy 'Microsoft.ApiManagement/service/apis/policies@2023-09-01-preview' = {
+        parent: apimApi
+        name: 'policy'
+        properties: {
+          format: 'xml'
+          value: '''
+            <policies>
+              <inbound>
+                <base />
+                <validate-jwt header-name="Authorization"
+                              failed-validation-httpcode="401"
+                              failed-validation-error-message="Unauthorized. Access token is missing or invalid."
+                              require-expiration-time="true"
+                              require-signed-tokens="true">
+                  <openid-config url="https://login.microsoftonline.com/{tenantId}/v2.0/.well-known/openid-configuration" />
+                  <audiences>
+                    <audience>{apiAudience}</audience>
+                  </audiences>
+                  <issuers>
+                    <issuer>https://login.microsoftonline.com/{tenantId}/v2.0</issuer>
+                    <issuer>https://sts.windows.net/{tenantId}/</issuer>
+                  </issuers>
+                  <required-claims>
+                    <claim name="roles" match="any">
+                      <value>{requiredRole}</value>
+                    </claim>
+                  </required-claims>
+                </validate-jwt>
+                <set-header name="X-User-Id" exists-action="override">
+                  <value>@(context.Request.Headers.GetValueOrDefault("Authorization","").AsJwt()?.Claims.GetValueOrDefault("oid",""))</value>
+                </set-header>
+              </inbound>
+              <backend>
+                <base />
+              </backend>
+              <outbound>
+                <base />
+              </outbound>
+              <on-error>
+                <base />
+              </on-error>
+            </policies>
+          '''
+        }
+      }
+
+      // APIM authorization server registration (for developer portal)
+      resource apimAuthServer 'Microsoft.ApiManagement/service/authorizationServers@2023-09-01-preview' = {
+        parent: apim
+        name: 'entra-id-oauth'
+        properties: {
+          displayName: 'Microsoft Entra ID'
+          clientRegistrationEndpoint: 'https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize'
+          authorizationEndpoint: 'https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize'
+          tokenEndpoint: 'https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token'
+          grantTypes: ['authorizationCode']
+          clientId: apimAppClientId
+          clientSecret: apimAppClientSecret
+          defaultScope: '${apiAudience}/.default'
+          authorizationMethods: ['GET', 'POST']
+          tokenBodyParameters: []
+          supportState: true
+          bearerTokenSendingMethods: ['authorizationHeader']
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.ApiManagement/service/authorizationServers@2023-09-01-preview"
+        name: "entra-id-oauth"
+        description: "OAuth 2.0 authorization server for Entra ID integration in developer portal"
+    prohibitions:
+      - "NEVER deploy APIs without authentication — unauthenticated APIs allow unrestricted access"
+      - "NEVER validate JWTs without checking audience (aud) and issuer (iss) claims"
+      - "NEVER accept tokens without expiration (require-expiration-time must be true)"
+      - "NEVER accept unsigned tokens (require-signed-tokens must be true)"
+      - "NEVER hardcode client secrets in APIM policies — use named values backed by Key Vault"
+      - "NEVER trust JWT claims without server-side validation — client-provided claims are untrustworthy"
+
+  - id: API-003
+    severity: required
+    description: "Configure request and response validation policies in APIM to enforce API contracts"
+    rationale: "Request validation prevents malformed input from reaching backends; response validation ensures API contract compliance"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer]
+    terraform_pattern: |
+      # APIM API with OpenAPI specification import and validation policies
+      resource "azapi_resource" "apim_api_with_spec" {
+        type      = "Microsoft.ApiManagement/service/apis@2023-09-01-preview"
+        name      = var.api_name
+        parent_id = azapi_resource.apim.id
+
+        body = {
+          properties = {
+            displayName          = var.api_display_name
+            path                 = var.api_path
+            protocols            = ["https"]
+            subscriptionRequired = true
+            format               = "openapi+json"
+            value                = var.openapi_spec_json
+            apiType              = "http"
+          }
+        }
+      }
+
+      # Request and response validation policy
+      resource "azapi_resource" "apim_validation_policy" {
+        type      = "Microsoft.ApiManagement/service/apis/policies@2023-09-01-preview"
+        name      = "policy"
+        parent_id = azapi_resource.apim_api_with_spec.id
+
+        body = {
+          properties = {
+            format = "xml"
+            value  = <<-XML
+              <policies>
+                <inbound>
+                  <base />
+                  <validate-content unspecified-content-type-action="prevent"
+                                    max-size="102400"
+                                    size-exceeded-action="prevent"
+                                    errors-variable-name="requestValidation">
+                    <content type="application/json" validate-as="json"
+                             action="prevent"
+                             allow-additional-properties="false" />
+                  </validate-content>
+                  <validate-parameters specified-parameter-action="prevent"
+                                       unspecified-parameter-action="prevent"
+                                       errors-variable-name="paramValidation" />
+                  <validate-headers specified-header-action="ignore"
+                                    unspecified-header-action="ignore"
+                                    errors-variable-name="headerValidation" />
+                </inbound>
+                <backend>
+                  <base />
+                </backend>
+                <outbound>
+                  <base />
+                  <validate-status-code unspecified-status-code-action="ignore"
+                                        errors-variable-name="responseValidation" />
+                  <validate-content unspecified-content-type-action="ignore"
+                                    max-size="1048576"
+                                    size-exceeded-action="ignore"
+                                    errors-variable-name="responseContentValidation">
+                    <content type="application/json" validate-as="json"
+                             action="ignore"
+                             allow-additional-properties="true" />
+                  </validate-content>
+                </outbound>
+                <on-error>
+                  <base />
+                  <return-response>
+                    <set-status code="400" reason="Bad Request" />
+                    <set-header name="Content-Type" exists-action="override">
+                      <value>application/problem+json</value>
+                    </set-header>
+                    <set-body>@{
+                      return new JObject(
+                        new JProperty("type", "https://tools.ietf.org/html/rfc9110#section-15.5.1"),
+                        new JProperty("title", "Bad Request"),
+                        new JProperty("status", 400),
+                        new JProperty("detail", "Request validation failed"),
+                        new JProperty("errors", context.Variables.GetValueOrDefault<string>("requestValidation", ""))
+                      ).ToString();
+                    }</set-body>
+                  </return-response>
+                </on-error>
+              </policies>
+            XML
+          }
+        }
+      }
+    bicep_pattern: |
+      // APIM API with OpenAPI specification import and validation policies
+      resource apimApiWithSpec 'Microsoft.ApiManagement/service/apis@2023-09-01-preview' = {
+        parent: apim
+        name: apiName
+        properties: {
+          displayName: apiDisplayName
+          path: apiPath
+          protocols: ['https']
+          subscriptionRequired: true
+          format: 'openapi+json'
+          value: openApiSpecJson
+          apiType: 'http'
+        }
+      }
+
+      // Request and response validation policy
+      resource apimValidationPolicy 'Microsoft.ApiManagement/service/apis/policies@2023-09-01-preview' = {
+        parent: apimApiWithSpec
+        name: 'policy'
+        properties: {
+          format: 'xml'
+          value: '''
+            <policies>
+              <inbound>
+                <base />
+                <validate-content unspecified-content-type-action="prevent"
+                                  max-size="102400"
+                                  size-exceeded-action="prevent"
+                                  errors-variable-name="requestValidation">
+                  <content type="application/json" validate-as="json"
+                           action="prevent"
+                           allow-additional-properties="false" />
+                </validate-content>
+                <validate-parameters specified-parameter-action="prevent"
+                                     unspecified-parameter-action="prevent"
+                                     errors-variable-name="paramValidation" />
+                <validate-headers specified-header-action="ignore"
+                                  unspecified-header-action="ignore"
+                                  errors-variable-name="headerValidation" />
+              </inbound>
+              <backend>
+                <base />
+              </backend>
+              <outbound>
+                <base />
+                <validate-status-code unspecified-status-code-action="ignore"
+                                      errors-variable-name="responseValidation" />
+                <validate-content unspecified-content-type-action="ignore"
+                                  max-size="1048576"
+                                  size-exceeded-action="ignore"
+                                  errors-variable-name="responseContentValidation">
+                  <content type="application/json" validate-as="json"
+                           action="ignore"
+                           allow-additional-properties="true" />
+                </validate-content>
+              </outbound>
+              <on-error>
+                <base />
+                <return-response>
+                  <set-status code="400" reason="Bad Request" />
+                  <set-header name="Content-Type" exists-action="override">
+                    <value>application/problem+json</value>
+                  </set-header>
+                  <set-body>@{
+                    return new JObject(
+                      new JProperty("type", "https://tools.ietf.org/html/rfc9110#section-15.5.1"),
+                      new JProperty("title", "Bad Request"),
+                      new JProperty("status", 400),
+                      new JProperty("detail", "Request validation failed"),
+                      new JProperty("errors", context.Variables.GetValueOrDefault<string>("requestValidation", ""))
+                    ).ToString();
+                  }</set-body>
+                </return-response>
+              </on-error>
+            </policies>
+          '''
+        }
+      }
+    prohibitions:
+      - "NEVER skip request validation — malformed input causes unpredictable backend behavior"
+      - "NEVER allow additional properties in request validation unless the schema explicitly permits it"
+      - "NEVER expose internal error details (stack traces, SQL errors) in validation error responses"
+      - "NEVER set max-size to unlimited — always cap request body size to prevent abuse"
+      - "NEVER block on response validation in production (use action='ignore') — outbound validation should log, not reject"
+
+  - id: API-004
+    severity: recommended
+    description: "Integrate OpenAPI specification with APIM for auto-generated documentation and developer portal"
+    rationale: "OpenAPI specs provide machine-readable API contracts; APIM developer portal auto-generates interactive documentation"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent, app-developer]
+    terraform_pattern: |
+      # APIM API imported from OpenAPI spec URL
+      resource "azapi_resource" "apim_api_openapi" {
+        type      = "Microsoft.ApiManagement/service/apis@2023-09-01-preview"
+        name      = var.api_name
+        parent_id = azapi_resource.apim.id
+
+        body = {
+          properties = {
+            displayName          = var.api_display_name
+            path                 = var.api_path
+            protocols            = ["https"]
+            subscriptionRequired = true
+            format               = "openapi-link"
+            value                = var.openapi_spec_url
+            apiType              = "http"
+          }
+        }
+      }
+
+      # APIM product for developer portal access
+      resource "azapi_resource" "apim_dev_product" {
+        type      = "Microsoft.ApiManagement/service/products@2023-09-01-preview"
+        name      = "developer"
+        parent_id = azapi_resource.apim.id
+
+        body = {
+          properties = {
+            displayName          = "Developer"
+            description          = "Developer tier with rate limiting for API exploration"
+            subscriptionRequired = true
+            approvalRequired     = false
+            subscriptionsLimit   = 1
+            state                = "published"
+            terms                = var.api_terms_of_use
+          }
+        }
+      }
+
+      # Link API to product
+      resource "azapi_resource" "apim_product_api" {
+        type      = "Microsoft.ApiManagement/service/products/apis@2023-09-01-preview"
+        name      = var.api_name
+        parent_id = azapi_resource.apim_dev_product.id
+        body      = {}
+      }
+    bicep_pattern: |
+      // APIM API imported from OpenAPI spec URL
+      resource apimApiOpenapi 'Microsoft.ApiManagement/service/apis@2023-09-01-preview' = {
+        parent: apim
+        name: apiName
+        properties: {
+          displayName: apiDisplayName
+          path: apiPath
+          protocols: ['https']
+          subscriptionRequired: true
+          format: 'openapi-link'
+          value: openapiSpecUrl
+          apiType: 'http'
+        }
+      }
+
+      // APIM product for developer portal access
+      resource apimDevProduct 'Microsoft.ApiManagement/service/products@2023-09-01-preview' = {
+        parent: apim
+        name: 'developer'
+        properties: {
+          displayName: 'Developer'
+          description: 'Developer tier with rate limiting for API exploration'
+          subscriptionRequired: true
+          approvalRequired: false
+          subscriptionsLimit: 1
+          state: 'published'
+          terms: apiTermsOfUse
+        }
+      }
+
+      // Link API to product
+      resource apimProductApi 'Microsoft.ApiManagement/service/products/apis@2023-09-01-preview' = {
+        parent: apimDevProduct
+        name: apiName
+      }
+    prohibitions:
+      - "NEVER deploy APIs without an OpenAPI specification — undocumented APIs are unusable by consumers"
+      - "NEVER use 'swagger' format for new APIs — use 'openapi+json' (OpenAPI 3.0+)"
+      - "NEVER expose the developer portal without authentication — configure Entra ID or other IdP"
+      - "NEVER publish APIs to products without rate limiting policies"
+
+patterns:
+  - name: "Versioned API with APIM version sets"
+    description: "URL path-segmented API versioning with sunset headers on deprecated versions"
+  - name: "JWT-validated API with Entra ID"
+    description: "APIM inbound JWT validation using Entra ID OpenID Connect discovery"
+  - name: "OpenAPI-driven API with request validation"
+    description: "API imported from OpenAPI spec with inbound content and parameter validation"
+
+anti_patterns:
+  - description: "Do not deploy APIs without versioning"
+    instead: "Use APIM API version sets with URL segment versioning (v1, v2)"
+  - description: "Do not deploy APIs without authentication"
+    instead: "Configure validate-jwt policy with Entra ID OpenID Connect discovery"
+  - description: "Do not skip request validation"
+    instead: "Use validate-content and validate-parameters policies with OpenAPI schema enforcement"
+  - description: "Do not expose internal error details in API responses"
+    instead: "Use on-error policy to return RFC 9457 Problem Details format"
+
+references:
+  - title: "APIM API versioning"
+    url: "https://learn.microsoft.com/azure/api-management/api-management-versions"
+  - title: "APIM JWT validation"
+    url: "https://learn.microsoft.com/azure/api-management/validate-jwt-policy"
+  - title: "APIM content validation"
+    url: "https://learn.microsoft.com/azure/api-management/validate-content-policy"
+  - title: "APIM OpenAPI import"
+    url: "https://learn.microsoft.com/azure/api-management/import-api-from-oas"
+  - title: "RFC 9457 Problem Details"
+    url: "https://www.rfc-editor.org/rfc/rfc9457"

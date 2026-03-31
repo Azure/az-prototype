@@ -1,0 +1,277 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: action-groups
+  category: azure
+  services: [action-groups]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: AG-001
+    severity: required
+    description: "Create action groups with email and webhook notification channels for critical alerts"
+    rationale: "Without action groups, alerts fire but nobody is notified — incidents go undetected"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "action_group" {
+        type      = "Microsoft.Insights/actionGroups@2023-01-01"
+        name      = var.action_group_name
+        location  = "global"
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            groupShortName = var.short_name
+            enabled        = true
+            emailReceivers = [
+              {
+                name                 = "ops-team"
+                emailAddress         = var.ops_email
+                useCommonAlertSchema = true
+              }
+            ]
+            azureAppPushReceivers = []
+            smsReceivers          = []
+            webhookReceivers = [
+              {
+                name                 = "teams-webhook"
+                serviceUri           = var.teams_webhook_uri
+                useCommonAlertSchema = true
+                useAadAuth           = false
+              }
+            ]
+            armRoleReceivers = [
+              {
+                name          = "monitoring-contributor"
+                roleId        = "749f88d5-cbae-40b8-bcfc-e573ddc772fa"
+                useCommonAlertSchema = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
+        name: actionGroupName
+        location: 'global'
+        properties: {
+          groupShortName: shortName
+          enabled: true
+          emailReceivers: [
+            {
+              name: 'ops-team'
+              emailAddress: opsEmail
+              useCommonAlertSchema: true
+            }
+          ]
+          azureAppPushReceivers: []
+          smsReceivers: []
+          webhookReceivers: [
+            {
+              name: 'teams-webhook'
+              serviceUri: teamsWebhookUri
+              useCommonAlertSchema: true
+              useAadAuth: false
+            }
+          ]
+          armRoleReceivers: [
+            {
+              name: 'monitoring-contributor'
+              roleId: '749f88d5-cbae-40b8-bcfc-e573ddc772fa'
+              useCommonAlertSchema: true
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.Insights/metricAlerts (metric alert rules that reference this action group)"
+      - "Microsoft.Insights/scheduledQueryRules (log alert rules that reference this action group)"
+      - "Microsoft.Insights/activityLogAlerts (activity log alerts for subscription-level events)"
+    prohibitions:
+      - "Do not create action groups without at least one notification receiver"
+      - "Do not hardcode webhook URIs in templates — use Key Vault references or parameters"
+      - "Do not use personal email addresses — use distribution lists or shared mailboxes"
+      - "Do not disable action groups without documenting the reason"
+
+  - id: AG-002
+    severity: required
+    description: "Use Common Alert Schema for all receivers"
+    rationale: "Common Alert Schema provides a standardized payload format across all alert types for consistent processing"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      # Set useCommonAlertSchema = true on all receivers
+      # See AG-001 terraform_pattern for full example
+    bicep_pattern: |
+      // Set useCommonAlertSchema: true on all receivers
+      // See AG-001 bicep_pattern for full example
+    companion_resources: []
+    prohibitions:
+      - "Do not set useCommonAlertSchema to false — non-standard payloads require custom parsing per alert type"
+
+  - id: AG-003
+    severity: required
+    description: "Create metric alerts for critical resource health indicators"
+    rationale: "Proactive alerting on CPU, memory, response time, and error rate prevents outages from going undetected"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "metric_alert" {
+        type      = "Microsoft.Insights/metricAlerts@2018-03-01"
+        name      = var.alert_name
+        location  = "global"
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            description = var.alert_description
+            severity    = 2
+            enabled     = true
+            scopes      = [var.target_resource_id]
+            evaluationFrequency = "PT5M"
+            windowSize          = "PT15M"
+            criteria = {
+              "odata.type" = "Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria"
+              allOf = [
+                {
+                  criterionType   = "StaticThresholdCriterion"
+                  name            = "cpu-threshold"
+                  metricName      = "Percentage CPU"
+                  metricNamespace = "Microsoft.Compute/virtualMachines"
+                  operator        = "GreaterThan"
+                  threshold       = 90
+                  timeAggregation = "Average"
+                }
+              ]
+            }
+            actions = [
+              {
+                actionGroupId = azapi_resource.action_group.id
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource metricAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
+        name: alertName
+        location: 'global'
+        properties: {
+          description: alertDescription
+          severity: 2
+          enabled: true
+          scopes: [targetResourceId]
+          evaluationFrequency: 'PT5M'
+          windowSize: 'PT15M'
+          criteria: {
+            'odata.type': 'Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria'
+            allOf: [
+              {
+                criterionType: 'StaticThresholdCriterion'
+                name: 'cpu-threshold'
+                metricName: 'Percentage CPU'
+                metricNamespace: 'Microsoft.Compute/virtualMachines'
+                operator: 'GreaterThan'
+                threshold: 90
+                timeAggregation: 'Average'
+              }
+            ]
+          }
+          actions: [
+            {
+              actionGroupId: actionGroup.id
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.Insights/actionGroups (action group for notifications)"
+    prohibitions:
+      - "Do not create alerts without action groups — unnotified alerts are useless"
+      - "Do not set severity to 4 (Verbose) for critical metrics — use 0 (Critical) or 1 (Error)"
+
+  - id: AG-004
+    severity: recommended
+    description: "Create activity log alerts for subscription-level administrative events"
+    rationale: "Track resource deletions, role assignments, and policy changes at the subscription level"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "activity_log_alert" {
+        type      = "Microsoft.Insights/activityLogAlerts@2020-10-01"
+        name      = var.activity_alert_name
+        location  = "global"
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            description = "Alert on resource deletions"
+            enabled     = true
+            scopes      = ["/subscriptions/${var.subscription_id}"]
+            condition = {
+              allOf = [
+                {
+                  field  = "category"
+                  equals = "Administrative"
+                },
+                {
+                  field  = "operationName"
+                  equals = "Microsoft.Resources/subscriptions/resourceGroups/delete"
+                }
+              ]
+            }
+            actions = {
+              actionGroups = [
+                {
+                  actionGroupId = azapi_resource.action_group.id
+                }
+              ]
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource activityLogAlert 'Microsoft.Insights/activityLogAlerts@2020-10-01' = {
+        name: activityAlertName
+        location: 'global'
+        properties: {
+          description: 'Alert on resource deletions'
+          enabled: true
+          scopes: ['/subscriptions/${subscriptionId}']
+          condition: {
+            allOf: [
+              {
+                field: 'category'
+                equals: 'Administrative'
+              }
+              {
+                field: 'operationName'
+                equals: 'Microsoft.Resources/subscriptions/resourceGroups/delete'
+              }
+            ]
+          }
+          actions: {
+            actionGroups: [
+              {
+                actionGroupId: actionGroup.id
+              }
+            ]
+          }
+        }
+      }
+    companion_resources:
+      - "Microsoft.Insights/actionGroups (action group for notifications)"
+    prohibitions:
+      - "Do not alert on all activity log events — filter to specific critical operations"
+
+patterns:
+  - name: "Action group with multi-channel notifications and metric alerts"
+    description: "Action group with email, webhook, and role-based receivers linked to metric alerts"
+    example: |
+      # See AG-001 through AG-004 for complete azapi_resource patterns
+
+anti_patterns:
+  - description: "Do not deploy monitoring without action groups"
+    instead: "Create action groups first, then link them to all alert rules"
+  - description: "Do not use personal email addresses in action groups"
+    instead: "Use distribution lists or team mailboxes for reliable notification delivery"
+
+references:
+  - title: "Action groups documentation"
+    url: "https://learn.microsoft.com/azure/azure-monitor/alerts/action-groups"
+  - title: "Common Alert Schema"
+    url: "https://learn.microsoft.com/azure/azure-monitor/alerts/alerts-common-schema"

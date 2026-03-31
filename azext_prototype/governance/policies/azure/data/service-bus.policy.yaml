@@ -1,0 +1,267 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: service-bus
+  category: azure
+  services: [service-bus]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: SB-001
+    severity: required
+    description: "Deploy Service Bus namespace with Premium SKU, TLS 1.2, local auth disabled, and public access off"
+    rationale: "Premium SKU provides VNet integration, zone redundancy, and dedicated capacity; local auth bypass RBAC"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "servicebus_namespace" {
+        type      = "Microsoft.ServiceBus/namespaces@2024-01-01"
+        name      = var.sb_namespace_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        identity {
+          type = "SystemAssigned"
+        }
+        body = {
+          sku = {
+            name     = "Premium"
+            tier     = "Premium"
+            capacity = var.messaging_units
+          }
+          properties = {
+            minimumTlsVersion   = "1.2"
+            publicNetworkAccess = "Disabled"
+            disableLocalAuth    = true
+            zoneRedundant       = true
+            premiumMessagingPartitions = 1
+          }
+        }
+      }
+    bicep_pattern: |
+      resource serviceBusNamespace 'Microsoft.ServiceBus/namespaces@2024-01-01' = {
+        name: sbNamespaceName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: 'Premium'
+          tier: 'Premium'
+          capacity: messagingUnits
+        }
+        properties: {
+          minimumTlsVersion: '1.2'
+          publicNetworkAccess: 'Disabled'
+          disableLocalAuth: true
+          zoneRedundant: true
+          premiumMessagingPartitions: 1
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/privateEndpoints (private endpoint with groupId 'namespace')"
+      - "Microsoft.Network/privateDnsZones (privatelink.servicebus.windows.net)"
+      - "Microsoft.Authorization/roleAssignments (Azure Service Bus Data Sender: 69a216fc-b224-4f12-b13e-bc0d1c5bc7d2, Azure Service Bus Data Receiver: 4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0)"
+      - "Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)"
+    prohibitions:
+      - "Do not use Basic or Standard SKU for production — they lack VNet integration, zone redundancy, and message sessions"
+      - "Do not enable publicNetworkAccess — use private endpoints"
+      - "Do not enable local auth (SAS keys) — use Entra RBAC"
+      - "Do not allow TLS versions below 1.2"
+      - "When disableLocalAuth = true, SAS keys and connection strings are NOT available. NEVER output primaryConnectionString or use listKeys."
+      - "NEVER use 'Service Bus Contributor' for data access — use Data Sender/Receiver roles"
+
+  - id: SB-002
+    severity: required
+    description: "Create queues and topics with dead-letter and duplicate detection enabled"
+    rationale: "Dead-letter queues capture failed messages for investigation; duplicate detection prevents reprocessing"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      resource "azapi_resource" "sb_queue" {
+        type      = "Microsoft.ServiceBus/namespaces/queues@2024-01-01"
+        name      = var.queue_name
+        parent_id = azapi_resource.servicebus_namespace.id
+        body = {
+          properties = {
+            maxSizeInMegabytes              = 5120
+            requiresDuplicateDetection      = true
+            duplicateDetectionHistoryTimeWindow = "PT10M"
+            requiresSession                 = false
+            deadLetteringOnMessageExpiration = true
+            maxDeliveryCount                = 10
+            lockDuration                    = "PT1M"
+            defaultMessageTimeToLive        = "P14D"
+            enableBatchedOperations         = true
+          }
+        }
+      }
+    bicep_pattern: |
+      resource sbQueue 'Microsoft.ServiceBus/namespaces/queues@2024-01-01' = {
+        parent: serviceBusNamespace
+        name: queueName
+        properties: {
+          maxSizeInMegabytes: 5120
+          requiresDuplicateDetection: true
+          duplicateDetectionHistoryTimeWindow: 'PT10M'
+          requiresSession: false
+          deadLetteringOnMessageExpiration: true
+          maxDeliveryCount: 10
+          lockDuration: 'PT1M'
+          defaultMessageTimeToLive: 'P14D'
+          enableBatchedOperations: true
+        }
+      }
+    companion_resources: []
+    prohibitions:
+      - "Do not set maxDeliveryCount to 1 — transient failures will immediately dead-letter messages"
+      - "Do not disable deadLetteringOnMessageExpiration — expired messages will be silently lost"
+
+  - id: SB-003
+    severity: required
+    description: "Create topic subscriptions with dead-letter and appropriate filters"
+    rationale: "Subscriptions without filters receive all messages; dead-letter captures failures"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
+    terraform_pattern: |
+      resource "azapi_resource" "sb_topic" {
+        type      = "Microsoft.ServiceBus/namespaces/topics@2024-01-01"
+        name      = var.topic_name
+        parent_id = azapi_resource.servicebus_namespace.id
+        body = {
+          properties = {
+            maxSizeInMegabytes              = 5120
+            requiresDuplicateDetection      = true
+            duplicateDetectionHistoryTimeWindow = "PT10M"
+            defaultMessageTimeToLive        = "P14D"
+            enableBatchedOperations         = true
+          }
+        }
+      }
+
+      resource "azapi_resource" "sb_subscription" {
+        type      = "Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01"
+        name      = var.subscription_name
+        parent_id = azapi_resource.sb_topic.id
+        body = {
+          properties = {
+            maxDeliveryCount                = 10
+            lockDuration                    = "PT1M"
+            deadLetteringOnMessageExpiration = true
+            deadLetteringOnFilterEvaluationExceptions = true
+            defaultMessageTimeToLive        = "P14D"
+            enableBatchedOperations         = true
+          }
+        }
+      }
+    bicep_pattern: |
+      resource sbTopic 'Microsoft.ServiceBus/namespaces/topics@2024-01-01' = {
+        parent: serviceBusNamespace
+        name: topicName
+        properties: {
+          maxSizeInMegabytes: 5120
+          requiresDuplicateDetection: true
+          duplicateDetectionHistoryTimeWindow: 'PT10M'
+          defaultMessageTimeToLive: 'P14D'
+          enableBatchedOperations: true
+        }
+      }
+
+      resource sbSubscription 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+        parent: sbTopic
+        name: subscriptionName
+        properties: {
+          maxDeliveryCount: 10
+          lockDuration: 'PT1M'
+          deadLetteringOnMessageExpiration: true
+          deadLetteringOnFilterEvaluationExceptions: true
+          defaultMessageTimeToLive: 'P14D'
+          enableBatchedOperations: true
+        }
+      }
+    companion_resources: []
+    prohibitions:
+      - "Do not disable deadLetteringOnFilterEvaluationExceptions — filter errors will silently drop messages"
+
+  - id: SB-004
+    severity: recommended
+    description: "Enable diagnostic settings for Service Bus namespace"
+    rationale: "Monitor message counts, throttled requests, and dead-letter queue depth"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "sb_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-service-bus"
+        parent_id = azapi_resource.servicebus_namespace.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "OperationalLogs"
+                enabled  = true
+              },
+              {
+                category = "VNetAndIPFilteringLogs"
+                enabled  = true
+              },
+              {
+                category = "RuntimeAuditLogs"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource sbDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-service-bus'
+        scope: serviceBusNamespace
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
+            {
+              category: 'OperationalLogs'
+              enabled: true
+            }
+            {
+              category: 'VNetAndIPFilteringLogs'
+              enabled: true
+            }
+            {
+              category: 'RuntimeAuditLogs'
+              enabled: true
+            }
+          ]
+          metrics: [
+            {
+              category: 'AllMetrics'
+              enabled: true
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.OperationalInsights/workspaces (Log Analytics workspace)"
+    prohibitions:
+      - "Do not omit RuntimeAuditLogs — they track authentication and authorization events"
+
+patterns:
+  - name: "Premium Service Bus with Entra RBAC and private endpoint"
+    description: "Production Service Bus with local auth disabled, private endpoint, and dead-letter queues"
+    example: |
+      # See SB-001 through SB-004 for complete azapi_resource patterns
+
+anti_patterns:
+  - description: "Do not use SAS keys for Service Bus authentication"
+    instead: "Disable local auth and use Entra RBAC with managed identity"
+  - description: "Do not use Basic or Standard SKU for production"
+    instead: "Use Premium SKU for VNet integration, zone redundancy, and message sessions"
+
+references:
+  - title: "Service Bus documentation"
+    url: "https://learn.microsoft.com/azure/service-bus-messaging/service-bus-messaging-overview"
+  - title: "Service Bus Premium tier"
+    url: "https://learn.microsoft.com/azure/service-bus-messaging/service-bus-premium-messaging"

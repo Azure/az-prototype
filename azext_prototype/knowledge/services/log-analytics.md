@@ -106,8 +106,8 @@ resource "azurerm_role_assignment" "contributor" {
 
 ```hcl
 # Private endpoint for Log Analytics is via Azure Monitor Private Link Scope (AMPLS)
-# This is NOT typically needed for POC -- public ingestion and query endpoints are fine
-# Include as a production backlog item
+# Unless told otherwise, private endpoint via AMPLS is required per governance policy —
+# publicNetworkAccessForIngestion and publicNetworkAccessForQuery should be set to "Disabled"
 
 # For production:
 resource "azurerm_monitor_private_link_scope" "this" {

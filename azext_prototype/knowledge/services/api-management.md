@@ -19,7 +19,7 @@ Prefer API Management when you have multiple APIs or need centralized governance
 | SKU | Consumption | No infrastructure cost when idle; pay per execution |
 | SKU (alternative) | Developer | Full feature set for development/testing; single-instance, no SLA |
 | Managed identity | System-assigned | For authenticating to backend APIs |
-| Public network access | Enabled (POC) | Flag VNet integration as production backlog item |
+| Public network access | Disabled (unless user overrides) | Flag VNet integration as production backlog item |
 
 **CRITICAL:** Non-Consumption tier deployments take **30-45 minutes**. Plan for this in deployment timelines. The v2 SKUs (BasicV2, StandardV2) offer significantly faster deployment times (5-15 minutes).
 

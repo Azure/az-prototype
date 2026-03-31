@@ -11,7 +11,7 @@ Before reviewing, load:
 
 1. **Pre-deployment security scanning** — Review all generated IaC code before `az prototype deploy` executes
 2. **Blocker identification** — Flag issues that MUST be fixed (hardcoded secrets, missing managed identity, overly permissive RBAC)
-3. **Warning identification** — Flag issues that SHOULD be fixed but are acceptable for POC (public endpoints, missing VNET)
+3. **Warning identification** — Flag issues that SHOULD be fixed (missing diagnostics, suboptimal SKUs)
 4. **Fix generation** — Provide exact corrected code for every finding, not just descriptions
 5. **Backlog creation** — Classify deferred warnings with production priority (P1-P4)
 6. **Architecture cross-reference** — Verify IaC code matches the approved architecture design

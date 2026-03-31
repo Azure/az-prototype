@@ -1,0 +1,872 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: monitoring-observability
+  category: performance
+  services:
+    - app-insights
+    - log-analytics
+    - app-service
+    - container-apps
+    - functions
+    - aks
+    - api-management
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: OBS-001
+    severity: required
+    description: "Configure Application Insights with auto-instrumentation for .NET, Python, and Node.js — use connection string, not instrumentation key"
+    rationale: "Application Insights provides request tracking, dependency tracing, and performance metrics. Connection strings support regional ingestion endpoints"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer, monitoring-agent]
+    terraform_pattern: |
+      # === Application Insights Resource ===
+      resource "azapi_resource" "app_insights" {
+        type      = "Microsoft.Insights/components@2020-02-02"
+        name      = var.app_insights_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          kind = "web"
+          properties = {
+            Application_Type              = "web"
+            WorkspaceResourceId           = azapi_resource.log_analytics.id
+            RetentionInDays               = var.environment == "dev" ? 30 : 90
+            IngestionMode                 = "LogAnalytics"
+            publicNetworkAccessForIngestion = "Disabled"
+            publicNetworkAccessForQuery     = "Disabled"
+            DisableLocalAuth              = true        # Entra-only auth for queries
+          }
+        }
+      }
+
+      # === App Service with Application Insights ===
+      resource "azapi_resource" "app_service_with_ai" {
+        type      = "Microsoft.Web/sites@2023-12-01"
+        name      = var.app_service_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            siteConfig = {
+              appSettings = [
+                # .NET auto-instrumentation (codeless)
+                {
+                  name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+                  value = azapi_resource.app_insights.output.properties.ConnectionString
+                },
+                {
+                  name  = "ApplicationInsightsAgent_EXTENSION_VERSION"
+                  value = "~3"          # Enable auto-instrumentation agent
+                },
+                {
+                  name  = "XDT_MicrosoftApplicationInsights_Mode"
+                  value = "Recommended"  # Full telemetry collection
+                },
+
+                # Python auto-instrumentation
+                # {
+                #   name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+                #   value = azapi_resource.app_insights.output.properties.ConnectionString
+                # },
+                # Requires: pip install azure-monitor-opentelemetry
+                # In app startup:
+                #   from azure.monitor.opentelemetry import configure_azure_monitor
+                #   configure_azure_monitor(
+                #       connection_string=os.environ["APPLICATIONINSIGHTS_CONNECTION_STRING"],
+                #       enable_live_metrics=True,
+                #   )
+
+                # Node.js auto-instrumentation
+                # {
+                #   name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+                #   value = azapi_resource.app_insights.output.properties.ConnectionString
+                # },
+                # Requires: npm install applicationinsights
+                # In app startup (BEFORE other imports):
+                #   const appInsights = require("applicationinsights");
+                #   appInsights.setup(process.env.APPLICATIONINSIGHTS_CONNECTION_STRING)
+                #     .setAutoCollectRequests(true)
+                #     .setAutoCollectDependencies(true)
+                #     .setAutoCollectExceptions(true)
+                #     .setAutoCollectPerformance(true, true)
+                #     .start();
+
+                # Sampling configuration (reduce costs while maintaining visibility)
+                {
+                  name  = "APPINSIGHTS_SAMPLING_PERCENTAGE"
+                  value = var.environment == "dev" ? "100" : "25"
+                }
+              ]
+            }
+          }
+        }
+      }
+
+      # === Container App with Application Insights ===
+      resource "azapi_resource" "container_app_with_ai" {
+        type      = "Microsoft.App/containerApps@2024-03-01"
+        name      = var.container_app_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            configuration = {
+              secrets = [
+                {
+                  name  = "app-insights-connection-string"
+                  value = azapi_resource.app_insights.output.properties.ConnectionString
+                }
+              ]
+            }
+            template = {
+              containers = [
+                {
+                  name = var.container_name
+                  image = var.container_image
+                  env = [
+                    {
+                      name      = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+                      secretRef = "app-insights-connection-string"
+                    },
+                    {
+                      name  = "OTEL_SERVICE_NAME"
+                      value = var.container_app_name
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Application Insights Resource ===
+      resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
+        name: appInsightsName
+        location: location
+        kind: 'web'
+        properties: {
+          Application_Type: 'web'
+          WorkspaceResourceId: logAnalytics.id
+          RetentionInDays: environment == 'dev' ? 30 : 90
+          IngestionMode: 'LogAnalytics'
+          DisableLocalAuth: true
+        }
+      }
+
+      // === App Service with App Insights (.NET auto-instrumentation) ===
+      resource appService 'Microsoft.Web/sites@2023-12-01' = {
+        name: appServiceName
+        location: location
+        properties: {
+          siteConfig: {
+            appSettings: [
+              {
+                name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+                value: appInsights.properties.ConnectionString
+              }
+              {
+                name: 'ApplicationInsightsAgent_EXTENSION_VERSION'
+                value: '~3'
+              }
+              {
+                name: 'XDT_MicrosoftApplicationInsights_Mode'
+                value: 'Recommended'
+              }
+              {
+                name: 'APPINSIGHTS_SAMPLING_PERCENTAGE'
+                value: environment == 'dev' ? '100' : '25'
+              }
+            ]
+          }
+        }
+      }
+
+      // === Container App with App Insights ===
+      resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
+        name: containerAppName
+        location: location
+        properties: {
+          configuration: {
+            secrets: [
+              {
+                name: 'app-insights-cs'
+                value: appInsights.properties.ConnectionString
+              }
+            ]
+          }
+          template: {
+            containers: [
+              {
+                name: containerName
+                image: containerImage
+                env: [
+                  {
+                    name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+                    secretRef: 'app-insights-cs'
+                  }
+                  {
+                    name: 'OTEL_SERVICE_NAME'
+                    value: containerAppName
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER deploy application compute without Application Insights — it is the primary observability tool"
+      - "NEVER use InstrumentationKey — always use ConnectionString (InstrumentationKey is deprecated)"
+      - "NEVER set sampling rate below 10% in production — too much data loss for meaningful analysis"
+      - "NEVER set sampling rate to 100% in production with high traffic — costs will be excessive"
+      - "NEVER store Application Insights connection string as a public-facing environment variable — use secrets or Key Vault references"
+      - "NEVER use Classic Application Insights (standalone) — always use workspace-based (LogAnalytics ingestion)"
+
+  - id: OBS-002
+    severity: required
+    description: "Configure custom metric alerts for key performance indicators — P95 latency, error rate, throughput, and resource utilization"
+    rationale: "Metric alerts provide proactive notification before performance degradation becomes user-visible; without alerts, issues are discovered by users"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      # === Metric Alert: P95 Response Time ===
+      resource "azapi_resource" "alert_latency" {
+        type      = "Microsoft.Insights/metricAlerts@2018-03-01"
+        name      = "alert-p95-latency-${var.app_name}"
+        location  = "global"
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            severity    = 2                # Sev2: Warning
+            enabled     = true
+            scopes      = [azapi_resource.app_insights.id]
+            evaluationFrequency = "PT5M"   # Check every 5 minutes
+            windowSize          = "PT15M"  # Over 15-minute window
+            criteria = {
+              "odata.type" = "Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria"
+              allOf = [
+                {
+                  name             = "P95Latency"
+                  metricName       = "requests/duration"
+                  metricNamespace  = "microsoft.insights/components"
+                  operator         = "GreaterThan"
+                  threshold        = 2000        # 2 seconds P95
+                  timeAggregation  = "Average"
+                  criterionType    = "StaticThresholdCriterion"
+                }
+              ]
+            }
+            actions = [
+              {
+                actionGroupId = azapi_resource.action_group.id
+              }
+            ]
+          }
+        }
+      }
+
+      # === Metric Alert: Error Rate ===
+      resource "azapi_resource" "alert_errors" {
+        type      = "Microsoft.Insights/metricAlerts@2018-03-01"
+        name      = "alert-error-rate-${var.app_name}"
+        location  = "global"
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            severity    = 1                # Sev1: Critical
+            enabled     = true
+            scopes      = [azapi_resource.app_insights.id]
+            evaluationFrequency = "PT1M"   # Check every minute
+            windowSize          = "PT5M"   # Over 5-minute window
+            criteria = {
+              "odata.type" = "Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria"
+              allOf = [
+                {
+                  name             = "ErrorRate"
+                  metricName       = "requests/failed"
+                  metricNamespace  = "microsoft.insights/components"
+                  operator         = "GreaterThan"
+                  threshold        = 10          # >10 failed requests in 5 minutes
+                  timeAggregation  = "Count"
+                  criterionType    = "StaticThresholdCriterion"
+                }
+              ]
+            }
+            actions = [
+              {
+                actionGroupId = azapi_resource.action_group.id
+              }
+            ]
+          }
+        }
+      }
+
+      # === Metric Alert: CPU Utilization ===
+      resource "azapi_resource" "alert_cpu" {
+        type      = "Microsoft.Insights/metricAlerts@2018-03-01"
+        name      = "alert-cpu-${var.app_name}"
+        location  = "global"
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            severity    = 2
+            enabled     = true
+            scopes      = [azapi_resource.app_service_plan.id]
+            evaluationFrequency = "PT5M"
+            windowSize          = "PT15M"
+            criteria = {
+              "odata.type" = "Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria"
+              allOf = [
+                {
+                  name             = "HighCPU"
+                  metricName       = "CpuPercentage"
+                  metricNamespace  = "Microsoft.Web/serverfarms"
+                  operator         = "GreaterThan"
+                  threshold        = 85           # CPU > 85% sustained
+                  timeAggregation  = "Average"
+                  criterionType    = "StaticThresholdCriterion"
+                }
+              ]
+            }
+            actions = [
+              {
+                actionGroupId = azapi_resource.action_group.id
+              }
+            ]
+          }
+        }
+      }
+
+      # === Action Group ===
+      resource "azapi_resource" "action_group" {
+        type      = "Microsoft.Insights/actionGroups@2023-01-01"
+        name      = "ag-${var.app_name}"
+        location  = "global"
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            groupShortName = "perf-alert"
+            enabled        = true
+            emailReceivers = [
+              {
+                name                 = "team"
+                emailAddress         = var.team_email
+                useCommonAlertSchema = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Metric Alert: P95 Response Time ===
+      resource alertLatency 'Microsoft.Insights/metricAlerts@2018-03-01' = {
+        name: 'alert-p95-latency-${appName}'
+        location: 'global'
+        properties: {
+          severity: 2
+          enabled: true
+          scopes: [appInsights.id]
+          evaluationFrequency: 'PT5M'
+          windowSize: 'PT15M'
+          criteria: {
+            'odata.type': 'Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria'
+            allOf: [
+              {
+                name: 'P95Latency'
+                metricName: 'requests/duration'
+                metricNamespace: 'microsoft.insights/components'
+                operator: 'GreaterThan'
+                threshold: 2000
+                timeAggregation: 'Average'
+                criterionType: 'StaticThresholdCriterion'
+              }
+            ]
+          }
+          actions: [
+            {
+              actionGroupId: actionGroup.id
+            }
+          ]
+        }
+      }
+
+      // === Metric Alert: Error Rate ===
+      resource alertErrors 'Microsoft.Insights/metricAlerts@2018-03-01' = {
+        name: 'alert-error-rate-${appName}'
+        location: 'global'
+        properties: {
+          severity: 1
+          enabled: true
+          scopes: [appInsights.id]
+          evaluationFrequency: 'PT1M'
+          windowSize: 'PT5M'
+          criteria: {
+            'odata.type': 'Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria'
+            allOf: [
+              {
+                name: 'ErrorRate'
+                metricName: 'requests/failed'
+                metricNamespace: 'microsoft.insights/components'
+                operator: 'GreaterThan'
+                threshold: 10
+                timeAggregation: 'Count'
+                criterionType: 'StaticThresholdCriterion'
+              }
+            ]
+          }
+          actions: [
+            {
+              actionGroupId: actionGroup.id
+            }
+          ]
+        }
+      }
+
+      // === Metric Alert: CPU ===
+      resource alertCpu 'Microsoft.Insights/metricAlerts@2018-03-01' = {
+        name: 'alert-cpu-${appName}'
+        location: 'global'
+        properties: {
+          severity: 2
+          enabled: true
+          scopes: [appServicePlan.id]
+          evaluationFrequency: 'PT5M'
+          windowSize: 'PT15M'
+          criteria: {
+            'odata.type': 'Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria'
+            allOf: [
+              {
+                name: 'HighCPU'
+                metricName: 'CpuPercentage'
+                metricNamespace: 'Microsoft.Web/serverfarms'
+                operator: 'GreaterThan'
+                threshold: 85
+                timeAggregation: 'Average'
+                criterionType: 'StaticThresholdCriterion'
+              }
+            ]
+          }
+          actions: [
+            {
+              actionGroupId: actionGroup.id
+            }
+          ]
+        }
+      }
+
+      // === Action Group ===
+      resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
+        name: 'ag-${appName}'
+        location: 'global'
+        properties: {
+          groupShortName: 'perf-alert'
+          enabled: true
+          emailReceivers: [
+            {
+              name: 'team'
+              emailAddress: teamEmail
+              useCommonAlertSchema: true
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Insights/actionGroups@2023-01-01"
+        description: "Action group for alert notifications — required for metric alerts to trigger email/webhook/Logic App notifications"
+    prohibitions:
+      - "NEVER deploy without at minimum latency, error rate, and CPU utilization alerts"
+      - "NEVER set alert evaluation frequency > 15 minutes — slow detection delays incident response"
+      - "NEVER create alerts without an action group — silent alerts are useless"
+      - "NEVER use only Sev3/Sev4 for error rate alerts — failed requests should be Sev1 or Sev2"
+      - "NEVER set CPU alert threshold below 70% — normal load can trigger false alarms"
+
+  - id: OBS-003
+    severity: required
+    description: "Enable W3C distributed tracing with trace context propagation across all services in the request chain"
+    rationale: "Without distributed tracing, diagnosing performance issues in microservices requires correlating logs across multiple systems manually. W3C traceparent header provides automatic correlation"
+    applies_to: [app-developer, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      # === Distributed Tracing Configuration ===
+      # W3C trace context is enabled by default in Application Insights SDK.
+      # Key configuration points:
+      #
+      # 1. All services in the call chain MUST share the same App Insights resource
+      #    OR use the same Log Analytics workspace for cross-resource correlation.
+      #
+      # 2. App Service automatic instrumentation:
+      #    Set APPLICATIONINSIGHTS_CONNECTION_STRING (see OBS-001)
+      #    W3C trace context propagation is automatic.
+      #
+      # 3. Custom header propagation for non-HTTP communication:
+      #    .NET: Activity.Current propagates automatically
+      #    Python: OpenTelemetry trace context propagator
+      #    Node.js: applicationinsights auto-correlation
+      #
+      # 4. Service Map configuration:
+      resource "azapi_resource" "app_insights_tracing" {
+        type      = "Microsoft.Insights/components@2020-02-02"
+        name      = var.app_insights_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          kind = "web"
+          properties = {
+            Application_Type    = "web"
+            WorkspaceResourceId = azapi_resource.log_analytics.id
+            IngestionMode       = "LogAnalytics"
+            Flow_Type           = "Bluefield"
+          }
+        }
+      }
+
+      # App settings for correlation:
+      # {
+      #   name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+      #   value = azapi_resource.app_insights.output.properties.ConnectionString
+      # },
+      # {
+      #   name  = "DiagnosticServices_EXTENSION_VERSION"
+      #   value = "~3"                  # Enable diagnostic services
+      # }
+      #
+      # Python OpenTelemetry setup:
+      #   from azure.monitor.opentelemetry import configure_azure_monitor
+      #   from opentelemetry import trace
+      #
+      #   configure_azure_monitor(
+      #       connection_string=os.environ["APPLICATIONINSIGHTS_CONNECTION_STRING"],
+      #   )
+      #   tracer = trace.get_tracer(__name__)
+      #
+      #   with tracer.start_as_current_span("process-order") as span:
+      #       span.set_attribute("order.id", order_id)
+      #       span.set_attribute("tenant.id", tenant_id)
+      #       # Downstream HTTP calls automatically propagate trace context
+      #
+      # Node.js setup:
+      #   const appInsights = require("applicationinsights");
+      #   appInsights.setup(process.env.APPLICATIONINSIGHTS_CONNECTION_STRING)
+      #     .setDistributedTracingMode(appInsights.DistributedTracingModes.AI_AND_W3C)
+      #     .start();
+    bicep_pattern: |
+      // === Application Insights for Distributed Tracing ===
+      // All services share the same App Insights resource for automatic correlation.
+      resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
+        name: appInsightsName
+        location: location
+        kind: 'web'
+        properties: {
+          Application_Type: 'web'
+          WorkspaceResourceId: logAnalytics.id
+          IngestionMode: 'LogAnalytics'
+          Flow_Type: 'Bluefield'
+        }
+      }
+
+      // All compute resources MUST reference the same App Insights connection string.
+      // W3C traceparent header propagation is automatic with SDK instrumentation.
+      //
+      // Python: configure_azure_monitor() + OpenTelemetry
+      // .NET: ApplicationInsightsAgent_EXTENSION_VERSION = "~3"
+      // Node.js: applicationinsights.setup() with AI_AND_W3C mode
+    prohibitions:
+      - "NEVER use separate Application Insights resources for services that communicate — correlation requires shared resource or shared workspace"
+      - "NEVER disable W3C trace context propagation — it is the standard for distributed tracing"
+      - "NEVER use AI-only correlation mode — always use W3C (or AI_AND_W3C for backward compatibility)"
+      - "NEVER omit custom span attributes for business-relevant fields (order ID, tenant ID, user ID)"
+
+  - id: OBS-004
+    severity: recommended
+    description: "Create standard KQL queries for performance monitoring — P95 latency, error rates, throughput, and slow dependency calls"
+    rationale: "Pre-built KQL queries enable rapid diagnosis during incidents; without them, engineers spend 15-30 minutes writing queries instead of investigating"
+    applies_to: [monitoring-agent, cloud-architect, qa-engineer]
+    terraform_pattern: |
+      # === Standard KQL Queries for Performance Monitoring ===
+      # These queries should be saved as Log Analytics saved searches or
+      # pinned to Azure Dashboard / Grafana dashboards.
+      #
+      # 1. P95 Request Latency (last 24 hours, by operation):
+      # requests
+      # | where timestamp > ago(24h)
+      # | summarize
+      #     P50 = percentile(duration, 50),
+      #     P95 = percentile(duration, 95),
+      #     P99 = percentile(duration, 99),
+      #     Count = count()
+      #   by operation_Name, bin(timestamp, 1h)
+      # | order by timestamp desc
+      #
+      # 2. Error Rate (5xx errors, last 1 hour):
+      # requests
+      # | where timestamp > ago(1h)
+      # | summarize
+      #     TotalRequests = count(),
+      #     FailedRequests = countif(resultCode startswith "5"),
+      #     ErrorRate = round(100.0 * countif(resultCode startswith "5") / count(), 2)
+      #   by bin(timestamp, 5m)
+      # | order by timestamp desc
+      #
+      # 3. Slow Dependency Calls (>2 seconds):
+      # dependencies
+      # | where timestamp > ago(1h) and duration > 2000
+      # | summarize
+      #     AvgDuration = avg(duration),
+      #     P95Duration = percentile(duration, 95),
+      #     Count = count()
+      #   by target, type, name
+      # | order by P95Duration desc
+      #
+      # 4. Throughput (requests per second, by operation):
+      # requests
+      # | where timestamp > ago(1h)
+      # | summarize
+      #     RequestsPerSecond = count() / 300.0    // 5-minute bins
+      #   by operation_Name, bin(timestamp, 5m)
+      # | order by timestamp desc
+      #
+      # 5. Exception Hotspots (grouped by type and method):
+      # exceptions
+      # | where timestamp > ago(24h)
+      # | summarize Count = count() by type, method, outerMessage
+      # | order by Count desc
+      # | take 20
+      #
+      # 6. Resource Utilization (App Service):
+      # AzureMetrics
+      # | where ResourceProvider == "MICROSOFT.WEB"
+      # | where MetricName in ("CpuPercentage", "MemoryPercentage")
+      # | summarize Avg = avg(Average), Max = max(Maximum)
+      #   by MetricName, bin(TimeGenerated, 5m)
+      # | order by TimeGenerated desc
+
+      # === Saved Search in Log Analytics ===
+      resource "azapi_resource" "saved_search_latency" {
+        type      = "Microsoft.OperationalInsights/workspaces/savedSearches@2020-08-01"
+        name      = "perf-p95-latency"
+        parent_id = azapi_resource.log_analytics.id
+
+        body = {
+          properties = {
+            category    = "Performance"
+            displayName = "P95 Request Latency by Operation"
+            query       = "requests | where timestamp > ago(24h) | summarize P50=percentile(duration,50), P95=percentile(duration,95), P99=percentile(duration,99), Count=count() by operation_Name, bin(timestamp, 1h) | order by timestamp desc"
+          }
+        }
+      }
+
+      resource "azapi_resource" "saved_search_errors" {
+        type      = "Microsoft.OperationalInsights/workspaces/savedSearches@2020-08-01"
+        name      = "perf-error-rate"
+        parent_id = azapi_resource.log_analytics.id
+
+        body = {
+          properties = {
+            category    = "Performance"
+            displayName = "Error Rate (5xx) per 5 Minutes"
+            query       = "requests | where timestamp > ago(1h) | summarize TotalRequests=count(), FailedRequests=countif(resultCode startswith '5'), ErrorRate=round(100.0 * countif(resultCode startswith '5') / count(), 2) by bin(timestamp, 5m) | order by timestamp desc"
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Saved Searches in Log Analytics ===
+      resource savedSearchLatency 'Microsoft.OperationalInsights/workspaces/savedSearches@2020-08-01' = {
+        parent: logAnalytics
+        name: 'perf-p95-latency'
+        properties: {
+          category: 'Performance'
+          displayName: 'P95 Request Latency by Operation'
+          query: 'requests | where timestamp > ago(24h) | summarize P50=percentile(duration,50), P95=percentile(duration,95), P99=percentile(duration,99), Count=count() by operation_Name, bin(timestamp, 1h) | order by timestamp desc'
+        }
+      }
+
+      resource savedSearchErrors 'Microsoft.OperationalInsights/workspaces/savedSearches@2020-08-01' = {
+        parent: logAnalytics
+        name: 'perf-error-rate'
+        properties: {
+          category: 'Performance'
+          displayName: 'Error Rate (5xx) per 5 Minutes'
+          query: 'requests | where timestamp > ago(1h) | summarize TotalRequests=count(), FailedRequests=countif(resultCode startswith \'5\'), ErrorRate=round(100.0 * countif(resultCode startswith \'5\') / count(), 2) by bin(timestamp, 5m) | order by timestamp desc'
+        }
+      }
+
+      resource savedSearchDeps 'Microsoft.OperationalInsights/workspaces/savedSearches@2020-08-01' = {
+        parent: logAnalytics
+        name: 'perf-slow-dependencies'
+        properties: {
+          category: 'Performance'
+          displayName: 'Slow Dependency Calls (>2s)'
+          query: 'dependencies | where timestamp > ago(1h) and duration > 2000 | summarize AvgDuration=avg(duration), P95Duration=percentile(duration,95), Count=count() by target, type, name | order by P95Duration desc'
+        }
+      }
+    prohibitions:
+      - "NEVER deploy without saved KQL queries for P95 latency, error rate, and throughput"
+      - "NEVER query across multiple time ranges in a single KQL query — use parameterized time ranges"
+      - "NEVER use count() without time bins — unbinned counts hide temporal patterns"
+
+  - id: OBS-005
+    severity: recommended
+    description: "Configure availability tests for public endpoints — standard URL ping test and multi-step web tests"
+    rationale: "Availability tests detect outages from external perspective (outside Azure network); internal health checks may pass while external access fails"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      # === Standard Availability Test (URL Ping) ===
+      resource "azapi_resource" "availability_test" {
+        type      = "Microsoft.Insights/webtests@2022-06-15"
+        name      = "avail-${var.app_name}"
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        tags = {
+          "hidden-link:${azapi_resource.app_insights.id}" = "Resource"
+        }
+
+        body = {
+          kind = "ping"
+          properties = {
+            SyntheticMonitorId = "avail-${var.app_name}"
+            Name               = "Availability - ${var.app_name}"
+            Enabled            = true
+            Frequency          = 300         # Test every 5 minutes
+            Timeout            = 30          # 30-second timeout
+            Kind               = "ping"
+            RetryEnabled       = true
+            Locations = [
+              { Id = "us-tx-sn1-azr" },     # South Central US
+              { Id = "us-il-ch1-azr" },     # North Central US
+              { Id = "emea-gb-db3-azr" },   # UK South
+              { Id = "emea-nl-ams-azr" },   # West Europe
+              { Id = "apac-jp-kaw-azr" }    # Japan East
+            ]
+            Configuration = {
+              WebTest = "<WebTest Name=\"Availability\" Id=\"${var.app_name}\" Enabled=\"True\" Timeout=\"30\" xmlns=\"http://microsoft.com/schemas/VisualStudio/TeamTest/2010\"><Items><Request Method=\"GET\" Guid=\"a5f10126-e4cd-570d-961c-cea43999a200\" Version=\"1.1\" Url=\"https://${var.app_hostname}/healthz\" ThinkTime=\"0\" Timeout=\"30\" ParseDependentRequests=\"False\" FollowRedirects=\"True\" RecordResult=\"True\" Cache=\"False\" ResponseTimeGoal=\"0\" Encoding=\"utf-8\" ExpectedHttpStatusCode=\"200\" /></Items></WebTest>"
+            }
+          }
+        }
+      }
+
+      # === Availability Alert ===
+      resource "azapi_resource" "availability_alert" {
+        type      = "Microsoft.Insights/metricAlerts@2018-03-01"
+        name      = "alert-availability-${var.app_name}"
+        location  = "global"
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            severity    = 1                # Sev1: Critical — site is down
+            enabled     = true
+            scopes      = [azapi_resource.app_insights.id]
+            evaluationFrequency = "PT1M"
+            windowSize          = "PT5M"
+            criteria = {
+              "odata.type"     = "Microsoft.Azure.Monitor.WebtestLocationAvailabilityCriteria"
+              webTestId        = azapi_resource.availability_test.id
+              componentId      = azapi_resource.app_insights.id
+              failedLocationCount = 2      # Alert when 2+ locations fail
+            }
+            actions = [
+              {
+                actionGroupId = azapi_resource.action_group.id
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Standard Availability Test ===
+      resource availabilityTest 'Microsoft.Insights/webtests@2022-06-15' = {
+        name: 'avail-${appName}'
+        location: location
+        tags: {
+          'hidden-link:${appInsights.id}': 'Resource'
+        }
+        kind: 'ping'
+        properties: {
+          SyntheticMonitorId: 'avail-${appName}'
+          Name: 'Availability - ${appName}'
+          Enabled: true
+          Frequency: 300
+          Timeout: 30
+          Kind: 'ping'
+          RetryEnabled: true
+          Locations: [
+            { Id: 'us-tx-sn1-azr' }
+            { Id: 'us-il-ch1-azr' }
+            { Id: 'emea-gb-db3-azr' }
+            { Id: 'emea-nl-ams-azr' }
+            { Id: 'apac-jp-kaw-azr' }
+          ]
+          Configuration: {
+            WebTest: '<WebTest Name="Availability" Id="${appName}" Enabled="True" Timeout="30" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010"><Items><Request Method="GET" Guid="a5f10126-e4cd-570d-961c-cea43999a200" Version="1.1" Url="https://${appHostname}/healthz" ThinkTime="0" Timeout="30" ParseDependentRequests="False" FollowRedirects="True" RecordResult="True" Cache="False" ResponseTimeGoal="0" Encoding="utf-8" ExpectedHttpStatusCode="200" /></Items></WebTest>'
+          }
+        }
+      }
+
+      // === Availability Alert ===
+      resource availabilityAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
+        name: 'alert-availability-${appName}'
+        location: 'global'
+        properties: {
+          severity: 1
+          enabled: true
+          scopes: [appInsights.id]
+          evaluationFrequency: 'PT1M'
+          windowSize: 'PT5M'
+          criteria: {
+            'odata.type': 'Microsoft.Azure.Monitor.WebtestLocationAvailabilityCriteria'
+            webTestId: availabilityTest.id
+            componentId: appInsights.id
+            failedLocationCount: 2
+          }
+          actions: [
+            {
+              actionGroupId: actionGroup.id
+            }
+          ]
+        }
+      }
+    prohibitions:
+      - "NEVER deploy public-facing endpoints without availability tests"
+      - "NEVER test from fewer than 3 geographic locations — insufficient for reliable failure detection"
+      - "NEVER set availability test frequency > 10 minutes — slow detection delays incident response"
+      - "NEVER skip the availability alert — tests without alerts only provide historical data"
+      - "NEVER test internal/private endpoints with availability tests — they run from Azure global POPs"
+      - "NEVER use availability tests as the sole health check — they complement, not replace, internal health probes"
+
+patterns:
+  - name: "Full observability stack"
+    description: "Application Insights (auto-instrumentation) + metric alerts (P95, errors, CPU) + distributed tracing (W3C) + saved KQL queries + availability tests"
+  - name: "Three pillars of observability"
+    description: "Metrics (alerts, dashboards), Logs (KQL queries, saved searches), Traces (distributed tracing, service map)"
+
+anti_patterns:
+  - description: "Do not deploy applications without Application Insights"
+    instead: "Enable auto-instrumentation via APPLICATIONINSIGHTS_CONNECTION_STRING on all compute resources"
+  - description: "Do not use InstrumentationKey for Application Insights configuration"
+    instead: "Use ConnectionString — InstrumentationKey is deprecated and does not support regional ingestion"
+  - description: "Do not create alerts without action groups"
+    instead: "Configure action groups with email, webhook, or Logic App receivers for all metric alerts"
+  - description: "Do not rely solely on internal health probes"
+    instead: "Add external availability tests from multiple global locations to detect network-level outages"
+
+references:
+  - title: "Application Insights overview"
+    url: "https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview"
+  - title: "KQL query language reference"
+    url: "https://learn.microsoft.com/azure/data-explorer/kusto/query/"
+  - title: "Metric alerts"
+    url: "https://learn.microsoft.com/azure/azure-monitor/alerts/alerts-metric-overview"
+  - title: "Distributed tracing"
+    url: "https://learn.microsoft.com/azure/azure-monitor/app/distributed-trace-data"
+  - title: "Availability tests"
+    url: "https://learn.microsoft.com/azure/azure-monitor/app/availability-overview"

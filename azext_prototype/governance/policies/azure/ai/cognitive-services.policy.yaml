@@ -1,0 +1,204 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: cognitive-services
+  category: azure
+  services: [cognitive-services]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: CS-001
+    severity: required
+    description: "Deploy Cognitive Services with managed identity, disabled local auth, and no public access"
+    rationale: "API keys are shared secrets that cannot be scoped; managed identity provides auditable, per-service access"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "cognitive" {
+        type      = "Microsoft.CognitiveServices/accounts@2024-04-01-preview"
+        name      = var.cognitive_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          kind = var.cognitive_kind  # "CognitiveServices", "TextAnalytics", "ComputerVision", etc.
+          sku = {
+            name = var.sku_name  # "S0", "S1", "F0"
+          }
+          properties = {
+            customSubDomainName  = var.cognitive_subdomain
+            disableLocalAuth     = true
+            publicNetworkAccess  = "Disabled"
+            networkAcls = {
+              defaultAction = "Deny"
+              ipRules       = []
+            }
+            encryption = {
+              keySource = "Microsoft.CognitiveServices"
+            }
+            apiProperties = {}
+          }
+        }
+      }
+    bicep_pattern: |
+      resource cognitive 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' = {
+        name: cognitiveName
+        location: location
+        kind: cognitiveKind
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: skuName
+        }
+        properties: {
+          customSubDomainName: cognitiveSubdomain
+          disableLocalAuth: true
+          publicNetworkAccess: 'Disabled'
+          networkAcls: {
+            defaultAction: 'Deny'
+            ipRules: []
+          }
+          encryption: {
+            keySource: 'Microsoft.CognitiveServices'
+          }
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Network/privateEndpoints@2024-01-01"
+        name: "pe-cognitive"
+        description: "Private endpoint for Cognitive Services to eliminate public network exposure"
+        terraform_pattern: |
+          resource "azapi_resource" "pe_cognitive" {
+            type      = "Microsoft.Network/privateEndpoints@2024-01-01"
+            name      = "pe-${var.cognitive_name}"
+            location  = var.location
+            parent_id = var.resource_group_id
+
+            body = {
+              properties = {
+                subnet = {
+                  id = var.subnet_id
+                }
+                privateLinkServiceConnections = [
+                  {
+                    name = "cognitive-connection"
+                    properties = {
+                      privateLinkServiceId = azapi_resource.cognitive.id
+                      groupIds             = ["account"]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource peCognitive 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+            name: 'pe-${cognitiveName}'
+            location: location
+            properties: {
+              subnet: {
+                id: subnetId
+              }
+              privateLinkServiceConnections: [
+                {
+                  name: 'cognitive-connection'
+                  properties: {
+                    privateLinkServiceId: cognitive.id
+                    groupIds: ['account']
+                  }
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Network/privateDnsZones@2024-06-01"
+        name: "privatelink.cognitiveservices.azure.com"
+        description: "Private DNS zone for Cognitive Services private endpoint resolution"
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name: "diag-cognitive"
+        description: "Diagnostic settings to route audit and request logs to Log Analytics"
+        terraform_pattern: |
+          resource "azapi_resource" "diag_cognitive" {
+            type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+            name      = "diag-${var.cognitive_name}"
+            parent_id = azapi_resource.cognitive.id
+
+            body = {
+              properties = {
+                workspaceId = var.log_analytics_workspace_id
+                logs = [
+                  {
+                    categoryGroup = "allLogs"
+                    enabled       = true
+                  }
+                ]
+                metrics = [
+                  {
+                    category = "AllMetrics"
+                    enabled  = true
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource diagCognitive 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+            name: 'diag-${cognitiveName}'
+            scope: cognitive
+            properties: {
+              workspaceId: logAnalyticsWorkspaceId
+              logs: [
+                {
+                  categoryGroup: 'allLogs'
+                  enabled: true
+                }
+              ]
+              metrics: [
+                {
+                  category: 'AllMetrics'
+                  enabled: true
+                }
+              ]
+            }
+          }
+      - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name: "Cognitive Services User"
+        description: "RBAC role assignment granting consuming identity the Cognitive Services User role"
+    prohibitions:
+      - "Never hardcode API keys in source code or IaC templates"
+      - "Never set disableLocalAuth to false — always disable key-based authentication"
+      - "Never set publicNetworkAccess to Enabled without compensating network controls"
+      - "Never use Cognitive Services Contributor when Cognitive Services User suffices"
+      - "Never omit customSubDomainName — it is required for Microsoft Entra authentication"
+
+  - id: CS-002
+    severity: required
+    description: "Set customSubDomainName on all Cognitive Services accounts"
+    rationale: "Custom subdomain is required for Microsoft Entra authentication and private endpoints"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+  - id: CS-003
+    severity: recommended
+    description: "Enable customer-managed key encryption for accounts processing sensitive data"
+    rationale: "CMK provides additional control over data-at-rest encryption beyond platform-managed keys"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
+
+patterns:
+  - name: "Cognitive Services with private endpoint and RBAC"
+    description: "Secure Cognitive Services deployment with no public access, managed identity, and diagnostics"
+
+anti_patterns:
+  - description: "Do not use API key authentication for Cognitive Services"
+    instead: "Set disableLocalAuth=true and use managed identity with Cognitive Services User role"
+  - description: "Do not deploy without a customSubDomainName"
+    instead: "Always set customSubDomainName — it is required for Entra auth and private endpoints"
+
+references:
+  - title: "Cognitive Services security baseline"
+    url: "https://learn.microsoft.com/azure/ai-services/security-baseline"
+  - title: "Configure virtual networks for Cognitive Services"
+    url: "https://learn.microsoft.com/azure/ai-services/cognitive-services-virtual-networks"

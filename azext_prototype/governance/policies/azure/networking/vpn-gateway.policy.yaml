@@ -1,0 +1,314 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: vpn-gateway
+  category: azure
+  services: [vpn-gateway]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: VPN-001
+    severity: required
+    description: "Deploy VPN Gateway with VpnGw2AZ or higher SKU for zone redundancy"
+    rationale: "AZ SKUs provide availability zone support; VpnGw1 lacks zone redundancy and has limited bandwidth"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "vpn_gateway" {
+        type      = "Microsoft.Network/virtualNetworkGateways@2024-01-01"
+        name      = var.vpn_gateway_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            gatewayType = "Vpn"
+            vpnType     = "RouteBased"
+            sku = {
+              name = "VpnGw2AZ"
+              tier = "VpnGw2AZ"
+            }
+            enableBgp      = true
+            activeActive   = true
+            ipConfigurations = [
+              {
+                name = "vnetGatewayConfig1"
+                properties = {
+                  privateIPAllocationMethod = "Dynamic"
+                  subnet = {
+                    id = var.gateway_subnet_id
+                  }
+                  publicIPAddress = {
+                    id = azapi_resource.vpn_pip_1.id
+                  }
+                }
+              },
+              {
+                name = "vnetGatewayConfig2"
+                properties = {
+                  privateIPAllocationMethod = "Dynamic"
+                  subnet = {
+                    id = var.gateway_subnet_id
+                  }
+                  publicIPAddress = {
+                    id = azapi_resource.vpn_pip_2.id
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource vpnGateway 'Microsoft.Network/virtualNetworkGateways@2024-01-01' = {
+        name: vpnGatewayName
+        location: location
+        properties: {
+          gatewayType: 'Vpn'
+          vpnType: 'RouteBased'
+          sku: {
+            name: 'VpnGw2AZ'
+            tier: 'VpnGw2AZ'
+          }
+          enableBgp: true
+          activeActive: true
+          ipConfigurations: [
+            {
+              name: 'vnetGatewayConfig1'
+              properties: {
+                privateIPAllocationMethod: 'Dynamic'
+                subnet: {
+                  id: gatewaySubnetId
+                }
+                publicIPAddress: {
+                  id: vpnPip1.id
+                }
+              }
+            }
+            {
+              name: 'vnetGatewayConfig2'
+              properties: {
+                privateIPAllocationMethod: 'Dynamic'
+                subnet: {
+                  id: gatewaySubnetId
+                }
+                publicIPAddress: {
+                  id: vpnPip2.id
+                }
+              }
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/publicIPAddresses (two Standard SKU static IPs for active-active)"
+      - "Microsoft.Network/virtualNetworks/subnets (GatewaySubnet with /27 or larger)"
+      - "Microsoft.Network/localNetworkGateways (on-premises network definition)"
+      - "Microsoft.Network/connections (site-to-site connection resource)"
+      - "Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)"
+    prohibitions:
+      - "Do not use Basic SKU — it is legacy and does not support AZ, BGP, or active-active"
+      - "Do not use PolicyBased VPN type — RouteBased is required for most scenarios"
+      - "Do not deploy single-instance VPN Gateway in production — use active-active"
+
+  - id: VPN-002
+    severity: required
+    description: "Use IKEv2 with custom IPsec/IKE policy for site-to-site connections"
+    rationale: "Default policies use weaker algorithms; custom policies enforce strong encryption"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "vpn_connection" {
+        type      = "Microsoft.Network/connections@2024-01-01"
+        name      = var.connection_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            connectionType = "IPsec"
+            virtualNetworkGateway1 = {
+              id = azapi_resource.vpn_gateway.id
+            }
+            localNetworkGateway2 = {
+              id = azapi_resource.local_gateway.id
+            }
+            sharedKey              = var.shared_key
+            enableBgp              = true
+            connectionProtocol     = "IKEv2"
+            usePolicyBasedTrafficSelectors = false
+            ipsecPolicies = [
+              {
+                saLifeTimeSeconds   = 27000
+                saDataSizeKilobytes = 102400000
+                ipsecEncryption     = "AES256"
+                ipsecIntegrity      = "SHA256"
+                ikeEncryption       = "AES256"
+                ikeIntegrity        = "SHA256"
+                dhGroup             = "DHGroup14"
+                pfsGroup            = "PFS2048"
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource vpnConnection 'Microsoft.Network/connections@2024-01-01' = {
+        name: connectionName
+        location: location
+        properties: {
+          connectionType: 'IPsec'
+          virtualNetworkGateway1: {
+            id: vpnGateway.id
+          }
+          localNetworkGateway2: {
+            id: localGateway.id
+          }
+          sharedKey: sharedKey
+          enableBgp: true
+          connectionProtocol: 'IKEv2'
+          usePolicyBasedTrafficSelectors: false
+          ipsecPolicies: [
+            {
+              saLifeTimeSeconds: 27000
+              saDataSizeKilobytes: 102400000
+              ipsecEncryption: 'AES256'
+              ipsecIntegrity: 'SHA256'
+              ikeEncryption: 'AES256'
+              ikeIntegrity: 'SHA256'
+              dhGroup: 'DHGroup14'
+              pfsGroup: 'PFS2048'
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/virtualNetworkGateways (VPN gateway)"
+      - "Microsoft.Network/localNetworkGateways (on-premises gateway)"
+    prohibitions:
+      - "Do not use IKEv1 — it is deprecated and has known vulnerabilities"
+      - "Do not use DES or 3DES encryption — use AES256"
+      - "Do not hardcode sharedKey in templates — use Key Vault references or parameters"
+      - "Do not use DHGroup1 or DHGroup2 — use DHGroup14 or higher"
+
+  - id: VPN-003
+    severity: required
+    description: "Deploy GatewaySubnet with /27 or larger prefix for VPN Gateway"
+    rationale: "VPN Gateway requires a dedicated GatewaySubnet; /27 allows for future growth and active-active"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "gateway_subnet" {
+        type      = "Microsoft.Network/virtualNetworks/subnets@2024-01-01"
+        name      = "GatewaySubnet"
+        parent_id = azapi_resource.vnet.id
+        body = {
+          properties = {
+            addressPrefix = var.gateway_subnet_prefix
+          }
+        }
+      }
+    bicep_pattern: |
+      resource gatewaySubnet 'Microsoft.Network/virtualNetworks/subnets@2024-01-01' = {
+        parent: vnet
+        name: 'GatewaySubnet'
+        properties: {
+          addressPrefix: gatewaySubnetPrefix
+        }
+      }
+    companion_resources: []
+    prohibitions:
+      - "Do not name the subnet anything other than GatewaySubnet"
+      - "Do not use a prefix smaller than /27"
+      - "Do not attach NSG to GatewaySubnet — it is not supported for VPN Gateway"
+      - "Do not attach route tables to GatewaySubnet unless specifically required"
+
+  - id: VPN-004
+    severity: recommended
+    description: "Enable diagnostic settings for VPN Gateway tunnel and route logs"
+    rationale: "Tunnel diagnostics are critical for troubleshooting connectivity and monitoring BGP sessions"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    terraform_pattern: |
+      resource "azapi_resource" "vpn_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-vpn-gateway"
+        parent_id = azapi_resource.vpn_gateway.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "GatewayDiagnosticLog"
+                enabled  = true
+              },
+              {
+                category = "TunnelDiagnosticLog"
+                enabled  = true
+              },
+              {
+                category = "RouteDiagnosticLog"
+                enabled  = true
+              },
+              {
+                category = "IKEDiagnosticLog"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource vpnDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-vpn-gateway'
+        scope: vpnGateway
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
+            {
+              category: 'GatewayDiagnosticLog'
+              enabled: true
+            }
+            {
+              category: 'TunnelDiagnosticLog'
+              enabled: true
+            }
+            {
+              category: 'RouteDiagnosticLog'
+              enabled: true
+            }
+            {
+              category: 'IKEDiagnosticLog'
+              enabled: true
+            }
+          ]
+          metrics: [
+            {
+              category: 'AllMetrics'
+              enabled: true
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - "Microsoft.OperationalInsights/workspaces (Log Analytics workspace)"
+    prohibitions:
+      - "Do not omit TunnelDiagnosticLog — it is the primary source for VPN troubleshooting"
+
+patterns:
+  - name: "Active-active VPN Gateway with custom IPsec"
+    description: "Zone-redundant VPN Gateway with BGP, active-active, and strong IPsec policy"
+    example: |
+      # See VPN-001 through VPN-004 for complete azapi_resource patterns
+
+anti_patterns:
+  - description: "Do not deploy a single-instance VPN Gateway for production"
+    instead: "Use active-active configuration with two public IPs for high availability"
+  - description: "Do not store VPN shared keys in plain text in source control"
+    instead: "Use Key Vault references or secure parameters for shared keys"
+
+references:
+  - title: "VPN Gateway documentation"
+    url: "https://learn.microsoft.com/azure/vpn-gateway/vpn-gateway-about-vpngateways"
+  - title: "IPsec/IKE policy for VPN"
+    url: "https://learn.microsoft.com/azure/vpn-gateway/ipsec-ike-policy-howto"

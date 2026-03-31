@@ -1,0 +1,114 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: managed-identity
+  category: azure
+  services: [managed-identity]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: MI-001
+    severity: required
+    description: "Create User-Assigned Managed Identity for shared identity across services"
+    rationale: "User-assigned identities can be shared across multiple resources and survive resource recreation"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "user_assigned_identity" {
+        type      = "Microsoft.ManagedIdentity/userAssignedIdentities@2023-07-31-preview"
+        name      = var.identity_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+      }
+
+      output "identity_client_id" {
+        value = azapi_resource.user_assigned_identity.output.properties.clientId
+      }
+
+      output "identity_principal_id" {
+        value = azapi_resource.user_assigned_identity.output.properties.principalId
+      }
+
+      output "identity_resource_id" {
+        value = azapi_resource.user_assigned_identity.id
+      }
+    bicep_pattern: |
+      resource userAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-07-31-preview' = {
+        name: identityName
+        location: location
+      }
+
+      output identityClientId string = userAssignedIdentity.properties.clientId
+      output identityPrincipalId string = userAssignedIdentity.properties.principalId
+      output identityResourceId string = userAssignedIdentity.id
+    prohibitions:
+      - "NEVER use system-assigned identity as the sole identity for multi-resource architectures — use user-assigned for shared access"
+      - "NEVER hardcode principal IDs — always reference the identity resource output"
+
+  - id: MI-002
+    severity: required
+    description: "Use deterministic names for RBAC role assignments using uuidv5"
+    rationale: "Role assignment names must be GUIDs; uuidv5 generates deterministic UUIDs from a namespace + name, ensuring idempotent deployments"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # Use uuidv5 for deterministic RBAC role assignment names
+      # uuidv5(namespace_uuid, name_string) is a Terraform built-in function
+      # Use the URL namespace UUID and a combination of resource IDs for uniqueness
+      resource "azapi_resource" "role_assignment" {
+        type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name      = uuidv5("6ba7b811-9dad-11d1-80b4-00c04fd430c8", "${var.scope_resource_id}-${var.principal_id}-${var.role_definition_id}")
+        parent_id = var.scope_resource_id
+
+        body = {
+          properties = {
+            roleDefinitionId = "${var.subscription_resource_id}/providers/Microsoft.Authorization/roleDefinitions/${var.role_definition_id}"
+            principalId      = azapi_resource.user_assigned_identity.output.properties.principalId
+            principalType    = "ServicePrincipal"
+          }
+        }
+      }
+    bicep_pattern: |
+      // Use guid() with deterministic seed for Bicep role assignment names
+      resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+        scope: targetResource
+        name: guid(targetResource.id, userAssignedIdentity.id, roleDefinitionId)
+        properties: {
+          roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleDefinitionId)
+          principalId: userAssignedIdentity.properties.principalId
+          principalType: 'ServicePrincipal'
+        }
+      }
+    prohibitions:
+      - "NEVER use uuid() for role assignment names — it generates a new random UUID every plan, causing unnecessary replacements"
+      - "NEVER use guid() in Terraform — it does not exist; use uuidv5() instead"
+      - "NEVER hardcode role assignment GUIDs as literal strings — always generate deterministically with uuidv5"
+
+  - id: MI-003
+    severity: required
+    description: "Always output client_id and principal_id from the identity module"
+    rationale: "Downstream resources need both IDs: client_id for SDK configuration, principal_id for RBAC assignments"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+  - id: MI-004
+    severity: recommended
+    description: "Create one identity per logical application boundary"
+    rationale: "Sharing identity across all services simplifies RBAC management while maintaining security boundaries per application"
+    applies_to: [cloud-architect]
+
+patterns:
+  - name: "User-Assigned Managed Identity with RBAC"
+    description: "Create identity and assign roles to target resources using deterministic names"
+
+anti_patterns:
+  - description: "Do not use system-assigned identity when multiple resources need shared access"
+    instead: "Use user-assigned managed identity shared across the application boundary"
+  - description: "Do not use newGuid() for role assignment names"
+    instead: "Use guid() with deterministic seeds: guid(resourceId, identityId, roleDefId)"
+  - description: "Do not create multiple identities for tightly coupled services in the same app"
+    instead: "Share one user-assigned identity per logical application"
+
+references:
+  - title: "Managed identities best practices"
+    url: "https://learn.microsoft.com/azure/active-directory/managed-identities-azure-resources/managed-identity-best-practice-recommendations"
+  - title: "User-assigned managed identity"
+    url: "https://learn.microsoft.com/azure/active-directory/managed-identities-azure-resources/how-manage-user-assigned-managed-identities"

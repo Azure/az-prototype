@@ -22,7 +22,7 @@ Choose Databricks over Fabric when you need advanced Spark tuning, custom ML pip
 | Auto-termination | 30 minutes | Prevent idle cluster costs |
 | Runtime | Latest LTS | e.g., 14.3 LTS with Spark 3.5 |
 | Unity Catalog | Enabled | Free with Premium tier; required for governance |
-| Public network access | Enabled (POC) | Flag VNet injection as production backlog item |
+| Public network access | Disabled (unless user overrides) | Flag VNet injection as production backlog item |
 
 ## Terraform Patterns
 
@@ -35,7 +35,7 @@ resource "azurerm_databricks_workspace" "this" {
   resource_group_name           = var.resource_group_name
   sku                           = "premium"  # Required for Unity Catalog
   managed_resource_group_name   = "${var.resource_group_name}-databricks-managed"
-  public_network_access_enabled = true  # Set false for VNet injection
+  public_network_access_enabled = false  # Unless told otherwise, disabled per governance policy
 
   tags = var.tags
 }
@@ -181,7 +181,7 @@ resource workspace 'Microsoft.Databricks/workspaces@2024-05-01' = {
   }
   properties: {
     managedResourceGroupId: subscriptionResourceId('Microsoft.Resources/resourceGroups', managedResourceGroupName)
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: 'Disabled'  // Unless told otherwise, disabled per governance policy
     requiredNsgRules: 'AllRules'
   }
 }

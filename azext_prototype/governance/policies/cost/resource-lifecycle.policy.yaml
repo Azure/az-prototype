@@ -1,0 +1,691 @@
+# yaml-language-server: $schema=../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: resource-lifecycle
+  category: cost
+  services:
+    - virtual-machines
+    - storage
+    - log-analytics
+    - key-vault
+    - recovery-services
+    - resource-groups
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: LIFE-001
+    severity: required
+    description: "Configure auto-shutdown schedules for dev/POC VMs — shut down at 7 PM, no auto-start"
+    rationale: "Dev VMs running 24/7 cost 3x more than VMs with 10-hour daily usage; auto-shutdown eliminates forgotten instances"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
+    terraform_pattern: |
+      # === VM Auto-Shutdown Schedule ===
+      resource "azapi_resource" "vm_auto_shutdown" {
+        type      = "Microsoft.DevTestLab/schedules@2018-09-15"
+        name      = "shutdown-computevm-${var.vm_name}"
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            status           = "Enabled"
+            taskType         = "ComputeVmShutdownTask"
+            dailyRecurrence  = {
+              time = "1900"                    # 7:00 PM daily
+            }
+            timeZoneId       = var.time_zone   # e.g., "Eastern Standard Time", "Pacific Standard Time"
+            targetResourceId = azapi_resource.vm.id
+            notificationSettings = {
+              status        = "Enabled"
+              timeInMinutes = 30               # Notify 30 minutes before shutdown
+              emailRecipient = var.admin_email
+              notificationLocale = "en"
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // === VM Auto-Shutdown Schedule ===
+      resource vmAutoShutdown 'Microsoft.DevTestLab/schedules@2018-09-15' = {
+        name: 'shutdown-computevm-${vmName}'
+        location: location
+        properties: {
+          status: 'Enabled'
+          taskType: 'ComputeVmShutdownTask'
+          dailyRecurrence: {
+            time: '1900'                      // 7:00 PM daily
+          }
+          timeZoneId: timeZone
+          targetResourceId: vm.id
+          notificationSettings: {
+            status: 'Enabled'
+            timeInMinutes: 30
+            emailRecipient: adminEmail
+            notificationLocale: 'en'
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER deploy dev/POC VMs without an auto-shutdown schedule"
+      - "NEVER set auto-shutdown status to Disabled — if a VM needs 24/7 uptime, it should be in a production resource group"
+      - "NEVER set auto-shutdown notification to Disabled — users must have the option to extend"
+
+  - id: LIFE-002
+    severity: required
+    description: "Configure storage lifecycle management policies — move to Cool after 30 days, Archive after 90 days, delete after 365 days"
+    rationale: "Storage lifecycle policies automatically tier data by age; Cool tier is 50% cheaper than Hot, Archive is 90% cheaper"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
+    terraform_pattern: |
+      # === Storage Lifecycle Management Policy ===
+      resource "azapi_resource" "storage_lifecycle" {
+        type      = "Microsoft.Storage/storageAccounts/managementPolicies@2023-05-01"
+        name      = "default"
+        parent_id = azapi_resource.storage_account.id
+
+        body = {
+          properties = {
+            policy = {
+              rules = [
+                {
+                  name    = "tier-to-cool"
+                  enabled = true
+                  type    = "Lifecycle"
+                  definition = {
+                    filters = {
+                      blobTypes   = ["blockBlob"]
+                      prefixMatch = ["data/", "logs/", "uploads/"]
+                    }
+                    actions = {
+                      baseBlob = {
+                        tierToCool = {
+                          daysAfterModificationGreaterThan = 30     # Move to Cool after 30 days
+                        }
+                        tierToArchive = {
+                          daysAfterModificationGreaterThan = 90     # Move to Archive after 90 days
+                        }
+                        delete = {
+                          daysAfterModificationGreaterThan = 365    # Delete after 1 year
+                        }
+                      }
+                      snapshot = {
+                        delete = {
+                          daysAfterCreationGreaterThan = 90
+                        }
+                      }
+                      version = {
+                        delete = {
+                          daysAfterCreationGreaterThan = 90
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  name    = "cleanup-temp"
+                  enabled = true
+                  type    = "Lifecycle"
+                  definition = {
+                    filters = {
+                      blobTypes   = ["blockBlob"]
+                      prefixMatch = ["tmp/", "temp/", "staging/"]
+                    }
+                    actions = {
+                      baseBlob = {
+                        delete = {
+                          daysAfterModificationGreaterThan = 7      # Delete temp data after 7 days
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Storage Lifecycle Management Policy ===
+      resource storageLifecycle 'Microsoft.Storage/storageAccounts/managementPolicies@2023-05-01' = {
+        parent: storageAccount
+        name: 'default'
+        properties: {
+          policy: {
+            rules: [
+              {
+                name: 'tier-to-cool'
+                enabled: true
+                type: 'Lifecycle'
+                definition: {
+                  filters: {
+                    blobTypes: ['blockBlob']
+                    prefixMatch: ['data/', 'logs/', 'uploads/']
+                  }
+                  actions: {
+                    baseBlob: {
+                      tierToCool: {
+                        daysAfterModificationGreaterThan: 30
+                      }
+                      tierToArchive: {
+                        daysAfterModificationGreaterThan: 90
+                      }
+                      delete: {
+                        daysAfterModificationGreaterThan: 365
+                      }
+                    }
+                    snapshot: {
+                      delete: {
+                        daysAfterCreationGreaterThan: 90
+                      }
+                    }
+                    version: {
+                      delete: {
+                        daysAfterCreationGreaterThan: 90
+                      }
+                    }
+                  }
+                }
+              }
+              {
+                name: 'cleanup-temp'
+                enabled: true
+                type: 'Lifecycle'
+                definition: {
+                  filters: {
+                    blobTypes: ['blockBlob']
+                    prefixMatch: ['tmp/', 'temp/', 'staging/']
+                  }
+                  actions: {
+                    baseBlob: {
+                      delete: {
+                        daysAfterModificationGreaterThan: 7
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER deploy storage accounts without lifecycle management policies"
+      - "NEVER set lifecycle delete retention > 365 days for dev/POC"
+      - "NEVER use Archive tier for data that needs frequent access — rehydration takes up to 15 hours"
+      - "NEVER skip temp/staging cleanup rules — temporary data accumulates indefinitely without lifecycle policies"
+
+  - id: LIFE-003
+    severity: required
+    description: "Set appropriate Log Analytics retention — 30 days for dev/POC, 90 days for production, with archive tier for compliance"
+    rationale: "Log Analytics charges per GB ingested and per day retained beyond 31 days; reducing retention from 90 to 30 days saves ~65%"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst, monitoring-agent]
+    terraform_pattern: |
+      # === Log Analytics Workspace: Dev/POC (30 days) ===
+      resource "azapi_resource" "log_analytics_dev" {
+        type      = "Microsoft.OperationalInsights/workspaces@2023-09-01"
+        name      = var.log_analytics_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            sku = {
+              name = "PerGB2018"
+            }
+            retentionInDays          = 30        # Dev/POC: 30 days (free retention tier)
+            features = {
+              enableDataExport = false
+            }
+            workspaceCapping = {
+              dailyQuotaGb = 1                   # Dev/POC: cap ingestion at 1 GB/day
+            }
+          }
+        }
+      }
+
+      # === Log Analytics Workspace: Production (90 days + archive) ===
+      resource "azapi_resource" "log_analytics_prod" {
+        type      = "Microsoft.OperationalInsights/workspaces@2023-09-01"
+        name      = var.log_analytics_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            sku = {
+              name = "PerGB2018"
+            }
+            retentionInDays          = 90        # Production: 90 days interactive
+            features = {
+              enableDataExport = true
+            }
+            workspaceCapping = {
+              dailyQuotaGb = -1                  # Production: no daily cap
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Log Analytics Workspace: Dev/POC (30 days) ===
+      resource logAnalyticsDev 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+        name: logAnalyticsName
+        location: location
+        properties: {
+          sku: {
+            name: 'PerGB2018'
+          }
+          retentionInDays: 30                   // Dev/POC: 30 days (free retention)
+          features: {
+            enableDataExport: false
+          }
+          workspaceCapping: {
+            dailyQuotaGb: 1                     // Dev/POC: cap at 1 GB/day
+          }
+        }
+      }
+
+      // === Log Analytics Workspace: Production (90 days) ===
+      resource logAnalyticsProd 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+        name: logAnalyticsName
+        location: location
+        properties: {
+          sku: {
+            name: 'PerGB2018'
+          }
+          retentionInDays: 90                   // Production: 90 days interactive
+          features: {
+            enableDataExport: true
+          }
+          workspaceCapping: {
+            dailyQuotaGb: json('-1')            // Production: no cap
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER set Log Analytics retention > 90 days for dev/POC — excessive retention wastes budget"
+      - "NEVER remove daily ingestion cap for dev/POC workspaces — runaway logging can generate huge costs"
+      - "NEVER set retention below 30 days — it is the minimum and provides free retention"
+      - "NEVER use Free or Standalone SKU — PerGB2018 is the current pricing tier"
+
+  - id: LIFE-004
+    severity: required
+    description: "Configure appropriate soft-delete retention periods — shorter for dev/POC, longer for production"
+    rationale: "Soft-delete protects against accidental deletion but costs storage; longer retention in dev wastes budget"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
+    terraform_pattern: |
+      # === Key Vault Soft-Delete ===
+      resource "azapi_resource" "key_vault" {
+        type      = "Microsoft.KeyVault/vaults@2023-07-01"
+        name      = var.key_vault_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            tenantId                 = var.tenant_id
+            sku = {
+              family = "A"
+              name   = "standard"
+            }
+            enableSoftDelete         = true
+            softDeleteRetentionInDays = 7       # Dev/POC: 7 days (minimum)
+            enablePurgeProtection    = false     # Dev/POC: allow purge for cleanup
+          }
+        }
+      }
+
+      # === Storage Account Soft-Delete ===
+      resource "azapi_resource" "storage_blob_service" {
+        type      = "Microsoft.Storage/storageAccounts/blobServices@2023-05-01"
+        name      = "default"
+        parent_id = azapi_resource.storage_account.id
+
+        body = {
+          properties = {
+            deleteRetentionPolicy = {
+              enabled = true
+              days    = 7              # Dev/POC: 7 days
+            }
+            containerDeleteRetentionPolicy = {
+              enabled = true
+              days    = 7              # Dev/POC: 7 days
+            }
+          }
+        }
+      }
+
+      # === Recovery Services Vault ===
+      resource "azapi_resource" "recovery_vault" {
+        type      = "Microsoft.RecoveryServices/vaults@2024-04-01"
+        name      = var.recovery_vault_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "Standard"
+          }
+          properties = {
+            publicNetworkAccess = "Disabled"
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Key Vault Soft-Delete ===
+      resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+        name: keyVaultName
+        location: location
+        properties: {
+          tenantId: tenantId
+          sku: {
+            family: 'A'
+            name: 'standard'
+          }
+          enableSoftDelete: true
+          softDeleteRetentionInDays: 7         // Dev/POC: 7 days (minimum)
+          enablePurgeProtection: false          // Dev/POC: allow purge for cleanup
+        }
+      }
+
+      // === Storage Account Soft-Delete ===
+      resource storageBlobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+        parent: storageAccount
+        name: 'default'
+        properties: {
+          deleteRetentionPolicy: {
+            enabled: true
+            days: 7                            // Dev/POC: 7 days
+          }
+          containerDeleteRetentionPolicy: {
+            enabled: true
+            days: 7                            // Dev/POC: 7 days
+          }
+        }
+      }
+
+      // === Recovery Services Vault ===
+      resource recoveryVault 'Microsoft.RecoveryServices/vaults@2024-04-01' = {
+        name: recoveryVaultName
+        location: location
+        sku: {
+          name: 'Standard'
+        }
+        properties: {
+          publicNetworkAccess: 'Disabled'
+        }
+      }
+    prohibitions:
+      - "NEVER disable soft-delete on Key Vault — it is now mandatory and cannot be disabled after creation"
+      - "NEVER set softDeleteRetentionInDays > 30 for dev/POC Key Vaults"
+      - "NEVER enable purge protection on dev/POC Key Vaults — it prevents resource group cleanup"
+      - "NEVER set blob soft-delete retention > 14 days for dev/POC"
+      - "NEVER deploy Recovery Services Vault for dev/POC unless backup is an explicit requirement"
+
+  - id: LIFE-005
+    severity: required
+    description: "Apply mandatory cost tracking tags to all resources — Environment, CostCenter, Owner, Project"
+    rationale: "Tags enable cost allocation, showback/chargeback, and automated cleanup of orphaned resources"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst, project-manager]
+    terraform_pattern: |
+      # === Mandatory Tags (apply to all resources) ===
+      locals {
+        mandatory_tags = {
+          Environment = var.environment         # "dev", "staging", "prod"
+          CostCenter  = var.cost_center         # Cost center code for chargeback
+          Owner       = var.owner_email         # Owner email for contact
+          Project     = var.project_name        # Project name for grouping
+          ManagedBy   = "terraform"             # Automation tool
+          CreatedDate = formatdate("YYYY-MM-DD", timestamp())
+        }
+      }
+
+      # === Resource Group with tags ===
+      resource "azapi_resource" "resource_group" {
+        type      = "Microsoft.Resources/resourceGroups@2024-03-01"
+        name      = var.resource_group_name
+        location  = var.location
+        parent_id = "/subscriptions/${var.subscription_id}"
+
+        tags = local.mandatory_tags
+
+        body = {}
+      }
+
+      # === Tag inheritance: all child resources ===
+      # Apply local.mandatory_tags to every azapi_resource via top-level tags argument
+      resource "azapi_resource" "example_resource" {
+        type      = "Microsoft.Web/serverfarms@2023-12-01"
+        name      = var.resource_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        tags = local.mandatory_tags
+
+        body = {}
+      }
+    bicep_pattern: |
+      // === Mandatory Tags (apply to all resources) ===
+      @description('Environment tier: dev, staging, prod')
+      param environment string
+
+      @description('Cost center code for chargeback')
+      param costCenter string
+
+      @description('Owner email for contact')
+      param ownerEmail string
+
+      @description('Project name for grouping')
+      param projectName string
+
+      var mandatoryTags = {
+        Environment: environment
+        CostCenter: costCenter
+        Owner: ownerEmail
+        Project: projectName
+        ManagedBy: 'bicep'
+        CreatedDate: utcNow('yyyy-MM-dd')
+      }
+
+      // === Apply tags to every resource ===
+      resource exampleResource 'Microsoft.Web/serverfarms@2023-12-01' = {
+        name: resourceName
+        location: location
+        tags: mandatoryTags
+        // ... resource properties
+      }
+    prohibitions:
+      - "NEVER deploy resources without at minimum Environment, CostCenter, Owner, and Project tags"
+      - "NEVER use free-form tag values for Environment — restrict to 'dev', 'staging', 'prod'"
+      - "NEVER omit the ManagedBy tag — it distinguishes IaC-managed from manually-created resources"
+      - "NEVER hardcode tag values — always use variables/parameters for reusability"
+
+  - id: LIFE-006
+    severity: required
+    description: "Configure Azure budget alerts with action groups — monthly budget with 50%, 80%, 100%, and 120% thresholds"
+    rationale: "Budget alerts provide early warning before costs exceed expectations; without them, overspend is only discovered on invoices"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
+    terraform_pattern: |
+      # === Budget with Alert Thresholds ===
+      resource "azapi_resource" "budget" {
+        type      = "Microsoft.Consumption/budgets@2023-11-01"
+        name      = "budget-${var.project_name}"
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            category  = "Cost"
+            amount    = var.monthly_budget       # e.g., 500 for $500/month
+            timeGrain = "Monthly"
+            timePeriod = {
+              startDate = var.budget_start_date   # e.g., "2026-04-01T00:00:00Z"
+            }
+            filter = {
+              tags = {
+                name   = "Project"
+                values = [var.project_name]
+              }
+            }
+            notifications = {
+              "50-percent" = {
+                enabled       = true
+                operator      = "GreaterThanOrEqualTo"
+                threshold     = 50
+                thresholdType = "Actual"
+                contactEmails = var.budget_alert_emails
+                contactGroups = [azapi_resource.budget_action_group.id]
+              }
+              "80-percent" = {
+                enabled       = true
+                operator      = "GreaterThanOrEqualTo"
+                threshold     = 80
+                thresholdType = "Actual"
+                contactEmails = var.budget_alert_emails
+                contactGroups = [azapi_resource.budget_action_group.id]
+              }
+              "100-percent" = {
+                enabled       = true
+                operator      = "GreaterThanOrEqualTo"
+                threshold     = 100
+                thresholdType = "Actual"
+                contactEmails = var.budget_alert_emails
+                contactGroups = [azapi_resource.budget_action_group.id]
+              }
+              "120-percent-forecast" = {
+                enabled       = true
+                operator      = "GreaterThanOrEqualTo"
+                threshold     = 120
+                thresholdType = "Forecasted"
+                contactEmails = var.budget_alert_emails
+                contactGroups = [azapi_resource.budget_action_group.id]
+              }
+            }
+          }
+        }
+      }
+
+      # === Action Group for Budget Alerts ===
+      resource "azapi_resource" "budget_action_group" {
+        type      = "Microsoft.Insights/actionGroups@2023-01-01"
+        name      = "ag-budget-${var.project_name}"
+        location  = "global"
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            groupShortName = "budget"
+            enabled        = true
+            emailReceivers = [
+              {
+                name                 = "owner"
+                emailAddress         = var.owner_email
+                useCommonAlertSchema = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Budget with Alert Thresholds ===
+      resource budget 'Microsoft.Consumption/budgets@2023-11-01' = {
+        name: 'budget-${projectName}'
+        properties: {
+          category: 'Cost'
+          amount: monthlyBudget
+          timeGrain: 'Monthly'
+          timePeriod: {
+            startDate: budgetStartDate
+          }
+          filter: {
+            tags: {
+              name: 'Project'
+              values: [projectName]
+            }
+          }
+          notifications: {
+            '50-percent': {
+              enabled: true
+              operator: 'GreaterThanOrEqualTo'
+              threshold: 50
+              thresholdType: 'Actual'
+              contactEmails: budgetAlertEmails
+              contactGroups: [budgetActionGroup.id]
+            }
+            '80-percent': {
+              enabled: true
+              operator: 'GreaterThanOrEqualTo'
+              threshold: 80
+              thresholdType: 'Actual'
+              contactEmails: budgetAlertEmails
+              contactGroups: [budgetActionGroup.id]
+            }
+            '100-percent': {
+              enabled: true
+              operator: 'GreaterThanOrEqualTo'
+              threshold: 100
+              thresholdType: 'Actual'
+              contactEmails: budgetAlertEmails
+              contactGroups: [budgetActionGroup.id]
+            }
+            '120-percent-forecast': {
+              enabled: true
+              operator: 'GreaterThanOrEqualTo'
+              threshold: 120
+              thresholdType: 'Forecasted'
+              contactEmails: budgetAlertEmails
+              contactGroups: [budgetActionGroup.id]
+            }
+          }
+        }
+      }
+
+      // === Action Group for Budget Alerts ===
+      resource budgetActionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
+        name: 'ag-budget-${projectName}'
+        location: 'global'
+        properties: {
+          groupShortName: 'budget'
+          enabled: true
+          emailReceivers: [
+            {
+              name: 'owner'
+              emailAddress: ownerEmail
+              useCommonAlertSchema: true
+            }
+          ]
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Insights/actionGroups@2023-01-01"
+        description: "Action group for budget alert notifications — required for budget alerts to trigger email/webhook notifications"
+    prohibitions:
+      - "NEVER deploy a project without a budget resource and alert thresholds"
+      - "NEVER skip the 80% and 100% actual-spend thresholds — they are the primary early warnings"
+      - "NEVER skip the forecasted threshold — it provides advance warning before actual spend occurs"
+      - "NEVER set budget amount without consulting cost-analyst for estimation"
+      - "NEVER use only contactEmails without an action group — action groups support webhooks, Logic Apps, and runbook automation"
+
+patterns:
+  - name: "Cost-optimized resource lifecycle"
+    description: "Combine auto-shutdown, lifecycle policies, retention limits, mandatory tags, and budget alerts for comprehensive cost governance"
+
+anti_patterns:
+  - description: "Do not deploy resources without cost tracking tags"
+    instead: "Apply Environment, CostCenter, Owner, and Project tags to every resource"
+  - description: "Do not set unlimited log retention for dev/POC"
+    instead: "Use 30 days for dev/POC; use 90 days with archive tier for production"
+  - description: "Do not forget to configure budget alerts"
+    instead: "Create a monthly budget with 50%, 80%, 100% actual and 120% forecasted thresholds"
+  - description: "Do not leave dev VMs running 24/7"
+    instead: "Configure auto-shutdown at 7 PM with 30-minute notification"
+
+references:
+  - title: "Azure Cost Management best practices"
+    url: "https://learn.microsoft.com/azure/cost-management-billing/costs/cost-mgt-best-practices"
+  - title: "Storage lifecycle management"
+    url: "https://learn.microsoft.com/azure/storage/blobs/lifecycle-management-overview"
+  - title: "Log Analytics pricing"
+    url: "https://learn.microsoft.com/azure/azure-monitor/logs/cost-logs"
+  - title: "Azure budgets"
+    url: "https://learn.microsoft.com/azure/cost-management-billing/costs/tutorial-acm-create-budgets"
+  - title: "Azure tagging strategy"
+    url: "https://learn.microsoft.com/azure/cloud-adoption-framework/ready/azure-best-practices/resource-tagging"

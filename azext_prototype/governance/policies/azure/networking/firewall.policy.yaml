@@ -1,0 +1,309 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: firewall
+  category: azure
+  services: [azure-firewall]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: FW-001
+    severity: required
+    description: "Deploy Azure Firewall Premium with threat intelligence, IDPS, and TLS inspection"
+    rationale: "Premium SKU provides signature-based IDPS, TLS inspection, and URL filtering beyond Standard capabilities"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "firewall" {
+        type      = "Microsoft.Network/azureFirewalls@2024-01-01"
+        name      = var.firewall_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        body = {
+          properties = {
+            sku = {
+              name = "AZFW_VNet"
+              tier = "Premium"
+            }
+            ipConfigurations = [
+              {
+                name = "fw-ipconfig"
+                properties = {
+                  subnet = {
+                    id = var.firewall_subnet_id  # Must be named "AzureFirewallSubnet"
+                  }
+                  publicIPAddress = {
+                    id = var.firewall_pip_id
+                  }
+                }
+              }
+            ]
+            firewallPolicy = {
+              id = azapi_resource.firewall_policy.id
+            }
+            threatIntelMode = "Deny"
+          }
+          zones = ["1", "2", "3"]
+        }
+      }
+    bicep_pattern: |
+      resource firewall 'Microsoft.Network/azureFirewalls@2024-01-01' = {
+        name: firewallName
+        location: location
+        zones: ['1', '2', '3']
+        properties: {
+          sku: {
+            name: 'AZFW_VNet'
+            tier: 'Premium'
+          }
+          ipConfigurations: [
+            {
+              name: 'fw-ipconfig'
+              properties: {
+                subnet: {
+                  id: firewallSubnetId
+                }
+                publicIPAddress: {
+                  id: firewallPipId
+                }
+              }
+            }
+          ]
+          firewallPolicy: {
+            id: firewallPolicy.id
+          }
+          threatIntelMode: 'Deny'
+        }
+      }
+    companion_resources:
+      - type: "Microsoft.Network/firewallPolicies@2024-01-01"
+        name: "fw-policy"
+        description: "Firewall policy with IDPS, TLS inspection, and threat intelligence enabled"
+        terraform_pattern: |
+          resource "azapi_resource" "firewall_policy" {
+            type      = "Microsoft.Network/firewallPolicies@2024-01-01"
+            name      = "fwpol-${var.firewall_name}"
+            location  = var.location
+            parent_id = var.resource_group_id
+
+            body = {
+              properties = {
+                sku = {
+                  tier = "Premium"
+                }
+                threatIntelMode = "Deny"
+                threatIntelWhitelist = {
+                  fqdns      = []
+                  ipAddresses = []
+                }
+                intrusionDetection = {
+                  mode = "Deny"
+                  configuration = {
+                    signatureOverrides  = []
+                    bypassTrafficSettings = []
+                  }
+                }
+                transportSecurity = {
+                  certificateAuthority = {
+                    keyVaultSecretId = var.tls_ca_secret_id
+                    name             = var.tls_ca_name
+                  }
+                }
+                dnsSettings = {
+                  enableProxy = true
+                  servers     = var.dns_servers
+                }
+              }
+            }
+          }
+        bicep_pattern: |
+          resource firewallPolicy 'Microsoft.Network/firewallPolicies@2024-01-01' = {
+            name: 'fwpol-${firewallName}'
+            location: location
+            properties: {
+              sku: {
+                tier: 'Premium'
+              }
+              threatIntelMode: 'Deny'
+              intrusionDetection: {
+                mode: 'Deny'
+                configuration: {
+                  signatureOverrides: []
+                  bypassTrafficSettings: []
+                }
+              }
+              transportSecurity: {
+                certificateAuthority: {
+                  keyVaultSecretId: tlsCaSecretId
+                  name: tlsCaName
+                }
+              }
+              dnsSettings: {
+                enableProxy: true
+                servers: dnsServers
+              }
+            }
+          }
+      - type: "Microsoft.Network/publicIPAddresses@2024-01-01"
+        name: "pip-fw"
+        description: "Zone-redundant public IP for Azure Firewall"
+        terraform_pattern: |
+          resource "azapi_resource" "firewall_pip" {
+            type      = "Microsoft.Network/publicIPAddresses@2024-01-01"
+            name      = "pip-${var.firewall_name}"
+            location  = var.location
+            parent_id = var.resource_group_id
+
+            body = {
+              sku = {
+                name = "Standard"
+                tier = "Regional"
+              }
+              properties = {
+                publicIPAllocationMethod = "Static"
+                publicIPAddressVersion   = "IPv4"
+              }
+              zones = ["1", "2", "3"]
+            }
+          }
+        bicep_pattern: |
+          resource firewallPip 'Microsoft.Network/publicIPAddresses@2024-01-01' = {
+            name: 'pip-${firewallName}'
+            location: location
+            sku: {
+              name: 'Standard'
+              tier: 'Regional'
+            }
+            zones: ['1', '2', '3']
+            properties: {
+              publicIPAllocationMethod: 'Static'
+              publicIPAddressVersion: 'IPv4'
+            }
+          }
+      - type: "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name: "diag-fw"
+        description: "Diagnostic settings for firewall logs including network rules, application rules, and threat intelligence"
+        terraform_pattern: |
+          resource "azapi_resource" "diag_fw" {
+            type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+            name      = "diag-${var.firewall_name}"
+            parent_id = azapi_resource.firewall.id
+
+            body = {
+              properties = {
+                workspaceId = var.log_analytics_workspace_id
+                logs = [
+                  {
+                    categoryGroup = "allLogs"
+                    enabled       = true
+                  }
+                ]
+                metrics = [
+                  {
+                    category = "AllMetrics"
+                    enabled  = true
+                  }
+                ]
+              }
+            }
+          }
+        bicep_pattern: |
+          resource diagFw 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+            name: 'diag-${firewallName}'
+            scope: firewall
+            properties: {
+              workspaceId: logAnalyticsWorkspaceId
+              logs: [
+                {
+                  categoryGroup: 'allLogs'
+                  enabled: true
+                }
+              ]
+              metrics: [
+                {
+                  category: 'AllMetrics'
+                  enabled: true
+                }
+              ]
+            }
+          }
+    prohibitions:
+      - "Never deploy Azure Firewall without a firewall policy — always use policy-based management"
+      - "Never set threatIntelMode to Off — use Alert or Deny"
+      - "Never deploy without zone redundancy (zones 1, 2, 3)"
+      - "Never use Basic SKU public IP — use Standard SKU"
+      - "Never use the AzureFirewallSubnet for any resources other than Azure Firewall"
+      - "Never hardcode Key Vault secret IDs for TLS certificates"
+
+  - id: FW-002
+    severity: required
+    description: "Deploy in zone-redundant configuration across all three availability zones"
+    rationale: "Zone redundancy ensures firewall availability during zone failures"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+  - id: FW-003
+    severity: required
+    description: "Enable DNS proxy on the firewall policy for FQDN-based network rules"
+    rationale: "DNS proxy is required for FQDN filtering in network rules and supports private DNS resolution"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+  - id: FW-004
+    severity: recommended
+    description: "Organize rules into rule collection groups by function (infra, app, network)"
+    rationale: "Structured rule organization improves manageability and reduces rule processing time"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+  - id: FW-005
+    severity: recommended
+    description: "Use structured firewall log format and send to Log Analytics"
+    rationale: "WAF Operational Excellence: Structured logs make data easy to search, filter, and analyze; latest monitoring tools require this format"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
+    prohibitions:
+      - "Do not enable both structured and legacy diagnostic log formats simultaneously"
+
+  - id: FW-006
+    severity: recommended
+    description: "Monitor SNAT port utilization, firewall health state, throughput, and latency probe metrics"
+    rationale: "WAF Reliability: These metrics detect when service state degrades, enabling proactive measures to prevent failures"
+    applies_to: [cloud-architect, monitoring-agent]
+
+  - id: FW-007
+    severity: recommended
+    description: "Configure at least 5 public IP addresses for deployments susceptible to SNAT port exhaustion"
+    rationale: "WAF Performance: Each public IP provides 2,496 SNAT ports per backend VMSS instance; 5 IPs increase available ports fivefold"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+
+  - id: FW-008
+    severity: recommended
+    description: "Use policy analytics dashboard to identify and optimize firewall policies"
+    rationale: "WAF Performance: Policy analytics identifies potential problems like meeting policy limits, improper rules, and improper IP groups usage, improving security posture and rule-processing performance"
+    applies_to: [cloud-architect, security-reviewer]
+
+  - id: FW-009
+    severity: recommended
+    description: "Place frequently used rules early in rule collection groups to optimize latency"
+    rationale: "WAF Performance: Azure Firewall processes rules by priority; placing frequently-hit rules first reduces processing latency for common traffic patterns"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+
+patterns:
+  - name: "Azure Firewall Premium with IDPS and TLS inspection"
+    description: "Hub firewall with Premium policy, threat intelligence in Deny mode, and zone-redundant deployment"
+
+anti_patterns:
+  - description: "Do not deploy firewall without a dedicated firewall policy"
+    instead: "Always create a firewallPolicy resource and reference it from the firewall"
+  - description: "Do not set threat intelligence to Off"
+    instead: "Set threatIntelMode to Deny for maximum protection"
+
+references:
+  - title: "Azure Firewall documentation"
+    url: "https://learn.microsoft.com/azure/firewall/overview"
+  - title: "Azure Firewall Premium features"
+    url: "https://learn.microsoft.com/azure/firewall/premium-features"
+  - title: "WAF: Azure Firewall service guide"
+    url: "https://learn.microsoft.com/azure/well-architected/service-guides/azure-firewall"
+  - title: "Azure Firewall monitoring"
+    url: "https://learn.microsoft.com/azure/firewall/monitor-firewall"
+  - title: "Azure Firewall policy analytics"
+    url: "https://learn.microsoft.com/azure/firewall/policy-analytics"

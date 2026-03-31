@@ -1,0 +1,175 @@
+apiVersion: v1
+kind: policy
+metadata:
+  name: route-tables
+  category: azure
+  services: [route-tables]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: UDR-001
+    severity: required
+    description: "Disable BGP route propagation on subnets with forced tunneling to an NVA or firewall"
+    rationale: "BGP propagation can override UDR next-hops and bypass security inspection"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "route_table" {
+        type      = "Microsoft.Network/routeTables@2024-01-01"
+        name      = var.route_table_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            disableBgpRoutePropagation = true
+            routes = []
+          }
+        }
+      }
+    bicep_pattern: |
+      resource routeTable 'Microsoft.Network/routeTables@2024-01-01' = {
+        name: routeTableName
+        location: location
+        properties: {
+          disableBgpRoutePropagation: true
+          routes: []
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/virtualNetworks/subnets (associate route table with target subnets)"
+      - "Microsoft.Network/azureFirewalls or NVA (next-hop target for forced tunneling)"
+    prohibitions:
+      - "Do not leave disableBgpRoutePropagation as false when forcing traffic to an NVA"
+      - "Do not create routes with nextHopType 'Internet' in secured subnets — use firewall as next hop"
+
+  - id: UDR-002
+    severity: required
+    description: "Define explicit routes with valid next-hop types and addresses"
+    rationale: "Invalid or missing next-hop addresses cause traffic black-holes"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "route_to_firewall" {
+        type      = "Microsoft.Network/routeTables/routes@2024-01-01"
+        name      = "route-to-firewall"
+        parent_id = azapi_resource.route_table.id
+        body = {
+          properties = {
+            addressPrefix    = "0.0.0.0/0"
+            nextHopType      = "VirtualAppliance"
+            nextHopIpAddress = var.firewall_private_ip
+          }
+        }
+      }
+    bicep_pattern: |
+      resource routeToFirewall 'Microsoft.Network/routeTables/routes@2024-01-01' = {
+        parent: routeTable
+        name: 'route-to-firewall'
+        properties: {
+          addressPrefix: '0.0.0.0/0'
+          nextHopType: 'VirtualAppliance'
+          nextHopIpAddress: firewallPrivateIp
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/routeTables (parent route table)"
+    prohibitions:
+      - "Do not omit nextHopIpAddress when nextHopType is VirtualAppliance"
+      - "Do not use hardcoded IP addresses — use variables or references"
+
+  - id: UDR-003
+    severity: recommended
+    description: "Associate route tables with subnets explicitly in the subnet resource"
+    rationale: "Unassociated route tables have no effect on traffic flow"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "subnet_with_udr" {
+        type      = "Microsoft.Network/virtualNetworks/subnets@2024-01-01"
+        name      = var.subnet_name
+        parent_id = azapi_resource.vnet.id
+        body = {
+          properties = {
+            addressPrefix = var.subnet_prefix
+            routeTable = {
+              id = azapi_resource.route_table.id
+            }
+            networkSecurityGroup = {
+              id = azapi_resource.nsg.id
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-01-01' = {
+        parent: vnet
+        name: subnetName
+        properties: {
+          addressPrefix: subnetPrefix
+          routeTable: {
+            id: routeTable.id
+          }
+          networkSecurityGroup: {
+            id: nsg.id
+          }
+        }
+      }
+    companion_resources:
+      - "Microsoft.Network/networkSecurityGroups (always pair UDR with NSG)"
+    prohibitions:
+      - "Do not associate a route table with GatewaySubnet unless specifically required for forced tunneling"
+      - "Do not create subnets without both NSG and route table associations"
+
+  - id: UDR-004
+    severity: recommended
+    description: "Document all custom routes and their purpose with tags"
+    rationale: "Route tables can create complex traffic flows that are hard to debug without documentation"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "route_table_tagged" {
+        type      = "Microsoft.Network/routeTables@2024-01-01"
+        name      = var.route_table_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        tags = {
+          purpose     = "force-tunnel-to-firewall"
+          managed_by  = "terraform"
+          environment = var.environment
+        }
+        body = {
+          properties = {
+            disableBgpRoutePropagation = true
+          }
+        }
+      }
+    bicep_pattern: |
+      resource routeTable 'Microsoft.Network/routeTables@2024-01-01' = {
+        name: routeTableName
+        location: location
+        tags: {
+          purpose: 'force-tunnel-to-firewall'
+          managedBy: 'bicep'
+          environment: environment
+        }
+        properties: {
+          disableBgpRoutePropagation: true
+        }
+      }
+    companion_resources: []
+    prohibitions:
+      - "Do not deploy route tables without descriptive tags"
+
+patterns:
+  - name: "Forced tunneling via Azure Firewall"
+    description: "Route table with 0.0.0.0/0 route to Azure Firewall private IP"
+    example: |
+      # See UDR-001 through UDR-003 for complete azapi_resource patterns
+
+anti_patterns:
+  - description: "Do not create overlapping routes with different next-hops"
+    instead: "Use most-specific prefix matching and validate route precedence"
+  - description: "Do not use the None next-hop type to silently drop traffic without logging"
+    instead: "Route to a firewall that logs dropped traffic for audit purposes"
+
+references:
+  - title: "Virtual network traffic routing"
+    url: "https://learn.microsoft.com/azure/virtual-network/virtual-networks-udr-overview"
+  - title: "Route table tutorial"
+    url: "https://learn.microsoft.com/azure/virtual-network/tutorial-create-route-table-portal"
