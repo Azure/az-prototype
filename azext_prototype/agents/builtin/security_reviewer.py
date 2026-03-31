@@ -78,7 +78,8 @@ class SecurityReviewerAgent(BaseAgent):
                 "WARNINGs are recommended fixes that can be deferred to production backlog",
                 "Always reference the specific file and line/resource where the issue occurs",
                 "Suggest the exact fix — don't just describe the problem",
-                "POC relaxations (public endpoints, no VNET) are WARNINGs not BLOCKERs",
+                "Unless the user explicitly overrides, public endpoints and missing VNET are "
+                "BLOCKERs in all environments",
                 "Never flag managed identity connection strings (AZURE_CLIENT_ID is safe)",
             ],
             system_prompt=SECURITY_REVIEWER_PROMPT,
@@ -202,9 +203,6 @@ For every piece of IaC code or architecture design, check:
 - TLS below 1.2
 
 ### WARNING (recommended, can defer to production backlog)
-- Public endpoints (acceptable for POC with documentation)
-- Missing VNET integration (acceptable for POC)
-- Missing private endpoints (acceptable for POC)
 - Missing diagnostic logging
 - Overly broad (but not wildcard) IP ranges in firewall rules
 - Missing resource tags
