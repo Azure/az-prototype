@@ -3,8 +3,8 @@
 Release History
 ===============
 
-0.2.1b6
-+++++++
+0.2.1b6 _(Under active development)_
+++++++++++++++++++++++++++++++++++++   
 
 Benchmark suite
 ~~~~~~~~~~~~~~~~
@@ -85,6 +85,25 @@ Anti-pattern detection
   ``pc-`` prefixes).
 * **QA scope compliance** -- added Section 8 to QA engineer checklist:
   scope compliance, tag placement, and azurerm resource checks.
+
+Truncation recovery
+~~~~~~~~~~~~~~~~~~~~
+* **Continuation now carries conversation history** --
+  ``_execute_with_continuation()`` appends the truncated response as an
+  assistant message to ``conversation_history`` before requesting a
+  continuation.  Previously the model had no context of what it already
+  generated, causing it to respond with "I don't have previous context"
+  instead of continuing where it left off.
+* **Documentation path fix** -- removed ``docs/`` prefix from code block
+  labels in ``DOCUMENTATION_PROMPT``.  The stage directory already
+  provides ``concept/docs/``, so labeling files as ``docs/architecture.md``
+  produced a nested ``concept/docs/docs/architecture.md`` path.
+* **Documentation stage context enrichment** -- new
+  ``_build_docs_context()`` reads actual ``outputs.tf`` from each
+  previously generated stage and injects output names, descriptions, and
+  file lists into the documentation prompt.  This ensures docs reflect
+  real build artifacts (including QA remediation changes) rather than
+  just the planned architecture.
 
 AI provider
 ~~~~~~~~~~~~
