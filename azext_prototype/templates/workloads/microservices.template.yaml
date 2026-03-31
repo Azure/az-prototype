@@ -29,6 +29,7 @@ services:
       identity: user-assigned    # MI-002 — shared identity across services
       min_replicas: 1
       health_probes: true
+      zone_redundant: true       # HA-001
 
   - name: order-service
     type: container-apps
@@ -38,6 +39,7 @@ services:
       identity: user-assigned    # MI-002
       min_replicas: 0            # CA-004
       health_probes: true
+      zone_redundant: true       # HA-001
 
   - name: notification-service
     type: container-apps
@@ -47,6 +49,7 @@ services:
       identity: user-assigned    # MI-002
       min_replicas: 0            # CA-004
       health_probes: true
+      zone_redundant: true       # HA-001
 
   - name: messaging
     type: service-bus
@@ -54,6 +57,7 @@ services:
     config:
       identity: user-assigned
       private_endpoint: true     # NET-001
+      zone_redundant: true       # HA-001
       queues:
         - name: orders
         - name: notifications
@@ -88,6 +92,11 @@ services:
           delegation: container-apps
         - name: private-endpoints
         - name: apim
+
+  - name: app-insights
+    type: application-insights
+    config:
+      workspace_based: true      # MS-003 — distributed tracing
 
   - name: monitoring
     type: log-analytics

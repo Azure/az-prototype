@@ -35,9 +35,10 @@ services:
       autoscale: true                    # CDB-003 — autoscale throughput
       partition_key: "/tenantId"         # CDB-004 — query-aligned partition key
       private_endpoint: true             # NET-001
+      zone_redundant: true               # HA-001
 
   - name: ingest
-    type: storage
+    type: storage-account
     tier: standard-lrs
     config:
       identity: system-assigned    # MI-001
@@ -46,12 +47,14 @@ services:
       shared_key_disabled: true    # ST-001
       public_access_disabled: true # ST-002
       min_tls_version: "TLS1_2"   # ST-003
+      zone_redundant: true         # HA-001
 
   - name: events
     type: event-grid
     config:
       identity: system-assigned
       topic_type: custom
+      dead_letter_storage: ingest  # ED-001 — dead-letter to storage account
 
   - name: secrets
     type: key-vault

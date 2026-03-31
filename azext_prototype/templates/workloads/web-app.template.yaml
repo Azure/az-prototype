@@ -23,6 +23,7 @@ services:
       identity: system-assigned  # MI-001 — system-assigned for single-service
       min_replicas: 0            # CA-004 — zero replicas in dev
       health_probes: true        # CA patterns — liveness + readiness
+      zone_redundant: true       # HA-001
 
   - name: gateway
     type: api-management
@@ -39,6 +40,7 @@ services:
       tde_enabled: true          # SQL-002 — TDE mandatory
       threat_protection: true    # SQL-003 — Advanced Threat Protection
       private_endpoint: true     # NET-001 — private endpoint for data services
+      zone_redundant: true       # HA-001
 
   - name: secrets
     type: key-vault
@@ -58,6 +60,11 @@ services:
           delegation: container-apps
         - name: private-endpoints
         - name: apim
+
+  - name: app-insights
+    type: application-insights
+    config:
+      workspace_based: true      # MS-003 — distributed tracing
 
   - name: monitoring
     type: log-analytics

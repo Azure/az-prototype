@@ -41,6 +41,7 @@ services:
       auto_pause_delay: 60       # SQL-004 — serverless auto-pause
       geo_replication: false     # SQL-005 — enabled in prod override
       private_endpoint: true     # NET-001
+      zone_redundant: true       # HA-001
 
   - name: secrets
     type: key-vault

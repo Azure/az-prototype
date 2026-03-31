@@ -23,6 +23,7 @@ services:
       identity: system-assigned  # MI-001
       min_replicas: 1            # AI apps need warm instances
       health_probes: true
+      zone_redundant: true       # HA-001
 
   - name: ai-engine
     type: cognitive-services
@@ -48,6 +49,7 @@ services:
       partition_key: "/userId"   # CDB-004
       ttl_seconds: 2592000       # 30 days — no unlimited containers
       private_endpoint: true     # NET-001
+      zone_redundant: true       # HA-001
 
   - name: gateway
     type: api-management
@@ -75,6 +77,11 @@ services:
           delegation: container-apps
         - name: private-endpoints
         - name: apim
+
+  - name: app-insights
+    type: application-insights
+    config:
+      workspace_based: true      # MS-003 — distributed tracing
 
   - name: monitoring
     type: log-analytics
