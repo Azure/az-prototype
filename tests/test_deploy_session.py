@@ -2763,7 +2763,7 @@ class TestRunPhasesCoverage:
 
     def test_run_natural_language_fallback(self, tmp_project):
         """Line 468: Unrecognized input shows help hint."""
-        from azext_prototype.stages.intent import IntentResult, IntentKind
+        from azext_prototype.stages.intent import IntentKind, IntentResult
 
         stages = [
             {
@@ -2790,7 +2790,7 @@ class TestRunPhasesCoverage:
 
     def test_run_natural_language_multi_stage(self, tmp_project):
         """Lines 448-456: Multi-stage intent dispatches multiple commands."""
-        from azext_prototype.stages.intent import IntentResult, IntentKind
+        from azext_prototype.stages.intent import IntentKind, IntentResult
 
         stages = [
             {

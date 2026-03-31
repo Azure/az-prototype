@@ -532,7 +532,9 @@ class BuildSession:
             # Debug: scan response for anti-pattern violations before policy resolver
             if content:
                 try:
-                    from azext_prototype.governance.anti_patterns import scan as _ap_scan
+                    from azext_prototype.governance.anti_patterns import (
+                        scan as _ap_scan,
+                    )
 
                     _ap_violations = _ap_scan(content)
                     if _ap_violations:
