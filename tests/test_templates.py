@@ -586,7 +586,7 @@ class TestDataPipelineTemplate:
         types = t.service_names()
         assert "functions" in types
         assert "cosmos-db" in types
-        assert "storage" in types
+        assert "storage-account" in types
         assert "event-grid" in types
 
     def test_cosmos_session_consistency(self):
