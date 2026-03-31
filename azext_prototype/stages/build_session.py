@@ -682,13 +682,22 @@ class BuildSession:
             qa_content = qa_result.content if qa_result else ""
 
             if qa_content:
+                # Save advisory notes to file instead of printing (avoids truncation)
+                advisory_path = Path(self._context.project_dir) / "concept" / "docs" / "ADVISORY.md"
+                advisory_path.parent.mkdir(parents=True, exist_ok=True)
+                import datetime as _dt
+
+                _ts = _dt.datetime.now().strftime("%Y-%m-%d %H:%M")
+                header = f"\n\n---\n\n## Advisory Notes ({_ts})\n\n"
+                with open(advisory_path, "a", encoding="utf-8") as f:
+                    f.write(header + str(qa_content) + "\n")
+                advisory_rel = str(advisory_path.relative_to(Path(self._context.project_dir)))
                 if use_styled:
                     self._console.print_header("Advisory Notes")
-                    self._console.print_agent_response(qa_content)
+                    self._console.print_agent_response(f"Advisory Notes saved to: {advisory_rel}")
                 else:
                     _print("")
-                    _print("Advisory Notes:")
-                    _print(qa_content[:2000])
+                    _print(f"Advisory Notes saved to: {advisory_rel}")
             if use_styled:
                 self._console.print_token_status(self._token_tracker.format_status())
 
@@ -1819,7 +1828,7 @@ class BuildSession:
                             for k, v in s.config.items():
                                 template_context += f"    {k}: {v}\n"
 
-        # Cross-references to previously generated stages
+        # Cross-references to previously generated stages (with output key names)
         prev_stages = self._build_state.get_generated_stages()
         prev_context = ""
         if prev_stages:
@@ -1828,11 +1837,16 @@ class BuildSession:
                 "Use terraform_remote_state (Terraform) or parameter inputs (Bicep) to "
                 "reference resources from these stages. NEVER hardcode their resource names.\n"
             )
+            project_dir = Path(self._context.project_dir)
             for ps in prev_stages:
                 prev_svcs = ps.get("services", [])
                 prev_names = [s.get("computed_name") or s.get("name") for s in prev_svcs]
                 names_str = ", ".join(prev_names) if prev_names else "none"
                 prev_context += f"- Stage {ps['stage']}: {ps['name']} (resources: {names_str})\n"
+                # Include available output keys so downstream stages reference exact names
+                output_keys = self._extract_output_keys(ps, project_dir)
+                if output_keys:
+                    prev_context += f"  Available outputs: {', '.join(output_keys)}\n"
 
         naming_instructions = self._naming.to_prompt_instructions()
         stage_dir = stage.get("dir", "concept")
@@ -2341,6 +2355,26 @@ class BuildSession:
             parts.append(companion_brief)
         return "\n".join(parts)
 
+    @staticmethod
+    def _extract_output_keys(stage: dict, project_dir: Path) -> list[str]:
+        """Extract output key names from a stage's outputs.tf or outputs.bicep."""
+        stage_files = stage.get("files", [])
+        for f in stage_files:
+            fpath = project_dir / f
+            if fpath.name in ("outputs.tf", "outputs.bicep") and fpath.exists():
+                try:
+                    content = fpath.read_text(encoding="utf-8", errors="replace")
+                    keys: list[str] = []
+                    for line in content.splitlines():
+                        stripped = line.strip()
+                        if stripped.startswith("output ") and "{" in stripped:
+                            name = stripped.split('"')[1] if '"' in stripped else stripped.split()[1]
+                            keys.append(name)
+                    return keys
+                except OSError:
+                    pass
+        return []
+
     def _build_docs_context(self) -> str:
         """Build context from actual generated stage files for the documentation stage.
 
@@ -2476,7 +2510,8 @@ class BuildSession:
             svc_names = [s.get("name", "") for s in services if s.get("name")]
             if not svc_names:
                 return ""
-            result = engine.resolve_for_stage(svc_names, self._iac_tool, agent_name="terraform-agent")
+            agent_name = f"{self._iac_tool}-agent" if self._iac_tool in ("terraform", "bicep") else "terraform-agent"
+            result = engine.resolve_for_stage(svc_names, self._iac_tool, agent_name=agent_name)
 
             from azext_prototype.debug_log import log_flow as _dbg
 

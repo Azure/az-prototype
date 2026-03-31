@@ -95,3 +95,15 @@ patterns:
     warning_message: >-
       jsondecode() on azapi_resource output detected — in azapi v2.x, output is
       already a parsed object. Access directly via .output.properties.PropertyName.
+
+  # Detect .output.properties references without response_export_values
+  - search_patterns:
+      - ".output.properties."
+    safe_patterns:
+      - "response_export_values"
+    correct_patterns:
+      - 'response_export_values = ["*"]'
+    warning_message: >-
+      .output.properties referenced but no response_export_values declaration found
+      in this file. Add response_export_values = ["*"] to the azapi_resource whose
+      output properties are being referenced.

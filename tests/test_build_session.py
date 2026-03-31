@@ -2646,7 +2646,7 @@ class TestQAPromptTerraformChecklist:
         assert "Terraform File Structure" in QA_ENGINEER_PROMPT
         assert "versions.tf" in QA_ENGINEER_PROMPT
         assert "providers.tf" in QA_ENGINEER_PROMPT
-        assert "trivially empty" in QA_ENGINEER_PROMPT
+        assert "empty" in QA_ENGINEER_PROMPT
         assert "syntactically valid HCL" in QA_ENGINEER_PROMPT
 
 

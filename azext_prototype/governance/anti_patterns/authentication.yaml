@@ -43,10 +43,20 @@ patterns:
       - "narrowest scope"
       - "least privilege"
       - "specific role"
+      - "data owner"
+      - "data contributor"
+      - "blob data"
+      - "secrets officer"
+      - "cosmos db"
+      - "signalr service owner"
+      - "rest api owner"
+      - "service bus data"
+      - "redis cache contributor"
+      - "acr"
     correct_patterns:
       - '"Reader"'
       - '"Storage Blob Data Contributor"'
       - '"Key Vault Secrets User"'
       - '"Cosmos DB Account Reader Role"'
       - "# Use the most specific built-in role at the narrowest scope"
-    warning_message: "Broad role assignment detected (Owner/Contributor) — use the most specific built-in role at the narrowest scope."
+    warning_message: "Broad role assignment detected (Owner/Contributor at subscription/RG scope) -- use the most specific built-in role at the narrowest scope."

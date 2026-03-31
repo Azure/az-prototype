@@ -86,6 +86,40 @@ Anti-pattern detection
 * **QA scope compliance** -- added Section 8 to QA engineer checklist:
   scope compliance, tag placement, and azurerm resource checks.
 
+Prompt optimization (58 fixes)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **TERRAFORM_PROMPT rewrite** -- complete rewrite with CRITICAL sections for
+  ``response_export_values``, state file naming convention, cross-stage
+  dependencies via ``terraform_remote_state``, output naming convention,
+  deploy.sh standardization (logging functions, control flow, auto-approve
+  pattern, env var convention), design notes format, diagnostic settings
+  pattern, provider block template, and variable validation examples.
+* **BICEP_PROMPT parity** -- added file structure rules, deploy.sh
+  requirements (150-line minimum with argument parsing), subnet drift
+  prevention, diagnostic settings, design notes format, and output format
+  rules matching the Terraform prompt.
+* **APP_DEVELOPER_PROMPT enrichment** -- added Azure service connection
+  patterns (Cosmos DB, Storage, Key Vault, Service Bus with
+  DefaultAzureCredential), deploy.sh requirements (container build/push,
+  health check, rollback), and project structure template.
+* **Prior stage output key injection** -- downstream stages now see exact
+  output key names from previously generated stages, eliminating output
+  name mismatches.
+* **RBAC enforcement language** -- companion requirements now explicitly
+  require ALL listed roles in the current stage with no deferral.
+* **Policy agent name fix** -- ``_resolve_service_policies()`` uses actual
+  IaC tool agent name instead of hardcoded ``"terraform-agent"``.
+* **Advisory notes to file** -- advisory review output saved to
+  ``concept/docs/ADVISORY.md`` instead of printing to screen.
+* **QA checklist expansion** -- added checks for ``response_export_values``,
+  empty files, ``required_version``, state file naming, output key naming
+  consistency, and remote state path matching.
+* **Anti-pattern expansion** -- 40 checks across 10 domains (was 39).
+  Added ``.output.properties`` without ``response_export_values`` detection
+  and data-plane role name safe_patterns for spurious warning prevention.
+* **Documentation agent** -- added exact directory path guidance, actual
+  SKU value guidance, and mandatory deployment guide section list.
+
 Truncation recovery
 ~~~~~~~~~~~~~~~~~~~~
 * **Continuation now carries conversation history** --

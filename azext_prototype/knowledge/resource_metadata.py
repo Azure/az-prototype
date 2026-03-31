@@ -365,7 +365,16 @@ def format_companion_brief(
 
     if needs_rbac:
         lines.append(
-            "REQUIRED data source (add to data.tf or providers.tf):\n" '  data "azurerm_client_config" "current" {}\n'
+            "Use `var.subscription_id` and `var.tenant_id` to construct role definition "
+            'ID paths. Do NOT use `data "azurerm_client_config"`.\n'
+        )
+        lines.append(
+            "CRITICAL: Create ALL RBAC role assignments listed below in THIS stage.\n"
+            "Do NOT defer any roles to later stages. Every role listed here MUST have\n"
+            "a corresponding azapi_resource role assignment in this stage's output.\n"
+            "roleDefinitionId format:\n"
+            '  "/subscriptions/${var.subscription_id}/providers/'
+            'Microsoft.Authorization/roleDefinitions/{GUID}"\n'
         )
 
     for req in requirements:
@@ -374,7 +383,7 @@ def format_companion_brief(
             lines.append(f"- Authentication: {req.auth_method}")
 
         if req.rbac_role_ids:
-            lines.append("- REQUIRED RBAC role assignments on the managed identity:")
+            lines.append("- REQUIRED RBAC role assignments (create ALL of these):")
             for role_key, role_id in req.rbac_role_ids.items():
                 role_name = req.rbac_roles.get(role_key, role_key)
                 lines.append(f"  * {role_name} (GUID: {role_id})")
