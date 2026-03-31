@@ -722,7 +722,11 @@ class TestCosmosDbChecks:
         base_config.update(config_overrides)
         return _compliant_template(
             services=[
-                {"name": "api", "type": "container-apps", "config": {"identity": "system-assigned", "zone_redundant": True}},
+                {
+                    "name": "api",
+                    "type": "container-apps",
+                    "config": {"identity": "system-assigned", "zone_redundant": True},
+                },
                 {"name": "store", "type": "cosmos-db", "config": base_config},
                 {"name": "net", "type": "virtual-network", "config": {}},
             ]

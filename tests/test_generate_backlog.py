@@ -415,10 +415,12 @@ class TestBacklogPushHelpers:
     def test_push_devops_story_success(self):
         from azext_prototype.stages.backlog_push import push_devops_story
 
-        resp = json.dumps({
-            "id": 200,
-            "_links": {"html": {"href": "https://dev.azure.com/o/p/_workitems/edit/200"}},
-        })
+        resp = json.dumps(
+            {
+                "id": 200,
+                "_links": {"html": {"href": "https://dev.azure.com/o/p/_workitems/edit/200"}},
+            }
+        )
         with patch("azext_prototype.stages.backlog_push.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout=resp)
             result = push_devops_story("o", "p", {"title": "Story"}, parent_id=100)
@@ -427,10 +429,12 @@ class TestBacklogPushHelpers:
     def test_push_devops_task_success(self):
         from azext_prototype.stages.backlog_push import push_devops_task
 
-        resp = json.dumps({
-            "id": 300,
-            "_links": {"html": {"href": "https://dev.azure.com/o/p/_workitems/edit/300"}},
-        })
+        resp = json.dumps(
+            {
+                "id": 300,
+                "_links": {"html": {"href": "https://dev.azure.com/o/p/_workitems/edit/300"}},
+            }
+        )
         with patch("azext_prototype.stages.backlog_push.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout=resp)
             result = push_devops_task("o", "p", {"title": "Task"}, parent_id=200)
@@ -441,10 +445,12 @@ class TestBacklogPushHelpers:
     def test_push_devops_feature_with_epic_area(self):
         from azext_prototype.stages.backlog_push import push_devops_feature
 
-        resp = json.dumps({
-            "id": 10,
-            "_links": {"html": {"href": "https://dev.azure.com/o/p/_workitems/edit/10"}},
-        })
+        resp = json.dumps(
+            {
+                "id": 10,
+                "_links": {"html": {"href": "https://dev.azure.com/o/p/_workitems/edit/10"}},
+            }
+        )
         with patch("azext_prototype.stages.backlog_push.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout=resp)
             result = push_devops_feature("o", "p", {"title": "T", "epic": "Infra"})
@@ -469,10 +475,12 @@ class TestBacklogPushHelpers:
     def test_push_devops_story_calls_link_parent(self):
         from azext_prototype.stages.backlog_push import push_devops_story
 
-        resp = json.dumps({
-            "id": 77,
-            "_links": {"html": {"href": "https://dev.azure.com/o/p/_workitems/edit/77"}},
-        })
+        resp = json.dumps(
+            {
+                "id": 77,
+                "_links": {"html": {"href": "https://dev.azure.com/o/p/_workitems/edit/77"}},
+            }
+        )
         with patch("azext_prototype.stages.backlog_push.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout=resp)
             result = push_devops_story("o", "p", {"title": "S"}, parent_id=10)
@@ -1344,9 +1352,7 @@ class TestBacklogSessionCoverage:
         registry = MagicMock()
         registry.find_by_capability.return_value = []
 
-        session = BacklogSession(
-            ctx, registry, backlog_state=BacklogState(str(tmp_project))
-        )
+        session = BacklogSession(ctx, registry, backlog_state=BacklogState(str(tmp_project)))
 
         output = []
         result = session.run(
@@ -1387,9 +1393,7 @@ class TestBacklogSessionCoverage:
 
         registry.find_by_capability.side_effect = find_by_cap
 
-        session = BacklogSession(
-            ctx, registry, backlog_state=BacklogState(str(tmp_project))
-        )
+        session = BacklogSession(ctx, registry, backlog_state=BacklogState(str(tmp_project)))
 
         output = []
         result = session.run(
@@ -1410,9 +1414,7 @@ class TestBacklogSessionCoverage:
 
     def test_empty_input_skipped(self, tmp_project):
         items_json = json.dumps([{"epic": "A", "title": "B", "effort": "S"}])
-        session, state, _ = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        session, state, _ = self._make_session(tmp_project, items_response=items_json)
 
         inputs = iter(["", "done"])
         output = []
@@ -1436,9 +1438,7 @@ class TestBacklogSessionCoverage:
         from azext_prototype.stages.intent import IntentKind, IntentResult
 
         items_json = json.dumps([{"epic": "A", "title": "B", "effort": "S"}])
-        session, state, _ = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        session, state, _ = self._make_session(tmp_project, items_response=items_json)
 
         # Mock the intent classifier to return a COMMAND
         session._intent_classifier = MagicMock()
@@ -1469,9 +1469,7 @@ class TestBacklogSessionCoverage:
         from azext_prototype.stages.intent import IntentKind, IntentResult
 
         items_json = json.dumps([{"epic": "A", "title": "B", "effort": "S"}])
-        session, state, _ = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        session, state, _ = self._make_session(tmp_project, items_response=items_json)
 
         session._intent_classifier = MagicMock()
         session._intent_classifier.classify.return_value = IntentResult(
@@ -1482,11 +1480,10 @@ class TestBacklogSessionCoverage:
             confidence=0.9,
         )
 
-        with patch(f"{_SESSION_MODULE}.check_gh_auth", return_value=True), \
-             patch(f"{_SESSION_MODULE}.push_github_issue") as mock_push:
-            mock_push.return_value = {
-                "url": "https://github.com/o/p/issues/1"
-            }
+        with patch(f"{_SESSION_MODULE}.check_gh_auth", return_value=True), patch(
+            f"{_SESSION_MODULE}.push_github_issue"
+        ) as mock_push:
+            mock_push.return_value = {"url": "https://github.com/o/p/issues/1"}
 
             output = []
             result = session.run(
@@ -1504,16 +1501,10 @@ class TestBacklogSessionCoverage:
         from azext_prototype.ai.provider import AIResponse
         from azext_prototype.stages.intent import IntentKind, IntentResult
 
-        items_json = json.dumps(
-            [{"epic": "A", "title": "Original", "effort": "S"}]
-        )
-        session, state, ai = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        items_json = json.dumps([{"epic": "A", "title": "Original", "effort": "S"}])
+        session, state, ai = self._make_session(tmp_project, items_response=items_json)
 
-        updated_json = json.dumps(
-            [{"epic": "A", "title": "Updated", "effort": "M"}]
-        )
+        updated_json = json.dumps([{"epic": "A", "title": "Updated", "effort": "M"}])
 
         session._intent_classifier = MagicMock()
         session._intent_classifier.classify.return_value = IntentResult(
@@ -1527,12 +1518,14 @@ class TestBacklogSessionCoverage:
             call_count[0] += 1
             if call_count[0] == 1:
                 return AIResponse(
-                    content=items_json, model="t",
+                    content=items_json,
+                    model="t",
                     usage={"prompt_tokens": 10, "completion_tokens": 5},
                 )
             else:
                 return AIResponse(
-                    content=updated_json, model="t",
+                    content=updated_json,
+                    model="t",
                     usage={"prompt_tokens": 10, "completion_tokens": 5},
                 )
 
@@ -1555,9 +1548,7 @@ class TestBacklogSessionCoverage:
         from azext_prototype.stages.intent import IntentKind, IntentResult
 
         items_json = json.dumps([{"epic": "A", "title": "T", "effort": "S"}])
-        session, state, ai = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        session, state, ai = self._make_session(tmp_project, items_response=items_json)
 
         session._intent_classifier = MagicMock()
         session._intent_classifier.classify.return_value = IntentResult(
@@ -1612,9 +1603,7 @@ class TestBacklogSessionCoverage:
 
     def test_quick_mode_eof_cancels(self, tmp_project):
         items_json = json.dumps([{"epic": "A", "title": "B", "effort": "S"}])
-        session, state, _ = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        session, state, _ = self._make_session(tmp_project, items_response=items_json)
 
         def eof_input(p):
             raise EOFError
@@ -1634,15 +1623,12 @@ class TestBacklogSessionCoverage:
     def test_quick_mode_confirm_push(self, tmp_project):
         """Quick mode confirm=yes triggers push (line 417)."""
         items_json = json.dumps([{"epic": "A", "title": "B", "effort": "S"}])
-        session, state, _ = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        session, state, _ = self._make_session(tmp_project, items_response=items_json)
 
-        with patch(f"{_SESSION_MODULE}.check_gh_auth", return_value=True), \
-             patch(f"{_SESSION_MODULE}.push_github_issue") as mock_push:
-            mock_push.return_value = {
-                "url": "https://github.com/o/p/issues/1"
-            }
+        with patch(f"{_SESSION_MODULE}.check_gh_auth", return_value=True), patch(
+            f"{_SESSION_MODULE}.push_github_issue"
+        ) as mock_push:
+            mock_push.return_value = {"url": "https://github.com/o/p/issues/1"}
 
             output = []
             result = session.run(
@@ -1662,12 +1648,8 @@ class TestBacklogSessionCoverage:
 
     def test_generate_items_with_full_scope(self, tmp_project):
         """Scope in/out/deferred all present (lines 440-448, 494)."""
-        items_json = json.dumps(
-            [{"epic": "A", "title": "B", "effort": "S"}]
-        )
-        session, state, ai = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        items_json = json.dumps([{"epic": "A", "title": "B", "effort": "S"}])
+        session, state, ai = self._make_session(tmp_project, items_response=items_json)
 
         scope = {
             "in_scope": ["API Gateway"],
@@ -1698,12 +1680,8 @@ class TestBacklogSessionCoverage:
 
     def test_generate_items_devops_format(self, tmp_project):
         """DevOps provider uses hierarchical JSON schema (line 504)."""
-        items_json = json.dumps(
-            [{"epic": "A", "title": "B", "effort": "S"}]
-        )
-        session, state, ai = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        items_json = json.dumps([{"epic": "A", "title": "B", "effort": "S"}])
+        session, state, ai = self._make_session(tmp_project, items_response=items_json)
 
         output = []
         session.run(
@@ -1739,9 +1717,7 @@ class TestBacklogSessionCoverage:
         registry = MagicMock()
         registry.find_by_capability.return_value = []
 
-        session = BacklogSession(
-            ctx, registry, backlog_state=BacklogState(str(tmp_project))
-        )
+        session = BacklogSession(ctx, registry, backlog_state=BacklogState(str(tmp_project)))
 
         result = session._mutate_items("add an item", "arch")
         assert result is None
@@ -1809,9 +1785,7 @@ class TestBacklogSessionCoverage:
 
         with patch(f"{_SESSION_MODULE}.check_gh_auth", return_value=False):
             output = []
-            result = session._push_all(
-                "github", "o", "p", output.append, False
-            )
+            result = session._push_all("github", "o", "p", output.append, False)
         assert result.cancelled
         joined = "\n".join(output)
         assert "not authenticated" in joined.lower()
@@ -1823,9 +1797,7 @@ class TestBacklogSessionCoverage:
 
         with patch(f"{_SESSION_MODULE}.check_devops_ext", return_value=False):
             output = []
-            result = session._push_all(
-                "devops", "o", "p", output.append, False
-            )
+            result = session._push_all("devops", "o", "p", output.append, False)
         assert result.cancelled
         joined = "\n".join(output)
         assert "not available" in joined.lower()
@@ -1854,10 +1826,11 @@ class TestBacklogSessionCoverage:
             ]
         )
 
-        with patch(f"{_SESSION_MODULE}.check_devops_ext", return_value=True), \
-             patch(f"{_SESSION_MODULE}.push_devops_feature") as mock_feat, \
-             patch(f"{_SESSION_MODULE}.push_devops_story") as mock_story, \
-             patch(f"{_SESSION_MODULE}.push_devops_task") as mock_task:
+        with patch(f"{_SESSION_MODULE}.check_devops_ext", return_value=True), patch(
+            f"{_SESSION_MODULE}.push_devops_feature"
+        ) as mock_feat, patch(f"{_SESSION_MODULE}.push_devops_story") as mock_story, patch(
+            f"{_SESSION_MODULE}.push_devops_task"
+        ) as mock_task:
             mock_feat.return_value = {
                 "id": 100,
                 "url": "https://dev.azure.com/o/p/_workitems/100",
@@ -1869,9 +1842,7 @@ class TestBacklogSessionCoverage:
             mock_task.return_value = {"id": 102, "url": ""}
 
             output = []
-            result = session._push_all(
-                "devops", "o", "p", output.append, False
-            )
+            result = session._push_all("devops", "o", "p", output.append, False)
 
         assert result.items_pushed == 1
         assert len(result.push_urls) == 2  # feature + story
@@ -1886,15 +1857,13 @@ class TestBacklogSessionCoverage:
         session, state, _ = self._make_session(tmp_project)
         state.set_items([{"title": "FailItem"}])
 
-        with patch(f"{_SESSION_MODULE}.check_gh_auth", return_value=True), \
-             patch(f"{_SESSION_MODULE}.push_github_issue") as mock_push, \
-             patch(f"{_SESSION_MODULE}.route_error_to_qa") as mock_qa:
+        with patch(f"{_SESSION_MODULE}.check_gh_auth", return_value=True), patch(
+            f"{_SESSION_MODULE}.push_github_issue"
+        ) as mock_push, patch(f"{_SESSION_MODULE}.route_error_to_qa") as mock_qa:
             mock_push.return_value = {"error": "auth failed"}
 
             output = []
-            result = session._push_all(
-                "github", "o", "p", output.append, False
-            )
+            result = session._push_all("github", "o", "p", output.append, False)
 
         assert result.items_failed == 1
         mock_qa.assert_called_once()
@@ -1919,14 +1888,10 @@ class TestBacklogSessionCoverage:
         state.set_items([{"title": "Item1"}])
 
         with patch(f"{_SESSION_MODULE}.push_github_issue") as mock_push:
-            mock_push.return_value = {
-                "url": "https://github.com/o/p/issues/1"
-            }
+            mock_push.return_value = {"url": "https://github.com/o/p/issues/1"}
 
             output = []
-            session._push_single(
-                0, "github", "o", "p", output.append, False
-            )
+            session._push_single(0, "github", "o", "p", output.append, False)
 
         assert state.state["push_status"][0] == "pushed"
         joined = "\n".join(output)
@@ -1941,9 +1906,7 @@ class TestBacklogSessionCoverage:
             mock_push.return_value = {"error": "not found"}
 
             output = []
-            session._push_single(
-                0, "github", "o", "p", output.append, False
-            )
+            session._push_single(0, "github", "o", "p", output.append, False)
 
         assert state.state["push_status"][0] == "failed"
 
@@ -1964,17 +1927,15 @@ class TestBacklogSessionCoverage:
             ]
         )
 
-        with patch(f"{_SESSION_MODULE}.push_devops_feature") as mock_feat, \
-             patch(f"{_SESSION_MODULE}.push_devops_story") as mock_story, \
-             patch(f"{_SESSION_MODULE}.push_devops_task") as mock_task:
+        with patch(f"{_SESSION_MODULE}.push_devops_feature") as mock_feat, patch(
+            f"{_SESSION_MODULE}.push_devops_story"
+        ) as mock_story, patch(f"{_SESSION_MODULE}.push_devops_task") as mock_task:
             mock_feat.return_value = {"id": 10, "url": "http://f"}
             mock_story.return_value = {"id": 11, "url": "http://s"}
             mock_task.return_value = {"id": 12, "url": ""}
 
             output = []
-            session._push_single(
-                0, "devops", "o", "p", output.append, False
-            )
+            session._push_single(0, "devops", "o", "p", output.append, False)
 
         mock_story.assert_called_once()
         mock_task.assert_called_once()
@@ -1986,9 +1947,7 @@ class TestBacklogSessionCoverage:
     def test_slash_show_no_arg(self, tmp_project):
         """/show without number prints usage (line 812)."""
         items_json = json.dumps([{"epic": "A", "title": "B", "effort": "S"}])
-        session, state, _ = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        session, state, _ = self._make_session(tmp_project, items_response=items_json)
 
         inputs = iter(["/show", "done"])
         output = []
@@ -2006,9 +1965,7 @@ class TestBacklogSessionCoverage:
     def test_slash_add_with_description(self, tmp_project):
         """/add prompts for description and enriches (lines 815-829)."""
         items_json = json.dumps([{"epic": "A", "title": "B", "effort": "S"}])
-        session, state, _ = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        session, state, _ = self._make_session(tmp_project, items_response=items_json)
 
         inputs = iter(["/add", "New item description", "done"])
         output = []
@@ -2027,9 +1984,7 @@ class TestBacklogSessionCoverage:
     def test_slash_add_eof(self, tmp_project):
         """/add with EOF during description input (lines 821-822)."""
         items_json = json.dumps([{"epic": "A", "title": "B", "effort": "S"}])
-        session, state, _ = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        session, state, _ = self._make_session(tmp_project, items_response=items_json)
 
         call_count = [0]
 
@@ -2060,9 +2015,7 @@ class TestBacklogSessionCoverage:
     def test_slash_remove_invalid_arg(self, tmp_project):
         """/remove without number prints usage (lines 841-842)."""
         items_json = json.dumps([{"epic": "A", "title": "B", "effort": "S"}])
-        session, state, _ = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        session, state, _ = self._make_session(tmp_project, items_response=items_json)
 
         inputs = iter(["/remove", "done"])
         output = []
@@ -2080,9 +2033,7 @@ class TestBacklogSessionCoverage:
     def test_slash_remove_out_of_range(self, tmp_project):
         """/remove with index out of range (line 840)."""
         items_json = json.dumps([{"epic": "A", "title": "B", "effort": "S"}])
-        session, state, _ = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        session, state, _ = self._make_session(tmp_project, items_response=items_json)
 
         inputs = iter(["/remove 99", "done"])
         output = []
@@ -2108,9 +2059,7 @@ class TestBacklogSessionCoverage:
                 {"epic": "App", "title": "API", "effort": "L"},
             ]
         )
-        session, state, _ = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        session, state, _ = self._make_session(tmp_project, items_response=items_json)
 
         inputs = iter(["/preview", "done"])
         output = []
@@ -2129,12 +2078,8 @@ class TestBacklogSessionCoverage:
 
     def test_slash_preview_devops(self, tmp_project):
         """/preview for devops provider (no epic prefix, line 856)."""
-        items_json = json.dumps(
-            [{"title": "Feature1", "effort": "M"}]
-        )
-        session, state, _ = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        items_json = json.dumps([{"title": "Feature1", "effort": "M"}])
+        session, state, _ = self._make_session(tmp_project, items_response=items_json)
 
         inputs = iter(["/preview", "done"])
         output = []
@@ -2162,14 +2107,10 @@ class TestBacklogSessionCoverage:
                 {"epic": "A", "title": "Item2", "effort": "M"},
             ]
         )
-        session, state, _ = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        session, state, _ = self._make_session(tmp_project, items_response=items_json)
 
         with patch(f"{_SESSION_MODULE}.push_github_issue") as mock_push:
-            mock_push.return_value = {
-                "url": "https://github.com/o/p/issues/1"
-            }
+            mock_push.return_value = {"url": "https://github.com/o/p/issues/1"}
 
             inputs = iter(["/push 1", "done"])
             output = []
@@ -2187,18 +2128,13 @@ class TestBacklogSessionCoverage:
 
     def test_slash_push_all_breaks_on_success(self, tmp_project):
         """/push (all) breaks loop on success (line 868-869)."""
-        items_json = json.dumps(
-            [{"epic": "A", "title": "Item1", "effort": "S"}]
-        )
-        session, state, _ = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        items_json = json.dumps([{"epic": "A", "title": "Item1", "effort": "S"}])
+        session, state, _ = self._make_session(tmp_project, items_response=items_json)
 
-        with patch(f"{_SESSION_MODULE}.check_gh_auth", return_value=True), \
-             patch(f"{_SESSION_MODULE}.push_github_issue") as mock_push:
-            mock_push.return_value = {
-                "url": "https://github.com/o/p/issues/1"
-            }
+        with patch(f"{_SESSION_MODULE}.check_gh_auth", return_value=True), patch(
+            f"{_SESSION_MODULE}.push_github_issue"
+        ) as mock_push:
+            mock_push.return_value = {"url": "https://github.com/o/p/issues/1"}
 
             output = []
             result = session.run(
@@ -2243,9 +2179,7 @@ class TestBacklogSessionCoverage:
     def test_slash_help(self, tmp_project):
         """Display help text (lines 882-907)."""
         items_json = json.dumps([{"epic": "A", "title": "B", "effort": "S"}])
-        session, state, _ = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        session, state, _ = self._make_session(tmp_project, items_response=items_json)
 
         inputs = iter(["/help", "done"])
         output = []
@@ -2272,9 +2206,7 @@ class TestBacklogSessionCoverage:
     def test_enrich_strips_markdown_fences(self, tmp_project):
         from azext_prototype.ai.provider import AIResponse
 
-        item_json = json.dumps(
-            {"title": "Rate Limiting", "effort": "L"}
-        )
+        item_json = json.dumps({"title": "Rate Limiting", "effort": "L"})
         fenced = f"```json\n{item_json}\n```"
 
         session, state, ai = self._make_session(tmp_project)
@@ -2372,9 +2304,7 @@ class TestBacklogSessionCoverage:
         def status_fn(msg, phase):
             calls.append((msg, phase))
 
-        with session._maybe_spinner(
-            "Working...", False, status_fn=status_fn
-        ):
+        with session._maybe_spinner("Working...", False, status_fn=status_fn):
             pass
 
         assert ("Working...", "start") in calls
@@ -2393,18 +2323,13 @@ class TestBacklogSessionCoverage:
 
     def test_slash_command_push_breaks_loop(self, tmp_project):
         """When /push returns 'pushed', the loop breaks (line 324)."""
-        items_json = json.dumps(
-            [{"epic": "A", "title": "B", "effort": "S"}]
-        )
-        session, state, _ = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        items_json = json.dumps([{"epic": "A", "title": "B", "effort": "S"}])
+        session, state, _ = self._make_session(tmp_project, items_response=items_json)
 
-        with patch(f"{_SESSION_MODULE}.check_gh_auth", return_value=True), \
-             patch(f"{_SESSION_MODULE}.push_github_issue") as mock_push:
-            mock_push.return_value = {
-                "url": "https://github.com/o/p/issues/1"
-            }
+        with patch(f"{_SESSION_MODULE}.check_gh_auth", return_value=True), patch(
+            f"{_SESSION_MODULE}.push_github_issue"
+        ) as mock_push:
+            mock_push.return_value = {"url": "https://github.com/o/p/issues/1"}
 
             output = []
             result = session.run(
@@ -2428,17 +2353,16 @@ class TestBacklogSessionCoverage:
         session, state, _ = self._make_session(tmp_project)
         state.set_items([{"title": "F1"}])
 
-        with patch(f"{_SESSION_MODULE}.check_devops_ext", return_value=True), \
-             patch(f"{_SESSION_MODULE}.push_devops_feature") as mock_feat:
+        with patch(f"{_SESSION_MODULE}.check_devops_ext", return_value=True), patch(
+            f"{_SESSION_MODULE}.push_devops_feature"
+        ) as mock_feat:
             mock_feat.return_value = {
                 "id": 1,
                 "url": "https://dev.azure.com/o/p/1",
             }
 
             output = []
-            result = session._push_all(
-                "devops", "o", "p", output.append, False
-            )
+            result = session._push_all("devops", "o", "p", output.append, False)
 
         assert result.items_pushed == 1
         mock_feat.assert_called_once()
@@ -2450,12 +2374,8 @@ class TestBacklogSessionCoverage:
 
     def test_use_styled_calls_prompt(self, tmp_project):
         """With use_styled=True, prompt is used (line 283)."""
-        items_json = json.dumps(
-            [{"epic": "A", "title": "B", "effort": "S"}]
-        )
-        session, state, _ = self._make_session(
-            tmp_project, items_response=items_json
-        )
+        items_json = json.dumps([{"epic": "A", "title": "B", "effort": "S"}])
+        session, state, _ = self._make_session(tmp_project, items_response=items_json)
 
         # Mock the prompt to return "done"
         session._prompt = MagicMock()
@@ -2467,9 +2387,7 @@ class TestBacklogSessionCoverage:
         session._console.print = MagicMock()
         session._console.spinner = MagicMock()
         session._console.spinner.return_value.__enter__ = MagicMock()
-        session._console.spinner.return_value.__exit__ = MagicMock(
-            return_value=False
-        )
+        session._console.spinner.return_value.__exit__ = MagicMock(return_value=False)
 
         result = session.run(
             design_context="arch",

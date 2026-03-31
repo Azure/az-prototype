@@ -2587,8 +2587,13 @@ class TestRunPhasesCoverage:
 
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
@@ -2596,13 +2601,8 @@ class TestRunPhasesCoverage:
         build_path = Path(tmp_project) / ".prototype" / "state" / "build.yaml"
         session._deploy_state.load_from_build_state(build_path)
 
-        sync = SyncResult(
-            created=["Stage 2: Data"], orphaned=[], updated_code=1,
-            details=["Added new Stage 2: Data"]
-        )
-        with patch.object(
-            session._deploy_state, "sync_from_build_state", return_value=sync
-        ):
+        sync = SyncResult(created=["Stage 2: Data"], orphaned=[], updated_code=1, details=["Added new Stage 2: Data"])
+        with patch.object(session._deploy_state, "sync_from_build_state", return_value=sync):
             output = []
             session.run(
                 subscription="sub-123",
@@ -2617,8 +2617,13 @@ class TestRunPhasesCoverage:
         """Lines 352-353: Tenant is printed during plan overview."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
@@ -2636,8 +2641,13 @@ class TestRunPhasesCoverage:
         """Lines 354-355: Resource group is printed when set."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         config_data = {
@@ -2682,8 +2692,13 @@ class TestRunPhasesCoverage:
         """Lines 388-391: Preflight failures print fix instructions."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
@@ -2701,8 +2716,13 @@ class TestRunPhasesCoverage:
         """Lines 419-420: Empty input during interactive loop does nothing."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
@@ -2721,8 +2741,13 @@ class TestRunPhasesCoverage:
         """Lines 427-428: 'done' word exits loop."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
@@ -2740,8 +2765,13 @@ class TestRunPhasesCoverage:
         """Lines 416-417: EOFError in interactive loop breaks cleanly."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
@@ -2767,8 +2797,13 @@ class TestRunPhasesCoverage:
 
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
@@ -2794,8 +2829,13 @@ class TestRunPhasesCoverage:
 
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
@@ -2851,20 +2891,20 @@ class TestSingleStageFailureRemediation:
         "azext_prototype.stages.deploy_session.deploy_terraform",
         return_value={"status": "failed", "error": "auth error"},
     )
-    def test_single_stage_failure_shows_error_and_attempts_remediation(
-        self, mock_tf, tmp_project
-    ):
+    def test_single_stage_failure_shows_error_and_attempts_remediation(self, mock_tf, tmp_project):
         """Lines 587-598: Single-stage failure prints error and tries remediation."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "concept/infra/terraform",
-                "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "concept/infra/terraform",
+                "status": "generated",
+                "files": [],
             },
         ]
-        (tmp_project / "concept" / "infra" / "terraform").mkdir(
-            parents=True, exist_ok=True
-        )
+        (tmp_project / "concept" / "infra" / "terraform").mkdir(parents=True, exist_ok=True)
         session = self._make_session(tmp_project, build_stages=stages)
         # Clear fix agents so _remediate_deploy_failure returns None
         session._iac_agents = {}
@@ -2885,20 +2925,23 @@ class TestSingleStageFailureRemediation:
         """Lines 597-598: Remediation succeeds prints success."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "concept/infra/terraform",
-                "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "concept/infra/terraform",
+                "status": "generated",
+                "files": [],
             },
         ]
-        (tmp_project / "concept" / "infra" / "terraform").mkdir(
-            parents=True, exist_ok=True
-        )
+        (tmp_project / "concept" / "infra" / "terraform").mkdir(parents=True, exist_ok=True)
         session = self._make_session(tmp_project, build_stages=stages)
         # First call fails, remediation returns deployed
         mock_tf.return_value = {"status": "failed", "error": "oops"}
 
         with patch.object(
-            session, "_remediate_deploy_failure",
+            session,
+            "_remediate_deploy_failure",
             return_value={"status": "deployed"},
         ):
             output = []
@@ -2944,9 +2987,15 @@ class TestDeployPendingStagesAwaitingManual:
         """Lines 892-904: Manual step answered with 'done' marks deployed."""
         stages = [
             {
-                "stage": 1, "name": "Manual DNS", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
-                "deploy_mode": "manual", "manual_instructions": "Update DNS records.",
+                "stage": 1,
+                "name": "Manual DNS",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
+                "deploy_mode": "manual",
+                "manual_instructions": "Update DNS records.",
             },
         ]
         (tmp_project / "stage-1").mkdir(parents=True, exist_ok=True)
@@ -2972,8 +3021,13 @@ class TestDeployPendingStagesAwaitingManual:
         """Lines 905-906: Manual step answered with 'skip' skips."""
         stages = [
             {
-                "stage": 1, "name": "Manual DNS", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Manual DNS",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         (tmp_project / "stage-1").mkdir(parents=True, exist_ok=True)
@@ -2998,8 +3052,13 @@ class TestDeployPendingStagesAwaitingManual:
         """Lines 899-901: Manual step EOF is treated as skipped."""
         stages = [
             {
-                "stage": 1, "name": "Manual Step", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Manual Step",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         (tmp_project / "stage-1").mkdir(parents=True, exist_ok=True)
@@ -3024,8 +3083,13 @@ class TestDeployPendingStagesAwaitingManual:
         """Lines 907-909: Unknown answer pauses deployment."""
         stages = [
             {
-                "stage": 1, "name": "Manual Step", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Manual Step",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         (tmp_project / "stage-1").mkdir(parents=True, exist_ok=True)
@@ -3080,8 +3144,13 @@ class TestRollbackAllCoverage:
         """Lines 1619-1621: No deployed stages to roll back."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
@@ -3098,12 +3167,22 @@ class TestRollbackAllCoverage:
         """Lines 1626-1640: Confirms each stage and rolls back."""
         stages = [
             {
-                "stage": 1, "name": "A", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "A",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
             {
-                "stage": 2, "name": "B", "category": "infra",
-                "services": [], "dir": "stage-2", "status": "generated", "files": [],
+                "stage": 2,
+                "name": "B",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-2",
+                "status": "generated",
+                "files": [],
             },
         ]
         (tmp_project / "stage-1").mkdir(parents=True, exist_ok=True)
@@ -3117,9 +3196,7 @@ class TestRollbackAllCoverage:
 
         mock_rb.return_value = {"status": "rolled_back"}
         output = []
-        session._rollback_all(
-            lambda msg: output.append(msg), lambda p: "y"
-        )
+        session._rollback_all(lambda msg: output.append(msg), lambda p: "y")
         joined = "\n".join(output)
         assert "Rolling back" in joined
         assert mock_rb.call_count == 2
@@ -3128,12 +3205,22 @@ class TestRollbackAllCoverage:
         """Lines 1635-1637: Declining rollback stops the sequence."""
         stages = [
             {
-                "stage": 1, "name": "A", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "A",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
             {
-                "stage": 2, "name": "B", "category": "infra",
-                "services": [], "dir": "stage-2", "status": "generated", "files": [],
+                "stage": 2,
+                "name": "B",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-2",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
@@ -3143,9 +3230,7 @@ class TestRollbackAllCoverage:
         session._deploy_state.mark_stage_deployed(2)
 
         output = []
-        session._rollback_all(
-            lambda msg: output.append(msg), lambda p: "n"
-        )
+        session._rollback_all(lambda msg: output.append(msg), lambda p: "n")
         joined = "\n".join(output)
         assert "Skipping" in joined
 
@@ -3153,8 +3238,13 @@ class TestRollbackAllCoverage:
         """Lines 1631-1633: EOF during rollback cancels."""
         stages = [
             {
-                "stage": 1, "name": "A", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "A",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
@@ -3207,15 +3297,18 @@ class TestSlashCommandPlan:
         """Lines 1843-1844: /plan without arg shows usage."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
         output = []
-        session._handle_slash_command(
-            "/plan", False, False, lambda msg: output.append(msg), lambda p: ""
-        )
+        session._handle_slash_command("/plan", False, False, lambda msg: output.append(msg), lambda p: "")
         joined = "\n".join(output)
         assert "Usage" in joined
 
@@ -3223,8 +3316,13 @@ class TestSlashCommandPlan:
         """Line 1850: Manual stage has no plan preview."""
         stages = [
             {
-                "stage": 1, "name": "Manual", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Manual",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         (tmp_project / "stage-1").mkdir(parents=True, exist_ok=True)
@@ -3233,9 +3331,7 @@ class TestSlashCommandPlan:
         ds["deploy_mode"] = "manual"
 
         output = []
-        session._handle_slash_command(
-            "/plan 1", False, False, lambda msg: output.append(msg), lambda p: ""
-        )
+        session._handle_slash_command("/plan 1", False, False, lambda msg: output.append(msg), lambda p: "")
         joined = "\n".join(output)
         assert "manual step" in joined.lower()
 
@@ -3243,15 +3339,18 @@ class TestSlashCommandPlan:
         """Lines 1851-1852: Stage dir not found."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "nonexistent", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "nonexistent",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
         output = []
-        session._handle_slash_command(
-            "/plan 1", False, False, lambda msg: output.append(msg), lambda p: ""
-        )
+        session._handle_slash_command("/plan 1", False, False, lambda msg: output.append(msg), lambda p: "")
         joined = "\n".join(output)
         assert "not found" in joined.lower()
 
@@ -3263,8 +3362,13 @@ class TestSlashCommandPlan:
         """Lines 1855-1861: Terraform plan for infra stage."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         (tmp_project / "stage-1").mkdir(parents=True, exist_ok=True)
@@ -3273,9 +3377,7 @@ class TestSlashCommandPlan:
         session._subscription = "sub-123"
 
         output = []
-        session._handle_slash_command(
-            "/plan 1", False, False, lambda msg: output.append(msg), lambda p: ""
-        )
+        session._handle_slash_command("/plan 1", False, False, lambda msg: output.append(msg), lambda p: "")
         joined = "\n".join(output)
         assert "Plan: 5 to add" in joined
 
@@ -3287,22 +3389,23 @@ class TestSlashCommandPlan:
         """Lines 1862-1868: Bicep what-if for infra stage."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         (tmp_project / "stage-1").mkdir(parents=True, exist_ok=True)
-        session = self._make_session(
-            tmp_project, iac_tool="bicep", build_stages=stages
-        )
+        session = self._make_session(tmp_project, iac_tool="bicep", build_stages=stages)
         session._deploy_env = {"ARM_SUBSCRIPTION_ID": "sub-123"}
         session._subscription = "sub-123"
         session._resource_group = "my-rg"
 
         output = []
-        session._handle_slash_command(
-            "/plan 1", False, False, lambda msg: output.append(msg), lambda p: ""
-        )
+        session._handle_slash_command("/plan 1", False, False, lambda msg: output.append(msg), lambda p: "")
         joined = "\n".join(output)
         assert "What-if: 2 to create" in joined
 
@@ -3314,8 +3417,13 @@ class TestSlashCommandPlan:
         """Lines 1871-1872: Plan error is displayed."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         (tmp_project / "stage-1").mkdir(parents=True, exist_ok=True)
@@ -3324,9 +3432,7 @@ class TestSlashCommandPlan:
         session._subscription = "sub-123"
 
         output = []
-        session._handle_slash_command(
-            "/plan 1", False, False, lambda msg: output.append(msg), lambda p: ""
-        )
+        session._handle_slash_command("/plan 1", False, False, lambda msg: output.append(msg), lambda p: "")
         joined = "\n".join(output)
         assert "Init failed" in joined
 
@@ -3334,17 +3440,20 @@ class TestSlashCommandPlan:
         """Lines 1873-1874: App stages have no plan preview."""
         stages = [
             {
-                "stage": 1, "name": "App", "category": "app",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "App",
+                "category": "app",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         (tmp_project / "stage-1").mkdir(parents=True, exist_ok=True)
         session = self._make_session(tmp_project, build_stages=stages)
 
         output = []
-        session._handle_slash_command(
-            "/plan 1", False, False, lambda msg: output.append(msg), lambda p: ""
-        )
+        session._handle_slash_command("/plan 1", False, False, lambda msg: output.append(msg), lambda p: "")
         joined = "\n".join(output)
         assert "app stage" in joined.lower()
 
@@ -3385,15 +3494,18 @@ class TestSlashCommandSplit:
         """Lines 1879-1880: /split without arg shows usage."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
         output = []
-        session._handle_slash_command(
-            "/split", False, False, lambda msg: output.append(msg), lambda p: ""
-        )
+        session._handle_slash_command("/split", False, False, lambda msg: output.append(msg), lambda p: "")
         joined = "\n".join(output)
         assert "Usage" in joined
 
@@ -3401,8 +3513,13 @@ class TestSlashCommandSplit:
         """Lines 1887-1900: Split stage into substages."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
@@ -3410,7 +3527,9 @@ class TestSlashCommandSplit:
 
         output = []
         session._handle_slash_command(
-            "/split 1", False, False,
+            "/split 1",
+            False,
+            False,
             lambda msg: output.append(msg),
             lambda p: next(names),
         )
@@ -3421,8 +3540,13 @@ class TestSlashCommandSplit:
         """Lines 1901-1902: Less than 2 substages cancels."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
@@ -3430,7 +3554,9 @@ class TestSlashCommandSplit:
 
         output = []
         session._handle_slash_command(
-            "/split 1", False, False,
+            "/split 1",
+            False,
+            False,
             lambda msg: output.append(msg),
             lambda p: next(names),
         )
@@ -3441,15 +3567,22 @@ class TestSlashCommandSplit:
         """Lines 1893-1894: EOF during substage naming stops input."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
 
         output = []
         session._handle_slash_command(
-            "/split 1", False, False,
+            "/split 1",
+            False,
+            False,
             lambda msg: output.append(msg),
             lambda p: (_ for _ in ()).throw(EOFError),
         )
@@ -3494,15 +3627,18 @@ class TestSlashCommandDestroy:
         """Lines 1907-1908: /destroy without arg shows usage."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
         output = []
-        session._handle_slash_command(
-            "/destroy", False, False, lambda msg: output.append(msg), lambda p: ""
-        )
+        session._handle_slash_command("/destroy", False, False, lambda msg: output.append(msg), lambda p: "")
         joined = "\n".join(output)
         assert "Usage" in joined
 
@@ -3511,8 +3647,13 @@ class TestSlashCommandDestroy:
         """Lines 1918-1922: Destroy confirmed rolls back and destroys."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         (tmp_project / "stage-1").mkdir(parents=True, exist_ok=True)
@@ -3523,7 +3664,9 @@ class TestSlashCommandDestroy:
 
         output = []
         session._handle_slash_command(
-            "/destroy 1", False, False,
+            "/destroy 1",
+            False,
+            False,
             lambda msg: output.append(msg),
             lambda p: "y",
         )
@@ -3534,8 +3677,13 @@ class TestSlashCommandDestroy:
         """Lines 1925-1926: Destroy declined is cancelled."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
@@ -3543,7 +3691,9 @@ class TestSlashCommandDestroy:
 
         output = []
         session._handle_slash_command(
-            "/destroy 1", False, False,
+            "/destroy 1",
+            False,
+            False,
             lambda msg: output.append(msg),
             lambda p: "n",
         )
@@ -3554,8 +3704,13 @@ class TestSlashCommandDestroy:
         """Lines 1915-1917: EOF during destroy confirmation cancels."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
@@ -3563,7 +3718,9 @@ class TestSlashCommandDestroy:
 
         output = []
         session._handle_slash_command(
-            "/destroy 1", False, False,
+            "/destroy 1",
+            False,
+            False,
             lambda msg: output.append(msg),
             lambda p: (_ for _ in ()).throw(EOFError),
         )
@@ -3607,15 +3764,18 @@ class TestSlashCommandManual:
         """Lines 1931-1932: /manual without arg shows usage."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
         output = []
-        session._handle_slash_command(
-            "/manual", False, False, lambda msg: output.append(msg), lambda p: ""
-        )
+        session._handle_slash_command("/manual", False, False, lambda msg: output.append(msg), lambda p: "")
         joined = "\n".join(output)
         assert "Usage" in joined
 
@@ -3623,15 +3783,21 @@ class TestSlashCommandManual:
         """Lines 1940-1944: Setting manual instructions."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
         output = []
         session._handle_slash_command(
             '/manual 1 "Run az keyvault set-policy"',
-            False, False,
+            False,
+            False,
             lambda msg: output.append(msg),
             lambda p: "",
         )
@@ -3645,8 +3811,13 @@ class TestSlashCommandManual:
         """Lines 1946-1948: Viewing existing manual instructions."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
@@ -3655,7 +3826,9 @@ class TestSlashCommandManual:
 
         output = []
         session._handle_slash_command(
-            "/manual 1", False, False,
+            "/manual 1",
+            False,
+            False,
             lambda msg: output.append(msg),
             lambda p: "",
         )
@@ -3666,14 +3839,21 @@ class TestSlashCommandManual:
         """Lines 1949-1951: No instructions set shows hint."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
         output = []
         session._handle_slash_command(
-            "/manual 1", False, False,
+            "/manual 1",
+            False,
+            False,
             lambda msg: output.append(msg),
             lambda p: "",
         )
@@ -3717,8 +3897,13 @@ class TestHandleDescribe:
         """Lines 2024-2026: No arg shows usage."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
@@ -3731,8 +3916,13 @@ class TestHandleDescribe:
         """Lines 2029-2031: No number in arg shows usage."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
@@ -3745,8 +3935,13 @@ class TestHandleDescribe:
         """Lines 2035-2037: Stage not found."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
@@ -3759,14 +3954,19 @@ class TestHandleDescribe:
         """Lines 2040-2080: Full description with services, files, output, error."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
                 "services": [
                     {
-                        "name": "kv", "computed_name": "mykv",
-                        "resource_type": "Microsoft.KeyVault/vaults", "sku": "standard",
+                        "name": "kv",
+                        "computed_name": "mykv",
+                        "resource_type": "Microsoft.KeyVault/vaults",
+                        "sku": "standard",
                     }
                 ],
-                "dir": "stage-1", "status": "generated",
+                "dir": "stage-1",
+                "status": "generated",
                 "files": ["stage-1/main.tf"],
             },
         ]
@@ -3792,8 +3992,13 @@ class TestHandleDescribe:
         """Lines 2074-2075: Long deploy output is truncated."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
@@ -3842,14 +4047,21 @@ class TestUnknownSlashCommand:
         """Line 2020: Unknown slash command shows error."""
         stages = [
             {
-                "stage": 1, "name": "Infra", "category": "infra",
-                "services": [], "dir": "stage-1", "status": "generated", "files": [],
+                "stage": 1,
+                "name": "Infra",
+                "category": "infra",
+                "services": [],
+                "dir": "stage-1",
+                "status": "generated",
+                "files": [],
             },
         ]
         session = self._make_session(tmp_project, build_stages=stages)
         output = []
         session._handle_slash_command(
-            "/foobar", False, False,
+            "/foobar",
+            False,
+            False,
             lambda msg: output.append(msg),
             lambda p: "",
         )
@@ -4009,9 +4221,7 @@ class TestParseStageNumbers:
         from azext_prototype.stages.deploy_session import DeploySession
 
         valid = [{"stage": 5}, {"stage": 6}]
-        result = DeploySession._parse_stage_numbers(
-            "Stages 5 and 6 need updates", valid
-        )
+        result = DeploySession._parse_stage_numbers("Stages 5 and 6 need updates", valid)
         assert 5 in result
         assert 6 in result
 
@@ -4061,9 +4271,7 @@ class TestWriteStageFiles:
     def test_no_file_blocks(self, tmp_project):
         """Lines 1298-1299: No parseable file blocks returns empty."""
         session = self._make_session(tmp_project)
-        result = session._write_stage_files(
-            {"dir": "stage-1"}, "No code blocks here."
-        )
+        result = session._write_stage_files({"dir": "stage-1"}, "No code blocks here.")
         assert result == []
 
     def test_writes_files_and_strips_prefix(self, tmp_project):
@@ -4074,9 +4282,7 @@ class TestWriteStageFiles:
 
         content = "```stage-1/main.tf\nresource {} {}\n```"
         with patch.object(session, "_sync_build_state"):
-            result = session._write_stage_files(
-                {"dir": "stage-1", "stage": 1}, content
-            )
+            result = session._write_stage_files({"dir": "stage-1", "stage": 1}, content)
         assert len(result) == 1
         assert (stage_dir / "main.tf").exists()
 
@@ -4088,12 +4294,10 @@ class TestWriteStageFiles:
 
         content = (
             "```stage-1/main.tf\nresource {} {}\n```\n\n"
-            "```stage-1/versions.tf\nterraform { required_version = \">= 1.0\" }\n```"
+            '```stage-1/versions.tf\nterraform { required_version = ">= 1.0" }\n```'
         )
         with patch.object(session, "_sync_build_state"):
-            result = session._write_stage_files(
-                {"dir": "stage-1", "stage": 1}, content
-            )
+            result = session._write_stage_files({"dir": "stage-1", "stage": 1}, content)
         # versions.tf should be dropped
         written_names = [Path(f).name for f in result]
         assert "versions.tf" not in written_names
@@ -4133,8 +4337,11 @@ class TestBuildFixTask:
         """Lines 1242-1243: Infra category selects IaC agent."""
         session = self._make_session(tmp_project)
         stage = {
-            "stage": 1, "name": "Infra", "category": "infra",
-            "dir": "stage-1", "services": [],
+            "stage": 1,
+            "name": "Infra",
+            "category": "infra",
+            "dir": "stage-1",
+            "services": [],
         }
         agent, task = session._build_fix_task(stage, "error", "diag", "guide")
         assert agent is not None  # terraform agent from registry
@@ -4144,8 +4351,11 @@ class TestBuildFixTask:
         """Lines 1244-1245: App category selects dev agent."""
         session = self._make_session(tmp_project)
         stage = {
-            "stage": 1, "name": "App", "category": "app",
-            "dir": "stage-1", "services": [],
+            "stage": 1,
+            "name": "App",
+            "category": "app",
+            "dir": "stage-1",
+            "services": [],
         }
         agent, task = session._build_fix_task(stage, "error", "diag", "guide")
         assert agent is not None
@@ -4157,8 +4367,11 @@ class TestBuildFixTask:
         session._iac_agents = {}
         session._dev_agent = None
         stage = {
-            "stage": 1, "name": "Infra", "category": "infra",
-            "dir": "stage-1", "services": [],
+            "stage": 1,
+            "name": "Infra",
+            "category": "infra",
+            "dir": "stage-1",
+            "services": [],
         }
         agent, task = session._build_fix_task(stage, "error", "diag", "guide")
         assert agent is None
@@ -4168,12 +4381,16 @@ class TestBuildFixTask:
         """Line 1277: Services included in fix task."""
         session = self._make_session(tmp_project)
         stage = {
-            "stage": 1, "name": "Infra", "category": "infra",
+            "stage": 1,
+            "name": "Infra",
+            "category": "infra",
             "dir": "stage-1",
             "services": [
                 {
-                    "name": "kv", "computed_name": "mykv",
-                    "resource_type": "Microsoft.KeyVault/vaults", "sku": "standard",
+                    "name": "kv",
+                    "computed_name": "mykv",
+                    "resource_type": "Microsoft.KeyVault/vaults",
+                    "sku": "standard",
                 }
             ],
         }
