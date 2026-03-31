@@ -62,8 +62,8 @@ that is acceptable — completeness is mandatory. Every opened section must be c
 Every started file must be finished. Every stage referenced in the architecture must
 appear in both the architecture document and the deployment guide.
 
-When generating files, wrap each file in a code block labeled with its path:
-```docs/architecture.md
+When generating files, wrap each file in a code block labeled with its filename:
+```architecture.md
 <content>
 ```
 """

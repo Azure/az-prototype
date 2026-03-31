@@ -1887,6 +1887,14 @@ class BuildSession:
         if prev_context:
             task += prev_context + "\n"
 
+        # For documentation stages, inject actual generated stage context
+        # (outputs, resource names, configurations) so docs reflect the
+        # real build artifacts including any QA remediation changes.
+        if category == "docs":
+            docs_context = self._build_docs_context()
+            if docs_context:
+                task += docs_context + "\n"
+
         networking_note = self._get_networking_stage_note()
         if networking_note:
             task += networking_note + "\n"
@@ -2333,6 +2341,79 @@ class BuildSession:
             parts.append(companion_brief)
         return "\n".join(parts)
 
+    def _build_docs_context(self) -> str:
+        """Build context from actual generated stage files for the documentation stage.
+
+        Reads outputs.tf from each previously generated stage to extract
+        real output names, descriptions, and resource configurations.
+        This ensures documentation reflects the actual build artifacts
+        (including any QA remediation changes) rather than just the
+        planned architecture.
+        """
+        all_stages = self._build_state._state.get("deployment_stages", [])
+        generated = [s for s in all_stages if s.get("status") == "generated" and s.get("files")]
+
+        if not generated:
+            return ""
+
+        sections: list[str] = []
+        sections.append("## Actual Generated Stage Outputs (post-QA remediation)")
+        sections.append(
+            "The following outputs were extracted from the ACTUAL generated code.\n"
+            "Use these exact output names and values in documentation. These may\n"
+            "differ from the planned architecture due to QA remediation changes.\n"
+        )
+
+        project_dir = Path(self._context.project_dir)
+
+        for stage in generated:
+            stage_num = stage.get("stage", "?")
+            stage_name = stage.get("name", "Unknown")
+            stage_files = stage.get("files", [])
+
+            # Find outputs.tf or outputs.bicep in the stage files
+            output_content = ""
+            for f in stage_files:
+                fpath = project_dir / f
+                if fpath.name in ("outputs.tf", "outputs.bicep") and fpath.exists():
+                    try:
+                        output_content = fpath.read_text(encoding="utf-8", errors="replace")
+                    except OSError:
+                        pass
+                    break
+
+            sections.append(f"### Stage {stage_num}: {stage_name}")
+            if output_content:
+                # Extract output names and descriptions from the file
+                lines = output_content.splitlines()
+                outputs_found: list[str] = []
+                for line in lines:
+                    stripped = line.strip()
+                    if stripped.startswith("output ") and "{" in stripped:
+                        # Extract output name: output "name" {
+                        name = stripped.split('"')[1] if '"' in stripped else stripped.split()[1]
+                        outputs_found.append(name)
+                    elif stripped.startswith("description") and "=" in stripped:
+                        # Extract description value
+                        desc = stripped.split("=", 1)[1].strip().strip('"').strip("'")
+                        if outputs_found:
+                            outputs_found[-1] = f"{outputs_found[-1]}: {desc}"
+
+                if outputs_found:
+                    sections.append("Outputs:")
+                    for o in outputs_found:
+                        sections.append(f"  - {o}")
+                else:
+                    sections.append("(outputs file present but no outputs parsed)")
+            else:
+                # List the files generated for this stage
+                file_names = [Path(f).name for f in stage_files]
+                sections.append(f"Files: {', '.join(file_names)}")
+
+            sections.append("")
+
+        return "\n".join(sections)
+
     def _get_networking_stage_note(self) -> str:
         """Return a QA note about the networking stage if one exists in the plan."""
         all_stages = self._build_state._state.get("deployment_stages", [])
@@ -2619,21 +2700,39 @@ class BuildSession:
     # ------------------------------------------------------------------ #
 
     def _execute_with_continuation(self, agent: Any, task: str, max_continuations: int = 3) -> Any:
-        """Execute an agent task, automatically continuing if truncated."""
-        from azext_prototype.ai.provider import AIResponse
+        """Execute an agent task, automatically continuing if truncated.
+
+        When the API returns ``finish_reason="length"`` (token limit hit),
+        the truncated response is appended to ``conversation_history`` as
+        an assistant message so the model can see what it already generated.
+        A continuation prompt is then sent as a new user message, and the
+        model picks up where it left off.
+        """
+        from azext_prototype.ai.provider import AIMessage, AIResponse
 
         response = agent.execute(self._context, task)
 
-        for _ in range(max_continuations):
+        for attempt in range(max_continuations):
             if not response or response.finish_reason != "length":
                 break
-            logger.info("Response truncated (finish_reason=length), requesting continuation")
+            logger.info(
+                "Response truncated (finish_reason=length), requesting continuation %d/%d",
+                attempt + 1,
+                max_continuations,
+            )
+
+            # Add the truncated response to conversation history so the
+            # model sees what it already generated when continuing.
+            self._context.conversation_history.append(AIMessage(role="assistant", content=response.content or ""))
+
             cont_task = (
                 "Your previous response was cut off mid-generation. "
                 "Continue EXACTLY where you left off — do not repeat any "
                 "file or content already generated. Pick up mid-line if "
                 "necessary. Maintain the same code block format."
             )
+            self._context.conversation_history.append(AIMessage(role="user", content=cont_task))
+
             cont = agent.execute(self._context, cont_task)
             if not cont:
                 break
