@@ -30,7 +30,7 @@ class QAEngineerAgent(BaseAgent):
     """Analyze errors, apply fixes, and guide redeployment."""
 
     _temperature = 0.2
-    _max_tokens = 8192
+    _max_tokens = 102400
     _enable_web_search = True
     _include_templates = False
     _include_standards = False
@@ -270,6 +270,14 @@ Classify each failure as CRITICAL (must fix before deploy) or WARNING (should fi
 - [ ] main.tf does NOT contain terraform {} or provider {} blocks
 - [ ] All .tf files are syntactically valid HCL (properly opened/closed blocks)
 
+### 8. CRITICAL: Scope Compliance
+- [ ] No resources created that are not listed in "Services in This Stage"
+- [ ] No additional subnets beyond what INPUT specifies
+- [ ] No firewall rules unless explicitly required by MANDATORY RESOURCE POLICY
+- [ ] Companion resources (PE, DNS, diagnostics) only from MANDATORY RESOURCE POLICIES
+- [ ] No azurerm_* resources — all resources MUST use azapi_resource
+- [ ] Tags placed as top-level attribute on azapi_resource, NOT inside body{}
+
 ## Output Format
 
 Always structure your response as:
@@ -300,4 +308,18 @@ SDK version, or configuration option, emit [SEARCH: your query] in your response
 The framework will fetch relevant Microsoft Learn documentation and re-invoke you
 with the results. Use at most 2 search markers per response. Only search when your
 built-in knowledge is insufficient.
+
+## Verdict
+
+After completing your review, you MUST end your response with exactly one of:
+
+    VERDICT: PASS
+
+or
+
+    VERDICT: FAIL
+
+Use PASS when there are zero CRITICAL issues remaining. Use FAIL when any CRITICAL
+issue exists. WARNING-only results should use PASS. This verdict line must appear
+on its own line at the very end of your response.
 """

@@ -62,16 +62,7 @@ Use Key Vault references in App Service and Container Apps configuration instead
 
 All data and backend services should use private endpoints to eliminate public internet exposure for the data plane.
 
-#### POC Relaxation
-
-For POC/prototype environments, private endpoints are **recommended but not mandatory**. Public endpoints are acceptable for rapid prototyping to reduce complexity and setup time. When public endpoints are used:
-
-- Flag private endpoint configuration as a **production backlog item**
-- Document which services are publicly exposed
-- Ensure service firewalls restrict access to known IP ranges where possible
-- Never set firewall rules to `0.0.0.0/0` or `0.0.0.0-255.255.255.255`
-
-For production readiness, all services in the private endpoint reference table below must use private endpoints.
+Unless told otherwise by the user (via discovery directives or custom policies), all environments — including POC — should disable public network access and use private endpoints. A dedicated Networking stage (Stage 2) handles VNet, subnets, private DNS zones, and private endpoints for all services.
 
 ### 2.2 VNET Integration
 
@@ -81,9 +72,7 @@ When the architecture includes Container Apps, App Service, or Functions:
 - Use NSGs to restrict traffic between subnets to only required ports
 - Enable diagnostic logging on NSGs for traffic auditing
 
-#### POC Relaxation
-
-For POCs, VNET integration is **recommended but not mandatory**. If omitted, document it as a production backlog item. Container Apps Environment without VNET integration is acceptable for prototyping.
+Unless told otherwise by the user, all compute services should deploy in a VNET-integrated subnet.
 
 ### 2.3 Connectivity Pattern (Production Target)
 
@@ -215,6 +204,29 @@ All Azure resources must include these tags:
 - Prefer built-in roles over custom role definitions
 - Document every role assignment with its justification
 
+### 6.4 CRITICAL: Principal Separation (MANDATORY)
+
+Administrative roles MUST be assigned to the deploying identity (human or CI/CD
+service principal), NOT to the application managed identity:
+
+| Role Type | Assign To | Examples |
+|-----------|-----------|---------|
+| Administrative (Key Vault Administrator, Owner, Contributor) | Deploying user/SPN via `var.deployer_object_id` | Break-glass access, secret rotation, infrastructure management |
+| Data-plane read/write (Secrets User, Data Contributor, Blob Data Contributor) | Application managed identity (Stage 1) | Runtime access for the application |
+| Data-plane read-only (Secrets Reader, Data Reader) | Application managed identity (Stage 1) | Read-only service accounts |
+
+The deploying user's object ID comes from `var.deployer_object_id` or the current
+Azure CLI account context. The application identity's principal ID comes from the
+managed identity resource created in Stage 1 (via terraform_remote_state).
+
+### 6.5 Cosmos DB Data-Plane RBAC (CRITICAL)
+
+Cosmos DB's built-in data roles (`00000000-0000-0000-0000-000000000001` Data Reader,
+`00000000-0000-0000-0000-000000000002` Data Contributor) are **data-plane RBAC** roles.
+They MUST be assigned via `Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments`,
+NOT via `Microsoft.Authorization/roleAssignments`. Using ARM RBAC (roleAssignments)
+for these roles will silently fail — the application will not have data access.
+
 ---
 
 ## 7. Private Endpoint Reference
@@ -280,9 +292,9 @@ This section clearly delineates what is acceptable in a POC versus what must be 
 | Area | POC Acceptable | Production Required |
 |------|---------------|-------------------|
 | **Authentication** | Managed identity (same as production) | Managed identity (no relaxation) |
-| **Network isolation** | Public endpoints with service firewalls | Private endpoints for all data services |
-| **VNET integration** | Optional; Container Apps external ingress OK | Mandatory; VNET-integrated environments with NSGs |
-| **Private DNS zones** | Not required | Required for all private endpoints |
+| **Network isolation** | Private endpoints (unless user overrides) | Private endpoints for all data services |
+| **VNET integration** | VNET-integrated (unless user overrides) | Mandatory; VNET-integrated environments with NSGs |
+| **Private DNS zones** | Required for private endpoints | Required for all private endpoints |
 | **SKUs** | Free / dev-test / consumption tiers | Production-appropriate SKUs with SLAs |
 | **Redundancy** | Locally redundant (LRS), single region | Zone-redundant or geo-redundant as needed |
 | **Backup** | Default backup policies | Custom retention policies, tested restore procedures |
@@ -299,7 +311,7 @@ This section clearly delineates what is acceptable in a POC versus what must be 
 
 ### What POCs Must Still Enforce
 
-Even in a prototype, these constraints are **non-negotiable**:
+Even in a prototype, these constraints are **non-negotiable** (unless the user explicitly overrides via discovery directives or custom policies):
 
 1. **Managed identity** for all service-to-service authentication
 2. **No hardcoded secrets** in code, config, or environment variables
@@ -309,6 +321,8 @@ Even in a prototype, these constraints are **non-negotiable**:
 6. **Entra-only auth** for databases (no SQL auth)
 7. **Resource tagging** on all resources
 8. **Naming conventions** followed consistently
+9. **Private endpoints** with publicNetworkAccess disabled on all PaaS services
+10. **VNET integration** for all compute services
 
 ### Production Backlog Items
 

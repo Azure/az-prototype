@@ -6,6 +6,91 @@ Release History
 0.2.1b6
 +++++++
 
+Benchmark suite
+~~~~~~~~~~~~~~~~
+* **14-benchmark quality suite** -- project-agnostic benchmarks (B-INST
+  through B-ANTI) measuring instruction adherence, constraint compliance,
+  technical correctness, security posture, operational readiness, dependency
+  hygiene, scope discipline, code quality, output completeness, cross-stage
+  consistency, documentation quality, response reliability, RBAC
+  architecture, and anti-pattern absence.  Each benchmark scored 0-100 with
+  4-5 weighted sub-factors.
+* **Benchmark report template** (``benchmarks/TEMPLATE.html``) -- reusable
+  HTML template with fixed rendering engine; only data arrays change between
+  runs.  Includes per-stage dimension tables, analysis notes, systematic
+  strengths/weaknesses, critical bugs table, and dimension heatmap.
+* **Benchmark trends dashboard** (``benchmarks/overall.html``) -- Chart.js
+  time-series dashboard with per-benchmark detail tabs showing sub-factor
+  breakdowns, scoring methodology, and improvement areas with severity.
+* **PDF report generation** (``scripts/generate_pdf.py``) -- populates
+  ``benchmarks/TEMPLATE.docx`` with scores, generates matplotlib charts
+  (overall trend, 14 factor comparisons, 14 score trends), embeds all 29
+  charts into the DOCX, converts to PDF via ``docx2pdf``, and cleans up
+  the temporary DOCX.
+* **Scoring instructions** (``benchmarks/INSTRUCTIONS.md``) -- testing
+  methodology, extraction scripts, copy-paste analysis instructions, and
+  report generation rules.
+
+Build quality improvements
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Tag placement root cause fix** -- constraint on line 36 of
+  ``terraform_agent.py`` said "in body block", directly causing tags-inside-
+  body across 11/14 stages.  Changed to "CRITICAL: as top-level attribute".
+  Added dedicated ``## CRITICAL: TAGS PLACEMENT`` section with correct and
+  incorrect examples.
+* **NEVER directive hierarchy** -- added ``## CRITICAL: DIRECTIVE HIERARCHY``
+  section to ``build_session.py``.  NEVER/MUST directives in policies now
+  explicitly override architecture context and POC notes during generation.
+  Users can still override post-generation via PolicyResolver.
+* **deploy.sh requirements** -- replaced bullet list in ``TERRAFORM_PROMPT``
+  with 13-point ``## CRITICAL: deploy.sh REQUIREMENTS`` section.  Scripts
+  under 100 lines are rejected.  Must include ``--dry-run``, ``--destroy``,
+  ``--help``, pre-flight validation, and post-deployment verification.
+* **Scope boundary enforcement** -- added ``## CRITICAL: SCOPE BOUNDARY``
+  section.  Resources not listed in "Services in This Stage" and not
+  required by policy companions are rejected.
+* **Provider hygiene** -- added ``## CRITICAL: PROVIDER RESTRICTIONS``
+  section.  Only ``hashicorp/azapi`` allowed; ``azurerm`` and ``random``
+  providers rejected.  Corresponding QA checklist updated.
+* **Subnet drift prevention** -- VNET-001 policy rewritten for both
+  Terraform and Bicep: VNet declares only ``addressSpace``; subnets are
+  separate child resources.  New prohibition: "NEVER define subnets inline
+  in the VNet body."  Added ``## CRITICAL: SUBNET RESOURCES`` to
+  ``TERRAFORM_PROMPT``.
+* **Networking stage boundary** -- expanded ``_get_networking_stage_note()``
+  to explicitly prohibit PE/DNS creation in service stages when a networking
+  stage handles them.
+* **RBAC principal separation** -- added Section 6.4 to ``constraints.md``:
+  administrative roles target deploying user, data roles target app MI.
+* **Cosmos DB RBAC documentation** -- added Section 6.5 to
+  ``constraints.md``: data-plane roles must use ``sqlRoleAssignments``, not
+  ARM ``roleAssignments``.
+* **azapi v2.x semantics** -- provider version injection now documents v2.x
+  semantics (top-level tags, ``.output.properties`` access, native HCL
+  body maps).
+* **Documentation agent max_tokens** -- increased from 4,096 to 204,800
+  (approx 350-400 pages) to prevent Stage 14 truncation.
+* **Documentation agent prompt** -- enriched with context handling,
+  completeness requirement, and explicit instructions to reference actual
+  stage outputs.
+
+Anti-pattern detection
+~~~~~~~~~~~~~~~~~~~~~~~
+* **New domain: ``terraform_structure``** -- 6 new anti-pattern checks for
+  unused azurerm/random providers, azapi v1.x versions, non-deterministic
+  ``uuid()``, ``jsondecode()`` on v2.x output, and azurerm resource usage.
+  Total checks: 33 to 39 across 10 domains.
+* **Hardcoded upstream name detection** -- new completeness check catches
+  ALZ-patterned hardcoded resource names (``zd-``, ``pi-``, ``pm-``,
+  ``pc-`` prefixes).
+* **QA scope compliance** -- added Section 8 to QA engineer checklist:
+  scope compliance, tag placement, and azurerm resource checks.
+
+AI provider
+~~~~~~~~~~~~
+* **Copilot default timeout** increased from 480s to 600s (10 minutes)
+  to accommodate large QA remediation prompts (200KB+).
+
 Discovery session
 ~~~~~~~~~~~~~~~~~~~
 * **Unified discovery tracking (``TrackedItem``)** — consolidated three
@@ -137,11 +222,142 @@ Debug logging
   content, token counts, timing), every state mutation, every decision
   branch, every slash command, and full error tracebacks.
 
+Governance policies (comprehensive overhaul)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **90 governance policies, 428 rules** — up from 13 policies / 65 rules.
+  Every policy now includes exact ``terraform_pattern`` (azapi) and
+  ``bicep_pattern`` code, ``companion_resources`` with full IaC code,
+  and ``prohibitions`` listing what agents must never generate.
+* **67 Azure service policies** across 11 subcategories: ai (5), compute (6),
+  data (16), identity (2), management (4), messaging (2), monitoring (3),
+  networking (17), security (4), storage (1), web (7).  Updated with
+  WAF service guide recommendations (40 new rules across 10 services).
+* **4 security policies** rewritten: authentication (5 rules), data
+  protection (7 rules), managed identity (6 rules), network isolation
+  (8 rules).  Aligned with Azure Well-Architected Framework Security
+  pillar (SE-01 through SE-05).
+* **6 integration policies**: APIM↔Container Apps (rewritten, 6 rules),
+  event-driven (5 rules), data-pipeline (4 rules), microservices
+  (5 rules), api-patterns (4 rules), frontend-backend (4 rules).
+* **4 cost policies** (new): SKU selection, scaling, resource lifecycle,
+  reserved instances.  Aligned with WAF Cost Optimization pillar.
+* **5 performance policies** (new): caching, database optimization,
+  compute optimization, networking optimization, monitoring/observability.
+  Aligned with WAF Performance Efficiency pillar.
+* **4 reliability policies** (new): high availability, backup/recovery,
+  fault tolerance, deployment safety.  Aligned with WAF Reliability
+  pillar (RE-01 through RE-05).
+* **Exact service matching with relevance filtering** —
+  ``PolicyEngine.resolve_for_stage()`` uses exact service name matching
+  (not embedding similarity).  Cross-cutting policies (3+ services) are
+  only included when at least half their services overlap with the stage,
+  preventing prompt bloat from irrelevant patterns.  IaC-tool filtering
+  strips Bicep patterns for Terraform builds and vice versa.
+* **Deterministic prompt injection** — ``_resolve_service_policies()``
+  injects matched policies into both generation and QA prompts as
+  ``## MANDATORY RESOURCE POLICIES`` with exact code templates.
+
+Build session
+~~~~~~~~~~~~~~
+* **Two-phase deployment plan derivation** — Phase 1: the architect
+  produces a simple map of stages and services (no SKUs, no naming,
+  no governance needed).  Phase 2: given the map, the architect fills
+  in computed names, resource types, and SKUs with ALL relevant
+  governance policies injected (since the service list is now known).
+  Eliminates SKU conflicts (e.g. Basic ACR when policy requires
+  Premium).
+* **Service policies injected early in prompt** — ``MANDATORY RESOURCE
+  POLICIES`` section moved from position 13 (near end) to position 3
+  (right after services list).  Ensures the AI reads the exact code
+  templates with correct property values before it starts generating.
+* **Enforce ``concept/`` output directory** — ``_normalise_stages()``
+  detects when the AI uses the project name as root and fixes it.
+* **``--reset`` cleans non-concept output dirs** — loads build state
+  before reset to find and clean project-named directories.
+* **Pre-fetched API versions per resource type** — resolves correct
+  API version from service-registry.yaml (fast) or Microsoft Learn
+  (fallback) before generation.
+* **Companion resource requirements** — RBAC roles, role GUIDs, and
+  auth method injected per-service from the service registry.
+* **Truncation recovery** — ``_execute_with_continuation()`` detects
+  ``finish_reason == "length"`` and auto-continues (4 call sites).
+* **``_max_tokens`` raised to 102,400** — Terraform, Bicep, App
+  Developer, and QA agents.
+* **QA reviews full file content** — no per-file or total size caps.
+* **Mandatory stage ordering** — Foundation=1, Networking=2 enforced
+  in architect prompt and ``_ensure_private_endpoint_stage()``.
+* **Networking stage auto-injection** — when services need private
+  endpoints, a networking stage with VNet + all PEs is injected at
+  position 2 after Foundation.
+* **Full QA report on max remediation** — when QA exhausts all
+  remediation attempts, the full remaining issues report is printed
+  (was truncated to 200 chars).
+* **Full diagnostic logging** — task prompts log the FULL prompt
+  sent to the AI (``task_full``), the FULL response (``content_full``),
+  resolved service policies (``policy_full``), anti-pattern violations
+  detected before the policy resolver, ``max_tokens`` sent per request,
+  and ``finish_reason`` on every response.
+* **TUI Ctrl+Q cancellation** — ``print_fn``, ``response_fn``, and
+  ``status_fn`` now raise ``ShutdownRequested`` when the shutdown flag
+  is set, breaking the worker thread out of QA/remediation loops
+  immediately after the current HTTP call completes.  Previously the
+  TUI exited but the prompt hung until the full QA loop finished.
+
+QA agent
+~~~~~~~~~
+* **QA receives service policies + API versions** — same deterministic
+  briefs injected into generation are also sent to QA for verification.
+* **Provider compliance** (Terraform only) — no ``azurerm_*`` resources.
+  Scoped to Terraform builds only — Bicep builds never see azurerm
+  constraints.
+* **Three-tier issue detection** — ``VERDICT: PASS/FAIL`` (handles
+  markdown bold), pass phrases, keyword fallback.  Eliminates false
+  positives from QA responses containing "critical" in headings.
+* **VERDICT instruction in QA prompt** — QA must end every review
+  with ``VERDICT: PASS`` or ``VERDICT: FAIL``.  WARNING-only results
+  use PASS.  Without this, QA never emitted verdicts and the keyword
+  fallback caused unnecessary remediation cycles.
+* **Checklist items 8 + 9** — Provider Compliance and API Version
+  Compliance added to Mandatory Review Checklist.
+* **Credential false positive fix** — ``connectionstring`` safe patterns
+  now include ARM property references and instrumentation context.
+
+Terraform agent
+~~~~~~~~~~~~~~~~
+* **RBAC role assignment names** — ``random_uuid`` resource from
+  ``hashicorp/random`` provider.  ``guid()`` does not exist in HCL.
+* **publicNetworkAccess** — "ALWAYS set Disabled, networking stage
+  handles private endpoints."
+
+Security reviewer agent
+~~~~~~~~~~~~~~~~~~~~~~~~
+* **Public endpoints are blockers** — unless the user explicitly
+  overrides, public endpoints and missing VNET are now BLOCKERs in
+  all environments (was WARNINGs for POC).
+
+Knowledge base
+~~~~~~~~~~~~~~~
+* **Eliminated public access contradictions** — removed all "POC
+  relaxation" language from ``constraints.md``, service knowledge
+  files, and agent prompts that told the AI public endpoints were
+  acceptable for POC.  Private endpoints and VNET integration are
+  now the default for all environments unless the user explicitly
+  overrides via discovery directives or custom policies.
+* **Fixed 9 service knowledge files** — ``public_network_access_enabled``
+  changed from ``true`` to ``false`` in Terraform examples; Bicep
+  examples changed from ``'Enabled'`` to ``'Disabled'``; POC Defaults
+  tables changed from "Enabled (POC)" to "Disabled (unless user
+  overrides)".
+* **Copilot model catalogue** — added ``claude-sonnet-4-6`` to the
+  fallback model list.
+
 Build & CI/CD
 ~~~~~~~~~~~~~~
 * Build scripts (``build.sh``, ``build.bat``) and all CI/CD workflows
   (``ci.yml``, ``pr.yml``, ``release.yml``) compute policy embeddings
   before wheel construction.
+* New policy subdirectories (azure/*, cost, performance, reliability)
+  have ``__init__.py`` files for proper package discovery.
 * Renamed ``--script-resource-group`` deploy flag to ``--script-rg``.
 
 Cleanup

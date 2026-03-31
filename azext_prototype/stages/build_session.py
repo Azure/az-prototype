@@ -60,6 +60,38 @@ _SLASH_COMMANDS = frozenset({"/status", "/stages", "/files", "/policy", "/descri
 # Maximum remediation cycles per stage before proceeding
 _MAX_STAGE_REMEDIATION_ATTEMPTS = 3
 
+# Keywords that indicate QA found actionable issues (fallback tier)
+_QA_ISSUE_KEYWORDS = frozenset({"critical", "error", "missing", "fix", "issue", "broken"})
+# Phrases that indicate QA found no issues (tier 2)
+_QA_PASS_PHRASES = ("all checks passed", "no issues found", "no issues remain", "all looks good", "code is clean")
+
+
+def _qa_has_issues(qa_content: str) -> bool:
+    """Determine whether QA found actionable issues.
+
+    Three-tier detection (checked in order):
+    1. **Verdict line** — ``VERDICT: PASS`` or ``VERDICT: FAIL``.
+    2. **Pass phrases** — common phrases indicating all clear.
+    3. **Keyword fallback** — any issue keyword present in the response.
+    """
+    if not qa_content:
+        return False
+
+    lower = qa_content.lower()
+
+    # Tier 1: explicit verdict (authoritative) — strip markdown bold/italic
+    stripped = re.sub(r"[*_]{1,3}", "", lower)
+    verdict_match = re.search(r"verdict:\s*(pass|fail)", stripped)
+    if verdict_match:
+        return verdict_match.group(1) == "fail"
+
+    # Tier 2: pass phrases
+    if any(phrase in lower for phrase in _QA_PASS_PHRASES):
+        return False
+
+    # Tier 3: keyword scan
+    return any(kw in lower for kw in _QA_ISSUE_KEYWORDS)
+
 
 # -------------------------------------------------------------------- #
 # BuildResult — public interface consumed by BuildStage
@@ -454,9 +486,20 @@ class BuildSession:
             with self._agent_build_context(agent, stage):
                 _, task = self._build_stage_task(stage, focused_context, templates)
 
+                _dbg_flow(
+                    "build_session.generate",
+                    f"Stage {stage_num} task prompt",
+                    task_len=len(task),
+                    has_service_policies="MANDATORY RESOURCE POLICIES" in task,
+                    has_api_versions="Resource API Versions" in task,
+                    has_companion="Companion Resource Requirements" in task,
+                    has_networking_note="Networking Stage" in task,
+                    task_full=task,
+                )
+
                 try:
                     with self._maybe_spinner(f"Building Stage {stage_num}: {stage_name}...", use_styled):
-                        response = agent.execute(self._context, task)
+                        response = self._execute_with_continuation(agent, task)
                 except Exception as exc:
                     _print(f"       Agent error in Stage {stage_num} — routing to QA for diagnosis...")
                     svc_names_list = [s.get("name", "") for s in services if s.get("name")]
@@ -483,8 +526,24 @@ class BuildSession:
                 f"Stage {stage_num} response",
                 content_len=len(content) if content else 0,
                 content_type=type(content).__name__,
-                content_preview=(content[:300] if content else "(empty)"),
+                content_full=content if content else "(empty)",
             )
+
+            # Debug: scan response for anti-pattern violations before policy resolver
+            if content:
+                try:
+                    from azext_prototype.governance.anti_patterns import scan as _ap_scan
+
+                    _ap_violations = _ap_scan(content)
+                    if _ap_violations:
+                        _dbg_flow(
+                            "build_session.generate",
+                            f"Stage {stage_num} anti-pattern violations detected",
+                            violation_count=len(_ap_violations),
+                            violations=_ap_violations,
+                        )
+                except Exception:
+                    pass
 
             # Debug: check what the parser would extract
             _dbg_files = parse_file_blocks(content) if content else {}
@@ -549,7 +608,7 @@ class BuildSession:
 
                     try:
                         with self._maybe_spinner(f"Re-building Stage {stage_num}...", use_styled):
-                            response = agent.execute(self._context, task + fix_instructions)
+                            response = self._execute_with_continuation(agent, task + fix_instructions)
                     except Exception as exc:
                         svc_names_list = [s.get("name", "") for s in services if s.get("name")]
                         route_error_to_qa(
@@ -735,7 +794,7 @@ class BuildSession:
                     task += f"\n\n## User Feedback\n{user_input}\n"
 
                     with self._maybe_spinner(f"Re-building Stage {stage_num}...", use_styled):
-                        response = agent.execute(self._context, task)
+                        response = self._execute_with_continuation(agent, task)
 
                     if response:
                         self._token_tracker.record(response)
@@ -791,13 +850,26 @@ class BuildSession:
         architecture: str,
         templates: list,
     ) -> list[dict]:
-        """Ask the architect to derive a deployment plan from the design.
+        """Derive a deployment plan in two phases.
+
+        **Phase 1 — Map**: The architect determines WHAT services to deploy
+        and in what stage order.  No details, no SKUs, no naming — just a
+        list of services grouped into ordered stages.
+
+        **Phase 2 — Detail**: Given the map (and therefore the full list of
+        services), the architect fills in computed names, SKUs, resource
+        types, and directory paths.  At this point ALL relevant governance
+        policies are injected because the service list is known.
 
         Falls back to :meth:`_fallback_deployment_plan` when no architect
         agent is available or the AI response cannot be parsed.
         """
         if not self._architect_agent or not self._context.ai_provider:
             return self._fallback_deployment_plan(templates)
+
+        # -------------------------------------------------------------- #
+        # Phase 1: Map — WHAT to build and in what order
+        # -------------------------------------------------------------- #
 
         template_context = ""
         if templates:
@@ -806,52 +878,125 @@ class BuildSession:
                 template_context += ", ".join(f"{s.name} ({s.type}, tier={s.tier})" for s in t.services)
                 template_context += "\n"
 
-        naming_instructions = self._naming.to_prompt_instructions()
-
-        task = (
-            "Analyze this architecture design and produce a deployment plan.\n\n" f"## Architecture\n{architecture}\n\n"
+        phase1_task = (
+            "Analyze this architecture and produce a deployment MAP.\n\n"
+            f"## Architecture\n{architecture}\n\n"
         )
         if template_context:
-            task += f"## Template Starting Points\n{template_context}\n\n"
+            phase1_task += f"## Template Starting Points\n{template_context}\n\n"
 
-        task += f"## Naming Convention\n{naming_instructions}\n\n"
-        task += (
+        phase1_task += (
             "## Instructions\n"
-            "Produce a JSON deployment plan with fine-grained stages.\n\n"
-            "Rules:\n"
-            "- All infrastructure stages come before all application/schema stages\n"
-            "- Each infrastructure component gets its own stage\n"
-            "- Each database system gets its own stage\n"
-            "- Each application gets its own stage\n"
-            "- Documentation is always the last stage\n"
-            "- Order stages by dependency (foundation first, then networking, "
-            "then data, then compute, then integration, etc.)\n"
-            "- 3rd-party integrations and CI/CD pipelines get their own stages if present\n\n"
-            "For each service include:\n"
-            "- name: short service identifier (e.g., 'key-vault', 'sql-server')\n"
+            "Produce a simple JSON map of stages and their services. "
+            "Do NOT include computed names, SKUs, resource types, or directories yet — "
+            "just the stage names and service identifiers.\n\n"
+            "STAGE PLANNING RULES:\n\n"
+            "1. ONE primary service per stage. Do NOT group unrelated services.\n"
+            "   - CORRECT: Stage 'Log Analytics' with services ['log-analytics']\n"
+            "   - CORRECT: Stage 'Container Registry' with services ['container-registry']\n"
+            "   - WRONG: Stage 'Foundation' with services ['log-analytics', 'app-insights', 'container-registry']\n\n"
+            "2. Parent-child services stay together in ONE stage:\n"
+            "   - SQL Server + its databases = one stage\n"
+            "   - Service Bus namespace + its queues = one stage\n"
+            "   - Cosmos account + its databases + containers = one stage\n"
+            "   - Event Hub namespace + its event hubs = one stage\n\n"
+            "3. Resource groups do NOT need their own stage. Each service stage creates\n"
+            "   its resource group inline if needed, or references an existing one.\n\n"
+            "4. Networking is ONE stage: VNet, subnets, NSGs, private DNS zones, and\n"
+            "   private endpoints for ALL services — grouped because they share the same VNet.\n\n"
+            "5. RBAC role assignments belong in the same stage as their target service.\n\n"
+            "6. Stage ordering:\n"
+            "   - Managed Identity first (shared identity used by other stages)\n"
+            "   - Monitoring (Log Analytics, then App Insights) — needed for diagnostic settings\n"
+            "   - Networking (VNet + all private endpoints)\n"
+            "   - Data services (Key Vault, SQL, Cosmos, Storage, etc.) — one stage each\n"
+            "   - Compute services (Container Apps, App Service, AKS, etc.) — one stage each\n"
+            "   - Integration (APIM, Event Grid, etc.) — one stage each\n"
+            "   - Documentation last\n\n"
+            "7. The LAST stage MUST always be 'Documentation' with category 'docs'.\n"
+            "   NEVER omit the Documentation stage.\n\n"
+            "Response format — return ONLY valid JSON:\n"
+            "```json\n"
+            '{"stages": [\n'
+            '  {"stage": 1, "name": "Managed Identity", "category": "infra",\n'
+            '   "services": ["user-assigned-identity"]},\n'
+            '  {"stage": 2, "name": "Log Analytics", "category": "infra",\n'
+            '   "services": ["log-analytics"]},\n'
+            '  {"stage": 3, "name": "Networking", "category": "infra",\n'
+            '   "services": ["virtual-network", "private-endpoints"]},\n'
+            '  {"stage": 4, "name": "Key Vault", "category": "infra",\n'
+            '   "services": ["key-vault"]},\n'
+            '  {"stage": 5, "name": "Documentation", "category": "docs",\n'
+            '   "services": ["architecture-doc", "deployment-guide"]}\n'
+            "]}\n"
+            "```\n"
+        )
+
+        # Phase 1 needs no governance — just structuring
+        self._architect_agent.set_governor_brief(" ")
+        try:
+            phase1_response = self._architect_agent.execute(self._context, phase1_task)
+        finally:
+            self._architect_agent.set_governor_brief("")
+
+        if phase1_response:
+            self._token_tracker.record(phase1_response)
+        if not phase1_response or not phase1_response.content:
+            return self._fallback_deployment_plan(templates)
+
+        stage_map = self._parse_stage_map(phase1_response.content)
+        if not stage_map:
+            return self._fallback_deployment_plan(templates)
+
+        # -------------------------------------------------------------- #
+        # Phase 2: Detail — fill in names, SKUs, types, dirs with policies
+        # -------------------------------------------------------------- #
+
+        # Collect ALL service names from the map
+        all_service_names = []
+        for stage in stage_map:
+            all_service_names.extend(stage.get("services", []))
+
+        # Resolve governance policies for ALL services in the plan
+        policy_text = self._resolve_service_policies(
+            [{"name": s} for s in all_service_names]
+        )
+
+        naming_instructions = self._naming.to_prompt_instructions()
+
+        phase2_task = (
+            "Take this deployment map and fill in the details for each service.\n\n"
+            f"## Deployment Map\n```json\n{json.dumps(stage_map, indent=2)}\n```\n\n"
+            f"## Naming Convention\n{naming_instructions}\n\n"
+        )
+
+        if policy_text:
+            phase2_task += policy_text + "\n\n"
+
+        phase2_task += (
+            "## Instructions\n"
+            "For each service in the map, add:\n"
+            "- name: keep the service identifier from the map\n"
             "- computed_name: full resource name using the naming convention\n"
             "- resource_type: ARM resource type (e.g., Microsoft.KeyVault/vaults)\n"
-            "- sku: tier/SKU if applicable (empty string if not)\n\n"
-            "Each stage must have: stage (number), name, category "
-            "(infra|data|app|schema|integration|docs|cicd|external), dir (output "
-            f"directory path), services (array), status ('pending'), files (empty array).\n\n"
-            "Optional per-stage fields:\n"
-            "- deploy_mode: 'auto' (default, deploy via IaC/scripts) or 'manual' "
-            "(step that cannot be scripted, e.g., portal configuration)\n"
-            "- manual_instructions: when deploy_mode is 'manual', provide clear "
-            "step-by-step instructions for the user\n\n"
+            "- sku: tier/SKU — MUST comply with the governance policies above. "
+            "If a policy requires a specific SKU (e.g., Premium for Container Registry), use that SKU.\n\n"
+            "For each stage, add:\n"
+            "- dir: output directory path\n"
+            "- status: 'pending'\n"
+            "- files: empty array\n\n"
             f"Use '{self._iac_tool}' for IaC directories.  Infrastructure stage dirs "
             f"should be like: concept/infra/{self._iac_tool}/stage-N-name/\n"
             "App stage dirs: concept/apps/stage-N-name/\n"
             "Schema stage dirs: concept/db/type/\n"
             "Doc stage dir: concept/docs/\n\n"
-            "Response format — return ONLY valid JSON, no markdown explanation:\n"
+            "Response format — return ONLY valid JSON:\n"
             "```json\n"
             '{"stages": [\n'
-            '  {"stage": 1, "name": "Foundation", "category": "infra",\n'
-            f'   "dir": "concept/infra/{self._iac_tool}/stage-1-foundation",\n'
+            '  {"stage": 1, "name": "Managed Identity", "category": "infra",\n'
+            f'   "dir": "concept/infra/{self._iac_tool}/stage-1-managed-identity",\n'
             '   "services": [\n'
-            '     {"name": "managed-identity", "computed_name": "...",\n'
+            '     {"name": "user-assigned-identity", "computed_name": "zd-id-worker-dev-eus",\n'
             '      "resource_type": "Microsoft.ManagedIdentity/userAssignedIdentities",\n'
             '      "sku": ""}\n'
             '   ], "status": "pending", "files": []}\n'
@@ -859,14 +1004,86 @@ class BuildSession:
             "```\n"
         )
 
-        response = self._architect_agent.execute(self._context, task)
-        if response:
-            self._token_tracker.record(response)
-        if not response or not response.content:
+        # Phase 2 has policies — suppress the full governance dump
+        self._architect_agent.set_governor_brief(" ")
+        try:
+            phase2_response = self._architect_agent.execute(self._context, phase2_task)
+        finally:
+            self._architect_agent.set_governor_brief("")
+
+        if phase2_response:
+            self._token_tracker.record(phase2_response)
+        if not phase2_response or not phase2_response.content:
             return self._fallback_deployment_plan(templates)
 
-        stages = self._parse_deployment_plan(response.content)
+        stages = self._parse_deployment_plan(phase2_response.content)
         return stages if stages else self._fallback_deployment_plan(templates)
+
+    def _parse_stage_map(self, content: str) -> list[dict]:
+        """Parse the phase 1 stage map (simple stage/services structure)."""
+        json_match = re.search(r"```(?:json)?\s*\n(.*?)\n```", content, re.DOTALL)
+        raw = json_match.group(1) if json_match else content.strip()
+
+        try:
+            data = json.loads(raw)
+            stages = data.get("stages", [])
+            if not stages:
+                return []
+            # Normalise: ensure services is a list of strings
+            for s in stages:
+                svcs = s.get("services", [])
+                if svcs and isinstance(svcs[0], dict):
+                    s["services"] = [svc.get("name", "") for svc in svcs]
+            # Ensure Networking stage is present when services need private endpoints
+            self._ensure_networking_in_map(stages)
+            # Ensure Documentation stage is always present
+            if not any(s.get("category") == "docs" for s in stages):
+                stages.append({
+                    "stage": len(stages) + 1,
+                    "name": "Documentation",
+                    "category": "docs",
+                    "services": ["architecture-doc", "deployment-guide"],
+                })
+            # Renumber stages sequentially
+            for idx, s in enumerate(stages, start=1):
+                s["stage"] = idx
+            return stages
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    @staticmethod
+    def _ensure_networking_in_map(stages: list[dict]) -> None:
+        """Insert a Networking stage if services need private endpoints but none exists.
+
+        Checks whether any stage covers networking. If not, inserts a
+        Networking stage after monitoring stages (position 3-4 typically)
+        but before data/compute stages.
+        """
+        _NETWORK_NAMES = {"networking", "network", "vnet", "virtual-network", "private-endpoint"}
+        for s in stages:
+            if s.get("name", "").lower().replace(" ", "-") in _NETWORK_NAMES:
+                return
+            if any(svc in _NETWORK_NAMES for svc in s.get("services", [])):
+                return
+
+        # Find insertion point — after monitoring, before data/compute/app
+        insert_idx = 0
+        for i, s in enumerate(stages):
+            name_lower = s.get("name", "").lower()
+            if any(kw in name_lower for kw in ("identity", "log", "analytics", "insights", "monitoring")):
+                insert_idx = i + 1
+            else:
+                break
+
+        # Default to position 2 if no monitoring stages found
+        insert_idx = max(insert_idx, min(2, len(stages)))
+
+        stages.insert(insert_idx, {
+            "stage": insert_idx + 1,
+            "name": "Networking",
+            "category": "infra",
+            "services": ["virtual-network", "private-endpoints", "private-dns-zones"],
+        })
 
     def _parse_deployment_plan(self, content: str) -> list[dict]:
         """Parse deployment plan JSON from architect response.
@@ -896,6 +1113,9 @@ class BuildSession:
 
         return []
 
+    # Known second-level directory components for concept/ output.
+    _CONCEPT_SUBDIRS = {"infra", "apps", "db", "docs"}
+
     def _normalise_stages(self, stages: list[dict]) -> list[dict]:
         """Ensure every stage has all required keys with sensible defaults."""
         normalised = []
@@ -906,7 +1126,7 @@ class BuildSession:
                 "stage": s.get("stage", len(normalised) + 1),
                 "name": s.get("name", f"Stage {len(normalised) + 1}"),
                 "category": s.get("category", "infra"),
-                "dir": s.get("dir", ""),
+                "dir": self._enforce_concept_prefix(s.get("dir", "")),
                 "services": s.get("services", []),
                 "status": "pending",
                 "files": [],
@@ -916,30 +1136,41 @@ class BuildSession:
             normalised.append(entry)
         return normalised
 
+    def _enforce_concept_prefix(self, dir_path: str) -> str:
+        """Ensure *dir_path* uses ``concept/`` as its root component."""
+        if not dir_path:
+            return dir_path
+        normalised = dir_path.replace("\\", "/").strip("/")
+        if normalised.startswith("concept/") or normalised == "concept":
+            return normalised
+        parts = normalised.split("/")
+        if len(parts) >= 2 and parts[1] in self._CONCEPT_SUBDIRS:
+            parts[0] = "concept"
+            fixed = "/".join(parts)
+            logger.info("Fixed stage dir: %s -> %s", dir_path, fixed)
+            return fixed
+        if len(parts) == 1 and parts[0] in self._CONCEPT_SUBDIRS:
+            return f"concept/{parts[0]}"
+        return dir_path
+
     def _fallback_deployment_plan(self, templates: list) -> list[dict]:
         """Create a basic deployment plan when no architect is available.
 
-        Derives stages from template services (if any) or creates a
-        minimal two-stage plan (Foundation + Documentation).
+        Each service gets its own stage (one primary service per stage).
+        Resource groups are created inline with services.
         """
         stages: list[dict] = []
         stage_num = 0
 
-        # Foundation stage (always present)
+        # Managed Identity stage (first — shared identity for other stages)
         stage_num += 1
         stages.append(
             {
                 "stage": stage_num,
-                "name": "Foundation",
+                "name": "Managed Identity",
                 "category": "infra",
-                "dir": f"concept/infra/{self._iac_tool}/stage-{stage_num}-foundation",
+                "dir": f"concept/infra/{self._iac_tool}/stage-{stage_num}-managed-identity",
                 "services": [
-                    {
-                        "name": "resource-group",
-                        "computed_name": self._naming.resolve("resource_group", self._project_name),
-                        "resource_type": "Microsoft.Resources/resourceGroups",
-                        "sku": "",
-                    },
                     {
                         "name": "managed-identity",
                         "computed_name": self._naming.resolve("managed_identity", self._project_name),
@@ -1057,6 +1288,79 @@ class BuildSession:
         )
 
         return stages
+
+    def _ensure_private_endpoint_stage(self, stages: list[dict]) -> list[dict]:
+        """Inject a networking stage if services need private endpoints but none exists."""
+        _NETWORK_INDICATORS = {"network", "vnet", "virtual-network", "private-endpoint", "privateendpoint"}
+        for stage in stages:
+            name_lower = stage.get("name", "").lower().replace(" ", "-")
+            if any(ind in name_lower for ind in _NETWORK_INDICATORS):
+                return stages
+            for svc in stage.get("services", []):
+                rt = svc.get("resource_type", "").lower()
+                svc_name = svc.get("name", "").lower()
+                if "microsoft.network" in rt or any(ind in svc_name for ind in _NETWORK_INDICATORS):
+                    return stages
+
+        try:
+            from azext_prototype.knowledge.resource_metadata import (
+                get_private_endpoint_services,
+            )
+
+            all_services = [svc for stage in stages for svc in stage.get("services", [])]
+            pe_services = get_private_endpoint_services(all_services)
+        except Exception:
+            return stages
+
+        if not pe_services:
+            return stages
+
+        # Always insert at position 2 (after Foundation)
+        insert_idx = 1
+
+        pe_stage_services = [
+            {
+                "name": f"private-endpoint-{pe.service_name}",
+                "computed_name": "",
+                "resource_type": "Microsoft.Network/privateEndpoints",
+                "sku": "",
+            }
+            for pe in pe_services
+        ]
+        pe_stage_services.insert(
+            0,
+            {
+                "name": "virtual-network",
+                "computed_name": self._naming.resolve("virtual_network", self._project_name),
+                "resource_type": "Microsoft.Network/virtualNetworks",
+                "sku": "",
+            },
+        )
+
+        networking_stage = {
+            "stage": insert_idx + 1,
+            "name": "Networking",
+            "category": "infra",
+            "dir": f"concept/infra/{self._iac_tool}/stage-{insert_idx + 1}-networking",
+            "services": pe_stage_services,
+            "status": "pending",
+            "files": [],
+            "deploy_mode": "auto",
+            "manual_instructions": None,
+        }
+
+        stages.insert(insert_idx, networking_stage)
+        for idx, stage in enumerate(stages, start=1):
+            stage["stage"] = idx
+            if idx > insert_idx + 1:
+                old_dir = stage.get("dir", "")
+                if old_dir:
+                    stage["dir"] = re.sub(r"stage-\d+", f"stage-{idx}", old_dir)
+
+        logger.info("Injected networking stage at position %d with %d PE services", insert_idx + 1, len(pe_services))
+        return stages
+
+    # _build_plan_governance_summary removed — replaced by two-phase plan derivation
 
     @staticmethod
     def _categorise_service(service_type: str) -> str:
@@ -1546,11 +1850,42 @@ class BuildSession:
         if svc_lines:
             task += f"## Services in This Stage\n{svc_lines}\n\n"
 
+        # Directive hierarchy — ensures NEVER directives override architecture
+        task += (
+            "## CRITICAL: DIRECTIVE HIERARCHY (GENERATION-TIME)\n"
+            "During code generation, NEVER directives in MANDATORY RESOURCE POLICIES\n"
+            "take precedence over architecture context, POC notes, and configuration\n"
+            "suggestions. When architecture says 'public network' but policy says\n"
+            "NEVER enable public access — generate code that follows the NEVER\n"
+            "directive (disable public access).\n\n"
+            "NOTE: Users can override any policy post-generation via the PolicyResolver\n"
+            "(Accept/Override with justification/Regenerate) or via custom project\n"
+            "policies in .prototype/policies/. Your job is to generate the COMPLIANT\n"
+            "default — the user decides whether to override it.\n\n"
+        )
+
+        # Inject deterministic service policies FIRST — these are the exact
+        # code templates the agent must use as starting points.  Placing them
+        # early ensures the AI reads the required property values BEFORE it
+        # starts generating code.
+        service_policies = self._resolve_service_policies(services)
+        if service_policies:
+            task += service_policies + "\n\n"
+
+        # Inject verified API versions for this stage's resource types
+        api_version_brief = self._resolve_api_versions(services)
+        if api_version_brief:
+            task += api_version_brief + "\n"
+
         if template_context:
             task += f"## Template Configuration\n{template_context}\n\n"
 
         if prev_context:
             task += prev_context + "\n"
+
+        networking_note = self._get_networking_stage_note()
+        if networking_note:
+            task += networking_note + "\n"
 
         task += f"## Naming Convention\n{naming_instructions}\n\n"
 
@@ -1569,9 +1904,27 @@ class BuildSession:
             "- Do NOT output sensitive values (keys, connection strings) — "
             "omit them entirely when local auth is disabled\n"
             "- deploy.sh MUST be complete and syntactically valid — never truncate it\n"
-            "- deploy.sh MUST include: set -euo pipefail, Azure login check, "
-            "error handling (trap), output export to JSON\n"
+            "- CRITICAL: deploy.sh MUST include: set -euo pipefail, Azure login check, "
+            "error handling (trap), output export to JSON, AND argument parsing "
+            "(--dry-run, --destroy, --help flags), pre-flight validation of upstream "
+            "stage outputs, and post-deployment verification using az CLI commands. "
+            "Scripts under 100 lines WILL BE REJECTED as incomplete.\n"
         )
+
+        # Scope discipline
+        task += (
+            "\n## CRITICAL: SCOPE BOUNDARY\n"
+            "Generate ONLY the resources listed in 'Services in This Stage' above.\n"
+            "Any resource not in that list and not required by a MANDATORY RESOURCE\n"
+            "POLICY companion requirement WILL BE REJECTED.\n"
+            "Do NOT add speculative subnets, firewall rules, patch schedules,\n"
+            "backup policies, alert rules, or resources 'for future use'.\n\n"
+        )
+
+        # Inject companion resource requirements (RBAC, identity, data sources)
+        companion_brief = self._resolve_companion_requirements(services)
+        if companion_brief:
+            task += "\n" + companion_brief + "\n"
 
         # Terraform-specific file structure rules
         if is_iac and self._iac_tool == "terraform":
@@ -1579,7 +1932,7 @@ class BuildSession:
                 "\n## Terraform File Structure (MANDATORY)\n"
                 "Generate ONLY these files:\n"
                 "- providers.tf — terraform {}, required_providers "
-                '{ azapi = { source = "azure/azapi", version pinned } }, '
+                '{ azapi = { source = "hashicorp/azapi", version pinned } }, '
                 "backend {}, provider config. "
                 "This is the ONLY file that may contain a terraform {} block.\n"
                 "- main.tf — resource definitions ONLY. No terraform {} or provider {} blocks.\n"
@@ -1598,6 +1951,8 @@ class BuildSession:
         scaffolding = self._get_app_scaffolding_requirements(stage)
         if scaffolding:
             task += scaffolding
+
+        # Service policies already injected early (after services list).
 
         # Inject governor brief as high-priority constraints (near the end
         # of the prompt where models pay the most attention).
@@ -1945,21 +2300,164 @@ class BuildSession:
     # Internal — utilities
     # ------------------------------------------------------------------ #
 
-    def _collect_stage_file_content(self, stage: dict, max_bytes: int = 20_000) -> str:
-        """Collect content of generated files for a single stage."""
+    # ------------------------------------------------------------------ #
+    # QA task construction
+    # ------------------------------------------------------------------ #
+
+    def _build_qa_context(self, services: list[dict]) -> str:
+        """Build context briefs (provider rules, policies, API versions) for QA."""
+        parts: list[str] = []
+        if self._iac_tool == "terraform":
+            parts.append(
+                "## Provider Compliance (Terraform)\n"
+                "ALL resources MUST use `azapi_resource` with ARM resource types.\n"
+                "NEVER suggest `azurerm_*` resources (azurerm_role_assignment, "
+                "azurerm_key_vault, etc.). Use `azapi_resource` with the correct "
+                "Microsoft.Authorization/roleAssignments type instead.\n"
+            )
+        networking_note = self._get_networking_stage_note()
+        if networking_note:
+            parts.append(networking_note)
+        service_policies = self._resolve_service_policies(services)
+        if service_policies:
+            parts.append(service_policies)
+        api_brief = self._resolve_api_versions(services)
+        if api_brief:
+            parts.append(api_brief)
+        companion_brief = self._resolve_companion_requirements(services)
+        if companion_brief:
+            parts.append(companion_brief)
+        return "\n".join(parts)
+
+    def _get_networking_stage_note(self) -> str:
+        """Return a QA note about the networking stage if one exists in the plan."""
+        all_stages = self._build_state._state.get("deployment_stages", [])
+        for stage in all_stages:
+            if stage.get("name", "").lower() == "networking":
+                pe_services = [
+                    s.get("name", "") for s in stage.get("services", []) if "private-endpoint" in s.get("name", "")
+                ]
+                if pe_services:
+                    return (
+                        "## CRITICAL: Networking Stage (ARCHITECTURE BOUNDARY)\n"
+                        f"A dedicated networking stage (Stage {stage['stage']}) provides "
+                        "VNet, subnets, private DNS zones, and private endpoints for ALL resources.\n\n"
+                        "In THIS stage:\n"
+                        '- DO set `publicNetworkAccess = "Disabled"` on the resource\n'
+                        '- Do NOT flag `publicNetworkAccess = "Disabled"` as an issue\n'
+                        "- CRITICAL: Do NOT create private endpoints, private DNS zones, "
+                        "DNS zone links, or DNS zone groups — those are created in "
+                        f"Stage {stage['stage']}\n"
+                        "- Do NOT reference VNet or subnet IDs (they may not exist yet if this "
+                        f"stage runs before Stage {stage['stage']})\n"
+                        f"Private endpoints handled by networking: {', '.join(pe_services)}\n"
+                    )
+        return ""
+
+    @staticmethod
+    def _build_qa_task(stage_num: int, stage_name: str, attempt: int, file_content: str, context: str) -> str:
+        """Build the QA task prompt for a given review attempt."""
+        if attempt == 0:
+            header = (
+                f"Review the generated code for Stage {stage_num}: {stage_name} "
+                "using your Mandatory Review Checklist. "
+                "Flag any issues — missing managed identity config, hardcoded secrets, "
+                "undefined references, missing outputs, incomplete scripts, etc.\n\n"
+                "Provide specific fixes (corrected file contents) for each issue.\n\n"
+            )
+        else:
+            header = (
+                f"Re-review the REMEDIATED code for Stage {stage_num}: {stage_name}. "
+                "Report ONLY remaining issues that were NOT fixed.\n\n"
+            )
+
+        task = header
+        if context:
+            task += context + "\n\n"
+        task += f"## Stage {stage_num} Files\n\n{file_content}"
+        return task
+
+    # ------------------------------------------------------------------ #
+    # Service policy resolution
+    # ------------------------------------------------------------------ #
+
+    def _resolve_service_policies(self, services: list[dict]) -> str:
+        """Resolve deterministic service policies via exact service matching."""
+        try:
+            from azext_prototype.governance.policies import PolicyEngine
+
+            engine = PolicyEngine()
+            engine.load()
+            svc_names = [s.get("name", "") for s in services if s.get("name")]
+            if not svc_names:
+                return ""
+            result = engine.resolve_for_stage(svc_names, self._iac_tool, agent_name="terraform-agent")
+
+            from azext_prototype.debug_log import log_flow as _dbg
+
+            _dbg(
+                "build_session.policies",
+                "Service policies resolved",
+                service_names=svc_names,
+                policy_len=len(result),
+                policy_full=result if result else "(empty)",
+            )
+            return result
+        except Exception:
+            return ""
+
+    # ------------------------------------------------------------------ #
+    # Resource metadata injection
+    # ------------------------------------------------------------------ #
+
+    def _resolve_api_versions(self, services: list[dict]) -> str:
+        """Resolve and format API version brief for the stage's services."""
+        try:
+            from azext_prototype.knowledge.resource_metadata import (
+                format_api_version_brief,
+                resolve_resource_metadata,
+            )
+
+            resource_types = [s.get("resource_type", "") for s in services if s.get("resource_type")]
+            if not resource_types:
+                return ""
+            cache = getattr(self._context, "_search_cache", None)
+            metadata = resolve_resource_metadata(resource_types, search_cache=cache)
+            return format_api_version_brief(metadata)
+        except Exception:
+            return ""
+
+    def _resolve_companion_requirements(self, services: list[dict]) -> str:
+        """Resolve and format companion resource requirements for the stage."""
+        try:
+            from azext_prototype.knowledge.resource_metadata import (
+                format_companion_brief,
+                resolve_companion_requirements,
+            )
+
+            requirements = resolve_companion_requirements(services)
+            if not requirements:
+                return ""
+            identity_types = {"microsoft.managedidentity/userassignedidentities"}
+            stage_has_identity = any(s.get("resource_type", "").lower() in identity_types for s in services)
+            return format_companion_brief(requirements, stage_has_identity)
+        except Exception:
+            return ""
+
+    # ------------------------------------------------------------------ #
+    # File content collection for QA
+    # ------------------------------------------------------------------ #
+
+    def _collect_stage_file_content(self, stage: dict) -> str:
+        """Collect complete content of generated files for a single stage."""
         project_root = Path(self._context.project_dir)
         parts: list[str] = []
-        total = 0
 
         files = stage.get("files", [])
         if not files:
             return ""
 
         for filepath in files:
-            if total >= max_bytes:
-                parts.append("\n(remaining files omitted — size cap reached)")
-                break
-
             full_path = project_root / filepath
             try:
                 content = full_path.read_text(encoding="utf-8")
@@ -1967,12 +2465,7 @@ class BuildSession:
                 parts.append(f"```{filepath}\n(could not read file)\n```")
                 continue
 
-            per_file_cap = 8_000
-            if len(content) > per_file_cap:
-                content = content[:per_file_cap] + "\n... (truncated)"
-
             block = f"```{filepath}\n{content}\n```"
-            total += len(block)
             parts.append(block)
 
         return "\n\n".join(parts)
@@ -1994,6 +2487,10 @@ class BuildSession:
         stage_num = stage["stage"]
         orchestrator = AgentOrchestrator(self._registry, self._context)
 
+        # Build context briefs once for all QA attempts
+        services = stage.get("services", [])
+        qa_context = self._build_qa_context(services)
+
         for attempt in range(_MAX_STAGE_REMEDIATION_ATTEMPTS + 1):
             # 1. Collect this stage's files
             file_content = self._collect_stage_file_content(stage)
@@ -2001,21 +2498,7 @@ class BuildSession:
                 return
 
             # 2. Build QA task
-            if attempt == 0:
-                qa_task = (
-                    f"Review the generated code for Stage {stage_num}: {stage['name']} "
-                    "using your Mandatory Review Checklist. "
-                    "Flag any issues — missing managed identity config, hardcoded secrets, "
-                    "undefined references, missing outputs, incomplete scripts, etc.\n\n"
-                    "Provide specific fixes (corrected file contents) for each issue.\n\n"
-                    f"## Stage {stage_num} Files\n\n{file_content}"
-                )
-            else:
-                qa_task = (
-                    f"Re-review the REMEDIATED code for Stage {stage_num}: {stage['name']}. "
-                    "Report ONLY remaining issues that were NOT fixed.\n\n"
-                    f"## Stage {stage_num} Files\n\n{file_content}"
-                )
+            qa_task = self._build_qa_task(stage_num, stage["name"], attempt, file_content, qa_context)
 
             # 3. Run QA
             with self._maybe_spinner(f"QA reviewing Stage {stage_num}...", use_styled):
@@ -2037,15 +2520,10 @@ class BuildSession:
             )
 
             # 4. Check if issues found
-            has_issues = qa_content and any(
-                kw in qa_content.lower() for kw in ["critical", "error", "missing", "fix", "issue", "broken"]
-            )
+            has_issues = _qa_has_issues(qa_content)
 
             if has_issues:
-                # Log which keywords triggered
-                qa_lower = qa_content.lower()
-                triggered = [kw for kw in ["critical", "error", "missing", "fix", "issue", "broken"] if kw in qa_lower]
-                _dbg("build_session.qa", f"Stage {stage_num} has_issues=True", triggered_keywords=triggered)
+                _dbg("build_session.qa", f"Stage {stage_num} has_issues=True")
 
             if not has_issues:
                 _print(f"       Stage {stage_num} passed QA.")
@@ -2055,7 +2533,9 @@ class BuildSession:
             if attempt >= _MAX_STAGE_REMEDIATION_ATTEMPTS:
                 _print(f"       Stage {stage_num}: QA issues remain after {attempt} remediation(s). Proceeding.")
                 if qa_content:
-                    _print(f"       Remaining: {qa_content[:200]}")
+                    _print(f"\n       Remaining — Stage {stage_num} {stage['name']} — Remaining Issues Report:\n")
+                    _print(qa_content)
+                    _print("")
                 return
 
             # 6. Remediate — re-invoke IaC agent with focused context + governance + knowledge
@@ -2094,7 +2574,7 @@ class BuildSession:
                 )
 
                 with self._maybe_spinner(f"Remediating Stage {stage_num} (attempt {attempt + 1})...", use_styled):
-                    response = agent.execute(self._context, task)
+                    response = self._execute_with_continuation(agent, task)
 
             if response:
                 self._token_tracker.record(response)
@@ -2102,17 +2582,10 @@ class BuildSession:
             written_paths = self._write_stage_files(stage, content)
             self._build_state.mark_stage_generated(stage_num, written_paths, agent.name)
 
-    def _collect_generated_file_content(self, max_bytes: int = 50_000) -> str:
-        """Collect content of all generated files for QA review.
-
-        Iterates generated stages, reads each file from disk, and builds
-        a formatted string with fenced code blocks.  Applies *max_bytes*
-        cap to avoid blowing the context window — individual large files
-        are truncated and collection stops once the cap is reached.
-        """
+    def _collect_generated_file_content(self) -> str:
+        """Collect complete content of all generated files for QA review."""
         project_root = Path(self._context.project_dir)
         parts: list[str] = []
-        total = 0
 
         for stage in self._build_state.get_generated_stages():
             stage_num = stage["stage"]
@@ -2122,15 +2595,9 @@ class BuildSession:
             if not files:
                 continue
 
-            header = f"### Stage {stage_num}: {stage_name} ({category})"
-            parts.append(header)
-            total += len(header)
+            parts.append(f"### Stage {stage_num}: {stage_name} ({category})")
 
             for filepath in files:
-                if total >= max_bytes:
-                    parts.append("\n(remaining files omitted — size cap reached)")
-                    return "\n\n".join(parts)
-
                 full_path = project_root / filepath
                 try:
                     content = full_path.read_text(encoding="utf-8")
@@ -2138,16 +2605,44 @@ class BuildSession:
                     parts.append(f"```{filepath}\n(could not read file)\n```")
                     continue
 
-                # Truncate individual large files
-                per_file_cap = 8_000
-                if len(content) > per_file_cap:
-                    content = content[:per_file_cap] + "\n... (truncated)"
-
                 block = f"```{filepath}\n{content}\n```"
-                total += len(block)
                 parts.append(block)
 
         return "\n\n".join(parts)
+
+    # ------------------------------------------------------------------ #
+    # Truncation recovery
+    # ------------------------------------------------------------------ #
+
+    def _execute_with_continuation(self, agent: Any, task: str, max_continuations: int = 3) -> Any:
+        """Execute an agent task, automatically continuing if truncated."""
+        from azext_prototype.ai.provider import AIResponse
+
+        response = agent.execute(self._context, task)
+
+        for _ in range(max_continuations):
+            if not response or response.finish_reason != "length":
+                break
+            logger.info("Response truncated (finish_reason=length), requesting continuation")
+            cont_task = (
+                "Your previous response was cut off mid-generation. "
+                "Continue EXACTLY where you left off — do not repeat any "
+                "file or content already generated. Pick up mid-line if "
+                "necessary. Maintain the same code block format."
+            )
+            cont = agent.execute(self._context, cont_task)
+            if not cont:
+                break
+            response = AIResponse(
+                content=(response.content or "") + (cont.content or ""),
+                model=cont.model,
+                usage={
+                    k: response.usage.get(k, 0) + cont.usage.get(k, 0) for k in set(response.usage) | set(cont.usage)
+                },
+                finish_reason=cont.finish_reason,
+            )
+
+        return response
 
     @contextmanager
     def _maybe_spinner(self, message: str, use_styled: bool, *, status_fn: Callable | None = None) -> Iterator[None]:

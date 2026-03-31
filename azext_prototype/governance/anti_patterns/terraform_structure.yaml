@@ -1,0 +1,97 @@
+# Anti-pattern detection — Terraform structure domain
+#
+# Detects provider hygiene issues, version mismatches, incorrect tag
+# placement, and non-deterministic patterns in AI-generated Terraform code.
+
+domain: terraform_structure
+description: Provider hygiene, version consistency, tag placement, and azapi conventions
+
+patterns:
+  # Detect azurerm provider declarations (should use azapi only)
+  - search_patterns:
+      - 'source  = "hashicorp/azurerm"'
+      - 'source = "hashicorp/azurerm"'
+      - 'provider "azurerm"'
+    safe_patterns:
+      - "# do not use azurerm"
+      - "# never use azurerm"
+      - "never declare the azurerm"
+    correct_patterns:
+      - 'source = "hashicorp/azapi"'
+    warning_message: >-
+      azurerm provider declared — use hashicorp/azapi for all Azure resources.
+      The only allowed provider is hashicorp/azapi.
+
+  # Detect azurerm resources mixed with azapi
+  - search_patterns:
+      - "azurerm_role_assignment"
+      - "azurerm_monitor_metric_alert"
+      - "azurerm_storage_management_policy"
+      - "azurerm_key_vault_secret"
+      - "azurerm_monitor_diagnostic_setting"
+    safe_patterns:
+      - "# do not use azurerm"
+      - "never use azurerm"
+    correct_patterns:
+      - "Microsoft.Authorization/roleAssignments@"
+      - "Microsoft.Insights/diagnosticSettings@"
+    warning_message: >-
+      azurerm resource detected — use azapi_resource with the corresponding ARM
+      resource type instead (e.g., Microsoft.Authorization/roleAssignments@2022-04-01).
+
+  # Detect random provider (unnecessary)
+  - search_patterns:
+      - 'source  = "hashicorp/random"'
+      - 'source = "hashicorp/random"'
+      - 'provider "random"'
+      - "random_string"
+      - "random_id"
+      - "random_pet"
+    safe_patterns:
+      - "# do not use random"
+    correct_patterns:
+      - 'substr(md5("'
+    warning_message: >-
+      random provider detected — use Terraform built-in functions (e.g.,
+      substr(md5("seed"), 0, 8)) instead of the random provider.
+
+  # Detect outdated azapi v1.x versions
+  - search_patterns:
+      - "~> 1.15"
+      - "~> 1.14"
+      - "~> 1.13"
+      - "~> 1.12"
+      - "~> 1.11"
+      - "~> 1.10"
+    safe_patterns: []
+    correct_patterns:
+      - "~> 2.8"
+      - "~> 2."
+    warning_message: >-
+      azapi v1.x version detected — use ~> 2.8.0 or later. v1.x has different
+      tag placement and output access semantics that are incompatible with v2.x patterns.
+
+  # Detect non-deterministic uuid()
+  - search_patterns:
+      - "uuid()"
+    safe_patterns:
+      - "uuidv5"
+      - "# never use uuid"
+      - "do not use uuid"
+    correct_patterns:
+      - 'uuidv5("6ba7b811-9dad-11d1-80b4-00c04fd430c8"'
+    warning_message: >-
+      Non-deterministic uuid() detected — use uuidv5() with deterministic seeds
+      (resource ID + principal ID + role ID) to ensure idempotent plans.
+
+  # Detect jsondecode() on azapi v2.x outputs (v1.x pattern on v2.x)
+  - search_patterns:
+      - "jsondecode(azapi_resource."
+      - "jsondecode( azapi_resource."
+    safe_patterns:
+      - "# jsondecode is for v1.x"
+    correct_patterns:
+      - ".output.properties."
+    warning_message: >-
+      jsondecode() on azapi_resource output detected — in azapi v2.x, output is
+      already a parsed object. Access directly via .output.properties.PropertyName.

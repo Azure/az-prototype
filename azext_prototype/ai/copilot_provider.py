@@ -44,10 +44,10 @@ _COMPLETIONS_URL = f"{_BASE_URL}/chat/completions"
 _MODELS_URL = f"{_BASE_URL}/models"
 
 # Default request timeout in seconds.  Architecture generation and
-# large prompts can take several minutes; 8 minutes is a safe default.
+# large prompts can take several minutes; 10 minutes is a safe default.
 # The discovery system prompt alone is ~69KB (governance + templates +
-# architect context), so normal turns need generous timeouts.
-_DEFAULT_TIMEOUT = 480
+# architect context), and QA remediation prompts can reach 235KB+.
+_DEFAULT_TIMEOUT = 600
 
 
 class CopilotProvider(AIProvider):
@@ -165,6 +165,7 @@ class CopilotProvider(AIProvider):
             model=target_model,
             messages=len(messages),
             prompt_chars=prompt_chars,
+            max_tokens=max_tokens,
             timeout=self._timeout,
         )
 
@@ -265,6 +266,7 @@ class CopilotProvider(AIProvider):
             "CopilotProvider.chat",
             "Response usage and headers",
             usage_keys=list(usage.keys()),
+            finish_reason=finish,
             pru=pru,
         )
 
@@ -363,6 +365,7 @@ class CopilotProvider(AIProvider):
         return [
             {"id": "claude-sonnet-4", "name": "Claude Sonnet 4"},
             {"id": "claude-sonnet-4.5", "name": "Claude Sonnet 4.5"},
+            {"id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6"},
             {"id": "gpt-4.1", "name": "GPT-4.1"},
             {"id": "gpt-5-mini", "name": "GPT-5 Mini"},
             {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro"},

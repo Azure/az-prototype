@@ -1,0 +1,347 @@
+# yaml-language-server: $schema=../../policy.schema.json
+apiVersion: v1
+kind: policy
+metadata:
+  name: virtual-network
+  category: azure
+  services: [virtual-network]
+  last_reviewed: "2026-03-27"
+
+rules:
+  - id: VNET-001
+    severity: required
+    description: "Create Virtual Network with planned address space and purpose-specific subnets"
+    rationale: "Address space must be planned to avoid overlap; subnets must be sized for their workload type"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      # VNet declares ONLY addressSpace — subnets are separate child resources
+      resource "azapi_resource" "virtual_network" {
+        type      = "Microsoft.Network/virtualNetworks@2024-01-01"
+        name      = var.vnet_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            addressSpace = {
+              addressPrefixes = [var.vnet_address_space]
+            }
+          }
+        }
+      }
+
+      # Each subnet is a separate child resource to prevent drift
+      resource "azapi_resource" "subnet_app" {
+        type      = "Microsoft.Network/virtualNetworks/subnets@2024-01-01"
+        name      = "snet-app"
+        parent_id = azapi_resource.virtual_network.id
+
+        body = {
+          properties = {
+            addressPrefix = var.app_subnet_prefix
+            delegations = [
+              {
+                name = "delegation-app"
+                properties = {
+                  serviceName = "Microsoft.Web/serverFarms"
+                }
+              }
+            ]
+            networkSecurityGroup = {
+              id = azapi_resource.nsg_app.id
+            }
+          }
+        }
+
+        depends_on = [azapi_resource.nsg_app]
+      }
+
+      resource "azapi_resource" "subnet_pe" {
+        type      = "Microsoft.Network/virtualNetworks/subnets@2024-01-01"
+        name      = "snet-pe"
+        parent_id = azapi_resource.virtual_network.id
+
+        body = {
+          properties = {
+            addressPrefix = var.pe_subnet_prefix
+            networkSecurityGroup = {
+              id = azapi_resource.nsg_pe.id
+            }
+          }
+        }
+
+        depends_on = [azapi_resource.nsg_pe, azapi_resource.subnet_app]
+      }
+
+      resource "azapi_resource" "subnet_aca" {
+        type      = "Microsoft.Network/virtualNetworks/subnets@2024-01-01"
+        name      = "snet-aca"
+        parent_id = azapi_resource.virtual_network.id
+
+        body = {
+          properties = {
+            addressPrefix = var.aca_subnet_prefix
+            delegations = [
+              {
+                name = "delegation-aca"
+                properties = {
+                  serviceName = "Microsoft.App/environments"
+                }
+              }
+            ]
+            networkSecurityGroup = {
+              id = azapi_resource.nsg_aca.id
+            }
+          }
+        }
+
+        depends_on = [azapi_resource.nsg_aca, azapi_resource.subnet_pe]
+      }
+    bicep_pattern: |
+      // VNet declares ONLY addressSpace — subnets are separate child resources
+      resource virtualNetwork 'Microsoft.Network/virtualNetworks@2024-01-01' = {
+        name: vnetName
+        location: location
+        properties: {
+          addressSpace: {
+            addressPrefixes: [
+              vnetAddressSpace
+            ]
+          }
+        }
+      }
+
+      // Each subnet is a separate child resource to prevent drift
+      resource subnetApp 'Microsoft.Network/virtualNetworks/subnets@2024-01-01' = {
+        parent: virtualNetwork
+        name: 'snet-app'
+        properties: {
+          addressPrefix: appSubnetPrefix
+          delegations: [
+            {
+              name: 'delegation-app'
+              properties: {
+                serviceName: 'Microsoft.Web/serverFarms'
+              }
+            }
+          ]
+          networkSecurityGroup: {
+            id: nsgApp.id
+          }
+        }
+      }
+
+      resource subnetPe 'Microsoft.Network/virtualNetworks/subnets@2024-01-01' = {
+        parent: virtualNetwork
+        name: 'snet-pe'
+        dependsOn: [subnetApp]
+        properties: {
+          addressPrefix: peSubnetPrefix
+          networkSecurityGroup: {
+            id: nsgPe.id
+          }
+        }
+      }
+
+      resource subnetAca 'Microsoft.Network/virtualNetworks/subnets@2024-01-01' = {
+        parent: virtualNetwork
+        name: 'snet-aca'
+        dependsOn: [subnetPe]
+        properties: {
+          addressPrefix: acaSubnetPrefix
+          delegations: [
+            {
+              name: 'delegation-aca'
+              properties: {
+                serviceName: 'Microsoft.App/environments'
+              }
+            }
+          ]
+          networkSecurityGroup: {
+            id: nsgAca.id
+          }
+        }
+      }
+    prohibitions:
+      - "NEVER define subnets inline in the VNet body -- always create subnets as separate child resources to prevent Terraform/ARM drift"
+      - "NEVER create a subnet without an NSG attached"
+      - "NEVER use a /8 or /16 address space for POC -- use /20 or smaller to avoid address space waste"
+      - "NEVER overlap subnet address ranges"
+      - "NEVER use overlapping address spaces with peered VNets"
+
+  - id: VNET-002
+    severity: required
+    description: "Create Network Security Groups with explicit rules for every subnet"
+    rationale: "NSGs provide network-level access control; every subnet must have an NSG to enforce least-privilege traffic flow"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    terraform_pattern: |
+      resource "azapi_resource" "nsg_app" {
+        type      = "Microsoft.Network/networkSecurityGroups@2024-01-01"
+        name      = "nsg-${var.project_name}-app"
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            securityRules = [
+              {
+                name = "AllowHTTPS"
+                properties = {
+                  priority                 = 100
+                  direction                = "Inbound"
+                  access                   = "Allow"
+                  protocol                 = "Tcp"
+                  sourcePortRange          = "*"
+                  destinationPortRange     = "443"
+                  sourceAddressPrefix      = "*"
+                  destinationAddressPrefix = "*"
+                }
+              },
+              {
+                name = "DenyAllInbound"
+                properties = {
+                  priority                 = 4096
+                  direction                = "Inbound"
+                  access                   = "Deny"
+                  protocol                 = "*"
+                  sourcePortRange          = "*"
+                  destinationPortRange     = "*"
+                  sourceAddressPrefix      = "*"
+                  destinationAddressPrefix = "*"
+                }
+              }
+            ]
+          }
+        }
+      }
+
+      resource "azapi_resource" "nsg_pe" {
+        type      = "Microsoft.Network/networkSecurityGroups@2024-01-01"
+        name      = "nsg-${var.project_name}-pe"
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            securityRules = [
+              {
+                name = "DenyAllInbound"
+                properties = {
+                  priority                 = 4096
+                  direction                = "Inbound"
+                  access                   = "Deny"
+                  protocol                 = "*"
+                  sourcePortRange          = "*"
+                  destinationPortRange     = "*"
+                  sourceAddressPrefix      = "*"
+                  destinationAddressPrefix = "*"
+                }
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource nsgApp 'Microsoft.Network/networkSecurityGroups@2024-01-01' = {
+        name: 'nsg-${projectName}-app'
+        location: location
+        properties: {
+          securityRules: [
+            {
+              name: 'AllowHTTPS'
+              properties: {
+                priority: 100
+                direction: 'Inbound'
+                access: 'Allow'
+                protocol: 'Tcp'
+                sourcePortRange: '*'
+                destinationPortRange: '443'
+                sourceAddressPrefix: '*'
+                destinationAddressPrefix: '*'
+              }
+            }
+            {
+              name: 'DenyAllInbound'
+              properties: {
+                priority: 4096
+                direction: 'Inbound'
+                access: 'Deny'
+                protocol: '*'
+                sourcePortRange: '*'
+                destinationPortRange: '*'
+                sourceAddressPrefix: '*'
+                destinationAddressPrefix: '*'
+              }
+            }
+          ]
+        }
+      }
+
+      resource nsgPe 'Microsoft.Network/networkSecurityGroups@2024-01-01' = {
+        name: 'nsg-${projectName}-pe'
+        location: location
+        properties: {
+          securityRules: [
+            {
+              name: 'DenyAllInbound'
+              properties: {
+                priority: 4096
+                direction: 'Inbound'
+                access: 'Deny'
+                protocol: '*'
+                sourcePortRange: '*'
+                destinationPortRange: '*'
+                sourceAddressPrefix: '*'
+                destinationAddressPrefix: '*'
+              }
+            }
+          ]
+        }
+      }
+
+  - id: VNET-003
+    severity: required
+    description: "Use proper subnet delegation for Azure services that require it"
+    rationale: "Services like App Service, Container Apps, and others require subnet delegation to function correctly"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+    prohibitions:
+      - "NEVER create a subnet for App Service without Microsoft.Web/serverFarms delegation"
+      - "NEVER create a subnet for Container Apps without Microsoft.App/environments delegation"
+      - "NEVER delegate a private endpoint subnet — PE subnets must NOT have delegations"
+      - "NEVER share a delegated subnet between different service types"
+
+  - id: VNET-004
+    severity: required
+    description: "Plan subnet sizes according to service requirements"
+    rationale: "App Service VNet integration needs /26 minimum; Container Apps needs /23 minimum; PE subnets need /27 minimum"
+    applies_to: [cloud-architect, terraform-agent, bicep-agent]
+    prohibitions:
+      - "NEVER create an App Service integration subnet smaller than /26"
+      - "NEVER create a Container Apps subnet smaller than /23"
+      - "NEVER create a private endpoint subnet smaller than /27"
+
+  - id: VNET-005
+    severity: recommended
+    description: "Use standard naming convention for subnets: snet-{purpose}"
+    rationale: "Consistent naming enables automation and reduces configuration errors"
+    applies_to: [terraform-agent, bicep-agent, cloud-architect]
+
+patterns:
+  - name: "VNet with delegated subnets and NSGs"
+    description: "Complete VNet deployment with purpose-specific subnets, delegations, and NSGs"
+
+anti_patterns:
+  - description: "Do not create subnets without NSGs"
+    instead: "Attach an NSG to every subnet"
+  - description: "Do not use a single large subnet for all services"
+    instead: "Create purpose-specific subnets with appropriate delegations"
+  - description: "Do not use /8 or /16 address spaces for POC"
+    instead: "Use /20 or /22 for POC; plan for future growth without waste"
+
+references:
+  - title: "Virtual network planning"
+    url: "https://learn.microsoft.com/azure/virtual-network/virtual-network-vnet-plan-design-arm"
+  - title: "Network security groups"
+    url: "https://learn.microsoft.com/azure/virtual-network/network-security-groups-overview"
+  - title: "Subnet delegation"
+    url: "https://learn.microsoft.com/azure/virtual-network/subnet-delegation-overview"

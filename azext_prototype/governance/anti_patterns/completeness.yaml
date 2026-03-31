@@ -95,3 +95,25 @@ patterns:
       - 'backend "local" {}'
       - "# Provide literal values or use local backend"
     warning_message: "Backend config has empty required fields — terraform init will fail. Either provide literal values or omit the backend block to use local state."
+
+  # Detect hardcoded upstream resource names (ALZ naming patterns)
+  - search_patterns:
+      - 'queueName = "zd-'
+      - 'queueName = "pi-'
+      - 'queueName = "pm-'
+      - 'queueName = "pc-'
+      - 'name = "zdacr'
+      - 'name = "zdst'
+      - 'resource_group_name = "zd-rg-'
+      - 'resource_group_name = "pi-rg-'
+      - 'resource_group_name = "pm-rg-'
+    safe_patterns:
+      - "var."
+      - "local."
+      - "data.terraform_remote_state"
+      - "data.azapi_resource"
+    correct_patterns:
+      - "data.terraform_remote_state.stage.outputs.queue_name"
+      - "var.resource_group_name"
+      - "local.resource_group_name"
+    warning_message: "Hardcoded upstream resource name detected — use terraform_remote_state outputs or variables to reference resources from other stages. NEVER hardcode resource names."
