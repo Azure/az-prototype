@@ -151,70 +151,50 @@ def generate_anti_patterns_page() -> str:
     return "\n".join(lines)
 
 
-def generate_standards_index() -> str:
-    """Generate the standards index page linking to subpages."""
-    lines = ["# Design Standards", ""]
-    lines.append(
-        "Design standards are injected into agent system messages to guide code quality. "
-        "They cover design principles, coding conventions, and IaC module patterns.\n"
-    )
+def generate_standards_leaf_page(yf: Path) -> str:
+    """Generate a single standards page for one YAML file."""
+    data = load_yaml(yf)
+    meta = data.get("metadata", {})
+    name = meta.get("name", yf.stem)
+    title = name.replace("-", " ").replace("_", " ").title()
+    description = data.get("description", meta.get("description", ""))
+    principles = data.get("principles", data.get("standards", []))
 
-    std_dir = GOVERNANCE_DIR / "standards"
-    yaml_files = sorted(std_dir.rglob("*.yaml"))
-
-    total = 0
-    for yf in yaml_files:
-        data = load_yaml(yf)
-        principles = data.get("principles", data.get("standards", []))
-        total += len(principles)
-
-    lines.append(f"**{len(yaml_files)} documents, {total} principles**\n")
-    lines.append("---\n")
-
-    sections = {
-        "Application": ("application", "Application code patterns (Python, .NET)"),
-        "IaC": ("iac", "Infrastructure-as-Code patterns (Bicep, Terraform)"),
-        "Principles": ("principles", "Universal design and coding principles"),
-    }
-
-    for section_name, (subdir, desc) in sections.items():
-        section_dir = std_dir / subdir
-        if not section_dir.is_dir():
-            continue
-        file_count = len(list(section_dir.glob("*.yaml")))
-        principle_count = 0
-        for yf in section_dir.glob("*.yaml"):
-            data = load_yaml(yf)
-            principle_count += len(data.get("principles", data.get("standards", [])))
-        lines.append(
-            f"- [[Governance Standards {section_name}]] "
-            f"-- {desc} ({file_count} documents, {principle_count} principles)"
-        )
-
-    lines.append("")
-    return "\n".join(lines)
-
-
-def generate_standards_subpage(title: str, section_dir: Path) -> str:
-    """Generate a standards subpage for a single category directory."""
     lines = [f"# {title}", ""]
-
-    yaml_files = sorted(section_dir.glob("*.yaml"))
-    if not yaml_files:
-        lines.append("No standards files found in this category.")
-        return "\n".join(lines)
-
-    total = 0
-    for yf in yaml_files:
-        data = load_yaml(yf)
-        principles = data.get("principles", data.get("standards", []))
-        total += len(principles)
-
-    lines.append(f"**{len(yaml_files)} documents, {total} principles**\n")
+    if description:
+        lines.append(f"{description}\n")
+    lines.append(f"**{len(principles)} principles**\n")
     lines.append("---\n")
 
-    for yf in yaml_files:
-        _render_standard_file(yf, lines)
+    if principles:
+        lines.append("| ID | Principle | Rationale |")
+        lines.append("|-----|-----------|-----------|")
+        for p in principles:
+            pid = p.get("id", "?")
+            principle = p.get("name", p.get("principle", "?")).replace("|", "\\|")
+            rationale = p.get("rationale", p.get("description", "")).replace("|", "\\|")[:100]
+            lines.append(f"| {pid} | {principle} | {rationale} |")
+        lines.append("")
+
+    # Render full details per principle
+    for p in principles:
+        pid = p.get("id", "?")
+        pname = p.get("name", p.get("principle", "?"))
+        desc = p.get("rationale", p.get("description", ""))
+        applies_to = p.get("applies_to", [])
+        examples = p.get("examples", [])
+
+        lines.append(f"### {pid}: {pname}\n")
+        lines.append(f"{desc}\n")
+        if applies_to:
+            agents_text = ", ".join(f"`{a}`" for a in applies_to)
+            lines.append(f"**Applies to**: {agents_text}\n")
+        if examples:
+            lines.append("**Examples**:\n")
+            for ex in examples:
+                lines.append(f"- {ex}")
+            lines.append("")
+        lines.append("---\n")
 
     return "\n".join(lines)
 
@@ -293,30 +273,25 @@ def main():
     out_path.write_text(content, encoding="utf-8")
     print(f"  {out_path.name}")
 
-    # Standards subpages
+    # Standards leaf pages — one per YAML file
     std_dir = GOVERNANCE_DIR / "standards"
-    standards_categories = {
-        "application": "Application Standards",
-        "iac": "Infrastructure-as-Code Standards",
-        "principles": "Design & Coding Principles",
+    standards_sections = {
+        "Application": std_dir / "application",
+        "Iac": std_dir / "iac",
+        "Principles": std_dir / "principles",
     }
     standards_page_count = 0
 
-    for subdir, title in standards_categories.items():
-        cat_path = std_dir / subdir
-        if cat_path.exists():
-            content = generate_standards_subpage(title, cat_path)
-            out_path = WIKI_DIR / f"Governance-Standards-{subdir.title()}.md"
+    for section_name, section_dir in standards_sections.items():
+        if not section_dir.is_dir():
+            continue
+        for yf in sorted(section_dir.glob("*.yaml")):
+            leaf_name = yf.stem.replace("-", " ").replace("_", " ").title()
+            content = generate_standards_leaf_page(yf)
+            out_path = WIKI_DIR / f"Governance-Standards-{section_name}-{leaf_name.replace(' ', '-')}.md"
             out_path.write_text(content, encoding="utf-8")
             print(f"  {out_path.name}")
             standards_page_count += 1
-
-    # Standards index page
-    content = generate_standards_index()
-    out_path = WIKI_DIR / "Governance-Standards.md"
-    out_path.write_text(content, encoding="utf-8")
-    print(f"  {out_path.name}")
-    standards_page_count += 1
 
     total_pages = len(azure_categories) + len(other_categories) + 2 + standards_page_count
     print(f"\nGenerated {total_pages} wiki pages.")
