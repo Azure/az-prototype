@@ -203,6 +203,9 @@ class BuildSession:
         qa_agents = registry.find_by_capability(AgentCapability.QA)
         self._qa_agent = qa_agents[0] if qa_agents else None
 
+        advisory_agents = registry.find_by_capability(AgentCapability.ADVISORY)
+        self._advisor_agent = advisory_agents[0] if advisory_agents else None
+
         # Escalation tracker
         self._escalation_tracker = EscalationTracker(agent_context.project_dir)
         if self._escalation_tracker.exists:
@@ -485,6 +488,9 @@ class BuildSession:
                     if qa_passed:
                         self._build_state.mark_stage_generated(stage_num, stage.get("files", []), "user-fix")
                         self._build_state.cascade_downstream_pending(stage_num)
+                        advisory = self._generate_stage_advisory(stage, _print)
+                        if advisory:
+                            self._build_state.set_stage_advisory(stage_num, advisory)
                         if self._update_task_fn:
                             self._update_task_fn(task_id, "completed")
                         _print("")
@@ -681,6 +687,12 @@ class BuildSession:
 
             if qa_passed:
                 self._build_state.mark_stage_generated(stage_num, written_paths, agent.name)
+
+                # Per-stage advisory (non-blocking — failure is logged, not fatal)
+                advisory = self._generate_stage_advisory(stage, _print)
+                if advisory:
+                    self._build_state.set_stage_advisory(stage_num, advisory)
+
                 if self._update_task_fn:
                     self._update_task_fn(task_id, "completed")
             else:
@@ -694,67 +706,37 @@ class BuildSession:
                 self._console.print_token_status(self._token_tracker.format_status())
             _print("")
 
-        # ---- Phase 4: Advisory QA review ----
-        if not skip_generation and not build_stopped and scope == "all" and self._qa_agent:
-            _print("Running advisory review...")
-
-            file_content = self._collect_generated_file_content()
-
-            qa_task = (
-                "All stages have passed per-stage QA validation. Now perform a "
-                "HIGH-LEVEL ADVISORY review of the complete build output.\n\n"
-                "Do NOT re-check for bugs or correctness issues — those were "
-                "already caught and fixed during per-stage QA.\n\n"
-                "Instead, focus on:\n"
-                "- **Known limitations** of the chosen architecture or services\n"
-                "- **Security considerations** worth noting (e.g., services running "
-                "with default SKUs that lack advanced threat protection)\n"
-                "- **Scalability notes** (e.g., Basic-tier services that may need "
-                "upgrading for production)\n"
-                "- **Cost implications** the user should be aware of\n"
-                "- **Architectural trade-offs** made for prototype simplicity\n"
-                "- **Missing production concerns** (monitoring gaps, backup config, "
-                "disaster recovery, etc.)\n\n"
-                "Format your response as a concise list of advisories. Each item "
-                "should be a short paragraph with a clear heading. Do NOT suggest "
-                "code changes — these are informational notes only.\n\n"
-                "## Generated Files\n\n"
-            )
-            qa_task += file_content if file_content else "(No files.)"
-
-            with self._maybe_spinner("Advisory review...", use_styled):
-                orchestrator = AgentOrchestrator(self._registry, self._context)
-                qa_result = orchestrator.delegate(
-                    from_agent="build-session",
-                    to_agent_name=self._qa_agent.name,
-                    sub_task=qa_task,
-                )
-            if qa_result:
-                self._token_tracker.record(qa_result)
-
-            qa_content = qa_result.content if qa_result else ""
-
-            if qa_content:
-                # Save advisory notes to file instead of printing (avoids truncation)
-                advisory_path = Path(self._context.project_dir) / "concept" / "docs" / "ADVISORY.md"
-                advisory_path.parent.mkdir(parents=True, exist_ok=True)
+        # ---- Phase 4: Aggregate per-stage advisories ----
+        if not build_stopped and scope == "all":
+            advisories = self._build_state.get_all_advisories()
+            if advisories:
                 import datetime as _dt
 
+                advisory_path = Path(self._context.project_dir) / "concept" / "docs" / "ADVISORY.md"
+                advisory_path.parent.mkdir(parents=True, exist_ok=True)
+
                 _ts = _dt.datetime.now().strftime("%Y-%m-%d %H:%M")
-                header = f"\n\n---\n\n## Advisory Notes ({_ts})\n\n"
-                with open(advisory_path, "a", encoding="utf-8") as f:
-                    f.write(header + str(qa_content) + "\n")
+                parts = [f"# Advisory Notes ({_ts})\n"]
+                for entry in advisories:
+                    parts.append(f"## Stage {entry['stage']}: {entry['name']}\n")
+                    parts.append(entry["advisory"])
+                    parts.append("")
+
+                advisory_path.write_text("\n".join(parts), encoding="utf-8")
                 advisory_rel = str(advisory_path.relative_to(Path(self._context.project_dir)))
                 if use_styled:
                     self._console.print_header("Advisory Notes")
-                    self._console.print_agent_response(f"Advisory Notes saved to: {advisory_rel}")
+                    self._console.print_agent_response(
+                        f"Advisory notes from {len(advisories)} stages saved to: {advisory_rel}"
+                    )
                 else:
                     _print("")
-                    _print(f"Advisory Notes saved to: {advisory_rel}")
+                    _print(f"Advisory notes from {len(advisories)} stages saved to: {advisory_rel}")
             if use_styled:
                 self._console.print_token_status(self._token_tracker.format_status())
 
-            # Fire-and-forget knowledge contribution
+            # Fire-and-forget knowledge contribution from advisory notes
+            all_advisory_text = "\n".join(e["advisory"] for e in advisories)
             try:
                 from azext_prototype.knowledge import KnowledgeLoader
                 from azext_prototype.stages.knowledge_contributor import (
@@ -768,9 +750,11 @@ class BuildSession:
                     for svc in ds.get("services", []):
                         if svc.get("name"):
                             all_services.add(svc["name"])
-                if all_services and qa_content:
+                if all_services and all_advisory_text:
                     for svc in all_services:
-                        finding = build_finding_from_qa(qa_content, service=svc, source="Build advisory review")
+                        finding = build_finding_from_qa(
+                            all_advisory_text, service=svc, source="Build advisory review"
+                        )
                         submit_if_gap(finding, loader, print_fn=_print)
             except Exception:
                 pass
@@ -2828,6 +2812,70 @@ class BuildSession:
                 parts.append(block)
 
         return "\n\n".join(parts)
+
+    # ------------------------------------------------------------------ #
+    # Per-stage advisory generation
+    # ------------------------------------------------------------------ #
+
+    def _generate_stage_advisory(
+        self,
+        stage: dict,
+        _print: Any,
+    ) -> str:
+        """Generate advisory notes for a single completed stage.
+
+        Calls the advisor agent with just this stage's files.  Returns
+        the advisory text (empty string on failure or if no advisor agent).
+        """
+        if not self._advisor_agent:
+            return ""
+
+        stage_num = stage["stage"]
+        stage_name = stage["name"]
+        category = stage.get("category", "infra")
+        files = stage.get("files", [])
+
+        if not files or category == "docs":
+            return ""
+
+        # Build file content for just this stage
+        project_root = Path(self._context.project_dir)
+        parts: list[str] = []
+        for filepath in files:
+            full_path = project_root / filepath
+            try:
+                content = full_path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                parts.append(f"```{filepath}\n(could not read file)\n```")
+                continue
+            parts.append(f"```{filepath}\n{content}\n```")
+
+        file_content = "\n\n".join(parts)
+
+        task = (
+            f"Review Stage {stage_num}: {stage_name} ({category}).\n"
+            f"This stage has passed QA validation.\n\n"
+            f"Provide advisory notes on trade-offs, limitations, and "
+            f"production readiness considerations.\n\n"
+            f"## Generated Files\n\n{file_content}"
+        )
+
+        try:
+            from azext_prototype.agents.orchestrator import AgentOrchestrator
+
+            orchestrator = AgentOrchestrator(self._registry, self._context)
+            result = orchestrator.delegate(
+                from_agent="build-session",
+                to_agent_name=self._advisor_agent.name,
+                sub_task=task,
+            )
+            if result:
+                self._token_tracker.record(result)
+                return result.content or ""
+        except Exception as exc:
+            logger.debug("Advisory generation failed for stage %d: %s", stage_num, exc)
+
+        return ""
 
     # ------------------------------------------------------------------ #
     # Timeout retry with backoff

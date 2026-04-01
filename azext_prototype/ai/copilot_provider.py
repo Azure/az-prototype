@@ -40,6 +40,24 @@ class CopilotTimeoutError(CLIError):
     """
 
 
+class CopilotPromptTooLargeError(CLIError):
+    """Raised when the prompt exceeds the Copilot API's token limit.
+
+    The Copilot API enforces a model-level prompt token cap (typically
+    168,000 tokens) that is lower than the model's native context window.
+    Callers can catch this and truncate/chunk the prompt before retrying.
+
+    Attributes:
+        token_count: Number of tokens the prompt contained.
+        token_limit: Maximum tokens the API accepts.
+    """
+
+    def __init__(self, message: str, token_count: int = 0, token_limit: int = 0):
+        super().__init__(message)
+        self.token_count = token_count
+        self.token_limit = token_limit
+
+
 logger = logging.getLogger(__name__)
 
 # Copilot API base URL.  The enterprise endpoint exposes the
@@ -204,12 +222,16 @@ class CopilotProvider(AIProvider):
             raise CLIError(f"Failed to reach Copilot API: {exc}") from exc
 
         _elapsed = _time.perf_counter() - _t0
+        request_id = (
+            resp.headers.get("x-request-id", "") or resp.headers.get("x-github-request-id", "")
+        )
         _dbg(
             "CopilotProvider.chat",
             "Response received",
             elapsed_s=f"{_elapsed:.1f}",
             status=resp.status_code,
             response_chars=len(resp.text),
+            request_id=request_id,
         )
 
         # 401 → token may be invalid or revoked; retry once
@@ -224,6 +246,7 @@ class CopilotProvider(AIProvider):
                 )
             except requests.RequestException as exc:
                 raise CLIError(f"Copilot API retry failed: {exc}") from exc
+            request_id = resp.headers.get("x-request-id", "")
 
         if resp.status_code != 200:
             body = ""
@@ -231,10 +254,34 @@ class CopilotProvider(AIProvider):
                 body = resp.text[:500]
             except Exception:
                 pass
-            raise CLIError(
-                f"Copilot API error (HTTP {resp.status_code}):\n{body}\n\n"
-                "Ensure you have a valid GitHub Copilot Business or Enterprise license."
-            )
+
+            # Parse structured error for specific handling
+            error_code = ""
+            try:
+                err_data = resp.json()
+                error_obj = err_data.get("error", {})
+                error_code = error_obj.get("code", "")
+            except Exception:
+                pass
+
+            if error_code == "model_max_prompt_tokens_exceeded":
+                # Extract token counts from the error message
+                import re as _re
+
+                token_count = 0
+                token_limit = 0
+                match = _re.search(r"(\d+)\s+exceeds the limit of\s+(\d+)", body)
+                if match:
+                    token_count = int(match.group(1))
+                    token_limit = int(match.group(2))
+                raise CopilotPromptTooLargeError(
+                    f"Prompt too large: {token_count:,} tokens exceeds "
+                    f"the Copilot API limit of {token_limit:,} tokens.",
+                    token_count=token_count,
+                    token_limit=token_limit,
+                )
+
+            raise CLIError(f"Copilot API error (HTTP {resp.status_code}):\n{body}")
 
         try:
             data = resp.json()

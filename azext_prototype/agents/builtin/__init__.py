@@ -1,5 +1,6 @@
 """Built-in agents that ship with the extension."""
 
+from azext_prototype.agents.builtin.advisor import AdvisorAgent
 from azext_prototype.agents.builtin.app_developer import AppDeveloperAgent
 from azext_prototype.agents.builtin.bicep_agent import BicepAgent
 from azext_prototype.agents.builtin.biz_analyst import BizAnalystAgent
@@ -26,6 +27,7 @@ ALL_BUILTIN_AGENTS = [
     SecurityReviewerAgent,
     MonitoringAgent,
     GovernorAgent,
+    AdvisorAgent,
 ]
 
 

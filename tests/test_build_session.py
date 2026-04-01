@@ -2912,10 +2912,10 @@ class TestAdvisoryQA:
         return session, qa_agent, tf_agent
 
     def test_advisory_qa_prompt_no_bug_hunting(self, tmp_project):
-        """Verify Phase 4 QA task uses advisory prompt, not bug-finding."""
+        """Verify Phase 4 aggregates per-stage advisories (no AI call)."""
         session, qa_agent, tf_agent = self._make_session(tmp_project)
 
-        # Pre-populate with generated stages and files
+        # Pre-populate with generated stages, files, and advisory
         stage_dir = tmp_project / "concept" / "infra" / "terraform" / "stage-1"
         stage_dir.mkdir(parents=True, exist_ok=True)
         (stage_dir / "main.tf").write_text('resource "null" "x" {}')
@@ -2933,40 +2933,35 @@ class TestAdvisoryQA:
                 },
             ]
         )
+        # Pre-store advisory (as if per-stage advisory already ran)
+        session._build_state.set_stage_advisory(
+            1, "- **[Scalability]** Consider upgrading SKUs for production."
+        )
+        # Set design snapshot so run() sees no design changes
+        session._build_state.set_design_snapshot({"architecture": "Simple architecture"})
 
         printed = []
-        inputs = iter(["", "done"])
+        inputs = iter(["done"])
 
         with patch("azext_prototype.stages.build_session.GovernanceContext") as mock_gov_cls:
             mock_gov_cls.return_value.check_response_for_violations.return_value = []
             session._governance = mock_gov_cls.return_value
             session._policy_resolver._governance = mock_gov_cls.return_value
 
-            with patch("azext_prototype.stages.build_session.AgentOrchestrator") as mock_orch:
-                mock_orch.return_value.delegate.return_value = _make_response(
-                    "Advisory: Consider upgrading SKUs for production."
-                )
-                session.run(
-                    design={"architecture": "Simple architecture"},
-                    input_fn=lambda p: next(inputs),
-                    print_fn=lambda m: printed.append(m),
-                )
+            session.run(
+                design={"architecture": "Simple architecture"},
+                input_fn=lambda p: next(inputs),
+                print_fn=lambda m: printed.append(m),
+            )
 
         output = "\n".join(printed)
-        # Should show advisory, not QA Review
-        assert "Advisory Notes" in output
-        # Verify the delegate was called with advisory prompt
-        delegate_calls = mock_orch.return_value.delegate.call_args_list
-        # Find the advisory call (the last one with qa_task)
-        advisory_calls = [  # noqa: F841
-            c
-            for c in delegate_calls
-            if "advisory" in c.kwargs.get("sub_task", "").lower() or "advisory" in str(c).lower()
-        ]
-        # At least one call should be advisory
-        all_tasks = [str(c) for c in delegate_calls]
-        advisory_found = any("Do NOT re-check for bugs" in str(c) for c in delegate_calls)
-        assert advisory_found, f"No advisory prompt found in delegate calls: {all_tasks}"
+        assert "Advisory notes from 1 stages saved to" in output
+        # Verify ADVISORY.md was written
+        advisory_path = tmp_project / "concept" / "docs" / "ADVISORY.md"
+        assert advisory_path.exists()
+        content = advisory_path.read_text()
+        assert "Scalability" in content
+        assert "Stage 1: Foundation" in content
 
     def test_advisory_qa_no_remediation_loop(self, tmp_project):
         """Phase 4 should NOT trigger _identify_affected_stages or IaC regen."""
@@ -3014,7 +3009,7 @@ class TestAdvisoryQA:
                     mock_identify.assert_not_called()
 
     def test_advisory_qa_header_says_advisory(self, tmp_project):
-        """Output should contain 'Advisory Notes' not 'QA Review'."""
+        """Output should contain 'Advisory notes' not 'QA Review'."""
         session, qa_agent, tf_agent = self._make_session(tmp_project)
 
         stage_dir = tmp_project / "concept" / "infra" / "terraform" / "stage-1"
@@ -3034,27 +3029,25 @@ class TestAdvisoryQA:
                 },
             ]
         )
+        session._build_state.set_stage_advisory(1, "- **[Cost]** Basic SKU is cheap but limited.")
+        session._build_state.set_design_snapshot({"architecture": "Simple architecture"})
 
         printed = []
-        inputs = iter(["", "done"])
+        inputs = iter(["done"])
 
         with patch("azext_prototype.stages.build_session.GovernanceContext") as mock_gov_cls:
             mock_gov_cls.return_value.check_response_for_violations.return_value = []
             session._governance = mock_gov_cls.return_value
             session._policy_resolver._governance = mock_gov_cls.return_value
 
-            with patch("azext_prototype.stages.build_session.AgentOrchestrator") as mock_orch:
-                mock_orch.return_value.delegate.return_value = _make_response(
-                    "Consider upgrading to premium SKUs for production."
-                )
-                session.run(
-                    design={"architecture": "Simple architecture"},
-                    input_fn=lambda p: next(inputs),
-                    print_fn=lambda m: printed.append(m),
-                )
+            session.run(
+                design={"architecture": "Simple architecture"},
+                input_fn=lambda p: next(inputs),
+                print_fn=lambda m: printed.append(m),
+            )
 
         output = "\n".join(printed)
-        assert "Advisory Notes" in output
+        assert "Advisory notes" in output
         # Should NOT contain "QA Review:" as a section header
         assert "QA Review:" not in output
 

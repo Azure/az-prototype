@@ -220,6 +220,33 @@ class BuildState:
 
         self.save()
 
+    def set_stage_advisory(self, stage_num: int, advisory: str) -> None:
+        """Store advisory notes for a completed stage."""
+        for stage in self._state["deployment_stages"]:
+            if stage["stage"] == stage_num:
+                stage["advisory"] = advisory
+                break
+        self.save()
+
+    def get_all_advisories(self) -> list[dict]:
+        """Return advisories from all stages that have them.
+
+        Returns a list of ``{"stage": N, "name": "...", "advisory": "..."}``
+        dicts, ordered by stage number.
+        """
+        results = []
+        for stage in self._state.get("deployment_stages", []):
+            advisory = stage.get("advisory", "")
+            if advisory:
+                results.append(
+                    {
+                        "stage": stage["stage"],
+                        "name": stage.get("name", ""),
+                        "advisory": advisory,
+                    }
+                )
+        return results
+
     def mark_stage_accepted(self, stage_num: int) -> None:
         """Mark a deployment stage as accepted after review."""
         for stage in self._state["deployment_stages"]:

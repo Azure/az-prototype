@@ -8,6 +8,24 @@ Release History
 
 Build resilience
 ~~~~~~~~~~~~~~~~~
+* **Per-stage advisory with dedicated advisor agent** -- advisory notes
+  are now generated per-stage immediately after QA passes, using a new
+  ``advisor`` built-in agent.  Phase 4 aggregates per-stage advisories
+  into ``ADVISORY.md`` with no AI call, eliminating the prompt-too-large
+  error that occurred when all generated files exceeded the 168K token
+  Copilot API limit.
+* **``CopilotPromptTooLargeError``** -- new exception class raised when
+  the Copilot API rejects a prompt for exceeding its token limit.
+  Includes ``token_count`` and ``token_limit`` attributes for callers
+  to decide how to truncate.  Design stage catches this and
+  automatically trims the architecture context before retrying.
+* **Copilot API error handling cleanup** -- removed the misleading
+  "Ensure you have a valid GitHub Copilot Business or Enterprise license"
+  message from all non-200 API errors (it was a red herring for token
+  limit, timeout, and other failures).
+* **Request ID logging** -- ``x-request-id`` response header from the
+  Copilot API is now captured in the debug log for every request,
+  enabling correlation with GitHub support.
 * **Timeout retry with exponential backoff** -- Copilot API timeouts
   now trigger up to 5 retry attempts with escalating wait periods
   (15s, 30s, 60s, 120s).  Retry status is communicated to the user

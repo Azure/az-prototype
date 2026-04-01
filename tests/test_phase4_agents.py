@@ -289,7 +289,7 @@ class TestNewAgentsInRegistry:
             assert name in populated_registry, f"Built-in agent '{name}' not registered"
 
     def test_builtin_count(self, populated_registry):
-        assert len(populated_registry) == 12
+        assert len(populated_registry) == 13
 
     def test_security_review_capability(self, populated_registry):
         agents = populated_registry.find_by_capability(AgentCapability.SECURITY_REVIEW)

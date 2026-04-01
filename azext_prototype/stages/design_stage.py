@@ -614,6 +614,44 @@ class DesignStage(BaseStage):
         {"name": "Future Considerations", "context": "Deferred items for later"},
     ]
 
+    @staticmethod
+    def _execute_with_prompt_trim(architect, agent_context, prompt, accumulated):
+        """Execute architect with automatic prompt trimming on token limit errors.
+
+        If the Copilot API rejects the prompt as too large, progressively
+        shrink the "Architecture So Far" section by summarizing older
+        sections as headings only, then retry.
+        """
+        from azext_prototype.ai.copilot_provider import CopilotPromptTooLargeError
+
+        try:
+            return architect.execute(agent_context, prompt)
+        except CopilotPromptTooLargeError:
+            pass
+
+        # Retry with aggressively trimmed context — keep only headings
+        # from ALL prior sections (no full content from any)
+        if accumulated and "## Architecture So Far" in prompt:
+            summaries = []
+            for sec_text in accumulated:
+                heading = next(
+                    (ln for ln in sec_text.splitlines() if ln.startswith("## ")),
+                    "",
+                )
+                summaries.append(heading + " *(content omitted — see prior output)*")
+            trimmed_context = "## Architecture So Far\n" + "\n\n".join(summaries)
+
+            # Replace the Architecture So Far section in the prompt
+            before_arch = prompt.split("## Architecture So Far")[0]
+            after_arch_parts = prompt.split("## Instructions")
+            instructions = "## Instructions" + after_arch_parts[-1] if len(after_arch_parts) > 1 else ""
+            trimmed_prompt = before_arch + trimmed_context + "\n\n" + instructions
+
+            return architect.execute(agent_context, trimmed_prompt)
+
+        # No accumulated context to trim — re-raise
+        raise
+
     def _plan_architecture(
         self,
         ui: Console | None,
@@ -768,10 +806,10 @@ class DesignStage(BaseStage):
             spinner_msg = f"Generating architecture ({section_name})..."
             if ui and not status_fn:
                 with ui.spinner(spinner_msg):
-                    response = architect.execute(agent_context, prompt)
+                    response = self._execute_with_prompt_trim(architect, agent_context, prompt, accumulated)
             else:
                 _print(spinner_msg)
-                response = architect.execute(agent_context, prompt)
+                response = self._execute_with_prompt_trim(architect, agent_context, prompt, accumulated)
 
             # Handle truncation for this section
             for _ in range(3):

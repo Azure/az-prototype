@@ -32,6 +32,7 @@ class AgentCapability(str, Enum):
     SECURITY_REVIEW = "security_review"
     MONITORING = "monitoring"
     GOVERNANCE = "governance"
+    ADVISORY = "advisory"
 
 
 @dataclass
