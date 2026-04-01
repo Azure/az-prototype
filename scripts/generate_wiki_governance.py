@@ -50,24 +50,29 @@ def generate_policy_page(title: str, category_path: Path, output_name: str) -> s
         lines.append("")
 
         if rules:
-            lines.append("### Rules\n")
-            lines.append("| ID | Severity | Description |")
-            lines.append("|-----|----------|-------------|")
+            lines.append("| Policy ID | Description | Agents |")
+            lines.append("| --------- | ----------- | ------ |")
             for rule in rules:
                 rid = rule.get("id", "?")
                 severity = rule.get("severity", "?")
-                desc = rule.get("description", "").replace("|", "\\|")
-                lines.append(f"| {rid} | {severity} | {desc} |")
-            lines.append("")
-
-            # Show prohibitions for each rule
-            for rule in rules:
+                desc = rule.get("description", "").replace("|", "\\|").replace("\n", " ")
+                applies_to = rule.get("applies_to", [])
                 prohibitions = rule.get("prohibitions", [])
+
+                # Build description cell with severity, prohibitions
+                cell = f"**[{severity}]** {desc}"
                 if prohibitions:
-                    lines.append(f"**{rule.get('id', '?')} Prohibitions:**")
-                    for p in prohibitions:
-                        lines.append(f"- {p}")
-                    lines.append("")
+                    prohib_text = "<br />".join(f"NEVER: {p}" for p in prohibitions)
+                    cell += f"<br /><br />{prohib_text}"
+
+                # Agents column
+                if applies_to:
+                    agents_text = ", ".join(f"`{a}`" for a in applies_to)
+                else:
+                    agents_text = "_all agents_"
+
+                lines.append(f"| {rid} | {cell} | {agents_text} |")
+            lines.append("")
 
         if anti_patterns:
             lines.append("### Anti-Patterns\n")
@@ -80,12 +85,12 @@ def generate_policy_page(title: str, category_path: Path, output_name: str) -> s
             lines.append("")
 
         if references:
-            lines.append("### References\n")
+            lines.append("<details><summary>References</summary>\n")
             for ref in references:
                 title_text = ref.get("title", "Link")
                 url = ref.get("url", "")
                 lines.append(f"- [{title_text}]({url})")
-            lines.append("")
+            lines.append("\n</details>\n")
 
         lines.append("---\n")
 
@@ -120,20 +125,27 @@ def generate_anti_patterns_page() -> str:
 
         lines.append(f"## {domain.replace('_', ' ').title()}")
         lines.append(f"\n{description}\n")
-        lines.append(f"**{len(patterns)} checks**\n")
+        if patterns:
+            lines.append("| Check | Description | Agents |")
+            lines.append("| ----- | ----------- | ------ |")
+            for i, p in enumerate(patterns, 1):
+                warning = p.get("warning_message", "").replace("|", "\\|").replace("\n", " ")
+                search = p.get("search_patterns", [])
+                safe = p.get("safe_patterns", [])
 
-        for i, p in enumerate(patterns, 1):
-            warning = p.get("warning_message", "")
-            search = p.get("search_patterns", [])
-            safe = p.get("safe_patterns", [])
-            if warning:
-                lines.append(f"{i}. **{warning}**")
+                # Build description cell
+                cell = warning
                 if search:
-                    lines.append(f"   - Triggers on: `{'`, `'.join(search[:3])}`")
+                    triggers = ", ".join(f"`{s}`" for s in search[:5])
+                    cell += f"<br /><br />Triggers on: {triggers}"
                 if safe:
-                    lines.append(f"   - Exempted by: `{'`, `'.join(safe[:3])}`")
+                    exemptions = ", ".join(f"`{s}`" for s in safe[:5])
+                    cell += f"<br />Exempted by: {exemptions}"
 
-        lines.append("\n---\n")
+                lines.append(f"| {domain.upper()}-{i:03d} | {cell} | _all agents_ |")
+            lines.append("")
+
+        lines.append("---\n")
 
     return "\n".join(lines)
 
