@@ -10,7 +10,7 @@ description: >-
   organization that all bicep-agent output must follow.
 
 principles:
-  - id: BCP-001
+  - id: STAN-BCP-001
     name: Standard File Layout
     description: >-
       Bicep templates must follow a consistent ordering: targetScope
@@ -23,7 +23,7 @@ principles:
       - "modules/appService.bicep — reusable App Service module"
       - "modules/networking.bicep — reusable networking module"
 
-  - id: BCP-002
+  - id: STAN-BCP-002
     name: Parameter Conventions
     description: >-
       All parameters must have @description decorators and type
@@ -35,7 +35,7 @@ principles:
       - "@description('Azure region for all resources') param location string = resourceGroup().location"
       - "@allowed(['dev','staging','prod']) param environment string"
 
-  - id: BCP-003
+  - id: STAN-BCP-003
     name: Module Composition
     description: >-
       Use Bicep modules for logical grouping of related resources.
@@ -47,7 +47,7 @@ principles:
       - "module networking 'modules/networking.bicep' = { ... }"
       - "module compute 'modules/compute.bicep' = { ... }"
 
-  - id: BCP-004
+  - id: STAN-BCP-004
     name: Resource Naming via Variables
     description: >-
       Define resource names in variables using a consistent naming
@@ -58,7 +58,7 @@ principles:
       - "var rgName = 'rg-${project}-${environment}'"
       - "var kvName = 'kv-${project}-${take(uniqueString(resourceGroup().id), 6)}'"
 
-  - id: BCP-005
+  - id: STAN-BCP-005
     name: Output Important Values
     description: >-
       Output resource IDs, endpoints, and principal IDs that
@@ -70,7 +70,7 @@ principles:
       - "@description('App Service default hostname') output appUrl string = app.properties.defaultHostName"
       - "@description('Managed identity principal ID') output principalId string = app.identity.principalId"
 
-  - id: BCP-006
+  - id: STAN-BCP-006
     name: Cross-Stage Dependencies via Parameters
     description: >-
       Multi-stage deployments MUST pass prior-stage resource references
@@ -85,7 +85,7 @@ principles:
       - "@description('Resource group from Stage 1') param foundationRgName string"
       - "resource rg 'Microsoft.Resources/resourceGroups@2023-07-01' existing = { name: foundationRgName }"
 
-  - id: BCP-007
+  - id: STAN-BCP-007
     name: Complete and Robust deploy.sh
     description: >-
       Every stage MUST include a deploy.sh that is syntactically complete
@@ -98,7 +98,7 @@ principles:
       - "az deployment group create --resource-group $RG --template-file main.bicep --parameters main.bicepparam"
       - "az deployment group show --name $DEPLOYMENT --query properties.outputs > stage-N-outputs.json"
 
-  - id: BCP-008
+  - id: STAN-BCP-008
     name: Companion Resources for Disabled Auth
     description: >-
       When disabling local/key-based auth on any service, the SAME stage

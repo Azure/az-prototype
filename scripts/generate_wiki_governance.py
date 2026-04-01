@@ -132,6 +132,7 @@ def generate_anti_patterns_page() -> str:
                 warning = p.get("warning_message", "").replace("|", "\\|").replace("\n", " ")
                 search = p.get("search_patterns", [])
                 safe = p.get("safe_patterns", [])
+                check_id = p.get("id", f"{domain.upper()}-{i:03d}")
 
                 # Build description cell
                 cell = warning
@@ -142,7 +143,7 @@ def generate_anti_patterns_page() -> str:
                     exemptions = ", ".join(f"`{s}`" for s in safe[:5])
                     cell += f"<br />Exempted by: {exemptions}"
 
-                lines.append(f"| {domain.upper()}-{i:03d} | {cell} | _all agents_ |")
+                lines.append(f"| {check_id} | {cell} | _all agents_ |")
             lines.append("")
 
         lines.append("---\n")

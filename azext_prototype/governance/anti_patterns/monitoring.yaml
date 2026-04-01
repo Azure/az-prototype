@@ -6,7 +6,8 @@ domain: monitoring
 description: Logging, diagnostics, and observability gap detection
 
 patterns:
-  - search_patterns:
+  - id: ANTI-MON-001
+    search_patterns:
       - "retention_in_days = 0"
       - "retention_days = 0"
     safe_patterns: []
@@ -15,7 +16,8 @@ patterns:
       - "retentionInDays = 30"
     warning_message: "Log retention set to 0 days — configure at least 30 days for compliance and incident investigation."
 
-  - search_patterns:
+  - id: ANTI-MON-002
+    search_patterns:
       - "enabled_log_category = []"
       - "logs_enabled = false"
       - "metrics_enabled = false"

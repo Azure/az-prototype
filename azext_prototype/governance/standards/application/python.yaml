@@ -10,7 +10,7 @@ description: >-
   structure, dependency management, and Azure SDK patterns.
 
 principles:
-  - id: PY-001
+  - id: STAN-PY-001
     name: Use Azure SDK with DefaultAzureCredential
     description: >-
       Always use DefaultAzureCredential from azure-identity for
@@ -23,7 +23,7 @@ principles:
       - "credential = DefaultAzureCredential()"
       - "Never pass connection strings when managed identity is available"
 
-  - id: PY-002
+  - id: STAN-PY-002
     name: Project Structure
     description: >-
       Python projects must have a clear structure: src/ for application
@@ -39,7 +39,7 @@ principles:
       - "src/app/services/ — business logic"
       - "tests/ — test files"
 
-  - id: PY-003
+  - id: STAN-PY-003
     name: Configuration via Environment Variables
     description: >-
       Use environment variables for all configuration (loaded via
@@ -51,7 +51,7 @@ principles:
       - "import os; port = int(os.environ.get('PORT', 8080))"
       - "Use pydantic Settings class for type-safe config"
 
-  - id: PY-004
+  - id: STAN-PY-004
     name: Async for I/O-Bound Operations
     description: >-
       Use async/await for HTTP handlers, database queries, and
@@ -63,7 +63,7 @@ principles:
       - "async def get_items(db: AsyncSession) -> list[Item]:"
       - "Use aiohttp or httpx for async HTTP clients"
 
-  - id: PY-005
+  - id: STAN-PY-005
     name: Type Annotations
     description: >-
       Use type annotations on all function signatures and return types.

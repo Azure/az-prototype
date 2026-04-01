@@ -78,6 +78,21 @@ class TestAntiPatternLoader:
         assert first is not second
         assert len(first) == len(second)
 
+    def test_all_checks_have_id(self):
+        checks = load()
+        for check in checks:
+            assert check.id, f"Check missing id in domain {check.domain}: {check.warning_message}"
+
+    def test_all_ids_have_anti_prefix(self):
+        checks = load()
+        for check in checks:
+            assert check.id.startswith("ANTI-"), f"ID {check.id} missing ANTI- prefix"
+
+    def test_all_ids_are_unique(self):
+        checks = load()
+        ids = [c.id for c in checks]
+        assert len(ids) == len(set(ids)), f"Duplicate IDs: {[i for i in ids if ids.count(i) > 1]}"
+
     def test_domains_loaded(self):
         checks = load()
         domains = {c.domain for c in checks}
@@ -97,7 +112,8 @@ class TestAntiPatternLoader:
         yaml_content = (
             "domain: test\n"
             "patterns:\n"
-            "  - search_patterns:\n"
+            "  - id: ANTI-TEST-001\n"
+            "    search_patterns:\n"
             '      - "test_pattern"\n'
             "    safe_patterns: []\n"
             '    warning_message: "Test warning"\n'
@@ -106,8 +122,23 @@ class TestAntiPatternLoader:
         reset_cache()
         checks = load(directory=tmp_path)
         assert len(checks) == 1
+        assert checks[0].id == "ANTI-TEST-001"
         assert checks[0].domain == "test"
         assert checks[0].search_patterns == ["test_pattern"]
+
+    def test_load_generates_fallback_id_when_missing(self, tmp_path):
+        yaml_content = (
+            "domain: test\n"
+            "patterns:\n"
+            "  - search_patterns:\n"
+            '      - "test_pattern"\n'
+            "    safe_patterns: []\n"
+            '    warning_message: "Test warning"\n'
+        )
+        (tmp_path / "test.yaml").write_text(yaml_content)
+        reset_cache()
+        checks = load(directory=tmp_path)
+        assert checks[0].id == "TEST-001"
 
     def test_load_skips_invalid_yaml(self, tmp_path):
         (tmp_path / "bad.yaml").write_text("{{invalid yaml")
@@ -378,3 +409,24 @@ class TestScannerDeduplication:
         credential_warnings = [w for w in warnings if "credential" in w.lower()]
         # Should be exactly 1, not 3
         assert len(credential_warnings) == 1
+
+
+# ------------------------------------------------------------------ #
+# Scanner — ID prefix in warnings
+# ------------------------------------------------------------------ #
+
+
+class TestScannerIdPrefix:
+    """Test that scan() includes the check ID in each warning."""
+
+    def test_warnings_include_anti_prefix(self):
+        warnings = scan("connection_string = bad")
+        assert len(warnings) > 0
+        for w in warnings:
+            assert w.startswith("[ANTI-"), f"Warning missing [ANTI-] prefix: {w}"
+
+    def test_warning_format(self):
+        warnings = scan('admin_enabled = true')
+        assert len(warnings) > 0
+        # Should be "[ANTI-SEC-002] Admin credentials detected..."
+        assert warnings[0].startswith("[ANTI-SEC-002]")

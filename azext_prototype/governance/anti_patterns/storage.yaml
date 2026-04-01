@@ -7,7 +7,8 @@ domain: storage
 description: Storage account, Cosmos DB, and data service configuration detection
 
 patterns:
-  - search_patterns:
+  - id: ANTI-STOR-001
+    search_patterns:
       - "account-level keys"
       - "account_key_enabled"
       - "shared_key_access = true"
@@ -20,7 +21,8 @@ patterns:
       - "# Use Microsoft Entra RBAC with managed identity"
     warning_message: "Account-level key access detected — use Microsoft Entra RBAC with managed identity instead."
 
-  - search_patterns:
+  - id: ANTI-STOR-002
+    search_patterns:
       - "allow_blob_public_access = true"
       - "public_access = \"blob\""
       - "public_access = \"container\""

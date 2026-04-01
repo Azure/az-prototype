@@ -11,7 +11,7 @@ description: >-
   isolated worker model requirements.
 
 principles:
-  - id: CS-001
+  - id: STAN-CS-001
     name: Use Azure SDK with DefaultAzureCredential
     description: >-
       Always use DefaultAzureCredential from Azure.Identity for
@@ -24,7 +24,7 @@ principles:
       - "var credential = new DefaultAzureCredential();"
       - "Never pass connection strings when managed identity is available"
 
-  - id: CS-002
+  - id: STAN-CS-002
     name: Complete Project Structure
     description: >-
       Every generated .NET app must include a .csproj file with all
@@ -39,7 +39,7 @@ principles:
       - "Models/Project.cs — every referenced model class must exist"
       - "If a service references 'ProjectDto', that class must be generated"
 
-  - id: CS-003
+  - id: STAN-CS-003
     name: Azure Functions Isolated Worker Model
     description: >-
       All C# Azure Functions must target the .NET isolated worker model
@@ -54,7 +54,7 @@ principles:
       - "local.settings.json with FUNCTIONS_WORKER_RUNTIME = dotnet-isolated"
       - "Program.cs with HostBuilder configuration"
 
-  - id: CS-004
+  - id: STAN-CS-004
     name: Configuration via appsettings.json
     description: >-
       Use IConfiguration with appsettings.json for all configuration.
@@ -67,7 +67,7 @@ principles:
       - "services.Configure<MyOptions>(config.GetSection(\"MyOptions\"))"
       - "Never hardcode URLs, ports, or service endpoints"
 
-  - id: CS-005
+  - id: STAN-CS-005
     name: Dependency Injection
     description: >-
       Use IServiceCollection for DI registration.  All services,

@@ -7,7 +7,8 @@ domain: networking
 description: Network isolation, firewall rules, and public exposure detection
 
 patterns:
-  - search_patterns:
+  - id: ANTI-NET-001
+    search_patterns:
       - "public_network_access_enabled = true"
       - 'public_network_access = "enabled"'
       - 'publicnetworkaccess = "enabled"'
@@ -28,7 +29,8 @@ patterns:
       - 'publicNetworkAccessForQuery = "Disabled"'
     warning_message: "Public network access is enabled — disable public access and use private endpoints or service endpoints. This applies to ALL environments including POC."
 
-  - search_patterns:
+  - id: ANTI-NET-002
+    search_patterns:
       - "0.0.0.0/0"
       - "0.0.0.0-255.255.255.255"
     safe_patterns:
@@ -36,7 +38,8 @@ patterns:
       - "avoid 0.0.0.0"
     warning_message: "Overly permissive network rule detected (0.0.0.0/0) — use specific IP ranges or service tags."
 
-  - search_patterns:
+  - id: ANTI-NET-003
+    search_patterns:
       - "ingress_type = \"external\""
       - "external_enabled = true"
     safe_patterns:
@@ -46,13 +49,15 @@ patterns:
       - "application gateway"
     warning_message: "Direct external ingress detected — consider using API Management or Front Door as a gateway."
 
-  - search_patterns:
+  - id: ANTI-NET-004
+    search_patterns:
       - "vnet_route_all_enabled = false"
       - "virtual_network_subnet_id = null"
     safe_patterns: []
     warning_message: "VNET integration disabled — enable VNET integration for backend connectivity to private resources."
 
-  - search_patterns:
+  - id: ANTI-NET-005
+    search_patterns:
       - "ip_restriction = []"
       - "scm_ip_restriction = []"
     safe_patterns:

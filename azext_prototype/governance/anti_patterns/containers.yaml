@@ -7,7 +7,8 @@ domain: containers
 description: Container Apps, ACR, and container runtime configuration detection
 
 patterns:
-  - search_patterns:
+  - id: ANTI-CONT-001
+    search_patterns:
       - "environment_variable"
       - "env_var"
     safe_patterns:
@@ -23,7 +24,8 @@ patterns:
       - 'keyVaultUrl'
     warning_message: "Secrets in environment variables detected — use Key Vault references with managed identity instead."
 
-  - search_patterns:
+  - id: ANTI-CONT-002
+    search_patterns:
       - "admin_user_enabled = true"
       - "acrpush"
     safe_patterns:

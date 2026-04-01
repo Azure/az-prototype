@@ -26,7 +26,8 @@ Each YAML file follows the schema::
     domain: "<domain name>"
     description: "<what this domain covers>"
     patterns:
-      - search_patterns: [<substrings to look for, case-insensitive>]
+      - id: "<ANTI-DOMAIN-NNN>"
+        search_patterns: [<substrings to look for, case-insensitive>]
         safe_patterns:   [<substrings that exempt the match>]
         warning_message: "<human-readable warning>"
 """
@@ -51,6 +52,7 @@ _cache: list["AntiPatternCheck"] | None = None
 class AntiPatternCheck:
     """A single anti-pattern detection rule."""
 
+    id: str
     domain: str
     search_patterns: list[str] = field(default_factory=list)
     safe_patterns: list[str] = field(default_factory=list)
@@ -87,7 +89,7 @@ def load(directory: Path | None = None) -> list[AntiPatternCheck]:
             continue
 
         domain = data.get("domain", yaml_file.stem)
-        for entry in data.get("patterns", []):
+        for idx, entry in enumerate(data.get("patterns", []), 1):
             if not isinstance(entry, dict):
                 continue
             search = entry.get("search_patterns", [])
@@ -96,8 +98,10 @@ def load(directory: Path | None = None) -> list[AntiPatternCheck]:
             if not search or not message:
                 continue
             correct = entry.get("correct_patterns", [])
+            check_id = entry.get("id", f"{domain.upper()}-{idx:03d}")
             checks.append(
                 AntiPatternCheck(
+                    id=check_id,
                     domain=domain,
                     search_patterns=[s.lower() for s in search],
                     safe_patterns=[s.lower() for s in safe],
@@ -125,7 +129,7 @@ def scan(text: str) -> list[str]:
                 # Check safe patterns — if any match, skip this check
                 if check.safe_patterns and any(s in lower for s in check.safe_patterns):
                     continue
-                warnings.append(check.warning_message)
+                warnings.append(f"[{check.id}] {check.warning_message}")
                 break  # one match per check is enough
 
     return warnings

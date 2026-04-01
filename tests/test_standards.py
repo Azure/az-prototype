@@ -122,8 +122,8 @@ class TestFormatForPrompt:
 
     def test_format_includes_principle_ids(self):
         text = format_for_prompt()
-        assert "DES-001" in text
-        assert "CODE-001" in text
+        assert "STAN-DES-001" in text
+        assert "STAN-CODE-001" in text
 
     def test_format_includes_principle_names(self):
         text = format_for_prompt()
@@ -154,15 +154,15 @@ class TestPrincipleContent:
     def test_solid_principles_present(self):
         loaded = load()
         all_ids = {p.id for s in loaded for p in s.principles}
-        assert "DES-001" in all_ids  # Single Responsibility
-        assert "DES-002" in all_ids  # DRY
-        assert "DES-003" in all_ids  # Open/Closed
+        assert "STAN-DES-001" in all_ids  # Single Responsibility
+        assert "STAN-DES-002" in all_ids  # DRY
+        assert "STAN-DES-003" in all_ids  # Open/Closed
 
     def test_coding_standards_present(self):
         loaded = load()
         all_ids = {p.id for s in loaded for p in s.principles}
-        assert "CODE-001" in all_ids  # Meaningful Names
-        assert "CODE-004" in all_ids  # Consistent Module Structure
+        assert "STAN-CODE-001" in all_ids  # Meaningful Names
+        assert "STAN-CODE-004" in all_ids  # Consistent Module Structure
 
     def test_applies_to_includes_agents(self):
         loaded = load()
@@ -194,32 +194,32 @@ class TestPrincipleContent:
         tf_standards = [s for s in loaded if s.domain == "Terraform Module Structure"]
         assert len(tf_standards) == 1
         ids = {p.id for p in tf_standards[0].principles}
-        assert "TF-001" in ids
-        assert "TF-005" in ids
+        assert "STAN-TF-001" in ids
+        assert "STAN-TF-005" in ids
 
     def test_bicep_has_module_composition(self):
         loaded = load()
         bcp_standards = [s for s in loaded if s.domain == "Bicep Module Structure"]
         assert len(bcp_standards) == 1
         ids = {p.id for p in bcp_standards[0].principles}
-        assert "BCP-001" in ids
-        assert "BCP-003" in ids
+        assert "STAN-BCP-001" in ids
+        assert "STAN-BCP-003" in ids
 
     def test_python_has_default_credential(self):
         loaded = load()
         py_standards = [s for s in loaded if s.domain == "Python Application Standards"]
         assert len(py_standards) == 1
         ids = {p.id for p in py_standards[0].principles}
-        assert "PY-001" in ids
+        assert "STAN-PY-001" in ids
 
     def test_format_terraform_category(self):
         text = format_for_prompt(category="terraform")
-        assert "TF-001" in text or "Terraform" in text
+        assert "STAN-TF-001" in text or "Terraform" in text
 
     def test_format_bicep_category(self):
         text = format_for_prompt(category="bicep")
-        assert "BCP-001" in text or "Bicep" in text
+        assert "STAN-BCP-001" in text or "Bicep" in text
 
     def test_format_application_category(self):
         text = format_for_prompt(category="application")
-        assert "PY-001" in text or "Python" in text
+        assert "STAN-PY-001" in text or "Python" in text

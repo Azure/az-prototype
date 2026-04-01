@@ -8,7 +8,8 @@ domain: cost
 description: Oversized SKUs, missing autoscale, and cost-inefficient configurations
 
 patterns:
-  - search_patterns:
+  - id: ANTI-COST-001
+    search_patterns:
       - "sku_name = \"p1v3\""
       - "sku_name = \"p2v3\""
       - "sku_name = \"p3v3\""
@@ -26,7 +27,8 @@ patterns:
       - 'tier = "Standard"'
     warning_message: "Premium SKU detected — consider Standard or Basic tier for POC workloads to reduce cost."
 
-  - search_patterns:
+  - id: ANTI-COST-002
+    search_patterns:
       - "min_replicas = 1"
       - "minimum_instance_count = 1"
     safe_patterns:
@@ -39,7 +41,8 @@ patterns:
       - "minReplicas = 0"
     warning_message: "Minimum instances set to 1 — consider 0 for dev/test to avoid idle costs."
 
-  - search_patterns:
+  - id: ANTI-COST-003
+    search_patterns:
       - "reserved_capacity"
       - "reserved_instance"
     safe_patterns:

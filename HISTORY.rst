@@ -139,16 +139,47 @@ Governance restructuring
 * **Well-Architected Framework alignment** -- cost, performance,
   reliability, and security policies organized under WAF categories.
   Integration patterns separated as cross-cutting.
+* **STAN- prefixed standard IDs** -- all 38 design standard principle IDs
+  renamed with ``STAN-`` prefix for consistency:
+
+  - ``STAN-DES-`` for design principles (5 principles)
+  - ``STAN-CODE-`` for coding standards (5 principles)
+  - ``STAN-PY-`` for Python application standards (5 principles)
+  - ``STAN-CS-`` for .NET application standards (5 principles)
+  - ``STAN-BCP-`` for Bicep module standards (8 principles)
+  - ``STAN-TF-`` for Terraform module standards (10 principles)
+
 * **Wiki governance subpages** -- 17 dedicated wiki pages with per-service
   policy tables (rule ID, description, agents), auto-generated from YAML
   via ``scripts/generate_wiki_governance.py``.
 
 Anti-pattern detection
 ~~~~~~~~~~~~~~~~~~~~~~~
-* **New domain: ``terraform_structure``** -- 6 new anti-pattern checks for
+* **ANTI- prefixed IDs** -- all anti-pattern checks now have explicit IDs
+  with ``ANTI-`` prefix:
+
+  - ``ANTI-SEC-`` for security (6 checks)
+  - ``ANTI-AUTH-`` for authentication (3 checks)
+  - ``ANTI-NET-`` for networking (5 checks)
+  - ``ANTI-STOR-`` for storage (2 checks)
+  - ``ANTI-CONT-`` for containers (2 checks)
+  - ``ANTI-ENC-`` for encryption (3 checks)
+  - ``ANTI-MON-`` for monitoring (2 checks)
+  - ``ANTI-COST-`` for cost (3 checks)
+  - ``ANTI-COMP-`` for completeness (8 checks)
+  - ``ANTI-TFS-`` for Terraform structure (7 checks)
+  - ``ANTI-BCS-`` for Bicep structure (7 checks)
+
+  Scanner output now includes the check ID in each warning
+  (e.g., ``[ANTI-SEC-001] Possible credential/secret...``).
+* **New domain: ``bicep_structure``** -- 7 new anti-pattern checks for
+  inline resources, listKeys/listSas usage, hardcoded names, missing
+  @description decorators, missing outputs, deploy.sh error handling,
+  and outdated API versions.
+* **New domain: ``terraform_structure``** -- 7 anti-pattern checks for
   unused azurerm/random providers, azapi v1.x versions, non-deterministic
   ``uuid()``, ``jsondecode()`` on v2.x output, and azurerm resource usage.
-  Total checks: 33 to 39 across 10 domains.
+  Total checks: 48 across 11 domains.
 * **Hardcoded upstream name detection** -- new completeness check catches
   ALZ-patterned hardcoded resource names (``zd-``, ``pi-``, ``pm-``,
   ``pc-`` prefixes).

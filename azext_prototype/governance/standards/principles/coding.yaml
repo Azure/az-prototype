@@ -9,7 +9,7 @@ description: >-
   Code quality standards for generated application and infrastructure code.
 
 principles:
-  - id: CODE-001
+  - id: STAN-CODE-001
     name: Meaningful Names
     description: >-
       Use descriptive, intention-revealing names for variables, functions,
@@ -23,7 +23,7 @@ principles:
       - "Use 'storage_account' not 'sa'; 'container_registry' not 'cr'"
       - "Use 'get_user_by_email()' not 'get_u()'"
 
-  - id: CODE-002
+  - id: STAN-CODE-002
     name: Small Functions
     description: >-
       Functions should be short and focused.  If a function exceeds
@@ -33,7 +33,7 @@ principles:
     examples:
       - "Split 'process_order()' into 'validate_order()', 'calculate_total()', 'save_order()'"
 
-  - id: CODE-003
+  - id: STAN-CODE-003
     name: Error Handling at Boundaries
     description: >-
       Handle errors at system boundaries (user input, external APIs,
@@ -44,7 +44,7 @@ principles:
       - "Validate API request payloads at the controller layer, not in every function"
       - "Wrap external HTTP calls in try/except, not internal method calls"
 
-  - id: CODE-004
+  - id: STAN-CODE-004
     name: Consistent Module Structure
     description: >-
       Terraform modules should follow a consistent file layout:
@@ -57,7 +57,7 @@ principles:
       - "Terraform: variables.tf for inputs, main.tf for resources, outputs.tf for outputs"
       - "Bicep: param block at top, resource declarations, output block at bottom"
 
-  - id: CODE-005
+  - id: STAN-CODE-005
     name: Parameterize, Don't Hard-Code
     description: >-
       All environment-specific values (names, regions, SKUs, IP ranges)

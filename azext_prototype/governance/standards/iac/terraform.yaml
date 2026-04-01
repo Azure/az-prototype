@@ -10,7 +10,7 @@ description: >-
   organization that all terraform-agent output must follow.
 
 principles:
-  - id: TF-001
+  - id: STAN-TF-001
     name: Standard File Layout
     description: >-
       Every Terraform module must use the standard file layout:
@@ -31,7 +31,7 @@ principles:
       - "locals.tf — computed local values and naming conventions"
       - "providers.tf — terraform {}, required_providers, backend, and provider configuration (ONE file, never duplicated)"
 
-  - id: TF-002
+  - id: STAN-TF-002
     name: Variable Conventions
     description: >-
       All variables must have a description and a type constraint.
@@ -43,7 +43,7 @@ principles:
       - "variable \"location\" { type = string; description = \"Azure region\" }"
       - "Use validation blocks for SKU names, IP ranges, etc."
 
-  - id: TF-003
+  - id: STAN-TF-003
     name: Resource Naming via Locals
     description: >-
       Define resource names in a locals block using a consistent naming
@@ -54,7 +54,7 @@ principles:
       - "locals { rg_name = \"rg-${var.project}-${var.environment}\" }"
       - "resource \"azurerm_resource_group\" \"main\" { name = local.rg_name }"
 
-  - id: TF-004
+  - id: STAN-TF-004
     name: One Resource Type Per File for Complex Modules
     description: >-
       When a module manages more than 5 resources, split logically
@@ -67,7 +67,7 @@ principles:
       - "iam.tf — role assignments, managed identities"
       - "monitoring.tf — diagnostic settings, alerts"
 
-  - id: TF-005
+  - id: STAN-TF-005
     name: Use Data Sources for Existing Resources
     description: >-
       Reference existing resources (resource groups, VNets, identities)
@@ -79,7 +79,7 @@ principles:
       - "data \"azurerm_client_config\" \"current\" {} for tenant/subscription IDs"
       - "data \"azurerm_resource_group\" \"existing\" { name = var.rg_name }"
 
-  - id: TF-006
+  - id: STAN-TF-006
     name: Cross-Stage Dependencies via Remote State
     description: >-
       Multi-stage deployments MUST use terraform_remote_state data sources
@@ -94,7 +94,7 @@ principles:
       - "data \"terraform_remote_state\" \"stage1\" { backend = \"azurerm\"; config = { key = \"stage1.tfstate\" } }"
       - "data \"azurerm_resource_group\" \"main\" { name = data.terraform_remote_state.stage1.outputs.resource_group_name }"
 
-  - id: TF-007
+  - id: STAN-TF-007
     name: Consistent Backend Configuration
     description: >-
       Backend configuration must be consistent across all stages.  For POC
@@ -113,7 +113,7 @@ principles:
       - "POC multi-stage: backend \"local\" { path = \"../.terraform-state/stage1.tfstate\" }"
       - "Production: backend \"azurerm\" { resource_group_name = \"terraform-state-rg\"; storage_account_name = \"tfstate12345\"; container_name = \"tfstate\"; key = \"stage1.tfstate\" }"
 
-  - id: TF-008
+  - id: STAN-TF-008
     name: Complete Stage Outputs
     description: >-
       Every stage's outputs.tf MUST export all resource names, IDs, and
@@ -128,7 +128,7 @@ principles:
       - "output \"managed_identity_client_id\" { value = azurerm_user_assigned_identity.app.client_id }"
       - "# Do NOT output primary_key when local auth is disabled"
 
-  - id: TF-009
+  - id: STAN-TF-009
     name: Complete and Robust deploy.sh
     description: >-
       Every stage MUST include a deploy.sh that is syntactically complete
@@ -142,7 +142,7 @@ principles:
       - "#!/bin/bash\\nset -euo pipefail\\ntrap 'echo Deploy failed' ERR"
       - "terraform output -json > stage-1-outputs.json"
 
-  - id: TF-010
+  - id: STAN-TF-010
     name: Companion Resources for Disabled Auth
     description: >-
       When disabling local/key-based authentication on any service

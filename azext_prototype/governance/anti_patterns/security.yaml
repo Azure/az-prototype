@@ -9,7 +9,8 @@ domain: security
 description: Credentials, secrets, and insecure configuration detection
 
 patterns:
-  - search_patterns:
+  - id: ANTI-SEC-001
+    search_patterns:
       - "connection_string"
       - "connectionstring"
       - "access_key"
@@ -35,7 +36,8 @@ patterns:
       - 'Microsoft.ManagedIdentity/userAssignedIdentities'
     warning_message: "Possible credential/secret in output — use managed identity instead of connection strings or keys."
 
-  - search_patterns:
+  - id: ANTI-SEC-002
+    search_patterns:
       - "admin_enabled = true"
       - "admin_username"
       - "admin_password"
@@ -46,7 +48,8 @@ patterns:
       - "# Use managed identity with RBAC role assignment"
     warning_message: "Admin credentials detected — use managed identity or RBAC-based authentication instead."
 
-  - search_patterns:
+  - id: ANTI-SEC-003
+    search_patterns:
       - "hardcoded"
       - "hard-coded"
       - "hard coded"
@@ -64,7 +67,8 @@ patterns:
       - 'Microsoft.KeyVault/vaults/secrets'
     warning_message: "Possible hard-coded value detected — externalize secrets to Key Vault or use managed identity."
 
-  - search_patterns:
+  - id: ANTI-SEC-004
+    search_patterns:
       - "disable_tde"
       - "transparent_data_encryption = false"
       - "encryption_at_rest = false"
@@ -75,7 +79,8 @@ patterns:
       - 'transparentDataEncryption = "Enabled"'
     warning_message: "Encryption at rest appears disabled — leave default encryption enabled on all data services."
 
-  - search_patterns:
+  - id: ANTI-SEC-005
+    search_patterns:
       - "output \"cosmos_account_primary_key\""
       - "output \"cosmos_primary_key\""
       - "output \"cosmos_connection_strings\""
@@ -95,7 +100,8 @@ patterns:
       - 'output "principal_id"'
     warning_message: "Sensitive value exposed as Terraform output — remove this output entirely. Use managed identity instead of keys."
 
-  - search_patterns:
+  - id: ANTI-SEC-006
+    search_patterns:
       - "DO NOT USE - use managed identity"
       - "DEPRECATED: Use managed identity"
       - "WARNING: Do not use"

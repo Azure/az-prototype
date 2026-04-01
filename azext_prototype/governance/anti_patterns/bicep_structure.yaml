@@ -1,0 +1,112 @@
+# Anti-pattern detection — Bicep structure domain
+#
+# Detects structural issues, deprecated patterns, and missing best
+# practices in AI-generated Bicep code.
+
+domain: bicep_structure
+description: Bicep file structure, module conventions, and deployment script patterns
+
+patterns:
+  # Detect inline resources instead of modules
+  - id: ANTI-BCS-001
+    search_patterns:
+      - "resource "
+    safe_patterns:
+      - "module "
+      - "modules/"
+      - "existing"
+    correct_patterns:
+      - "module identity './modules/identity.bicep'"
+      - "module monitoring './modules/monitoring.bicep'"
+    warning_message: >-
+      Bicep resources defined inline in main.bicep instead of in modules.
+      Use module references (module <name> './modules/<service>.bicep') for all resources.
+
+  # Detect missing managed identity module
+  - id: ANTI-BCS-002
+    search_patterns:
+      - "listKeys("
+      - "listAccountSas("
+      - "listServiceSas("
+    safe_patterns:
+      - "Microsoft.ManagedIdentity/userAssignedIdentities"
+      - "managedIdentity"
+      - "identity"
+    correct_patterns:
+      - "Microsoft.ManagedIdentity/userAssignedIdentities"
+      - "identity: { type: 'UserAssigned' }"
+    warning_message: >-
+      listKeys() or listSas() detected — use managed identity with RBAC role
+      assignments instead of extracting keys or SAS tokens.
+
+  # Detect hardcoded resource names
+  - id: ANTI-BCS-003
+    search_patterns:
+      - "name: '"
+    safe_patterns:
+      - "name: '${'"
+      - "name: resourceName"
+      - "name: storageAccountName"
+      - "param "
+      - "var "
+    correct_patterns:
+      - "var storageAccountName = '${prefix}-st-${suffix}'"
+      - "name: storageAccountName"
+    warning_message: >-
+      Hardcoded resource name detected — use variables with a consistent naming
+      pattern (e.g., var resourceName = '${prefix}-${type}-${suffix}').
+
+  # Detect missing @description decorators on parameters
+  - id: ANTI-BCS-004
+    search_patterns:
+      - "param "
+    safe_patterns:
+      - "@description("
+      - "@Description("
+    correct_patterns:
+      - "@description('The Azure region for all resources')"
+      - "param location string"
+    warning_message: >-
+      Parameter missing @description decorator — all parameters must have
+      @description decorators for documentation and discoverability.
+
+  # Detect missing outputs in main.bicep
+  - id: ANTI-BCS-005
+    search_patterns:
+      - "module "
+    safe_patterns:
+      - "output "
+    correct_patterns:
+      - "output storageAccountId string = storage.outputs.id"
+      - "output identityPrincipalId string = identity.outputs.principalId"
+    warning_message: >-
+      Modules referenced but no outputs declared — main.bicep must output all
+      resource IDs, endpoints, and principal IDs from module outputs.
+
+  # Detect deploy.sh using az cli without error handling
+  - id: ANTI-BCS-006
+    search_patterns:
+      - "az deployment group create"
+    safe_patterns:
+      - "set -euo pipefail"
+      - "set -e"
+    correct_patterns:
+      - "set -euo pipefail"
+      - "#!/bin/bash"
+    warning_message: >-
+      deploy.sh missing error handling — script must start with
+      set -euo pipefail for safe execution.
+
+  # Detect API version mismatches (old versions)
+  - id: ANTI-BCS-007
+    search_patterns:
+      - "@2021-"
+      - "@2020-"
+      - "@2019-"
+    safe_patterns: []
+    correct_patterns:
+      - "@2023-"
+      - "@2024-"
+    warning_message: >-
+      Outdated API version detected — use API versions from 2023 or later
+      for current resource type definitions and feature support.

@@ -673,28 +673,28 @@ class TestBuiltinAgentStandardsFlags:
         assert "Design Standards" not in all_content, f"{cls_name} system messages should NOT include Design Standards"
 
     def test_terraform_agent_sees_tf_standards(self):
-        """Terraform agent should see TF-001 module structure standard."""
+        """Terraform agent should see STAN-TF-001 module structure standard."""
         from azext_prototype.agents.builtin.terraform_agent import TerraformAgent
 
         agent = TerraformAgent()
         messages = agent.get_system_messages()
         all_content = "\n".join(m.content for m in messages)
-        assert "TF-001" in all_content or "Standard File Layout" in all_content
+        assert "STAN-TF-001" in all_content or "Standard File Layout" in all_content
 
     def test_bicep_agent_sees_bcp_standards(self):
-        """Bicep agent should see BCP-001 module structure standard."""
+        """Bicep agent should see STAN-BCP-001 module structure standard."""
         from azext_prototype.agents.builtin.bicep_agent import BicepAgent
 
         agent = BicepAgent()
         messages = agent.get_system_messages()
         all_content = "\n".join(m.content for m in messages)
-        assert "BCP-001" in all_content or "Standard File Layout" in all_content
+        assert "STAN-BCP-001" in all_content or "Standard File Layout" in all_content
 
     def test_app_developer_sees_python_standards(self):
-        """App developer should see PY-001 DefaultAzureCredential standard."""
+        """App developer should see STAN-PY-001 DefaultAzureCredential standard."""
         from azext_prototype.agents.builtin.app_developer import AppDeveloperAgent
 
         agent = AppDeveloperAgent()
         messages = agent.get_system_messages()
         all_content = "\n".join(m.content for m in messages)
-        assert "PY-001" in all_content or "DefaultAzureCredential" in all_content
+        assert "STAN-PY-001" in all_content or "DefaultAzureCredential" in all_content

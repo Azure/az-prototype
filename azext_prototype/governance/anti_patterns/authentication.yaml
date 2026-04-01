@@ -6,7 +6,8 @@ domain: authentication
 description: Authentication method and RBAC assignment detection
 
 patterns:
-  - search_patterns:
+  - id: ANTI-AUTH-001
+    search_patterns:
       - "sql authentication"
       - "username/password"
       - "sql_login"
@@ -21,7 +22,8 @@ patterns:
       - "# Use Microsoft Entra authentication with managed identity"
     warning_message: "SQL authentication with username/password detected — use Microsoft Entra (Azure AD) authentication with managed identity."
 
-  - search_patterns:
+  - id: ANTI-AUTH-002
+    search_patterns:
       - "access_policy {"
       - "access_policy ="
       - "access policies"
@@ -35,7 +37,8 @@ patterns:
       - "azurerm_role_assignment"
     warning_message: "Key Vault access policies detected — use enable_rbac_authorization = true with role assignments instead."
 
-  - search_patterns:
+  - id: ANTI-AUTH-003
+    search_patterns:
       - "\"owner\""
       - "\"contributor\""
     safe_patterns:

@@ -8,7 +8,8 @@ description: Provider hygiene, version consistency, tag placement, and azapi con
 
 patterns:
   # Detect azurerm provider declarations (should use azapi only)
-  - search_patterns:
+  - id: ANTI-TFS-001
+    search_patterns:
       - 'source  = "hashicorp/azurerm"'
       - 'source = "hashicorp/azurerm"'
       - 'provider "azurerm"'
@@ -23,7 +24,8 @@ patterns:
       The only allowed provider is hashicorp/azapi.
 
   # Detect azurerm resources mixed with azapi
-  - search_patterns:
+  - id: ANTI-TFS-002
+    search_patterns:
       - "azurerm_role_assignment"
       - "azurerm_monitor_metric_alert"
       - "azurerm_storage_management_policy"
@@ -40,7 +42,8 @@ patterns:
       resource type instead (e.g., Microsoft.Authorization/roleAssignments@2022-04-01).
 
   # Detect random provider (unnecessary)
-  - search_patterns:
+  - id: ANTI-TFS-003
+    search_patterns:
       - 'source  = "hashicorp/random"'
       - 'source = "hashicorp/random"'
       - 'provider "random"'
@@ -56,7 +59,8 @@ patterns:
       substr(md5("seed"), 0, 8)) instead of the random provider.
 
   # Detect outdated azapi v1.x versions
-  - search_patterns:
+  - id: ANTI-TFS-004
+    search_patterns:
       - "~> 1.15"
       - "~> 1.14"
       - "~> 1.13"
@@ -72,7 +76,8 @@ patterns:
       tag placement and output access semantics that are incompatible with v2.x patterns.
 
   # Detect non-deterministic uuid()
-  - search_patterns:
+  - id: ANTI-TFS-005
+    search_patterns:
       - "uuid()"
     safe_patterns:
       - "uuidv5"
@@ -85,7 +90,8 @@ patterns:
       (resource ID + principal ID + role ID) to ensure idempotent plans.
 
   # Detect jsondecode() on azapi v2.x outputs (v1.x pattern on v2.x)
-  - search_patterns:
+  - id: ANTI-TFS-006
+    search_patterns:
       - "jsondecode(azapi_resource."
       - "jsondecode( azapi_resource."
     safe_patterns:
@@ -97,7 +103,8 @@ patterns:
       already a parsed object. Access directly via .output.properties.PropertyName.
 
   # Detect .output.properties references without response_export_values
-  - search_patterns:
+  - id: ANTI-TFS-007
+    search_patterns:
       - ".output.properties."
     safe_patterns:
       - "response_export_values"

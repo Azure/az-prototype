@@ -11,7 +11,7 @@ description: >-
   must follow.  These are not suggestions — they are standards.
 
 principles:
-  - id: DES-001
+  - id: STAN-DES-001
     name: Single Responsibility
     description: >-
       Every function, method, class, and module must have exactly one
@@ -26,7 +26,7 @@ principles:
       - "Application: a function that fetches data should not also format it for display"
       - "Bicep: separate networking resources from compute resources into distinct modules"
 
-  - id: DES-002
+  - id: STAN-DES-002
     name: DRY (Don't Repeat Yourself)
     description: >-
       Extract repeated logic into shared functions, modules, or variables.
@@ -41,7 +41,7 @@ principles:
       - "Application: extract common HTTP client setup into a shared utility"
       - "Bicep: use modules for repeated resource patterns"
 
-  - id: DES-003
+  - id: STAN-DES-003
     name: Open/Closed Principle
     description: >-
       Modules and classes should be open for extension but closed for
@@ -55,7 +55,7 @@ principles:
       - "Terraform: use variable maps for optional features instead of hard-coded conditionals"
       - "Application: use dependency injection instead of hard-coded implementations"
 
-  - id: DES-004
+  - id: STAN-DES-004
     name: Least Privilege
     description: >-
       Grant only the minimum permissions required.  Every role assignment,
@@ -69,7 +69,7 @@ principles:
       - "Use 'Storage Blob Data Reader' instead of 'Contributor' for read-only access"
       - "Scope role assignments to the specific resource, not the resource group"
 
-  - id: DES-005
+  - id: STAN-DES-005
     name: Explicit Over Implicit
     description: >-
       Be explicit about configuration, dependencies, and behavior.
