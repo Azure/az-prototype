@@ -60,6 +60,19 @@ Build quality improvements
 * **Networking stage boundary** -- expanded ``_get_networking_stage_note()``
   to explicitly prohibit PE/DNS creation in service stages when a networking
   stage handles them.
+* **Application code stages** -- Phase 1 deployment plan prompt now
+  instructs the architect to create ``category: "app"`` stages for
+  application source code (APIs, workers, functions, web apps, Logic Apps)
+  separate from ``category: "infra"`` stages that provision Azure
+  resources.  Stage ordering now documents full dependency chain: each
+  group (identity, monitoring, networking, data, compute, integration,
+  app, docs) lists what it depends on and what it provides downstream.
+* **Empty message filtering** -- ``CopilotProvider._messages_to_dicts()``
+  now skips messages with empty, None, or whitespace-only content to
+  prevent HTTP 400 errors.  ``BaseAgent.get_system_messages()`` adds
+  ``.strip()`` guards on governance, standards, and knowledge text.
+  Root cause was ``set_governor_brief(" ")`` (single space) which
+  created a whitespace-only system message rejected by the API.
 * **RBAC principal separation** -- added Section 6.4 to ``constraints.md``:
   administrative roles target deploying user, data roles target app MI.
 * **Cosmos DB RBAC documentation** -- added Section 6.5 to
