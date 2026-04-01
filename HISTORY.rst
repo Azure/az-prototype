@@ -124,6 +124,25 @@ Build quality improvements
   dependencies."  Prevents unnecessary dependencies (e.g., Stage 10
   referencing Stage 4 networking when it has no networking dependency).
 
+Governance restructuring
+~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Domain-prefixed policy IDs** -- all 425 policy rule IDs renamed with
+  domain prefixes for clarity:
+
+  - ``AZ-`` for Azure service-specific rules (321 rules)
+  - ``WAF-COST-`` for cost optimization (20 rules)
+  - ``WAF-PERF-`` for performance (25 rules)
+  - ``WAF-REL-`` for reliability (20 rules)
+  - ``WAF-SEC-`` for security principles (16 rules)
+  - ``CC-INT-`` for cross-cutting integration patterns (26 rules)
+
+* **Well-Architected Framework alignment** -- cost, performance,
+  reliability, and security policies organized under WAF categories.
+  Integration patterns separated as cross-cutting.
+* **Wiki governance subpages** -- 17 dedicated wiki pages with per-service
+  policy tables (rule ID, description, agents), auto-generated from YAML
+  via ``scripts/generate_wiki_governance.py``.
+
 Anti-pattern detection
 ~~~~~~~~~~~~~~~~~~~~~~~
 * **New domain: ``terraform_structure``** -- 6 new anti-pattern checks for
