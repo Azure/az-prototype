@@ -99,9 +99,16 @@ class CopilotProvider(AIProvider):
 
     @staticmethod
     def _messages_to_dicts(messages: list[AIMessage]) -> list[dict[str, Any]]:
-        """Convert ``AIMessage`` list to OpenAI-style message dicts."""
+        """Convert ``AIMessage`` list to OpenAI-style message dicts.
+
+        Skips messages with empty or whitespace-only content to avoid
+        HTTP 400 errors from the Copilot API.
+        """
         result = []
         for m in messages:
+            # Skip messages with empty/whitespace/None content (API rejects these)
+            if not m.content or (isinstance(m.content, str) and not m.content.strip()):
+                continue
             msg: dict[str, Any] = {"role": m.role, "content": m.content}
             if m.tool_calls:
                 msg["tool_calls"] = [

@@ -248,19 +248,19 @@ class BaseAgent:
         # Inject governance context
         if self._governance_aware:
             governance_text = self._get_governance_text()
-            if governance_text:
+            if governance_text and governance_text.strip():
                 messages.append(AIMessage(role="system", content=governance_text))
 
         # Inject design standards
         if self._include_standards:
             standards_text = self._get_standards_text()
-            if standards_text:
+            if standards_text and standards_text.strip():
                 messages.append(AIMessage(role="system", content=standards_text))
 
         # Inject knowledge context
         if self._knowledge_role or self._knowledge_tools or self._knowledge_languages:
             knowledge_text = self._get_knowledge_text()
-            if knowledge_text:
+            if knowledge_text and knowledge_text.strip():
                 messages.append(AIMessage(role="system", content=knowledge_text))
 
         return messages
