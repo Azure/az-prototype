@@ -97,53 +97,74 @@ def generate_policy_page(title: str, category_path: Path, output_name: str) -> s
     return "\n".join(lines)
 
 
-def generate_anti_patterns_page() -> str:
-    """Generate the anti-patterns wiki page."""
-    lines = ["# Anti-Patterns", ""]
+def generate_anti_pattern_leaf_page(yf: Path) -> str:
+    """Generate a single anti-pattern page for one YAML domain file."""
+    data = load_yaml(yf)
+    domain = data.get("domain", yf.stem)
+    title = domain.replace("_", " ").title()
+    description = data.get("description", "")
+    patterns = data.get("patterns", [])
+
+    lines = [f"# {title}", ""]
     lines.append(
         "Anti-patterns are automatically detected in AI-generated output after each stage. "
         "When a pattern matches and no safe pattern exempts it, a warning is shown.\n"
     )
-
-    ap_dir = GOVERNANCE_DIR / "anti_patterns"
-    yaml_files = sorted(ap_dir.glob("*.yaml"))
-
-    total = 0
-    for yf in yaml_files:
-        data = load_yaml(yf)
-        patterns = data.get("patterns", [])
-        total += len(patterns)
-
-    lines.append(f"**{len(yaml_files)} domains, {total} checks**\n")
+    if description:
+        lines.append(f"{description}\n")
+    lines.append(f"**{len(patterns)} checks**\n")
     lines.append("---\n")
 
-    for yf in yaml_files:
-        data = load_yaml(yf)
-        domain = data.get("domain", yf.stem)
-        description = data.get("description", "")
-        patterns = data.get("patterns", [])
+    if patterns:
+        lines.append("| Check | Description | Agents |")
+        lines.append("| ----- | ----------- | ------ |")
+        for i, p in enumerate(patterns, 1):
+            warning = p.get("warning_message", "").replace("|", "\\|").replace("\n", " ")
+            search = p.get("search_patterns", [])
+            safe = p.get("safe_patterns", [])
+            check_id = p.get("id", f"{domain.upper()}-{i:03d}")
 
-        lines.append(f"## {domain.replace('_', ' ').title()}")
-        lines.append(f"\n{description}\n")
-        if patterns:
-            lines.append("| Check | Description | Agents |")
-            lines.append("| ----- | ----------- | ------ |")
-            for i, p in enumerate(patterns, 1):
-                warning = p.get("warning_message", "").replace("|", "\\|").replace("\n", " ")
-                search = p.get("search_patterns", [])
-                safe = p.get("safe_patterns", [])
-                check_id = p.get("id", f"{domain.upper()}-{i:03d}")
+            cell = warning
+            if search:
+                triggers = ", ".join(f"`{s}`" for s in search[:5])
+                cell += f"<br /><br />Triggers on: {triggers}"
+            if safe:
+                exemptions = ", ".join(f"`{s}`" for s in safe[:5])
+                cell += f"<br />Exempted by: {exemptions}"
 
-                # Build description cell
-                cell = warning
-                if search:
-                    triggers = ", ".join(f"`{s}`" for s in search[:5])
-                    cell += f"<br /><br />Triggers on: {triggers}"
-                if safe:
-                    exemptions = ", ".join(f"`{s}`" for s in safe[:5])
-                    cell += f"<br />Exempted by: {exemptions}"
+            lines.append(f"| {check_id} | {cell} | _all agents_ |")
+        lines.append("")
 
-                lines.append(f"| {check_id} | {cell} | _all agents_ |")
+    # Detailed sections per check
+    for i, p in enumerate(patterns, 1):
+        check_id = p.get("id", f"{domain.upper()}-{i:03d}")
+        warning = p.get("warning_message", "")
+        search = p.get("search_patterns", [])
+        safe = p.get("safe_patterns", [])
+        correct = p.get("correct_patterns", [])
+
+        if not warning:
+            continue
+
+        lines.append(f"### {check_id}\n")
+        lines.append(f"{warning}\n")
+
+        if search:
+            lines.append("**Triggers on**:\n")
+            for s in search:
+                lines.append(f"- `{s}`")
+            lines.append("")
+
+        if safe:
+            lines.append("**Exempted by**:\n")
+            for s in safe:
+                lines.append(f"- `{s}`")
+            lines.append("")
+
+        if correct:
+            lines.append("**Correct patterns**:\n")
+            for c in correct:
+                lines.append(f"- `{c}`")
             lines.append("")
 
         lines.append("---\n")
@@ -267,11 +288,18 @@ def main():
             out_path.write_text(content, encoding="utf-8")
             print(f"  {out_path.name}")
 
-    # Anti-patterns page
-    content = generate_anti_patterns_page()
-    out_path = WIKI_DIR / "Governance-Anti-Patterns.md"
-    out_path.write_text(content, encoding="utf-8")
-    print(f"  {out_path.name}")
+    # Anti-pattern leaf pages — one per YAML domain file
+    ap_dir = GOVERNANCE_DIR / "anti_patterns"
+    anti_pattern_page_count = 0
+    for yf in sorted(ap_dir.glob("*.yaml")):
+        data = load_yaml(yf)
+        domain = data.get("domain", yf.stem)
+        leaf_name = domain.replace("_", " ").title().replace(" ", "-")
+        content = generate_anti_pattern_leaf_page(yf)
+        out_path = WIKI_DIR / f"Governance-Anti-Patterns-{leaf_name}.md"
+        out_path.write_text(content, encoding="utf-8")
+        print(f"  {out_path.name}")
+        anti_pattern_page_count += 1
 
     # Standards leaf pages — one per YAML file
     std_dir = GOVERNANCE_DIR / "standards"
@@ -293,7 +321,7 @@ def main():
             print(f"  {out_path.name}")
             standards_page_count += 1
 
-    total_pages = len(azure_categories) + len(other_categories) + 2 + standards_page_count
+    total_pages = len(azure_categories) + len(other_categories) + anti_pattern_page_count + standards_page_count
     print(f"\nGenerated {total_pages} wiki pages.")
 
 
