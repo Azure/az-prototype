@@ -27,7 +27,7 @@ rules:
   # ------------------------------------------------------------------ #
   # HA-001: Zone redundancy for production PaaS services (WAF RE-02)
   # ------------------------------------------------------------------ #
-  - id: HA-001
+  - id: WAF-REL-HA-001
     severity: recommended
     description: >-
       Enable zone redundancy for ALL production PaaS services.  Every
@@ -393,7 +393,7 @@ rules:
   # ------------------------------------------------------------------ #
   # HA-002: Multi-region deployment for critical workloads (WAF RE-02)
   # ------------------------------------------------------------------ #
-  - id: HA-002
+  - id: WAF-REL-HA-002
     severity: recommended
     description: >-
       Deploy critical workloads across multiple Azure regions using
@@ -720,7 +720,7 @@ rules:
   # ------------------------------------------------------------------ #
   # HA-003: Availability zones for VMs (WAF RE-02)
   # ------------------------------------------------------------------ #
-  - id: HA-003
+  - id: WAF-REL-HA-003
     severity: required
     description: >-
       Deploy production VMs and VM Scale Sets across availability zones.
@@ -909,7 +909,7 @@ rules:
   # ------------------------------------------------------------------ #
   # HA-004: Health probes for load-balanced services (WAF RE-04)
   # ------------------------------------------------------------------ #
-  - id: HA-004
+  - id: WAF-REL-HA-004
     severity: required
     description: >-
       Configure health probes for ALL load-balanced services.  Every
@@ -1064,7 +1064,7 @@ rules:
   # ------------------------------------------------------------------ #
   # HA-005: Database geo-replication (WAF RE-02, RE-03)
   # ------------------------------------------------------------------ #
-  - id: HA-005
+  - id: WAF-REL-HA-005
     severity: recommended
     description: >-
       Configure geo-replication for all production databases.  SQL Database

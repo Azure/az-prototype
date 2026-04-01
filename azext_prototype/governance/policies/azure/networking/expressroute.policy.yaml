@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: ER-001
+  - id: AZ-ER-001
     severity: required
     description: "Deploy ExpressRoute circuit with Premium tier for cross-region connectivity or large route tables"
     rationale: "Standard tier limits to 4000 routes and single geopolitical region; Premium required for global reach"
@@ -62,7 +62,7 @@ rules:
       - "Do not use Standard tier if connecting across geopolitical regions"
       - "Do not share circuit service keys — treat them as secrets"
 
-  - id: ER-002
+  - id: AZ-ER-002
     severity: required
     description: "Deploy ExpressRoute Gateway with ErGw2AZ or higher SKU for zone redundancy"
     rationale: "AZ SKUs provide zone redundancy; ErGw1Az has limited throughput for production workloads"
@@ -130,7 +130,7 @@ rules:
       - "Do not use non-AZ SKUs for production ExpressRoute gateways"
       - "Do not colocate VPN and ExpressRoute gateways in the same GatewaySubnet without planning"
 
-  - id: ER-003
+  - id: AZ-ER-003
     severity: required
     description: "Configure private peering with BFD enabled for fast failover"
     rationale: "BFD detects link failures in sub-second intervals vs BGP hold timer defaults of 180 seconds"
@@ -168,7 +168,7 @@ rules:
       - "Do not use Microsoft peering for internal traffic — use private peering"
       - "Do not use overlapping address prefixes between primary and secondary paths"
 
-  - id: ER-004
+  - id: AZ-ER-004
     severity: recommended
     description: "Enable diagnostic settings for ExpressRoute circuit and gateway"
     rationale: "Monitor BGP route advertisements, circuit availability, and throughput metrics"

@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: IOT-001
+  - id: AZ-IOT-001
     severity: required
     description: "Deploy IoT Hub with Standard tier, managed identity, TLS 1.2, and public access disabled"
     rationale: "Standard tier supports cloud-to-device messaging and routing; managed identity eliminates connection strings"
@@ -92,7 +92,7 @@ rules:
       - "Do not enable local auth — use Entra RBAC for service operations"
       - "Do not allow TLS versions below 1.2"
 
-  - id: IOT-002
+  - id: AZ-IOT-002
     severity: required
     description: "Use X.509 certificates or TPM attestation for device authentication"
     rationale: "Symmetric keys are less secure and harder to rotate at scale; X.509 provides stronger device identity"
@@ -150,7 +150,7 @@ rules:
       - "Do not use symmetric keys for production device fleets — they cannot be rotated individually"
       - "Do not embed device connection strings in application code"
 
-  - id: IOT-003
+  - id: AZ-IOT-003
     severity: recommended
     description: "Enable diagnostic settings for IoT Hub operations and device telemetry"
     rationale: "Monitor device connections, message routing, and error rates for operational visibility"

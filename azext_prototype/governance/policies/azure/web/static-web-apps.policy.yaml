@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: SWA-001
+  - id: AZ-SWA-001
     severity: required
     description: "Deploy Azure Static Web Apps with Standard SKU, managed identity, and enterprise-grade auth"
     rationale: "Standard SKU enables custom auth, private endpoints, and enterprise features; managed identity secures backend API connections"
@@ -115,19 +115,19 @@ rules:
       - "Never embed secrets in application settings without Key Vault references"
       - "Never disable stagingEnvironmentPolicy — staging environments enable safe preview deployments"
 
-  - id: SWA-002
+  - id: AZ-SWA-002
     severity: required
     description: "Configure custom authentication with identity providers in staticwebapp.config.json"
     rationale: "Default GitHub auth is insufficient for enterprise; custom auth enables Entra ID and other IdPs"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
 
-  - id: SWA-003
+  - id: AZ-SWA-003
     severity: recommended
     description: "Enable enterprise-grade CDN for global content distribution"
     rationale: "Enterprise CDN provides edge caching, WAF integration, and custom domains with managed certificates"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: SWA-004
+  - id: AZ-SWA-004
     severity: recommended
     description: "Configure custom domain with managed SSL certificate"
     rationale: "Managed certificates auto-renew and eliminate manual certificate management"

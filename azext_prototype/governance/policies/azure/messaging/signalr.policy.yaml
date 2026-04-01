@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: SIG-001
+  - id: AZ-SIG-001
     severity: required
     description: "Deploy Azure SignalR Service with managed identity, disabled access keys, and no public access"
     rationale: "Access keys are shared secrets; managed identity with Microsoft Entra auth provides auditable, per-client access control"
@@ -222,13 +222,13 @@ rules:
       - "When disableLocalAuth = true, primaryConnectionString and primaryKey are null in the ARM response. NEVER output or reference them."
       - "Applications authenticate to SignalR via managed identity using DefaultAzureCredential, NOT connection strings."
 
-  - id: SIG-002
+  - id: AZ-SIG-002
     severity: required
     description: "Enable connectivity and messaging logs for connection tracking and troubleshooting"
     rationale: "Without logs, connection failures and message delivery issues cannot be diagnosed"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
 
-  - id: SIG-003
+  - id: AZ-SIG-003
     severity: recommended
     description: "Configure network ACLs to restrict access by connection type"
     rationale: "Network ACLs provide fine-grained control over which connection types are allowed through which endpoints"

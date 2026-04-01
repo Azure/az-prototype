@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: LA-001
+  - id: AZ-LA-001
     severity: required
     description: "Create Log Analytics Workspace with PerGB2018 SKU and appropriate retention"
     rationale: "PerGB2018 is the standard pricing tier; retention controls cost and compliance requirements"
@@ -207,13 +207,13 @@ rules:
       - "NEVER set publicNetworkAccessForIngestion to Enabled when private endpoints are available"
       - "NEVER set publicNetworkAccessForQuery to Enabled when private endpoints are available"
 
-  - id: LA-002
+  - id: AZ-LA-002
     severity: required
     description: "Output workspace ID and customer ID for downstream diagnostic settings"
     rationale: "All PaaS resources need the workspace ID for diagnostic settings; Container Apps need the customer ID"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: LA-003
+  - id: AZ-LA-003
     severity: recommended
     description: "Set retention to 30 days for POC, 90 days for production"
     rationale: "Longer retention increases cost; 30 days is sufficient for POC troubleshooting"

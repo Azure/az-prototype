@@ -15,7 +15,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: RI-001
+  - id: WAF-COST-RI-001
     severity: recommended
     description: "Recommend Azure Reserved VM Instances for production workloads with stable, predictable compute usage over 12+ months"
     rationale: "1-year reservations save 30-40% over pay-as-you-go; 3-year reservations save 55-65%. Only applicable to stable production workloads"
@@ -109,7 +109,7 @@ rules:
       - "NEVER purchase reservations for burstable B-series VMs — they are designed for variable workloads"
       - "NEVER scope reservations to a single resource group unless the workload will remain in that group"
 
-  - id: RI-002
+  - id: WAF-COST-RI-002
     severity: recommended
     description: "Recommend Azure Savings Plans for compute when workloads may change VM size, region, or service type"
     rationale: "Savings Plans provide 15-25% savings with flexibility to change compute type, unlike reservations which are locked to a specific VM size and region"
@@ -153,7 +153,7 @@ rules:
       - "NEVER recommend both savings plans AND reservations for the same compute without calculating overlap"
       - "NEVER recommend savings plans before understanding the workload's compute mix"
 
-  - id: RI-003
+  - id: WAF-COST-RI-003
     severity: recommended
     description: "Recommend Cosmos DB reserved capacity for production workloads with predictable RU/s consumption"
     rationale: "Cosmos DB 1-year reserved capacity saves ~20% on provisioned throughput; 3-year saves ~30%. Only for provisioned (not serverless) accounts"
@@ -223,7 +223,7 @@ rules:
       - "NEVER reserve more RU/s than the measured baseline — spikes should use autoscale at pay-as-you-go rates"
       - "NEVER recommend 3-year Cosmos DB reservations without confirmed production commitment"
 
-  - id: RI-004
+  - id: WAF-COST-RI-004
     severity: recommended
     description: "Recommend SQL Database reserved capacity for production vCore databases with stable utilization"
     rationale: "SQL reserved capacity saves ~30-40% on provisioned vCore compute (not serverless). Only for databases with consistent CPU usage"

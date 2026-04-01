@@ -16,7 +16,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: SCALE-001
+  - id: WAF-COST-SCALE-001
     severity: required
     description: "Configure App Service autoscale with CPU-based rules — scale out at >70%, scale in at <30%, with cooldown periods"
     rationale: "Autoscale prevents both over-provisioning (cost waste) and under-provisioning (performance degradation). Cooldown prevents flapping"
@@ -149,7 +149,7 @@ rules:
       - "NEVER set cooldown below PT5M — short cooldowns cause flapping"
       - "NEVER omit scale-in rules — scale-out without scale-in causes permanent cost increase"
 
-  - id: SCALE-002
+  - id: WAF-COST-SCALE-002
     severity: required
     description: "Configure Container Apps scaling rules with appropriate min/max replicas and HTTP/custom scaling triggers"
     rationale: "Container Apps scaling is per-app; proper configuration prevents idle costs in dev and ensures availability in production"
@@ -354,7 +354,7 @@ rules:
       - "NEVER omit scaling rules — Container Apps defaults to 0-10 replicas with no trigger"
       - "NEVER use minReplicas = 0 for production — cold starts impact availability"
 
-  - id: SCALE-003
+  - id: WAF-COST-SCALE-003
     severity: required
     description: "Configure VMSS autoscale profiles with CPU-based rules and scheduled profiles for predictable workloads"
     rationale: "VMSS without autoscale runs at fixed capacity; autoscale adapts to demand and reduces off-hours costs"
@@ -522,7 +522,7 @@ rules:
       - "NEVER omit off-hours scaling profile for dev/POC workloads — schedule scale-down to save costs"
       - "NEVER set scale-out threshold below 60% for VMSS — VM boot time is 2-5 minutes"
 
-  - id: SCALE-004
+  - id: WAF-COST-SCALE-004
     severity: required
     description: "Configure database autoscale — Cosmos DB autoscale maxThroughput for production, SQL elastic pools for multi-database workloads"
     rationale: "Database scaling directly impacts both cost and performance; autoscale prevents over-provisioning while handling spikes"
@@ -625,7 +625,7 @@ rules:
       - "NEVER use individual databases when 3+ databases share a SQL server — use elastic pools"
       - "NEVER set elastic pool perDatabaseSettings.minCapacity > 0 for dev databases — allow idle databases to release vCores"
 
-  - id: SCALE-005
+  - id: WAF-COST-SCALE-005
     severity: required
     description: "Configure AKS cluster autoscaler with appropriate node pool settings — spot nodes for dev, on-demand for production"
     rationale: "AKS cluster autoscaler adjusts node count automatically; spot VMs provide up to 90% savings for interruptible workloads"

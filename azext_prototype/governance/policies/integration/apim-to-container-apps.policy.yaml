@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2025-12-01"
 
 rules:
-  - id: INT-001
+  - id: CC-INT-APIM-001
     severity: required
     description: "Route all external API traffic through API Management"
     rationale: "Centralizes auth, rate limiting, and observability"
@@ -19,7 +19,7 @@ rules:
       severity: warning
       error_message: "Template has container-apps but no api-management gateway"
 
-  - id: INT-002
+  - id: CC-INT-APIM-002
     severity: required
     description: "Use APIM managed identity to authenticate to Container Apps"
     rationale: "No shared keys or certificates between services"
@@ -30,7 +30,7 @@ rules:
       require_config: [identity]
       error_message: "Service '{service_name}' ({service_type}) missing managed identity for authenticating to Container Apps"
 
-  - id: INT-003
+  - id: CC-INT-APIM-003
     severity: recommended
     description: "Set Container App ingress to internal-only when fronted by APIM"
     rationale: "Container App should not be directly accessible from the internet"
@@ -42,7 +42,7 @@ rules:
         ingress: internal
       error_message: "Service '{service_name}' ({service_type}) should set ingress: internal when APIM is the external gateway"
 
-  - id: INT-004
+  - id: CC-INT-APIM-004
     severity: recommended
     description: "Configure APIM caching policies for read-heavy endpoints"
     rationale: "Reduces backend load and improves response latency"

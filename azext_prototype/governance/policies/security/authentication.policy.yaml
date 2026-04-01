@@ -8,19 +8,19 @@ metadata:
   last_reviewed: "2026-02-01"
 
 rules:
-  - id: AUTH-001
+  - id: WAF-SEC-AUTH-001
     severity: required
     description: "Never hardcode credentials, API keys, or secrets in source code, config files, or environment variables"
     rationale: "Hardcoded secrets leak through source control, logs, and error messages"
     applies_to: [cloud-architect, app-developer, terraform-agent, bicep-agent, biz-analyst]
 
-  - id: AUTH-002
+  - id: WAF-SEC-AUTH-002
     severity: recommended
     description: "Assign least-privilege RBAC roles for all service principals and user accounts"
     rationale: "Principle of least privilege limits blast radius of compromised credentials"
     applies_to: [cloud-architect, terraform-agent, bicep-agent, biz-analyst]
 
-  - id: AUTH-003
+  - id: WAF-SEC-AUTH-003
     severity: recommended
     description: "Prefer app registrations with scoped permissions over shared API keys for client authentication"
     rationale: "App registrations support scoped permissions, token expiry, and audit logging"

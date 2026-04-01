@@ -405,7 +405,7 @@ After all code blocks, include a `## Key Design Decisions` section:
 1. List each significant decision as a numbered item
 2. Explain WHY (policy reference, architecture constraint)
 3. Note deviations from architecture context and why (e.g., policy override)
-4. Reference policy IDs where applicable (e.g., "per VNET-001")
+4. Reference policy IDs where applicable (e.g., "per AZ-VNET-001")
 
 ## OUTPUT FORMAT
 Use SHORT filenames in code block labels (e.g., `main.tf`, NOT `terraform/main.tf`

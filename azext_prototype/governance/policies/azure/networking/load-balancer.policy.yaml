@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: LB-001
+  - id: AZ-LB-001
     severity: required
     description: "Deploy Load Balancer with Standard SKU — Basic SKU is being retired"
     rationale: "Basic LB lacks zone redundancy, SLA, backend pool flexibility, and will be retired September 2025"
@@ -151,7 +151,7 @@ rules:
       - "Do not leave disableOutboundSnat as false unless you explicitly need implicit SNAT"
       - "Do not use HTTP probes for health checks unless the backend requires it — prefer Tcp or Https"
 
-  - id: LB-002
+  - id: AZ-LB-002
     severity: required
     description: "Enable TCP reset on idle timeout for all load balancing rules"
     rationale: "TCP reset on idle prevents half-open connections that cause application errors"
@@ -166,7 +166,7 @@ rules:
     prohibitions:
       - "Do not set enableTcpReset to false — half-open connections degrade reliability"
 
-  - id: LB-003
+  - id: AZ-LB-003
     severity: recommended
     description: "Use explicit outbound rules instead of implicit SNAT for outbound connectivity"
     rationale: "Implicit SNAT has port exhaustion risks; explicit outbound rules give control over SNAT ports"
@@ -228,7 +228,7 @@ rules:
     prohibitions:
       - "Do not rely on implicit SNAT for production workloads"
 
-  - id: LB-004
+  - id: AZ-LB-004
     severity: recommended
     description: "Enable diagnostic settings for Load Balancer health probe and SNAT metrics"
     rationale: "Monitor backend health, SNAT port utilization, and data path availability"

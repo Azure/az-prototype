@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: BAS-001
+  - id: AZ-BAS-001
     severity: required
     description: "Deploy Azure Bastion with Standard SKU for production workloads"
     rationale: "Standard SKU provides native client support, IP-based connections, shareable links, and Kerberos auth"
@@ -79,7 +79,7 @@ rules:
       - "Do not deploy Bastion in a subnet other than AzureBastionSubnet"
       - "Do not use a subnet smaller than /26 for AzureBastionSubnet"
 
-  - id: BAS-002
+  - id: AZ-BAS-002
     severity: required
     description: "Create a dedicated AzureBastionSubnet with minimum /26 prefix and required NSG"
     rationale: "Azure Bastion requires a specifically named subnet with minimum size and mandatory NSG rules"
@@ -115,7 +115,7 @@ rules:
       - "Do not name the subnet anything other than AzureBastionSubnet"
       - "Do not omit NSG from AzureBastionSubnet"
 
-  - id: BAS-003
+  - id: AZ-BAS-003
     severity: required
     description: "Configure NSG on AzureBastionSubnet with mandatory inbound and outbound rules"
     rationale: "Azure Bastion requires specific ports for GatewayManager, HTTPS ingress, and data plane communication"
@@ -303,7 +303,7 @@ rules:
       - "Do not omit mandatory GatewayManager inbound rule — Bastion will fail health checks"
       - "Do not allow RDP/SSH inbound from Internet — only Bastion should broker these connections"
 
-  - id: BAS-004
+  - id: AZ-BAS-004
     severity: recommended
     description: "Enable diagnostic settings for Bastion audit and session logs"
     rationale: "Audit logs track who connected to which VM, required for compliance"

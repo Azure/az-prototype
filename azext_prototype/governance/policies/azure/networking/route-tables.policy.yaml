@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: UDR-001
+  - id: AZ-UDR-001
     severity: required
     description: "Disable BGP route propagation on subnets with forced tunneling to an NVA or firewall"
     rationale: "BGP propagation can override UDR next-hops and bypass security inspection"
@@ -41,7 +41,7 @@ rules:
       - "Do not leave disableBgpRoutePropagation as false when forcing traffic to an NVA"
       - "Do not create routes with nextHopType 'Internet' in secured subnets — use firewall as next hop"
 
-  - id: UDR-002
+  - id: AZ-UDR-002
     severity: required
     description: "Define explicit routes with valid next-hop types and addresses"
     rationale: "Invalid or missing next-hop addresses cause traffic black-holes"
@@ -75,7 +75,7 @@ rules:
       - "Do not omit nextHopIpAddress when nextHopType is VirtualAppliance"
       - "Do not use hardcoded IP addresses — use variables or references"
 
-  - id: UDR-003
+  - id: AZ-UDR-003
     severity: recommended
     description: "Associate route tables with subnets explicitly in the subnet resource"
     rationale: "Unassociated route tables have no effect on traffic flow"
@@ -117,7 +117,7 @@ rules:
       - "Do not associate a route table with GatewaySubnet unless specifically required for forced tunneling"
       - "Do not create subnets without both NSG and route table associations"
 
-  - id: UDR-004
+  - id: AZ-UDR-004
     severity: recommended
     description: "Document all custom routes and their purpose with tags"
     rationale: "Route tables can create complex traffic flows that are hard to debug without documentation"

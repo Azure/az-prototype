@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: AUTO-001
+  - id: AZ-AUTO-001
     severity: required
     description: "Deploy Azure Automation account with managed identity, disabled public access, and encryption"
     rationale: "Automation accounts execute privileged runbooks; managed identity eliminates Run As account credentials"
@@ -162,19 +162,19 @@ rules:
       - "Never store secrets as plain-text Automation variables — use encrypted variables or Key Vault"
       - "Never enable public network access without compensating network controls"
 
-  - id: AUTO-002
+  - id: AZ-AUTO-002
     severity: required
     description: "Use managed identity for all runbook authentication instead of Run As accounts"
     rationale: "Run As accounts use certificates that must be rotated; managed identity is automatic and auditable"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
 
-  - id: AUTO-003
+  - id: AZ-AUTO-003
     severity: recommended
     description: "Link Automation account to Log Analytics workspace for job log aggregation"
     rationale: "Linked workspace enables centralized monitoring of runbook execution and failure analysis"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
 
-  - id: AUTO-004
+  - id: AZ-AUTO-004
     severity: recommended
     description: "Use encrypted Automation variables or Key Vault references for sensitive configuration"
     rationale: "Plain-text variables are visible to account contributors; encrypted variables add a protection layer"

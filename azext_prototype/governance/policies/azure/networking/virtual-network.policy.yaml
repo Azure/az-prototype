@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: VNET-001
+  - id: AZ-VNET-001
     severity: required
     description: "Create Virtual Network with planned address space and purpose-specific subnets"
     rationale: "Address space must be planned to avoid overlap; subnets must be sized for their workload type"
@@ -169,7 +169,7 @@ rules:
       - "NEVER overlap subnet address ranges"
       - "NEVER use overlapping address spaces with peered VNets"
 
-  - id: VNET-002
+  - id: AZ-VNET-002
     severity: required
     description: "Create Network Security Groups with explicit rules for every subnet"
     rationale: "NSGs provide network-level access control; every subnet must have an NSG to enforce least-privilege traffic flow"
@@ -299,7 +299,7 @@ rules:
         }
       }
 
-  - id: VNET-003
+  - id: AZ-VNET-003
     severity: required
     description: "Use proper subnet delegation for Azure services that require it"
     rationale: "Services like App Service, Container Apps, and others require subnet delegation to function correctly"
@@ -310,7 +310,7 @@ rules:
       - "NEVER delegate a private endpoint subnet — PE subnets must NOT have delegations"
       - "NEVER share a delegated subnet between different service types"
 
-  - id: VNET-004
+  - id: AZ-VNET-004
     severity: required
     description: "Plan subnet sizes according to service requirements"
     rationale: "App Service VNet integration needs /26 minimum; Container Apps needs /23 minimum; PE subnets need /27 minimum"
@@ -320,7 +320,7 @@ rules:
       - "NEVER create a Container Apps subnet smaller than /23"
       - "NEVER create a private endpoint subnet smaller than /27"
 
-  - id: VNET-005
+  - id: AZ-VNET-005
     severity: recommended
     description: "Use standard naming convention for subnets: snet-{purpose}"
     rationale: "Consistent naming enables automation and reduces configuration errors"

@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: WAF-001
+  - id: AZ-WAF-001
     severity: required
     description: "Deploy WAF policy in Prevention mode with OWASP 3.2 managed rule set and bot protection"
     rationale: "Detection mode only logs attacks; Prevention mode actively blocks them; OWASP 3.2 covers current threat landscape"
@@ -93,13 +93,13 @@ rules:
       - "Never add broad exclusions (e.g., entire rule groups) without documenting justification"
       - "Never deploy Application Gateway without WAF policy association"
 
-  - id: WAF-002
+  - id: AZ-WAF-002
     severity: required
     description: "Enable request body inspection and set appropriate size limits"
     rationale: "Without body inspection, injection attacks in POST payloads bypass the WAF"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: WAF-003
+  - id: AZ-WAF-003
     severity: recommended
     description: "Add custom rules for geo-filtering and rate limiting before managed rules"
     rationale: "Custom rules execute first and can block traffic by geography or rate before managed rule processing"
@@ -153,7 +153,7 @@ rules:
         ]
       }
 
-  - id: WAF-004
+  - id: AZ-WAF-004
     severity: recommended
     description: "Configure WAF exclusions only for verified false positives with documented justification"
     rationale: "Overly broad exclusions weaken WAF protection; each exclusion must be validated"

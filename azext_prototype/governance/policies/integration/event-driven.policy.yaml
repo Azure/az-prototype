@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: ED-001
+  - id: CC-INT-ED-001
     severity: required
     description: "Wire Event Grid subscriptions to Function App or Container App endpoints with dead-letter storage and managed identity delivery"
     rationale: "Event Grid provides at-least-once delivery; dead-letter captures undeliverable events; managed identity eliminates connection strings"
@@ -255,7 +255,7 @@ rules:
       severity: warning
       error_message: "Event Grid + Functions template must include a storage account for dead-letter configuration"
 
-  - id: ED-002
+  - id: CC-INT-ED-002
     severity: required
     description: "Wire Service Bus triggers to Function App or Container App using managed identity connections"
     rationale: "Service Bus provides reliable ordered messaging; managed identity eliminates connection string management and rotation burden"
@@ -368,7 +368,7 @@ rules:
       severity: warning
       error_message: "Service Bus + Functions template must include managed identity for connection string-free triggers"
 
-  - id: ED-003
+  - id: CC-INT-ED-003
     severity: required
     description: "Wire Event Hubs to Stream Analytics to Storage/SQL for real-time stream processing pipelines"
     rationale: "Event Hubs provides high-throughput ingestion; Stream Analytics handles windowed aggregation; output to durable storage completes the pipeline"
@@ -595,7 +595,7 @@ rules:
       - "NEVER set outputErrorPolicy to Drop in production — use Stop to surface data issues"
       - "NEVER skip eventsOutOfOrderPolicy — unordered events corrupt aggregation results"
 
-  - id: ED-004
+  - id: CC-INT-ED-004
     severity: required
     description: "Configure dead-letter queues for Service Bus and dead-letter storage for Event Grid"
     rationale: "Dead-letter captures messages/events that cannot be delivered or processed, enabling investigation and replay"
@@ -690,7 +690,7 @@ rules:
       - "NEVER skip dead-letter configuration on Event Grid subscriptions — undeliverable events are lost permanently"
       - "NEVER grant public access to dead-letter storage containers"
 
-  - id: ED-005
+  - id: CC-INT-ED-005
     severity: required
     description: "Implement poison message handling patterns for failed message processing"
     rationale: "Poison messages that repeatedly fail processing block other messages; explicit handling prevents queue stalls"

@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: ML-001
+  - id: AZ-ML-001
     severity: required
     description: "Deploy Azure Machine Learning workspace with managed identity, high business impact, and no public access"
     rationale: "ML workspaces handle sensitive training data and models; managed identity eliminates credential sprawl"
@@ -194,7 +194,7 @@ rules:
       - "Never create compute instances without managed identity"
       - "Never skip associated Key Vault, Storage Account, or Application Insights dependencies"
 
-  - id: ML-002
+  - id: AZ-ML-002
     severity: required
     description: "Deploy compute instances and clusters with managed identity and no public IP"
     rationale: "Compute resources with public IPs and no identity create attack surface and credential risk"
@@ -244,7 +244,7 @@ rules:
       - "Never create compute without managed identity"
       - "Never skip idle shutdown configuration — set idleTimeBeforeShutdown to avoid cost waste"
 
-  - id: ML-003
+  - id: AZ-ML-003
     severity: recommended
     description: "Use managed online endpoints with managed identity for model serving"
     rationale: "Managed endpoints handle scaling, versioning, and traffic splitting; managed identity secures model access"

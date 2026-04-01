@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: APIM-001
+  - id: AZ-APIM-001
     severity: required
     description: "Deploy API Management with managed identity, VNet integration, and TLS 1.2+ enforcement"
     rationale: "APIM is the gateway for all backend APIs; it must enforce transport security and use managed identity for backend auth"
@@ -189,25 +189,25 @@ rules:
       - "Never store plain-text secrets in named values — use Key Vault references"
       - "Never expose management API endpoint publicly without IP restrictions"
 
-  - id: APIM-002
+  - id: AZ-APIM-002
     severity: required
     description: "Use subscription keys or OAuth 2.0 for API authentication — never expose APIs without auth"
     rationale: "Unauthenticated APIs allow unrestricted access and abuse"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
 
-  - id: APIM-003
+  - id: AZ-APIM-003
     severity: recommended
     description: "Implement rate limiting and quota policies on all API products"
     rationale: "Rate limiting prevents abuse and ensures fair usage across consumers"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: APIM-004
+  - id: AZ-APIM-004
     severity: recommended
     description: "Use managed identity for backend service authentication"
     rationale: "Eliminates credential management between APIM and backend services"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
 
-  - id: APIM-005
+  - id: AZ-APIM-005
     severity: recommended
     description: "Enable zone redundancy for Premium tier APIM instances"
     rationale: "WAF Reliability: Zone redundancy ensures resiliency during a datacenter outage within a region; API traffic continues through remaining units in other zones"
@@ -221,31 +221,31 @@ rules:
       // Add zones to the APIM resource in APIM-001:
       //   zones: ['1', '2', '3']
 
-  - id: APIM-006
+  - id: AZ-APIM-006
     severity: recommended
     description: "Enable autoscaling or deploy multiple units to handle traffic spikes"
     rationale: "WAF Reliability/Performance: Sufficient gateway units guarantee resources to meet demand from API clients, preventing failures from insufficient capacity"
     applies_to: [cloud-architect, terraform-agent, bicep-agent]
 
-  - id: APIM-007
+  - id: AZ-APIM-007
     severity: recommended
     description: "Use Defender for APIs for threat detection and API security insights"
     rationale: "WAF Security: Defender for APIs provides security insights, recommendations, and threat detection for APIs hosted in APIM"
     applies_to: [cloud-architect, security-reviewer]
 
-  - id: APIM-008
+  - id: AZ-APIM-008
     severity: recommended
     description: "Implement validate-jwt, validate-content, and validate-headers policies for API security"
     rationale: "WAF Security: Delegating security checks to API policies at the gateway reduces nonlegitimate traffic reaching backend services, protecting integrity and availability"
     applies_to: [cloud-architect, app-developer, terraform-agent, bicep-agent]
 
-  - id: APIM-009
+  - id: AZ-APIM-009
     severity: recommended
     description: "Use built-in cache or external Redis-compatible cache for frequently accessed API responses"
     rationale: "WAF Performance/Cost: Caching reduces backend load and response latency; built-in cache avoids the cost of maintaining an external cache"
     applies_to: [cloud-architect, app-developer]
 
-  - id: APIM-010
+  - id: AZ-APIM-010
     severity: recommended
     description: "Disable the direct management REST API"
     rationale: "WAF Security: The direct management API is a legacy control plane access point that increases the attack surface"

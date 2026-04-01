@@ -18,7 +18,7 @@ rules:
   # ------------------------------------------------------------------ #
   # DS-001: Blue-green / canary deployment (WAF RE-05)
   # ------------------------------------------------------------------ #
-  - id: DS-001
+  - id: WAF-REL-DEPLOY-001
     severity: required
     description: >-
       Implement blue-green or canary deployment for ALL production
@@ -283,7 +283,7 @@ rules:
   # ------------------------------------------------------------------ #
   # DS-002: Deployment gates and health validation (WAF RE-04)
   # ------------------------------------------------------------------ #
-  - id: DS-002
+  - id: WAF-REL-DEPLOY-002
     severity: required
     description: >-
       Validate application health BEFORE shifting production traffic to
@@ -428,7 +428,7 @@ rules:
   # ------------------------------------------------------------------ #
   # DS-003: Rollback capability (WAF RE-03, RE-05)
   # ------------------------------------------------------------------ #
-  - id: DS-003
+  - id: WAF-REL-DEPLOY-003
     severity: required
     description: >-
       Ensure every production deployment has a tested rollback path.
@@ -647,7 +647,7 @@ rules:
   # ------------------------------------------------------------------ #
   # DS-004: Infrastructure as Code discipline (WAF RE-05)
   # ------------------------------------------------------------------ #
-  - id: DS-004
+  - id: WAF-REL-DEPLOY-004
     severity: required
     description: >-
       ALL infrastructure MUST be defined as code (Terraform or Bicep).
@@ -773,7 +773,7 @@ rules:
   # ------------------------------------------------------------------ #
   # DS-005: Immutable infrastructure (WAF RE-05)
   # ------------------------------------------------------------------ #
-  - id: DS-005
+  - id: WAF-REL-DEPLOY-005
     severity: required
     description: >-
       Use immutable infrastructure patterns for ALL containerized

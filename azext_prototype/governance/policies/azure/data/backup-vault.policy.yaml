@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: BKV-001
+  - id: AZ-BKV-001
     severity: required
     description: "Deploy Backup Vault with geo-redundant storage, immutability, and soft delete enabled"
     rationale: "GRS protects against regional outages; immutability prevents backup tampering; soft delete allows recovery"
@@ -76,7 +76,7 @@ rules:
       - "Do not disable soft delete — backups cannot be recovered after accidental deletion"
       - "Do not set immutability state to Disabled without explicit business justification"
 
-  - id: BKV-002
+  - id: AZ-BKV-002
     severity: required
     description: "Create backup policies with appropriate retention and schedule"
     rationale: "Backup policies define RPO and retention — they must match business recovery requirements"
@@ -200,7 +200,7 @@ rules:
       - "Do not set retention below 7 days for production backups"
       - "Do not use full backup type when incremental is available — it wastes storage"
 
-  - id: BKV-003
+  - id: AZ-BKV-003
     severity: recommended
     description: "Enable diagnostic settings for Backup Vault operations"
     rationale: "Monitor backup job success/failure rates and restore operations"

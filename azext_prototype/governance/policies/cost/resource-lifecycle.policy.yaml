@@ -14,7 +14,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: LIFE-001
+  - id: WAF-COST-LIFE-001
     severity: required
     description: "Configure auto-shutdown schedules for dev/POC VMs — shut down at 7 PM, no auto-start"
     rationale: "Dev VMs running 24/7 cost 3x more than VMs with 10-hour daily usage; auto-shutdown eliminates forgotten instances"
@@ -71,7 +71,7 @@ rules:
       - "NEVER set auto-shutdown status to Disabled — if a VM needs 24/7 uptime, it should be in a production resource group"
       - "NEVER set auto-shutdown notification to Disabled — users must have the option to extend"
 
-  - id: LIFE-002
+  - id: WAF-COST-LIFE-002
     severity: required
     description: "Configure storage lifecycle management policies — move to Cool after 30 days, Archive after 90 days, delete after 365 days"
     rationale: "Storage lifecycle policies automatically tier data by age; Cool tier is 50% cheaper than Hot, Archive is 90% cheaper"
@@ -214,7 +214,7 @@ rules:
       - "NEVER use Archive tier for data that needs frequent access — rehydration takes up to 15 hours"
       - "NEVER skip temp/staging cleanup rules — temporary data accumulates indefinitely without lifecycle policies"
 
-  - id: LIFE-003
+  - id: WAF-COST-LIFE-003
     severity: required
     description: "Set appropriate Log Analytics retention — 30 days for dev/POC, 90 days for production, with archive tier for compliance"
     rationale: "Log Analytics charges per GB ingested and per day retained beyond 31 days; reducing retention from 90 to 30 days saves ~65%"
@@ -307,7 +307,7 @@ rules:
       - "NEVER set retention below 30 days — it is the minimum and provides free retention"
       - "NEVER use Free or Standalone SKU — PerGB2018 is the current pricing tier"
 
-  - id: LIFE-004
+  - id: WAF-COST-LIFE-004
     severity: required
     description: "Configure appropriate soft-delete retention periods — shorter for dev/POC, longer for production"
     rationale: "Soft-delete protects against accidental deletion but costs storage; longer retention in dev wastes budget"
@@ -421,7 +421,7 @@ rules:
       - "NEVER set blob soft-delete retention > 14 days for dev/POC"
       - "NEVER deploy Recovery Services Vault for dev/POC unless backup is an explicit requirement"
 
-  - id: LIFE-005
+  - id: WAF-COST-LIFE-005
     severity: required
     description: "Apply mandatory cost tracking tags to all resources — Environment, CostCenter, Owner, Project"
     rationale: "Tags enable cost allocation, showback/chargeback, and automated cleanup of orphaned resources"
@@ -499,7 +499,7 @@ rules:
       - "NEVER omit the ManagedBy tag — it distinguishes IaC-managed from manually-created resources"
       - "NEVER hardcode tag values — always use variables/parameters for reusability"
 
-  - id: LIFE-006
+  - id: WAF-COST-LIFE-006
     severity: required
     description: "Configure Azure budget alerts with action groups — monthly budget with 50%, 80%, 100%, and 120% thresholds"
     rationale: "Budget alerts provide early warning before costs exceed expectations; without them, overspend is only discovered on invoices"

@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: ST-001
+  - id: AZ-ST-001
     severity: required
     description: "Create Storage Account with shared key disabled, public blob access disabled, TLS 1.2, HTTPS-only, and public network access disabled"
     rationale: "Shared keys grant full account access and cannot be scoped; public blob access risks data exposure; TLS 1.2 is the minimum secure transport"
@@ -222,7 +222,7 @@ rules:
       require_config: [shared_key_disabled, public_access_disabled]
       error_message: "Service '{service_name}' ({service_type}) missing {config_key}: true"
 
-  - id: ST-002
+  - id: AZ-ST-002
     severity: recommended
     description: "Enable blob versioning and soft delete for data protection"
     rationale: "Allows recovery from accidental deletion or overwrites"
@@ -264,7 +264,7 @@ rules:
         }
       }
 
-  - id: ST-003
+  - id: AZ-ST-003
     severity: recommended
     description: "Enable diagnostic settings to Log Analytics workspace"
     rationale: "Audit trail for storage access and performance monitoring"
@@ -317,13 +317,13 @@ rules:
             }
           }
 
-  - id: ST-004
+  - id: AZ-ST-004
     severity: recommended
     description: "Configure lifecycle management policies for cost optimization"
     rationale: "Automatically tier or delete blobs based on age and access patterns"
     applies_to: [cloud-architect, terraform-agent, bicep-agent, cost-analyst]
 
-  - id: ST-005
+  - id: AZ-ST-005
     severity: recommended
     description: "Configure zone-redundant or geo-zone-redundant storage replication"
     rationale: "WAF Reliability: ZRS replicates across availability zones; GZRS adds cross-region protection for maximum durability and availability during outages"
@@ -339,7 +339,7 @@ rules:
       //     name: 'Standard_ZRS'   // or 'Standard_GZRS' / 'Standard_RAGZRS'
       //   }
 
-  - id: ST-006
+  - id: AZ-ST-006
     severity: recommended
     description: "Enable point-in-time restore for block blob data protection"
     rationale: "WAF Reliability: Point-in-time restore protects against accidental blob deletion or corruption, allowing restoration of block blob data to an earlier state"
@@ -387,7 +387,7 @@ rules:
         }
       }
 
-  - id: ST-007
+  - id: AZ-ST-007
     severity: recommended
     description: "Apply an Azure Resource Manager lock on the storage account"
     rationale: "WAF Security: Locking the account prevents accidental deletion and resulting data loss"
@@ -415,7 +415,7 @@ rules:
         }
       }
 
-  - id: ST-008
+  - id: AZ-ST-008
     severity: recommended
     description: "Enable immutability policies for compliance-critical blob data"
     rationale: "WAF Security: Immutability policies protect blobs stored for legal, compliance, or other business purposes from being modified or deleted"

@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: DP-INT-001
+  - id: CC-INT-DP-001
     severity: required
     description: "Configure Data Factory linked services to SQL Database and Storage using managed identity — never stored credentials"
     rationale: "Managed identity eliminates credential rotation burden and prevents secret sprawl across linked services"
@@ -213,7 +213,7 @@ rules:
       severity: warning
       error_message: "Data Factory + SQL template must include Key Vault for secret management in linked services"
 
-  - id: DP-INT-002
+  - id: CC-INT-DP-002
     severity: required
     description: "Configure Synapse Workspace with ADLS Gen2 default data lake using managed identity and managed private endpoints"
     rationale: "Synapse requires a default data lake for workspace artifacts; managed identity eliminates storage account keys in configuration"
@@ -386,7 +386,7 @@ rules:
       severity: error
       error_message: "Synapse workspace requires a storage account with ADLS Gen2 (isHnsEnabled) as default data lake"
 
-  - id: DP-INT-003
+  - id: CC-INT-DP-003
     severity: required
     description: "Configure Databricks workspace with Key Vault-backed secret scope for secure credential access"
     rationale: "Databricks secret scopes backed by Key Vault centralize secret management; Azure-managed scopes lack audit trail and rotation"
@@ -555,7 +555,7 @@ rules:
       severity: warning
       error_message: "Databricks template must include Key Vault for Key Vault-backed secret scopes"
 
-  - id: DP-INT-004
+  - id: CC-INT-DP-004
     severity: required
     description: "Enforce encryption in transit for all cross-service data movement using private endpoints and TLS 1.2+"
     rationale: "Data in transit between services must be encrypted and routed privately to prevent interception and exfiltration"

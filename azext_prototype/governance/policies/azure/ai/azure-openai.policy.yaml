@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: AOI-001
+  - id: AZ-AOI-001
     severity: required
     description: "Deploy Azure OpenAI with managed identity and disable API key authentication"
     rationale: "API keys are long-lived credentials that cannot be scoped; managed identity eliminates credential management"
@@ -174,7 +174,7 @@ rules:
       - "Never embed endpoint URLs with keys in application configuration"
       - "Never use Cognitive Services Contributor role when Cognitive Services OpenAI User suffices"
 
-  - id: AOI-002
+  - id: AZ-AOI-002
     severity: required
     description: "Deploy model instances with explicit capacity and version pinning"
     rationale: "Unpinned model versions cause non-deterministic behavior; unset capacity causes throttling"
@@ -222,13 +222,13 @@ rules:
       - "Never use versionUpgradeOption 'OnceNewDefaultVersionAvailable' in production"
       - "Never deploy without explicit capacity (sku.capacity)"
 
-  - id: AOI-003
+  - id: AZ-AOI-003
     severity: recommended
     description: "Implement content filtering policies on all deployments"
     rationale: "Content filtering prevents misuse and ensures responsible AI compliance"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: AOI-004
+  - id: AZ-AOI-004
     severity: recommended
     description: "Configure rate limiting and retry logic in consuming applications"
     rationale: "Azure OpenAI enforces TPM and RPM limits; clients must handle 429 responses gracefully"

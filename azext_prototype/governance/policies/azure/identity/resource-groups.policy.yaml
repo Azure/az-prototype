@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: RG-001
+  - id: AZ-RG-001
     severity: required
     description: "Create Resource Group with required tags and location from variable"
     rationale: "Tags enable cost tracking, ownership identification, and automated governance; location must be parameterized for portability"
@@ -46,7 +46,7 @@ rules:
       - "NEVER create a resource group without tags"
       - "NEVER hardcode the resource group name — always use a variable"
 
-  - id: RG-002
+  - id: AZ-RG-002
     severity: required
     description: "Include mandatory tags: project, environment, owner, created_by"
     rationale: "These tags are required for cost tracking, environment identification, ownership, and audit trail"
@@ -56,7 +56,7 @@ rules:
       - "NEVER omit the environment tag — it distinguishes dev/staging/prod resources"
       - "NEVER omit the owner tag — it identifies who is responsible for the resource group"
 
-  - id: RG-003
+  - id: AZ-RG-003
     severity: required
     description: "Set Bicep targetScope to subscription when creating resource groups"
     rationale: "Resource groups are subscription-level resources; Bicep defaults to resourceGroup scope which cannot create resource groups"
@@ -64,13 +64,13 @@ rules:
     prohibitions:
       - "NEVER omit targetScope = 'subscription' in the Bicep file that creates resource groups"
 
-  - id: RG-004
+  - id: AZ-RG-004
     severity: recommended
     description: "Use naming convention: rg-{project}-{environment}-{location}"
     rationale: "Consistent naming enables automation, scripting, and resource identification"
     applies_to: [cloud-architect, terraform-agent, bicep-agent]
 
-  - id: RG-005
+  - id: AZ-RG-005
     severity: recommended
     description: "Create separate resource groups for different lifecycle boundaries"
     rationale: "Shared resources (VNet, DNS, Key Vault) should be in a separate resource group from application resources to avoid accidental deletion"

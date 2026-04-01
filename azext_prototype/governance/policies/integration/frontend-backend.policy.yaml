@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: FB-001
+  - id: CC-INT-FB-001
     severity: required
     description: "Configure Static Web App with linked backend API for managed API routing and authentication passthrough"
     rationale: "Linked backends provide managed routing from SWA to API backends; authentication context is automatically forwarded"
@@ -169,7 +169,7 @@ rules:
       severity: warning
       error_message: "Static Web App + Container Apps template should use linked backend for API routing"
 
-  - id: FB-002
+  - id: CC-INT-FB-002
     severity: required
     description: "Configure CORS with explicit allowed origins on all API backends serving browser-based frontends"
     rationale: "CORS misconfiguration either blocks legitimate frontends or exposes APIs to cross-origin attacks"
@@ -309,7 +309,7 @@ rules:
       - "NEVER expose Set-Cookie or Authorization in exposeHeaders"
       - "NEVER omit maxAge/preflight-result-max-age — every request will trigger a preflight OPTIONS call"
 
-  - id: FB-003
+  - id: CC-INT-FB-003
     severity: required
     description: "Configure Azure Front Door or CDN with origin groups for frontend + API backend routing"
     rationale: "Front Door provides global load balancing, WAF protection, and edge caching; origin groups separate static and API traffic"
@@ -613,7 +613,7 @@ rules:
       - "NEVER use HTTP for origin connections — set forwardingProtocol to HttpsOnly"
       - "NEVER deploy Front Door without WAF security policy association"
 
-  - id: FB-004
+  - id: CC-INT-FB-004
     severity: required
     description: "Configure authentication using Easy Auth (App Service/Functions) or MSAL (SPA) with Entra ID"
     rationale: "Authentication must be enforced at the platform or application level; Easy Auth handles token validation without application code changes"

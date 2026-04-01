@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: EG-001
+  - id: AZ-EG-001
     severity: required
     description: "Deploy Event Grid topic with managed identity, TLS 1.2, local auth disabled, and public access off"
     rationale: "Managed identity enables secure delivery; disabling local auth prevents SAS key usage"
@@ -56,7 +56,7 @@ rules:
       - "Do not enable local auth (SAS keys) — use Entra RBAC"
       - "Do not allow TLS versions below 1.2"
 
-  - id: EG-002
+  - id: AZ-EG-002
     severity: required
     description: "Configure event subscriptions with dead-letter destination and retry policy"
     rationale: "Without dead-letter, undeliverable events are lost; retry policy handles transient failures"
@@ -129,7 +129,7 @@ rules:
       - "Do not set maxDeliveryAttempts to 1 — transient failures will immediately discard events"
       - "Do not hardcode webhook URLs with embedded credentials"
 
-  - id: EG-003
+  - id: AZ-EG-003
     severity: recommended
     description: "Use managed identity for event delivery to Azure destinations"
     rationale: "Managed identity eliminates the need for access keys or connection strings in delivery configuration"
@@ -212,7 +212,7 @@ rules:
     prohibitions:
       - "Do not use connection strings for Azure destination delivery — use managed identity"
 
-  - id: EG-004
+  - id: AZ-EG-004
     severity: recommended
     description: "Enable diagnostic settings for Event Grid topic"
     rationale: "Monitor delivery success rates, failures, and dead-lettered events"

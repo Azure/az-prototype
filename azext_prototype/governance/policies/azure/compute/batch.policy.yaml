@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: BATCH-001
+  - id: AZ-BATCH-001
     severity: required
     description: "Deploy Azure Batch account with managed identity, no public access, and user-subscription pool allocation mode"
     rationale: "User-subscription mode puts VMs in your subscription for VNet control; managed identity eliminates shared key usage"
@@ -198,19 +198,19 @@ rules:
       - "Never use BatchService pool allocation mode when VNet control is required"
       - "Never embed secrets in task command lines — use Key Vault references"
 
-  - id: BATCH-002
+  - id: AZ-BATCH-002
     severity: required
     description: "Deploy Batch pools with VNet injection and no public IP for compute nodes"
     rationale: "Compute nodes with public IPs create attack surface; VNet injection enables network security group control"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: BATCH-003
+  - id: AZ-BATCH-003
     severity: recommended
     description: "Configure auto-scale formulas for cost optimization"
     rationale: "Static pools waste resources during idle periods; auto-scale adjusts capacity to workload demand"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
 
-  - id: BATCH-004
+  - id: AZ-BATCH-004
     severity: recommended
     description: "Use container task execution for reproducible and isolated job processing"
     rationale: "Container tasks provide consistent execution environments and faster node startup via pre-fetched images"

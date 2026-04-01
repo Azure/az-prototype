@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: API-001
+  - id: CC-INT-API-001
     severity: required
     description: "Implement API versioning using URL path segments in APIM with version sets"
     rationale: "API versioning prevents breaking changes for existing consumers; URL path versioning is the most discoverable approach"
@@ -190,7 +190,7 @@ rules:
       - "NEVER mix versioning schemes within the same API — pick one (Segment, Header, or Query) and be consistent"
       - "NEVER use date-based versions (2024-01-01) for REST APIs — use semantic versions (v1, v2)"
 
-  - id: API-002
+  - id: CC-INT-API-002
     severity: required
     description: "Configure OAuth 2.0 / JWT validation in APIM inbound policies for all API endpoints"
     rationale: "APIs without authentication allow unrestricted access; JWT validation at the gateway prevents unauthorized requests from reaching backends"
@@ -349,7 +349,7 @@ rules:
       - "NEVER hardcode client secrets in APIM policies — use named values backed by Key Vault"
       - "NEVER trust JWT claims without server-side validation — client-provided claims are untrustworthy"
 
-  - id: API-003
+  - id: CC-INT-API-003
     severity: required
     description: "Configure request and response validation policies in APIM to enforce API contracts"
     rationale: "Request validation prevents malformed input from reaching backends; response validation ensures API contract compliance"
@@ -527,7 +527,7 @@ rules:
       - "NEVER set max-size to unlimited — always cap request body size to prevent abuse"
       - "NEVER block on response validation in production (use action='ignore') — outbound validation should log, not reject"
 
-  - id: API-004
+  - id: CC-INT-API-004
     severity: recommended
     description: "Integrate OpenAPI specification with APIM for auto-generated documentation and developer portal"
     rationale: "OpenAPI specs provide machine-readable API contracts; APIM developer portal auto-generates interactive documentation"

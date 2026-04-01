@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: VM-001
+  - id: AZ-VM-001
     severity: required
     description: "Deploy VMs with managed identity, SSH key auth (Linux), and no public IP"
     rationale: "Managed identity eliminates credential management; SSH keys prevent brute-force attacks; no public IP reduces attack surface"
@@ -187,7 +187,7 @@ rules:
       - "Do not deploy VMs without managed identity"
       - "Do not use unmanaged disks — always use managed disks"
 
-  - id: VM-002
+  - id: AZ-VM-002
     severity: required
     description: "Enable Trusted Launch with Secure Boot and vTPM"
     rationale: "Trusted Launch protects against boot-level attacks with measured boot, secure boot, and vTPM"
@@ -207,7 +207,7 @@ rules:
       - "Do not disable Secure Boot or vTPM unless specific workload requires it"
       - "Do not use Gen1 images with Trusted Launch — requires Gen2 images"
 
-  - id: VM-003
+  - id: AZ-VM-003
     severity: required
     description: "Enable encryption at host and use Disk Encryption Sets for CMK"
     rationale: "Encryption at host ensures temp disks and caches are encrypted; CMK provides key control"
@@ -226,7 +226,7 @@ rules:
     prohibitions:
       - "Do not rely solely on platform-managed encryption when compliance requires CMK"
 
-  - id: VM-004
+  - id: AZ-VM-004
     severity: recommended
     description: "Install Azure Monitor Agent and configure data collection rules"
     rationale: "Azure Monitor Agent replaces the legacy Log Analytics agent and enables centralized log collection"
@@ -283,7 +283,7 @@ rules:
     prohibitions:
       - "Do not use the legacy Microsoft Monitoring Agent (MMA) — it is deprecated"
 
-  - id: VM-005
+  - id: AZ-VM-005
     severity: recommended
     description: "Enable automatic OS patching with AutomaticByPlatform mode"
     rationale: "Automatic patching ensures VMs receive security updates without manual intervention"

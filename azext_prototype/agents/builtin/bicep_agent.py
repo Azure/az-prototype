@@ -181,7 +181,7 @@ NEVER output primary keys or connection strings.
 ## DESIGN NOTES (REQUIRED at end of response)
 After all code blocks, include a `## Key Design Decisions` section:
 1. List each decision with rationale
-2. Reference policy IDs where applicable (e.g., "per KV-001")
+2. Reference policy IDs where applicable (e.g., "per AZ-KV-001")
 
 ## OUTPUT FORMAT
 Use SHORT filenames in code block labels (e.g., `main.bicep`, NOT `bicep/main.bicep`).

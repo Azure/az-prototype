@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: SYN-001
+  - id: AZ-SYN-001
     severity: required
     description: "Deploy Synapse Workspace with managed VNet, managed identity, and public access disabled"
     rationale: "Managed VNet isolates Spark/pipeline traffic; managed identity eliminates credential management"
@@ -94,7 +94,7 @@ rules:
       - "Do not hardcode sqlAdministratorLoginPassword in templates — use Key Vault references"
       - "Do not skip managed VNet configuration — pipelines and Spark will use public internet"
 
-  - id: SYN-002
+  - id: AZ-SYN-002
     severity: required
     description: "Configure Entra-only authentication for Synapse SQL pools"
     rationale: "SQL auth with passwords is less secure than Entra identity-based authentication"
@@ -123,7 +123,7 @@ rules:
     prohibitions:
       - "Do not use SQL authentication in production — use Entra-only auth"
 
-  - id: SYN-003
+  - id: AZ-SYN-003
     severity: required
     description: "Create private endpoints for all Synapse endpoints (SQL, SqlOnDemand, Dev)"
     rationale: "Synapse has three endpoints that all need private connectivity for full isolation"
@@ -262,7 +262,7 @@ rules:
     prohibitions:
       - "Do not skip any of the three private endpoints — partial coverage leaves endpoints exposed"
 
-  - id: SYN-004
+  - id: AZ-SYN-004
     severity: recommended
     description: "Enable diagnostic settings for Synapse workspace audit logs"
     rationale: "Audit logs track user activities, SQL queries, and pipeline executions"

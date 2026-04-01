@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: ACI-001
+  - id: AZ-ACI-001
     severity: required
     description: "Deploy Azure Container Instances with managed identity, VNet injection, and no public IP"
     rationale: "ACI containers often run batch or integration tasks; VNet injection prevents public exposure, managed identity removes credential needs"
@@ -162,19 +162,19 @@ rules:
       - "Never omit resource limits — always set both requests and limits for cpu and memory"
       - "Never use latest tag for container images — always pin to a specific version or digest"
 
-  - id: ACI-002
+  - id: AZ-ACI-002
     severity: required
     description: "Use secure environment variables or Key Vault references for secrets"
     rationale: "Plain-text environment variables are visible in container group definitions; secure variables are encrypted at rest"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
 
-  - id: ACI-003
+  - id: AZ-ACI-003
     severity: recommended
     description: "Set resource limits and requests on all containers"
     rationale: "Resource limits prevent noisy-neighbor issues and ensure predictable performance"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: ACI-004
+  - id: AZ-ACI-004
     severity: recommended
     description: "Pull images from a private registry using managed identity"
     rationale: "Public registry pulls are subject to rate limiting, supply chain attacks, and unavailability"

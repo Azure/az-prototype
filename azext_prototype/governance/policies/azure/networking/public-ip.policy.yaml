@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: PIP-001
+  - id: AZ-PIP-001
     severity: required
     description: "Deploy public IP addresses with Standard SKU and static allocation"
     rationale: "Basic SKU is being retired; Standard SKU is zone-aware and required for Standard LB, NAT Gateway, and Bastion"
@@ -58,7 +58,7 @@ rules:
       - "Do not use Dynamic allocation with Standard SKU for load balancers or NAT gateways"
       - "Do not deploy public IPs without DDoS protection in production"
 
-  - id: PIP-002
+  - id: AZ-PIP-002
     severity: required
     description: "Deploy zone-redundant public IPs for production workloads"
     rationale: "Zone-redundant IPs survive zone failures; zonal IPs are pinned to a single zone"
@@ -74,7 +74,7 @@ rules:
       - "Do not deploy production public IPs without zone redundancy"
       - "Do not mix zone-redundant IPs with zonal resources — they must be in the same zone or zone-redundant"
 
-  - id: PIP-003
+  - id: AZ-PIP-003
     severity: recommended
     description: "Minimize the use of public IP addresses — prefer private endpoints and internal load balancers"
     rationale: "Every public IP is an attack surface; reduce exposure by using private connectivity"
@@ -100,7 +100,7 @@ rules:
       - "Do not assign public IPs directly to VMs — use Bastion or internal LB"
       - "Do not assign public IPs to databases, caches, or storage accounts — use private endpoints"
 
-  - id: PIP-004
+  - id: AZ-PIP-004
     severity: recommended
     description: "Enable diagnostic settings for public IP address DDoS and flow logs"
     rationale: "Monitor DDoS mitigation events and traffic patterns for security analysis"

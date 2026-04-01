@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: DES-001
+  - id: AZ-DES-001
     severity: required
     description: "Create Disk Encryption Set with customer-managed key from Key Vault"
     rationale: "Customer-managed keys (CMK) provide control over encryption keys and meet compliance requirements"
@@ -61,7 +61,7 @@ rules:
       - "Do not disable rotationToLatestKeyVersionEnabled — manual rotation causes outages on key expiry"
       - "Do not use a Key Vault without purge protection — key deletion would make disks inaccessible"
 
-  - id: DES-002
+  - id: AZ-DES-002
     severity: required
     description: "Grant the Disk Encryption Set identity access to the Key Vault"
     rationale: "Without Key Vault access, the DES cannot retrieve the encryption key and disk operations will fail"
@@ -96,7 +96,7 @@ rules:
       - "Do not use access policies for Key Vault when using RBAC authorization model"
       - "Do not grant Key Vault Administrator to the DES — use least-privilege Crypto Service Encryption User"
 
-  - id: DES-003
+  - id: AZ-DES-003
     severity: required
     description: "Enable automatic key rotation to latest key version"
     rationale: "Manual key rotation risks service disruption if keys expire; automatic rotation ensures continuity"
@@ -114,7 +114,7 @@ rules:
       - "Do not pin keyUrl to a specific key version when auto-rotation is enabled"
       - "Do not disable auto-rotation without an explicit key rotation procedure"
 
-  - id: DES-004
+  - id: AZ-DES-004
     severity: recommended
     description: "Use EncryptionAtRestWithPlatformAndCustomerKeys for double encryption"
     rationale: "Double encryption uses both platform-managed and customer-managed keys for defense in depth"

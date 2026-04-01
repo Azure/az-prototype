@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: VMSS-001
+  - id: AZ-VMSS-001
     severity: required
     description: "Deploy VMSS with Flexible orchestration mode, managed identity, and zone distribution"
     rationale: "Flexible mode is the recommended orchestration; Uniform is legacy. Managed identity eliminates credential management"
@@ -199,7 +199,7 @@ rules:
       - "Do not deploy VMSS without NSG on network interfaces"
       - "Do not assign public IPs to VMSS instances — use internal LB and Bastion"
 
-  - id: VMSS-002
+  - id: AZ-VMSS-002
     severity: required
     description: "Enable encryption at host for VMSS instances"
     rationale: "Encryption at host ensures temp disks, caches, and data-in-transit to storage are encrypted"
@@ -214,7 +214,7 @@ rules:
     prohibitions:
       - "Do not disable encryption at host — temp disks and caches would be unencrypted"
 
-  - id: VMSS-003
+  - id: AZ-VMSS-003
     severity: required
     description: "Configure autoscale rules based on relevant metrics"
     rationale: "Without autoscale, VMSS requires manual capacity management and cannot respond to load changes"
@@ -343,7 +343,7 @@ rules:
       - "Do not set minimum capacity to 0 in production — leaves no instances for traffic"
       - "Do not use only scale-out rules without scale-in — costs will grow unbounded"
 
-  - id: VMSS-004
+  - id: AZ-VMSS-004
     severity: recommended
     description: "Enable automatic OS upgrades and automatic instance repairs"
     rationale: "Automatic upgrades keep instances patched; automatic repairs replace unhealthy instances"

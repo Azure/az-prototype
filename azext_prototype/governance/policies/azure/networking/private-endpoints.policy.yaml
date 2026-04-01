@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: PE-001
+  - id: AZ-PE-001
     severity: required
     description: "Every private endpoint must have a Private DNS Zone, VNet Link, and DNS Zone Group"
     rationale: "Without all three components, private endpoint DNS resolution fails and connections fall back to public endpoints"
@@ -147,7 +147,7 @@ rules:
       - "NEVER place private endpoints in delegated subnets"
       - "NEVER set registrationEnabled to true on PE DNS zone links — only hub DNS zones use auto-registration"
 
-  - id: PE-002
+  - id: AZ-PE-002
     severity: required
     description: "Use correct Private DNS Zone names for each Azure service"
     rationale: "Each Azure service has a specific private DNS zone name; using the wrong name causes resolution failures"
@@ -156,13 +156,13 @@ rules:
       - "NEVER use a custom DNS zone name — use the exact Azure-defined zone name for each service"
       - "NEVER create duplicate DNS zones for the same service — reuse existing zones across private endpoints"
 
-  - id: PE-003
+  - id: AZ-PE-003
     severity: required
     description: "Use standard naming convention: pe-{resource-name} for private endpoints"
     rationale: "Consistent naming enables automation and troubleshooting"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: PE-004
+  - id: AZ-PE-004
     severity: recommended
     description: "Centralize Private DNS Zones in a shared resource group for multi-resource architectures"
     rationale: "Avoids DNS zone sprawl and simplifies management; all PEs share the same zone per service type"

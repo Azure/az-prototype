@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: TM-001
+  - id: AZ-TM-001
     severity: required
     description: "Configure Traffic Manager profile with appropriate routing method and HTTPS monitoring"
     rationale: "HTTPS monitoring ensures endpoints are reachable and TLS is functional; routing method must match traffic pattern"
@@ -79,7 +79,7 @@ rules:
       - "Do not set TTL higher than 60 seconds for failover scenarios — increases failover time"
       - "Do not use Traffic Manager without health monitoring enabled"
 
-  - id: TM-002
+  - id: AZ-TM-002
     severity: required
     description: "Configure endpoints with proper priority and geographic constraints"
     rationale: "Endpoint configuration determines traffic distribution and failover behavior"
@@ -118,7 +118,7 @@ rules:
       - "Do not configure all endpoints with the same priority in Priority routing — creates ambiguous failover"
       - "Do not leave endpoints in Disabled state without documentation"
 
-  - id: TM-003
+  - id: AZ-TM-003
     severity: recommended
     description: "Enable diagnostic settings for Traffic Manager profile"
     rationale: "Monitor endpoint health probe results and DNS query patterns"
@@ -171,7 +171,7 @@ rules:
     prohibitions:
       - "Do not omit ProbeHealthStatusEvents — they are critical for failover diagnostics"
 
-  - id: TM-004
+  - id: AZ-TM-004
     severity: recommended
     description: "Use nested profiles for complex routing topologies"
     rationale: "Nested profiles allow combining routing methods (e.g., Performance at top, Weighted at region level)"

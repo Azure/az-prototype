@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: AS-001
+  - id: AZ-AS-001
     severity: required
     description: "Create App Service Plan with appropriate SKU"
     rationale: "Plan defines compute tier; B1+ required for VNet integration, P1v3+ for production"
@@ -45,7 +45,7 @@ rules:
         }
       }
 
-  - id: AS-002
+  - id: AZ-AS-002
     severity: required
     description: "Create App Service with HTTPS-only, TLS 1.2, managed identity, VNet integration, and public access disabled"
     rationale: "Baseline security configuration prevents cleartext transmission, enables identity-based access, and restricts network exposure"
@@ -285,7 +285,7 @@ rules:
       require_config: [https_only, identity]
       error_message: "Service '{service_name}' ({service_type}) missing {config_key}: true"
 
-  - id: AS-003
+  - id: AZ-AS-003
     severity: required
     description: "Deploy into a VNet-integrated subnet for backend connectivity"
     rationale: "Enables private access to databases, Key Vault, and other PaaS services"
@@ -295,19 +295,19 @@ rules:
       require_service: [virtual-network]
       error_message: "Template with app-service must include a virtual-network service for VNet integration"
 
-  - id: AS-004
+  - id: AZ-AS-004
     severity: recommended
     description: "Use deployment slots for zero-downtime deployments in production"
     rationale: "Slot swaps are atomic and support rollback"
     applies_to: [cloud-architect, terraform-agent, bicep-agent]
 
-  - id: AS-005
+  - id: AZ-AS-005
     severity: recommended
     description: "Use App Service Authentication (EasyAuth) or custom middleware for user-facing apps"
     rationale: "Built-in auth handles token validation without custom code"
     applies_to: [cloud-architect, app-developer]
 
-  - id: AS-006
+  - id: AZ-AS-006
     severity: recommended
     description: "Enable health check feature on the App Service"
     rationale: "WAF Reliability: Health checks detect problems early and automatically exclude unhealthy instances from serving requests, improving overall availability"
@@ -319,7 +319,7 @@ rules:
       // Add to the siteConfig properties in AS-002:
       //   healthCheckPath: '/health'
 
-  - id: AS-007
+  - id: AZ-AS-007
     severity: recommended
     description: "Disable ARR affinity for stateless applications"
     rationale: "WAF Reliability: Disabling ARR affinity distributes incoming requests evenly across all available nodes, preventing traffic from overwhelming a single node and enabling horizontal scaling"
@@ -331,7 +331,7 @@ rules:
       // Add to the properties block in AS-002:
       //   clientAffinityEnabled: false
 
-  - id: AS-008
+  - id: AZ-AS-008
     severity: recommended
     description: "Enable zone redundancy on the App Service Plan for production workloads"
     rationale: "WAF Reliability: Zone redundancy distributes instances across availability zones, maintaining application reliability if one zone is unavailable"
@@ -349,7 +349,7 @@ rules:
     prohibitions:
       - "NEVER deploy production workloads on non-zone-redundant plans when the region supports availability zones"
 
-  - id: AS-009
+  - id: AZ-AS-009
     severity: recommended
     description: "Disable remote debugging and basic authentication"
     rationale: "WAF Security: Remote debugging opens inbound ports and basic authentication uses username/password; disabling both reduces the attack surface"
@@ -404,7 +404,7 @@ rules:
       - "NEVER enable remote debugging in production"
       - "NEVER enable basic authentication (FTP or SCM) in production"
 
-  - id: AS-010
+  - id: AZ-AS-010
     severity: recommended
     description: "Enable auto-heal rules for automatic recovery from unexpected issues"
     rationale: "WAF Reliability: Auto-heal triggers healing actions when configurable thresholds are breached (request count, slow requests, memory limits), enabling automatic proactive maintenance"

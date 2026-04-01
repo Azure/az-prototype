@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: AGW-001
+  - id: AZ-AGW-001
     severity: required
     description: "Deploy Application Gateway v2 with WAF_v2 SKU for web application protection"
     rationale: "v2 SKU provides autoscaling, zone redundancy, and WAF v2 includes OWASP CRS and bot protection"
@@ -125,7 +125,7 @@ rules:
       - "Do not use Standard_v2 without WAF unless WAF is handled upstream by a CDN/Front Door"
       - "Do not deploy without zone redundancy in production"
 
-  - id: AGW-002
+  - id: AZ-AGW-002
     severity: required
     description: "Configure WAF policy in Prevention mode with OWASP 3.2 ruleset"
     rationale: "Detection mode only logs; Prevention mode blocks attacks. OWASP 3.2 is the latest stable ruleset"
@@ -185,7 +185,7 @@ rules:
       - "Do not disable requestBodyCheck — it leaves the application vulnerable to body-based attacks"
       - "Do not use OWASP 2.x rulesets — they are outdated"
 
-  - id: AGW-003
+  - id: AZ-AGW-003
     severity: required
     description: "Enforce TLS 1.2+ with strong SSL policy for all HTTPS listeners"
     rationale: "Older TLS versions and weak cipher suites are vulnerable to downgrade attacks"
@@ -205,7 +205,7 @@ rules:
       - "Do not use self-signed certificates in production"
       - "Do not hardcode SSL certificate passwords in templates"
 
-  - id: AGW-004
+  - id: AZ-AGW-004
     severity: recommended
     description: "Enable diagnostic settings for access logs, performance logs, and WAF logs"
     rationale: "Access logs are essential for troubleshooting; WAF logs track blocked requests"
@@ -274,7 +274,7 @@ rules:
     prohibitions:
       - "Do not omit ApplicationGatewayFirewallLog when WAF is enabled"
 
-  - id: AGW-005
+  - id: AZ-AGW-005
     severity: recommended
     description: "Configure autoscaling with appropriate minimum and maximum instance counts"
     rationale: "WAF Performance/Reliability: Autoscaling takes 3-5 minutes to provision new instances; setting a minimum based on average compute units prevents transient latency during traffic spikes"
@@ -296,7 +296,7 @@ rules:
       //     maxCapacity: 125
       //   }
 
-  - id: AGW-006
+  - id: AZ-AGW-006
     severity: recommended
     description: "Integrate Application Gateway with Key Vault for SSL/TLS certificate management"
     rationale: "WAF Security: Key Vault provides stronger security, role separation, managed certificate support, and automatic renewal/rotation for SSL certificates"
@@ -332,7 +332,7 @@ rules:
       //     }
       //   ]
 
-  - id: AGW-007
+  - id: AZ-AGW-007
     severity: recommended
     description: "Configure connection draining on backend HTTP settings"
     rationale: "WAF Reliability: Connection draining ensures graceful removal of backend pool members during planned updates, draining existing connections before taking the backend out of rotation"
@@ -350,7 +350,7 @@ rules:
       //     drainTimeoutInSec: 30
       //   }
 
-  - id: AGW-008
+  - id: AZ-AGW-008
     severity: recommended
     description: "Use HTTPS backend health probes with valid certificates"
     rationale: "HTTP probes send health check data in plaintext; HTTPS ensures backend communication is encrypted"

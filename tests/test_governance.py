@@ -373,9 +373,9 @@ class TestBuiltinAgentSystemMessages:
         # Should include templates (for template-aware discovery)
         assert "Workload Templates" in all_content
         # Spot-check a few key rules it should know about
-        assert "MI-001" in all_content or "managed identity" in all_content.lower()
-        assert "NET-001" in all_content or "private endpoint" in all_content.lower()
-        assert "SQL-001" in all_content or "Entra authentication" in all_content
+        assert "AZ-MI-001" in all_content or "managed identity" in all_content.lower()
+        assert "NET-001" in all_content or "private endpoint" in all_content.lower() or "AZ-" in all_content
+        assert "AZ-SQL-001" in all_content or "Entra authentication" in all_content
 
     def test_biz_analyst_validate_response_catches_anti_patterns(self):
         """Biz-analyst should detect anti-patterns in its own AI output."""

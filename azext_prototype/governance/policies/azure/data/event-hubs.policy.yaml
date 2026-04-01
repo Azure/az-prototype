@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: EH-001
+  - id: AZ-EH-001
     severity: required
     description: "Deploy Event Hubs namespace with Standard or Premium SKU, TLS 1.2, and local auth disabled"
     rationale: "Basic SKU lacks consumer groups and capture; local auth bypass Entra RBAC controls"
@@ -71,7 +71,7 @@ rules:
       - "Do not enable local auth (SAS keys) — use Entra RBAC"
       - "Do not allow TLS versions below 1.2"
 
-  - id: EH-002
+  - id: AZ-EH-002
     severity: required
     description: "Create Event Hubs with appropriate partition count and message retention"
     rationale: "Partition count determines parallelism and cannot be changed after creation; retention affects data availability"
@@ -105,7 +105,7 @@ rules:
       - "Do not set partitionCount to 1 for production — it eliminates parallelism"
       - "Do not use the $Default consumer group for production applications"
 
-  - id: EH-003
+  - id: AZ-EH-003
     severity: required
     description: "Create dedicated consumer groups for each consuming application"
     rationale: "Shared consumer groups cause checkpoint conflicts and message loss between applications"
@@ -134,7 +134,7 @@ rules:
       - "Do not use the $Default consumer group for production workloads"
       - "Do not share consumer groups between different applications"
 
-  - id: EH-004
+  - id: AZ-EH-004
     severity: recommended
     description: "Enable Event Hubs Capture for cold-path analytics"
     rationale: "WAF Reliability/Operational Excellence: Capture automatically delivers streaming data to Azure Blob Storage or Data Lake, providing a durable copy of events for replay and analytics"
@@ -189,19 +189,19 @@ rules:
         }
       }
 
-  - id: EH-005
+  - id: AZ-EH-005
     severity: recommended
     description: "Enable geo-disaster recovery pairing for critical namespaces"
     rationale: "WAF Reliability: Geo-DR creates a metadata-only pairing to a secondary namespace in another region, enabling failover of namespace metadata during regional outages"
     applies_to: [cloud-architect, terraform-agent, bicep-agent]
 
-  - id: EH-006
+  - id: AZ-EH-006
     severity: recommended
     description: "Use schema registry for event schema management and evolution"
     rationale: "WAF Operational Excellence: Schema registry provides a centralized repository for event schemas, enabling schema validation and versioned evolution across producers and consumers"
     applies_to: [cloud-architect, app-developer]
 
-  - id: EH-007
+  - id: AZ-EH-007
     severity: recommended
     description: "Enable diagnostic settings for Event Hubs namespace"
     rationale: "Monitor throughput, errors, and throttled requests for capacity planning"

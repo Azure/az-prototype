@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: SQL-001
+  - id: AZ-SQL-001
     severity: required
     description: "Create SQL Server with AAD-only authentication via separate child resources"
     rationale: "Centralised identity management via Entra ID; SQL auth passwords are a security liability"
@@ -99,7 +99,7 @@ rules:
       require_config: [entra_auth_only]
       error_message: "Service '{service_name}' ({service_type}) missing entra_auth_only: true"
 
-  - id: SQL-002
+  - id: AZ-SQL-002
     severity: required
     description: "Create SQL Database with appropriate SKU and settings"
     rationale: "Databases must be created as child resources of the server with explicit SKU configuration"
@@ -145,7 +145,7 @@ rules:
         }
       }
 
-  - id: SQL-003
+  - id: AZ-SQL-003
     severity: required
     description: "Enable Transparent Data Encryption (TDE) on every database"
     rationale: "Data-at-rest encryption is a baseline security requirement"
@@ -175,7 +175,7 @@ rules:
       require_config: [tde_enabled]
       error_message: "Service '{service_name}' ({service_type}) missing tde_enabled: true"
 
-  - id: SQL-004
+  - id: AZ-SQL-004
     severity: required
     description: "Enable Advanced Threat Protection on the SQL Server"
     rationale: "Detects anomalous database activities indicating potential security threats"
@@ -205,7 +205,7 @@ rules:
       require_config: [threat_protection]
       error_message: "Service '{service_name}' ({service_type}) missing threat_protection: true"
 
-  - id: SQL-005
+  - id: AZ-SQL-005
     severity: required
     description: "Disable public network access and enforce TLS 1.2 minimum"
     rationale: "Prevents direct internet access; all connections must traverse private endpoints"
@@ -339,7 +339,7 @@ rules:
       - "NEVER create firewall rules allowing 0.0.0.0-255.255.255.255"
       - "NEVER set minimalTlsVersion below 1.2"
 
-  - id: SQL-006
+  - id: AZ-SQL-006
     severity: required
     description: "Enable diagnostic settings to Log Analytics workspace"
     rationale: "Audit trail for access, query performance, and security events"
@@ -392,13 +392,13 @@ rules:
             }
           }
 
-  - id: SQL-007
+  - id: AZ-SQL-007
     severity: recommended
     description: "Use serverless tier (GP_S_Gen5) for POC and dev/test workloads"
     rationale: "Auto-pause reduces costs for intermittent usage patterns"
     applies_to: [cloud-architect, cost-analyst, terraform-agent, bicep-agent]
 
-  - id: SQL-008
+  - id: AZ-SQL-008
     severity: required
     description: "Enable SQL Database auditing on the logical server"
     rationale: "WAF Security: Auditing tracks database events and writes them to an audit log, maintaining regulatory compliance and providing insight into database activity"
@@ -428,7 +428,7 @@ rules:
         }
       }
 
-  - id: SQL-009
+  - id: AZ-SQL-009
     severity: recommended
     description: "Enable SQL Vulnerability Assessment on the SQL Server"
     rationale: "WAF Security: Built-in service that identifies, tracks, and helps remediate potential database vulnerabilities with actionable remediation scripts"
@@ -454,7 +454,7 @@ rules:
         }
       }
 
-  - id: SQL-010
+  - id: AZ-SQL-010
     severity: recommended
     description: "Configure zone redundancy for Business Critical or Premium tier databases"
     rationale: "WAF Reliability: Zone-redundant availability distributes compute and storage across availability zones, maintaining operations during zone failures"
@@ -462,7 +462,7 @@ rules:
     prohibitions:
       - "NEVER disable zone redundancy on Business Critical tier databases in production"
 
-  - id: SQL-011
+  - id: AZ-SQL-011
     severity: recommended
     description: "Use failover groups for automatic geo-failover of critical databases"
     rationale: "WAF Reliability: Failover groups automate failover from primary to secondary with read-write and read-only listener endpoints that remain unchanged during geo-failovers"

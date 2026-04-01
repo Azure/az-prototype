@@ -19,11 +19,11 @@ services:
     type: container-apps
     tier: consumption
     config:
-      ingress: internal          # INT-003
-      identity: system-assigned  # MI-001
+      ingress: internal          # AZ-INT-003
+      identity: system-assigned  # AZ-MI-001
       min_replicas: 1            # AI apps need warm instances
       health_probes: true
-      zone_redundant: true       # HA-001
+      zone_redundant: true       # WAF-REL-HA-001
 
   - name: ai-engine
     type: cognitive-services
@@ -34,29 +34,29 @@ services:
         - name: gpt-4o
           deployment: chat
           capacity: 30
-      identity: system-assigned  # MI-001
-      private_endpoint: true     # NET-001
+      identity: system-assigned  # AZ-MI-001
+      private_endpoint: true     # AZ-NET-001
 
   - name: conversation-store
     type: cosmos-db
     tier: serverless
     config:
       api: nosql
-      entra_rbac: true           # CDB-001
+      entra_rbac: true           # AZ-CDB-001
       local_auth_disabled: true
-      consistency: session       # CDB-002
-      autoscale: true            # CDB-003 — autoscale throughput
-      partition_key: "/userId"   # CDB-004
+      consistency: session       # AZ-CDB-002
+      autoscale: true            # AZ-CDB-003 — autoscale throughput
+      partition_key: "/userId"   # AZ-CDB-004
       ttl_seconds: 2592000       # 30 days — no unlimited containers
-      private_endpoint: true     # NET-001
-      zone_redundant: true       # HA-001
+      private_endpoint: true     # AZ-NET-001
+      zone_redundant: true       # WAF-REL-HA-001
 
   - name: gateway
     type: api-management
     tier: consumption
     config:
-      identity: system-assigned  # INT-002
-      caching: true              # INT-004
+      identity: system-assigned  # AZ-INT-002
+      caching: true              # AZ-INT-004
       rate_limiting: true
 
   - name: secrets
@@ -67,7 +67,7 @@ services:
       soft_delete: true
       purge_protection: true
       private_endpoint: true
-      diagnostics: true          # KV-004 — Log Analytics
+      diagnostics: true          # AZ-KV-004 — Log Analytics
 
   - name: network
     type: virtual-network
@@ -81,7 +81,7 @@ services:
   - name: app-insights
     type: application-insights
     config:
-      workspace_based: true      # MS-003 — distributed tracing
+      workspace_based: true      # CC-INT-MS-003 — distributed tracing
 
   - name: monitoring
     type: log-analytics

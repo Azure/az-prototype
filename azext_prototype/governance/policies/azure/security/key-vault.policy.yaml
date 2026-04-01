@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: KV-001
+  - id: AZ-KV-001
     severity: required
     description: "Create Key Vault with RBAC authorization, soft-delete, purge protection, and public access disabled"
     rationale: "RBAC is the recommended authorization model; soft-delete and purge protection prevent accidental permanent deletion; private access only"
@@ -241,7 +241,7 @@ rules:
       require_config: [rbac_authorization, soft_delete, purge_protection]
       error_message: "Service '{service_name}' ({service_type}) missing {config_key}: true"
 
-  - id: KV-002
+  - id: AZ-KV-002
     severity: required
     description: "Assign Key Vault RBAC roles to application identities"
     rationale: "Least-privilege access via built-in roles replaces broad access policies"

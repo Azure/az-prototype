@@ -23,7 +23,7 @@ rules:
   # ------------------------------------------------------------------ #
   # FT-001: Circuit breaker pattern (WAF RE-02)
   # ------------------------------------------------------------------ #
-  - id: FT-001
+  - id: WAF-REL-FT-001
     severity: required
     description: >-
       Implement the circuit breaker pattern for ALL external service calls.
@@ -169,7 +169,7 @@ rules:
   # ------------------------------------------------------------------ #
   # FT-002: Retry with exponential backoff (WAF RE-02)
   # ------------------------------------------------------------------ #
-  - id: FT-002
+  - id: WAF-REL-FT-002
     severity: required
     description: >-
       Configure retry policies with exponential backoff and jitter for
@@ -281,7 +281,7 @@ rules:
   # ------------------------------------------------------------------ #
   # FT-003: Bulkhead isolation (WAF RE-02)
   # ------------------------------------------------------------------ #
-  - id: FT-003
+  - id: WAF-REL-FT-003
     severity: required
     description: >-
       Implement bulkhead isolation to prevent a single failing component
@@ -440,7 +440,7 @@ rules:
   # ------------------------------------------------------------------ #
   # FT-004: Graceful degradation (WAF RE-02, RE-05)
   # ------------------------------------------------------------------ #
-  - id: FT-004
+  - id: WAF-REL-FT-004
     severity: recommended
     description: >-
       Implement graceful degradation patterns so that partial failures
@@ -602,7 +602,7 @@ rules:
   # ------------------------------------------------------------------ #
   # FT-005: Queue-based load leveling (WAF RE-02, RE-05)
   # ------------------------------------------------------------------ #
-  - id: FT-005
+  - id: WAF-REL-FT-005
     severity: required
     description: >-
       Use queue-based load leveling for all workloads with variable or

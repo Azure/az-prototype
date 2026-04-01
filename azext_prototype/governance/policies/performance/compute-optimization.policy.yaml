@@ -13,7 +13,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: COMP-001
+  - id: WAF-PERF-COMP-001
     severity: required
     description: "Define explicit CPU and memory resource limits for Container Apps — prevent unbounded resource consumption and noisy neighbor issues"
     rationale: "Containers without resource limits can consume all available CPU/memory, starving co-located containers and causing OOM kills"
@@ -172,7 +172,7 @@ rules:
       - "NEVER set liveness probe initialDelaySeconds < 5 — give the application time to start"
       - "NEVER skip the startup probe for slow-starting applications — liveness probes will kill containers during startup"
 
-  - id: COMP-002
+  - id: WAF-PERF-COMP-002
     severity: recommended
     description: "Configure App Service per-app scaling and deployment slots for density optimization and zero-downtime deployments"
     rationale: "Per-app scaling prevents a single app from consuming all plan capacity; slots enable blue-green deployments without downtime"
@@ -267,7 +267,7 @@ rules:
       - "NEVER omit slot-sticky settings for environment-specific configuration (connection strings, feature flags)"
       - "NEVER forget to warm up the staging slot before swapping — cold swaps cause latency spikes"
 
-  - id: COMP-003
+  - id: WAF-PERF-COMP-003
     severity: required
     description: "Define Kubernetes pod resource requests and limits for AKS workloads — prevent scheduling issues and resource contention"
     rationale: "Pods without requests cannot be scheduled efficiently; pods without limits can starve other workloads. Requests drive scheduling, limits prevent starvation"
@@ -383,7 +383,7 @@ rules:
       - "NEVER omit health probes (liveness, readiness, startup) on AKS pods"
       - "NEVER skip LimitRange on namespaces — it provides defaults for pods that omit resource specs"
 
-  - id: COMP-004
+  - id: WAF-PERF-COMP-004
     severity: required
     description: "Configure Azure Functions timeout, concurrency, and batching settings in host.json"
     rationale: "Default Function settings are not optimized for production; incorrect timeout causes failures, incorrect concurrency causes throttling or resource exhaustion"
@@ -511,7 +511,7 @@ rules:
       - "NEVER omit Application Insights sampling — unsampled telemetry can cost more than the function itself"
       - "NEVER use in-process .NET model for new functions — use isolated worker model (.NET 8+)"
 
-  - id: COMP-005
+  - id: WAF-PERF-COMP-005
     severity: required
     description: "Offload long-running operations to asynchronous processing with queues and background workers"
     rationale: "Synchronous processing of operations > 5 seconds blocks threads, degrades UX, and causes timeout failures. Async processing decouples producers from consumers"

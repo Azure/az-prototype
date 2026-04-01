@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: ACR-001
+  - id: AZ-ACR-001
     severity: required
     description: "Create Container Registry with Premium SKU, admin user disabled, and public access disabled. ALWAYS use Premium SKU — it is required for private endpoints, retention policies, and geo-replication. NEVER use Basic or Standard SKU."
     rationale: "Admin credentials are a shared secret that cannot be scoped or audited; public access exposes the registry to the internet; Premium SKU is required for private endpoint support"
@@ -246,19 +246,19 @@ rules:
       - "NEVER use Basic or Standard SKU when private endpoints are required — Premium is required for private endpoints"
       - "NEVER use admin credentials in container runtime configuration — use identity-based registry authentication"
 
-  - id: ACR-002
+  - id: AZ-ACR-002
     severity: required
     description: "Use Premium SKU when private endpoints are required"
     rationale: "Private endpoints are only available on Premium SKU; Basic and Standard do not support private link"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: ACR-003
+  - id: AZ-ACR-003
     severity: recommended
     description: "Enable retention policy for untagged manifests"
     rationale: "Prevents unbounded storage growth from untagged images; 7-day retention is a good default"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
 
-  - id: ACR-004
+  - id: AZ-ACR-004
     severity: recommended
     description: "Enable diagnostic settings to Log Analytics workspace"
     rationale: "Audit trail for image pull/push operations and repository events"

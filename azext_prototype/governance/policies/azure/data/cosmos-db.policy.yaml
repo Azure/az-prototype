@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: CDB-001
+  - id: AZ-CDB-001
     severity: required
     description: "Create Cosmos DB account with Entra RBAC and local auth disabled"
     rationale: "Key-based auth grants full account access and cannot be scoped; Entra RBAC provides fine-grained control"
@@ -230,7 +230,7 @@ rules:
       require_config: [entra_rbac, local_auth_disabled]
       error_message: "Service '{service_name}' ({service_type}) missing {config_key}: true"
 
-  - id: CDB-002
+  - id: AZ-CDB-002
     severity: recommended
     description: "Do not use Strong consistency for POC workloads"
     rationale: "Strong consistency has significant latency and cost implications; Session is sufficient for most POCs"
@@ -241,7 +241,7 @@ rules:
         consistency: strong
       error_message: "Service '{service_name}' ({service_type}) uses 'strong' consistency — consider Session or Eventual unless Strong is justified"
 
-  - id: CDB-003
+  - id: AZ-CDB-003
     severity: recommended
     description: "Use autoscale throughput for variable workloads or serverless for POC"
     rationale: "Avoids over-provisioning while handling traffic spikes; serverless has no idle cost"
@@ -288,7 +288,7 @@ rules:
       severity: warning
       error_message: "Service '{service_name}' ({service_type}) missing autoscale configuration — consider autoscale throughput for variable workloads"
 
-  - id: CDB-004
+  - id: AZ-CDB-004
     severity: recommended
     description: "Design partition keys based on query patterns, not just cardinality"
     rationale: "Poor partition keys cause hot partitions and throttling"
@@ -298,7 +298,7 @@ rules:
       require_config: [partition_key]
       error_message: "Service '{service_name}' ({service_type}) missing partition_key definition"
 
-  - id: CDB-005
+  - id: AZ-CDB-005
     severity: recommended
     description: "Enable continuous backup for point-in-time restore"
     rationale: "WAF Reliability: Continuous backup provides point-in-time restore capability, recovering from accidental destructive operations and restoring deleted resources"
@@ -324,7 +324,7 @@ rules:
     prohibitions:
       - "NEVER use Periodic backup for production workloads when Continuous is available — it provides inferior RPO"
 
-  - id: CDB-006
+  - id: AZ-CDB-006
     severity: recommended
     description: "Configure availability zone support on the Cosmos DB account"
     rationale: "WAF Reliability: Availability zones provide segregated power, networking, and cooling, isolating hardware failures to a subset of replicas"
@@ -348,25 +348,25 @@ rules:
       //     }
       //   ]
 
-  - id: CDB-007
+  - id: AZ-CDB-007
     severity: recommended
     description: "Enable Microsoft Defender for Cosmos DB"
     rationale: "WAF Security: Detects attempts to exploit databases, including potential SQL injections, suspicious access patterns, and other exploitation activities"
     applies_to: [cloud-architect, security-reviewer]
 
-  - id: CDB-008
+  - id: AZ-CDB-008
     severity: recommended
     description: "Configure multi-region replication for critical workloads"
     rationale: "WAF Reliability: Spanning multiple regions ensures workload resilience to regional outages with automatic failover; enable service-managed failover for single-region write accounts"
     applies_to: [cloud-architect, terraform-agent, bicep-agent]
 
-  - id: CDB-009
+  - id: AZ-CDB-009
     severity: recommended
     description: "Implement TTL (time-to-live) on containers with transient data"
     rationale: "WAF Cost: TTL automatically deletes unnecessary data, keeping the database clutter-free and optimizing storage costs"
     applies_to: [cloud-architect, app-developer, terraform-agent, bicep-agent]
 
-  - id: CDB-010
+  - id: AZ-CDB-010
     severity: required
     description: "Enable diagnostic settings to Log Analytics workspace"
     rationale: "Audit trail for data access and performance monitoring"

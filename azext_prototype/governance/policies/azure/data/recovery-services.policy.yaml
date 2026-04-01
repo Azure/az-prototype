@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: RSV-001
+  - id: AZ-RSV-001
     severity: required
     description: "Deploy Recovery Services vault with geo-redundant storage, soft delete, and immutability"
     rationale: "GRS protects against regional disasters; soft delete prevents accidental data loss; immutability prevents ransomware"
@@ -76,7 +76,7 @@ rules:
       - "Do not enable publicNetworkAccess — use private endpoints"
       - "Do not set immutability to Disabled without explicit business justification"
 
-  - id: RSV-002
+  - id: AZ-RSV-002
     severity: required
     description: "Configure storage replication as geo-redundant before protecting any items"
     rationale: "Storage replication cannot be changed after backup items are registered; GRS is required for DR"
@@ -107,7 +107,7 @@ rules:
       - "Do not use LocallyRedundant for production — data loss on regional failure"
       - "Do not register backup items before setting storage replication — it cannot be changed later"
 
-  - id: RSV-003
+  - id: AZ-RSV-003
     severity: required
     description: "Create backup policies with daily backups and appropriate retention tiers"
     rationale: "Backup policies define RPO, RTO, and retention compliance — they must match DR requirements"
@@ -227,7 +227,7 @@ rules:
       - "Do not set daily retention below 7 days for production"
       - "Do not skip weekly or monthly retention for compliance-regulated workloads"
 
-  - id: RSV-004
+  - id: AZ-RSV-004
     severity: recommended
     description: "Create private endpoint for Recovery Services vault"
     rationale: "Private endpoint ensures all backup traffic stays on the Azure backbone"
@@ -281,7 +281,7 @@ rules:
     prohibitions:
       - "Do not skip DNS zone configuration — backup operations require multiple DNS zones"
 
-  - id: RSV-005
+  - id: AZ-RSV-005
     severity: recommended
     description: "Enable diagnostic settings for Recovery Services vault"
     rationale: "Monitor backup job status, restore operations, and policy compliance"

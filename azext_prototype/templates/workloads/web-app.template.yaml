@@ -19,38 +19,38 @@ services:
     type: container-apps
     tier: consumption
     config:
-      ingress: internal          # INT-003 — internal-only behind APIM
-      identity: system-assigned  # MI-001 — system-assigned for single-service
-      min_replicas: 0            # CA-004 — zero replicas in dev
+      ingress: internal          # AZ-INT-003 — internal-only behind APIM
+      identity: system-assigned  # AZ-MI-001 — system-assigned for single-service
+      min_replicas: 0            # AZ-CA-004 — zero replicas in dev
       health_probes: true        # CA patterns — liveness + readiness
-      zone_redundant: true       # HA-001
+      zone_redundant: true       # WAF-REL-HA-001
 
   - name: gateway
     type: api-management
     tier: consumption
     config:
-      identity: system-assigned  # INT-002 — APIM uses MI to reach backend
-      caching: true              # INT-004 — cache read-heavy endpoints
+      identity: system-assigned  # AZ-INT-002 — APIM uses MI to reach backend
+      caching: true              # AZ-INT-004 — cache read-heavy endpoints
 
   - name: database
     type: sql-database
     tier: serverless
     config:
-      entra_auth_only: true      # SQL-001 — Entra auth, no SQL auth
-      tde_enabled: true          # SQL-002 — TDE mandatory
-      threat_protection: true    # SQL-003 — Advanced Threat Protection
-      private_endpoint: true     # NET-001 — private endpoint for data services
-      zone_redundant: true       # HA-001
+      entra_auth_only: true      # AZ-SQL-001 — Entra auth, no SQL auth
+      tde_enabled: true          # AZ-SQL-002 — TDE mandatory
+      threat_protection: true    # AZ-SQL-003 — Advanced Threat Protection
+      private_endpoint: true     # AZ-NET-001 — private endpoint for data services
+      zone_redundant: true       # WAF-REL-HA-001
 
   - name: secrets
     type: key-vault
     tier: standard
     config:
-      rbac_authorization: true   # KV-002 — RBAC model
-      soft_delete: true          # KV-001 — soft-delete + purge protection
+      rbac_authorization: true   # AZ-KV-002 — RBAC model
+      soft_delete: true          # AZ-KV-001 — soft-delete + purge protection
       purge_protection: true
-      private_endpoint: true     # KV-005 / NET-001
-      diagnostics: true          # KV-004 — Log Analytics
+      private_endpoint: true     # AZ-KV-005 / NET-001
+      diagnostics: true          # AZ-KV-004 — Log Analytics
 
   - name: network
     type: virtual-network
@@ -64,7 +64,7 @@ services:
   - name: app-insights
     type: application-insights
     config:
-      workspace_based: true      # MS-003 — distributed tracing
+      workspace_based: true      # CC-INT-MS-003 — distributed tracing
 
   - name: monitoring
     type: log-analytics

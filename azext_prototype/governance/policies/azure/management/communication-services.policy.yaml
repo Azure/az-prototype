@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: ACS-001
+  - id: AZ-ACS-001
     severity: required
     description: "Deploy Azure Communication Services with managed identity and disabled access key authentication"
     rationale: "Access keys grant full control and cannot be scoped; managed identity with RBAC provides auditable access"
@@ -150,25 +150,25 @@ rules:
       - "Never enable userEngagementTracking without user consent (privacy regulations)"
       - "Never skip data location selection — it determines data residency and compliance boundary"
 
-  - id: ACS-002
+  - id: AZ-ACS-002
     severity: required
     description: "Set dataLocation to match compliance requirements for data residency"
     rationale: "Communication data (chat transcripts, call recordings) must reside in the correct geography for regulatory compliance"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: ACS-003
+  - id: AZ-ACS-003
     severity: required
     description: "Use user access tokens for client applications — never expose connection strings to clients"
     rationale: "Connection strings grant full access; user tokens are scoped, short-lived, and tied to identity"
     applies_to: [cloud-architect, app-developer]
 
-  - id: ACS-004
+  - id: AZ-ACS-004
     severity: recommended
     description: "Configure custom domains with DKIM and SPF for email sending"
     rationale: "Azure-managed domains have sending limits and cannot be customized; custom domains improve deliverability"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: ACS-005
+  - id: AZ-ACS-005
     severity: recommended
     description: "Enable diagnostic logging for all communication modalities"
     rationale: "Logs enable troubleshooting, usage analytics, and compliance auditing for chat, SMS, voice, and email"

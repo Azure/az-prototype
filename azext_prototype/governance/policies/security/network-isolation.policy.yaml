@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2025-12-01"
 
 rules:
-  - id: NET-001
+  - id: WAF-SEC-NET-001
     severity: required
     description: >-
       Disable public network access AND use private endpoints for all PaaS
@@ -26,7 +26,7 @@ rules:
       require_config: [private_endpoint]
       error_message: "Service '{service_name}' ({service_type}) missing private_endpoint: true"
 
-  - id: NET-002
+  - id: WAF-SEC-NET-002
     severity: required
     description: "Deploy workloads in a dedicated subnet within the landing zone VNET"
     rationale: "Network segmentation enables NSG and route table controls"
@@ -35,7 +35,7 @@ rules:
       require_service: [virtual-network]
       error_message: "Template missing a virtual-network service for network isolation"
 
-  - id: NET-005
+  - id: WAF-SEC-NET-005
     severity: required
     description: >-
       Every Azure PaaS resource that supports publicNetworkAccess MUST
@@ -52,13 +52,13 @@ rules:
       non-production environments.
     applies_to: [terraform-agent, bicep-agent]
 
-  - id: NET-003
+  - id: WAF-SEC-NET-003
     severity: recommended
     description: "Use NSGs to restrict traffic between subnets to only required ports"
     rationale: "Defence in depth beyond private endpoints"
     applies_to: [cloud-architect, terraform-agent, bicep-agent]
 
-  - id: NET-004
+  - id: WAF-SEC-NET-004
     severity: recommended
     description: "Enable diagnostic logging on NSGs for traffic auditing"
     rationale: "Required for incident investigation and compliance"

@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: DDOS-001
+  - id: AZ-DDOS-001
     severity: required
     description: "Deploy DDoS Protection Plan and associate with all VNets containing public-facing resources"
     rationale: "DDoS Network Protection provides enhanced mitigation beyond Azure's basic infrastructure protection"
@@ -147,13 +147,13 @@ rules:
       - "Never set enableDdosProtection to false on VNets with public IP addresses"
       - "Never skip DDoS attack metric alerts — immediate notification is critical"
 
-  - id: DDOS-002
+  - id: AZ-DDOS-002
     severity: required
     description: "Configure DDoS attack metric alerts on all public IP addresses"
     rationale: "Immediate notification of DDoS attacks enables rapid response and mitigation tuning"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
 
-  - id: DDOS-003
+  - id: AZ-DDOS-003
     severity: recommended
     description: "Enable DDoS diagnostic logging for attack analytics and post-incident review"
     rationale: "Diagnostic logs provide attack vectors, dropped packets, and mitigation reports for forensics"

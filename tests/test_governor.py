@@ -273,7 +273,7 @@ class TestPolicyIndex:
         rule2.applies_to = []
 
         rule3 = MagicMock()
-        rule3.id = "COST-001"
+        rule3.id = "WAF-COST-SKU-001"
         rule3.severity = "optional"
         rule3.description = "Estimate monthly infrastructure cost"
         rule3.rationale = "Cost"

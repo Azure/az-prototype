@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: BOT-001
+  - id: AZ-BOT-001
     severity: required
     description: "Deploy Azure Bot Service with managed identity and isolated network configuration"
     rationale: "Bot Service handles user conversations; managed identity removes credential management for backend connections"
@@ -136,13 +136,13 @@ rules:
       - "Never enable V1 Direct Line protocol — it lacks enhanced authentication"
       - "Never leave trustedOrigins empty on Direct Line channels with isSecureSiteEnabled"
 
-  - id: BOT-002
+  - id: AZ-BOT-002
     severity: required
     description: "Configure Direct Line channels with enhanced authentication and trusted origins"
     rationale: "Enhanced authentication prevents token theft and ensures only trusted origins can embed the bot"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
 
-  - id: BOT-003
+  - id: AZ-BOT-003
     severity: recommended
     description: "Enable Application Insights for bot telemetry and conversation analytics"
     rationale: "Bot telemetry provides conversation flow analysis, error tracking, and user engagement metrics"

@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: AIS-001
+  - id: AZ-AIS-001
     severity: required
     description: "Deploy Azure AI Search with managed identity, disabled API key auth, and no public access"
     rationale: "API keys cannot be scoped or audited; managed identity with RBAC provides fine-grained access control"
@@ -177,13 +177,13 @@ rules:
       - "Never set publicNetworkAccess to enabled without compensating network controls"
       - "Never use admin keys for query operations — use query keys or RBAC"
 
-  - id: AIS-002
+  - id: AZ-AIS-002
     severity: recommended
     description: "Configure semantic ranking and vector search with appropriate dimensions"
     rationale: "Semantic ranker improves relevance; vector dimensions must match the embedding model"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
 
-  - id: AIS-003
+  - id: AZ-AIS-003
     severity: recommended
     description: "Enable customer-managed key encryption for indexes containing sensitive data"
     rationale: "CMK encryption provides an additional layer of control over data-at-rest encryption"

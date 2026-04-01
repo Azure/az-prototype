@@ -19,42 +19,42 @@ services:
     tier: consumption
     config:
       runtime: python
-      identity: system-assigned  # MI-001
-      vnet_integrated: true      # NET-002
-      https_only: true           # AS-001
-      min_tls_version: "1.2"     # AS-002
+      identity: system-assigned  # AZ-MI-001
+      vnet_integrated: true      # AZ-NET-002
+      https_only: true           # AZ-AS-001
+      min_tls_version: "1.2"     # AZ-AS-002
 
   - name: datastore
     type: cosmos-db
     tier: serverless
     config:
       api: nosql
-      entra_rbac: true                   # CDB-001 — Entra RBAC for data plane
-      local_auth_disabled: true          # CDB-001 — disable key-based auth
-      consistency: session               # CDB-002 — session, not strong
-      autoscale: true                    # CDB-003 — autoscale throughput
-      partition_key: "/tenantId"         # CDB-004 — query-aligned partition key
-      private_endpoint: true             # NET-001
-      zone_redundant: true               # HA-001
+      entra_rbac: true                   # AZ-CDB-001 — Entra RBAC for data plane
+      local_auth_disabled: true          # AZ-CDB-001 — disable key-based auth
+      consistency: session               # AZ-CDB-002 — session, not strong
+      autoscale: true                    # AZ-CDB-003 — autoscale throughput
+      partition_key: "/tenantId"         # AZ-CDB-004 — query-aligned partition key
+      private_endpoint: true             # AZ-NET-001
+      zone_redundant: true               # WAF-REL-HA-001
 
   - name: ingest
     type: storage-account
     tier: standard-lrs
     config:
-      identity: system-assigned    # MI-001
-      private_endpoint: true       # NET-001
+      identity: system-assigned    # AZ-MI-001
+      private_endpoint: true       # AZ-NET-001
       blob_versioning: true
-      shared_key_disabled: true    # ST-001
-      public_access_disabled: true # ST-002
-      min_tls_version: "TLS1_2"   # ST-003
-      zone_redundant: true         # HA-001
+      shared_key_disabled: true    # AZ-ST-001
+      public_access_disabled: true # AZ-ST-002
+      min_tls_version: "TLS1_2"   # AZ-ST-003
+      zone_redundant: true         # WAF-REL-HA-001
 
   - name: events
     type: event-grid
     config:
       identity: system-assigned
       topic_type: custom
-      dead_letter_storage: ingest  # ED-001 — dead-letter to storage account
+      dead_letter_storage: ingest  # CC-INT-ED-001 — dead-letter to storage account
 
   - name: secrets
     type: key-vault
@@ -64,7 +64,7 @@ services:
       soft_delete: true
       purge_protection: true
       private_endpoint: true
-      diagnostics: true          # KV-004 — Log Analytics
+      diagnostics: true          # AZ-KV-004 — Log Analytics
 
   - name: network
     type: virtual-network

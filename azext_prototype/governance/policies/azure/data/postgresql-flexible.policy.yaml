@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: PG-001
+  - id: AZ-PG-001
     severity: required
     description: "Deploy PostgreSQL Flexible Server with Microsoft Entra authentication, VNet integration, and TLS 1.2"
     rationale: "Entra auth centralizes identity; VNet integration eliminates public exposure; TLS 1.2 prevents downgrade attacks"
@@ -106,7 +106,7 @@ rules:
       - "Do not use passwordAuth Enabled when Entra auth is available"
       - "Do not use Burstable tier for production workloads requiring HA"
 
-  - id: PG-002
+  - id: AZ-PG-002
     severity: required
     description: "Configure Entra admin for PostgreSQL Flexible Server"
     rationale: "Entra admin is required for Entra authentication to function"
@@ -139,7 +139,7 @@ rules:
     prohibitions:
       - "Do not use individual user accounts as Entra admin — use a security group"
 
-  - id: PG-003
+  - id: AZ-PG-003
     severity: required
     description: "Enable diagnostic settings for PostgreSQL audit and slow query logs"
     rationale: "PostgreSQL logs track queries, connections, and errors for troubleshooting and compliance"
@@ -200,7 +200,7 @@ rules:
     prohibitions:
       - "Do not disable PostgreSQLLogs in production"
 
-  - id: PG-004
+  - id: AZ-PG-004
     severity: recommended
     description: "Enable zone-redundant high availability for production databases"
     rationale: "Zone-redundant HA provides automatic failover with near-zero data loss across zones"

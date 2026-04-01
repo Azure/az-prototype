@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: NAT-001
+  - id: AZ-NAT-001
     severity: required
     description: "Use Standard SKU for NAT Gateway with zone-redundant public IP"
     rationale: "Standard SKU is the only supported SKU; zone redundancy ensures high availability"
@@ -52,7 +52,7 @@ rules:
       - "Do not set idleTimeoutInMinutes above 120 — causes connection tracking overhead"
       - "Do not associate NAT Gateway with subnets that already have instance-level public IPs for outbound"
 
-  - id: NAT-002
+  - id: AZ-NAT-002
     severity: required
     description: "Associate NAT Gateway with a Standard SKU static public IP address"
     rationale: "NAT Gateway only works with Standard SKU static public IPs; dynamic allocation is not supported"
@@ -95,7 +95,7 @@ rules:
       - "Do not use Dynamic allocation — NAT Gateway requires Static"
       - "Do not use Basic SKU public IPs with NAT Gateway"
 
-  - id: NAT-003
+  - id: AZ-NAT-003
     severity: recommended
     description: "Associate NAT Gateway with private subnets for controlled outbound connectivity"
     rationale: "Subnets without NAT Gateway or other outbound mechanism lose internet access when default outbound is retired"
@@ -130,7 +130,7 @@ rules:
     prohibitions:
       - "Do not assign NAT Gateway to GatewaySubnet — use on application subnets only"
 
-  - id: NAT-004
+  - id: AZ-NAT-004
     severity: recommended
     description: "Enable diagnostic settings for NAT Gateway metrics"
     rationale: "Monitor SNAT port utilization, packet counts, and dropped packets for capacity planning"

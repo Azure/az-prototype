@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: NIC-001
+  - id: AZ-NIC-001
     severity: required
     description: "Associate every NIC with a Network Security Group"
     rationale: "NICs without NSGs allow all inbound and outbound traffic by default"
@@ -67,7 +67,7 @@ rules:
       - "Do not deploy NICs without NSG association"
       - "Do not associate public IPs directly to NICs — use Bastion or internal LB"
 
-  - id: NIC-002
+  - id: AZ-NIC-002
     severity: required
     description: "Do not assign public IP addresses directly to network interfaces"
     rationale: "Direct public IP assignment bypasses centralized ingress controls and exposes the VM to the internet"
@@ -127,7 +127,7 @@ rules:
       - "Do not add publicIPAddress to ipConfigurations"
       - "Do not create NICs with open NSG rules allowing RDP (3389) or SSH (22) from Internet"
 
-  - id: NIC-003
+  - id: AZ-NIC-003
     severity: recommended
     description: "Enable accelerated networking on supported VM sizes"
     rationale: "Accelerated networking provides up to 30Gbps throughput and lower latency via SR-IOV"
@@ -144,7 +144,7 @@ rules:
     prohibitions:
       - "Do not enable accelerated networking on unsupported VM sizes — deployment will fail"
 
-  - id: NIC-004
+  - id: AZ-NIC-004
     severity: recommended
     description: "Use static private IP allocation for infrastructure VMs (domain controllers, DNS servers)"
     rationale: "Dynamic IPs can change on deallocation, breaking dependent services"

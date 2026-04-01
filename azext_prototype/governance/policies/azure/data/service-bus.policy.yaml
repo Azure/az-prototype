@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: SB-001
+  - id: AZ-SB-001
     severity: required
     description: "Deploy Service Bus namespace with Premium SKU, TLS 1.2, local auth disabled, and public access off"
     rationale: "Premium SKU provides VNet integration, zone redundancy, and dedicated capacity; local auth bypass RBAC"
@@ -69,7 +69,7 @@ rules:
       - "When disableLocalAuth = true, SAS keys and connection strings are NOT available. NEVER output primaryConnectionString or use listKeys."
       - "NEVER use 'Service Bus Contributor' for data access — use Data Sender/Receiver roles"
 
-  - id: SB-002
+  - id: AZ-SB-002
     severity: required
     description: "Create queues and topics with dead-letter and duplicate detection enabled"
     rationale: "Dead-letter queues capture failed messages for investigation; duplicate detection prevents reprocessing"
@@ -114,7 +114,7 @@ rules:
       - "Do not set maxDeliveryCount to 1 — transient failures will immediately dead-letter messages"
       - "Do not disable deadLetteringOnMessageExpiration — expired messages will be silently lost"
 
-  - id: SB-003
+  - id: AZ-SB-003
     severity: required
     description: "Create topic subscriptions with dead-letter and appropriate filters"
     rationale: "Subscriptions without filters receive all messages; dead-letter captures failures"
@@ -179,7 +179,7 @@ rules:
     prohibitions:
       - "Do not disable deadLetteringOnFilterEvaluationExceptions — filter errors will silently drop messages"
 
-  - id: SB-004
+  - id: AZ-SB-004
     severity: recommended
     description: "Enable diagnostic settings for Service Bus namespace"
     rationale: "Monitor message counts, throttled requests, and dead-letter queue depth"

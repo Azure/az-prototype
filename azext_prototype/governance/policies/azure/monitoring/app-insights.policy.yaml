@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: AI-001
+  - id: AZ-AI-001
     severity: required
     description: "Create Application Insights linked to Log Analytics Workspace with workspace-based mode"
     rationale: "Workspace-based Application Insights is the current model; classic mode is deprecated. WorkspaceResourceId links telemetry to Log Analytics for unified querying"
@@ -59,7 +59,7 @@ rules:
       - "NEVER include publicNetworkAccessForIngestion or publicNetworkAccessForQuery on Microsoft.Insights/components@2020-02-02 — these properties are NOT supported on this API version"
       - "NEVER use InstrumentationKey for new integrations — use ConnectionString instead"
 
-  - id: AI-002
+  - id: AZ-AI-002
     severity: required
     description: "Link Application Insights to Log Analytics Workspace via WorkspaceResourceId"
     rationale: "Without WorkspaceResourceId, Application Insights creates in classic mode which is deprecated and lacks unified query support"
@@ -69,13 +69,13 @@ rules:
       require_service: [application-insights]
       error_message: "Template with compute services should include application-insights for observability"
 
-  - id: AI-003
+  - id: AZ-AI-003
     severity: recommended
     description: "Set SamplingPercentage to 100 for POC, reduce for high-traffic production"
     rationale: "Full sampling captures all telemetry for debugging; reduce to 10-50% for high-volume production to control costs"
     applies_to: [cloud-architect, monitoring-agent, cost-analyst]
 
-  - id: AI-004
+  - id: AZ-AI-004
     severity: recommended
     description: "Output ConnectionString for downstream app configuration"
     rationale: "Compute resources need the connection string to send telemetry; prefer ConnectionString over InstrumentationKey"

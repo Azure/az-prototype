@@ -20,7 +20,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: COST-001
+  - id: WAF-COST-SKU-001
     severity: required
     description: "Select appropriate compute SKU based on environment tier — B-series for dev/POC, D-series for production"
     rationale: "Compute is typically the largest cost driver; right-sizing by environment prevents overspending on dev while ensuring production performance"
@@ -368,7 +368,7 @@ rules:
       - "NEVER deploy Classic Cloud Services (PaaS) — use App Service or Container Apps"
       - "NEVER use A-series or legacy VM SKUs — they are deprecated and cost-inefficient"
 
-  - id: COST-002
+  - id: WAF-COST-SKU-002
     severity: required
     description: "Select appropriate database SKU based on environment tier — serverless/burstable for dev, provisioned/GP for production"
     rationale: "Database costs can exceed compute; serverless and burstable tiers eliminate idle costs in dev"
@@ -655,7 +655,7 @@ rules:
       - "NEVER set Cosmos DB fixed throughput (manual RU/s) in production — use autoscale"
       - "NEVER use geo-redundant backup for dev/POC databases"
 
-  - id: COST-003
+  - id: WAF-COST-SKU-003
     severity: required
     description: "Select appropriate storage redundancy — LRS for dev/POC, GRS or ZRS for production; use tiered access (Hot/Cool/Archive)"
     rationale: "Storage redundancy costs scale linearly; LRS is 2-3x cheaper than GRS. Access tiers reduce costs for infrequently accessed data"
@@ -778,7 +778,7 @@ rules:
       - "NEVER use BlobStorage kind — use StorageV2 which supports all storage services"
       - "NEVER leave large infrequently-accessed blobs in Hot tier — use lifecycle management to tier to Cool/Archive"
 
-  - id: COST-004
+  - id: WAF-COST-SKU-004
     severity: required
     description: "Select appropriate networking SKU — Basic for dev/POC, Standard for production"
     rationale: "Networking services vary significantly in cost by tier; Basic SKUs are sufficient for development"
@@ -952,7 +952,7 @@ rules:
       - "NEVER use legacy VPN Gateway SKUs (Basic) — they do not support IKEv2 or active-active"
       - "NEVER deploy Application Gateway WAF v1 — use v2 for autoscaling and zone-redundancy"
 
-  - id: COST-005
+  - id: WAF-COST-SKU-005
     severity: required
     description: "Select appropriate cache SKU — Basic C0 for dev/POC, Standard C1+ for staging, Premium for production clustering"
     rationale: "Redis cache pricing varies 10x between tiers; Basic is sufficient for development caching scenarios"

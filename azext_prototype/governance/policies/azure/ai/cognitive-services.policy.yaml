@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: CS-001
+  - id: AZ-CS-001
     severity: required
     description: "Deploy Cognitive Services with managed identity, disabled local auth, and no public access"
     rationale: "API keys are shared secrets that cannot be scoped; managed identity provides auditable, per-service access"
@@ -175,13 +175,13 @@ rules:
       - "Never use Cognitive Services Contributor when Cognitive Services User suffices"
       - "Never omit customSubDomainName — it is required for Microsoft Entra authentication"
 
-  - id: CS-002
+  - id: AZ-CS-002
     severity: required
     description: "Set customSubDomainName on all Cognitive Services accounts"
     rationale: "Custom subdomain is required for Microsoft Entra authentication and private endpoints"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: CS-003
+  - id: AZ-CS-003
     severity: recommended
     description: "Enable customer-managed key encryption for accounts processing sensitive data"
     rationale: "CMK provides additional control over data-at-rest encryption beyond platform-managed keys"

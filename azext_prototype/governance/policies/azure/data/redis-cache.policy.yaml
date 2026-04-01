@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: RED-001
+  - id: AZ-RED-001
     severity: required
     description: "Deploy Azure Cache for Redis with Premium or Enterprise SKU, TLS 1.2, and public access disabled"
     rationale: "Premium/Enterprise SKUs support VNet injection, clustering, and data persistence; TLS 1.2 secures in-transit data"
@@ -100,7 +100,7 @@ rules:
       - "When Microsoft Entra (AAD) auth is enabled, accessKeys are NOT available. NEVER output or reference redis access keys or connection strings."
       - "NEVER use Microsoft.Authorization/roleAssignments for Redis data-plane access — use Microsoft.Cache/redis/accessPolicyAssignments instead"
 
-  - id: RED-002
+  - id: AZ-RED-002
     severity: required
     description: "Disable the non-SSL port and enforce TLS 1.2 for all connections"
     rationale: "Port 6379 sends data in plaintext; all Redis traffic must be encrypted in transit"
@@ -116,7 +116,7 @@ rules:
       - "Do not set enableNonSslPort to true"
       - "Do not set minimumTlsVersion below 1.2"
 
-  - id: RED-003
+  - id: AZ-RED-003
     severity: recommended
     description: "Use Microsoft Entra authentication instead of access keys"
     rationale: "Entra auth eliminates shared key management and supports fine-grained RBAC"
@@ -178,7 +178,7 @@ rules:
       - "Do not distribute Redis access keys to applications — use Entra authentication"
       - "NEVER use Microsoft.Authorization/roleAssignments for Redis data-plane access — use Microsoft.Cache/redis/accessPolicyAssignments instead"
 
-  - id: RED-004
+  - id: AZ-RED-004
     severity: recommended
     description: "Enable diagnostic settings for Redis cache metrics and connection logs"
     rationale: "Monitor cache hit ratio, connected clients, memory usage, and server load"

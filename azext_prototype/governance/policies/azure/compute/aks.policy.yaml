@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: AKS-001
+  - id: AZ-AKS-001
     severity: required
     description: "Create AKS cluster with Azure AD RBAC, workload identity, private cluster, and managed identity"
     rationale: "Azure AD RBAC centralizes access control; workload identity eliminates pod-level secrets; private cluster prevents API server exposure; managed identity eliminates service principal credential management"
@@ -228,13 +228,13 @@ rules:
       - "NEVER disable workload identity — it replaces pod identity and AAD pod identity (both deprecated)"
       - "NEVER use local accounts — set disableLocalAccounts to true in production"
 
-  - id: AKS-002
+  - id: AZ-AKS-002
     severity: required
     description: "Enable OMS agent addon for container monitoring"
     rationale: "Container Insights provides CPU, memory, pod health, and log collection for troubleshooting"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, monitoring-agent]
 
-  - id: AKS-003
+  - id: AZ-AKS-003
     severity: required
     description: "Use VNet integration with azure CNI for network policy support"
     rationale: "Azure CNI assigns pod IPs from the VNet, enabling NSGs, network policies, and private endpoint connectivity"
@@ -244,19 +244,19 @@ rules:
       require_service: [virtual-network]
       error_message: "Template with AKS must include a virtual-network service for VNet integration"
 
-  - id: AKS-004
+  - id: AZ-AKS-004
     severity: recommended
     description: "Use Free tier for POC, Standard tier for production"
     rationale: "Free tier has limited SLA; Standard provides 99.95% uptime SLA"
     applies_to: [cloud-architect, cost-analyst]
 
-  - id: AKS-005
+  - id: AZ-AKS-005
     severity: recommended
     description: "Enable cluster autoscaler on node pools"
     rationale: "Automatically scales nodes based on pod scheduling demand; reduces idle cost"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
 
-  - id: AKS-006
+  - id: AZ-AKS-006
     severity: required
     description: "Enable Microsoft Defender for Containers on the cluster"
     rationale: "WAF Security: Provides runtime threat detection, vulnerability scanning, and security monitoring for clusters, containers, and applications"
@@ -281,7 +281,7 @@ rules:
         }
       }
 
-  - id: AKS-007
+  - id: AZ-AKS-007
     severity: required
     description: "Enable Azure Policy addon for AKS to enforce pod security and compliance"
     rationale: "WAF Security: Azure Policy applies at-scale enforcement and safeguards on clusters in a centralized, consistent manner, controlling pod functions and detecting policy violations"
@@ -301,7 +301,7 @@ rules:
       //     }
       //   }
 
-  - id: AKS-008
+  - id: AZ-AKS-008
     severity: recommended
     description: "Disable local accounts and enforce Microsoft Entra ID-only authentication"
     rationale: "WAF Security: Disabling local accounts ensures all cluster access flows through Microsoft Entra ID, providing centralized identity and auditable access control"
@@ -315,7 +315,7 @@ rules:
       // Add to the AKS cluster properties in AKS-001:
       //   disableLocalAccounts: true
 
-  - id: AKS-009
+  - id: AZ-AKS-009
     severity: recommended
     description: "Use availability zones for AKS node pools"
     rationale: "WAF Reliability: Distributes AKS agent nodes across physically separate datacenters, ensuring nodes continue running even if one zone goes down"
@@ -327,13 +327,13 @@ rules:
       // Add to agentPoolProfiles in AKS-001:
       //   availabilityZones: ['1', '2', '3']
 
-  - id: AKS-010
+  - id: AZ-AKS-010
     severity: recommended
     description: "Use NAT gateway for clusters with many concurrent outbound connections"
     rationale: "WAF Reliability: NAT Gateway supports reliable egress traffic at scale, avoiding reliability problems from Azure Load Balancer SNAT port exhaustion"
     applies_to: [cloud-architect, terraform-agent, bicep-agent]
 
-  - id: AKS-011
+  - id: AZ-AKS-011
     severity: recommended
     description: "Use the AKS uptime SLA (Standard tier) for production-grade clusters"
     rationale: "WAF Reliability: Standard tier provides 99.95% uptime SLA for the Kubernetes API server endpoint, higher availability guarantees than the Free tier"

@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: GRF-001
+  - id: AZ-GRF-001
     severity: required
     description: "Deploy Azure Managed Grafana with managed identity, deterministic outbound IP, and no public access"
     rationale: "Grafana dashboards access sensitive metrics; managed identity secures data source connections, deterministic IP enables firewall rules"
@@ -132,19 +132,19 @@ rules:
       - "Never hardcode data source credentials — use managed identity for Azure Monitor data sources"
       - "Never use Essential tier for production — it lacks zone redundancy, private link, and SMTP support"
 
-  - id: GRF-002
+  - id: AZ-GRF-002
     severity: required
     description: "Disable API key authentication — use Microsoft Entra ID only"
     rationale: "API keys bypass Entra ID authentication and cannot be audited per-user"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: GRF-003
+  - id: AZ-GRF-003
     severity: recommended
     description: "Enable zone redundancy for high availability"
     rationale: "Zone redundancy ensures dashboard availability during availability zone failures"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: GRF-004
+  - id: AZ-GRF-004
     severity: recommended
     description: "Grant Grafana managed identity Monitoring Reader role on all data sources"
     rationale: "Managed identity access to Azure Monitor eliminates credential management for data source connections"

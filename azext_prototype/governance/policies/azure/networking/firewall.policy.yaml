@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: FW-001
+  - id: AZ-FW-001
     severity: required
     description: "Deploy Azure Firewall Premium with threat intelligence, IDPS, and TLS inspection"
     rationale: "Premium SKU provides signature-based IDPS, TLS inspection, and URL filtering beyond Standard capabilities"
@@ -236,25 +236,25 @@ rules:
       - "Never use the AzureFirewallSubnet for any resources other than Azure Firewall"
       - "Never hardcode Key Vault secret IDs for TLS certificates"
 
-  - id: FW-002
+  - id: AZ-FW-002
     severity: required
     description: "Deploy in zone-redundant configuration across all three availability zones"
     rationale: "Zone redundancy ensures firewall availability during zone failures"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: FW-003
+  - id: AZ-FW-003
     severity: required
     description: "Enable DNS proxy on the firewall policy for FQDN-based network rules"
     rationale: "DNS proxy is required for FQDN filtering in network rules and supports private DNS resolution"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: FW-004
+  - id: AZ-FW-004
     severity: recommended
     description: "Organize rules into rule collection groups by function (infra, app, network)"
     rationale: "Structured rule organization improves manageability and reduces rule processing time"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: FW-005
+  - id: AZ-FW-005
     severity: recommended
     description: "Use structured firewall log format and send to Log Analytics"
     rationale: "WAF Operational Excellence: Structured logs make data easy to search, filter, and analyze; latest monitoring tools require this format"
@@ -262,25 +262,25 @@ rules:
     prohibitions:
       - "Do not enable both structured and legacy diagnostic log formats simultaneously"
 
-  - id: FW-006
+  - id: AZ-FW-006
     severity: recommended
     description: "Monitor SNAT port utilization, firewall health state, throughput, and latency probe metrics"
     rationale: "WAF Reliability: These metrics detect when service state degrades, enabling proactive measures to prevent failures"
     applies_to: [cloud-architect, monitoring-agent]
 
-  - id: FW-007
+  - id: AZ-FW-007
     severity: recommended
     description: "Configure at least 5 public IP addresses for deployments susceptible to SNAT port exhaustion"
     rationale: "WAF Performance: Each public IP provides 2,496 SNAT ports per backend VMSS instance; 5 IPs increase available ports fivefold"
     applies_to: [cloud-architect, terraform-agent, bicep-agent]
 
-  - id: FW-008
+  - id: AZ-FW-008
     severity: recommended
     description: "Use policy analytics dashboard to identify and optimize firewall policies"
     rationale: "WAF Performance: Policy analytics identifies potential problems like meeting policy limits, improper rules, and improper IP groups usage, improving security posture and rule-processing performance"
     applies_to: [cloud-architect, security-reviewer]
 
-  - id: FW-009
+  - id: AZ-FW-009
     severity: recommended
     description: "Place frequently used rules early in rule collection groups to optimize latency"
     rationale: "WAF Performance: Azure Firewall processes rules by priority; placing frequently-hit rules first reduces processing latency for common traffic patterns"

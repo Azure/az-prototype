@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: CDN-001
+  - id: AZ-CDN-001
     severity: required
     description: "Deploy Azure CDN Standard profile with HTTPS enforcement and optimized caching"
     rationale: "CDN accelerates content delivery globally; HTTPS enforcement prevents content interception"
@@ -233,25 +233,25 @@ rules:
       - "Never cache authenticated or personalized content — use cache-control headers"
       - "Never expose origin server directly — always serve through CDN endpoint"
 
-  - id: CDN-002
+  - id: AZ-CDN-002
     severity: required
     description: "Enforce HTTPS-only delivery with HTTP-to-HTTPS redirect"
     rationale: "HTTP content delivery is subject to interception and modification (content injection)"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: CDN-003
+  - id: AZ-CDN-003
     severity: recommended
     description: "Enable compression for text-based content types"
     rationale: "Compression reduces bandwidth consumption and improves page load time by 50-70% for text content"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: CDN-004
+  - id: AZ-CDN-004
     severity: recommended
     description: "Configure custom domain with managed HTTPS certificate"
     rationale: "Managed certificates auto-renew and eliminate manual certificate management overhead"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: CDN-005
+  - id: AZ-CDN-005
     severity: recommended
     description: "Set appropriate cache TTLs and query string caching behavior"
     rationale: "Proper caching configuration maximizes cache hit ratio and reduces origin load"

@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: NH-001
+  - id: AZ-NH-001
     severity: required
     description: "Deploy Notification Hubs namespace with Standard SKU, managed identity, and no public access"
     rationale: "Standard SKU provides SLA, telemetry, and scheduled push; managed identity eliminates SAS key management"
@@ -143,19 +143,19 @@ rules:
       - "Never set publicNetworkAccess to Enabled without IP rules"
       - "Never embed SAS connection strings in mobile application packages"
 
-  - id: NH-002
+  - id: AZ-NH-002
     severity: required
     description: "Store PNS credentials (APNS certificates, FCM keys) in Key Vault and reference from hub configuration"
     rationale: "PNS credentials are sensitive and must be rotated; Key Vault provides audited access and rotation"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
 
-  - id: NH-003
+  - id: AZ-NH-003
     severity: recommended
     description: "Use installation-based registration for device management"
     rationale: "Installations provide a newer API, support multiple PNS handles per device, and enable partial updates"
     applies_to: [cloud-architect, app-developer]
 
-  - id: NH-004
+  - id: AZ-NH-004
     severity: recommended
     description: "Enable zone redundancy for high availability"
     rationale: "Zone redundancy ensures notification delivery during availability zone failures"

@@ -15,7 +15,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: OBS-001
+  - id: WAF-PERF-OBS-001
     severity: required
     description: "Configure Application Insights with auto-instrumentation for .NET, Python, and Node.js — use connection string, not instrumentation key"
     rationale: "Application Insights provides request tracking, dependency tracing, and performance metrics. Connection strings support regional ingestion endpoints"
@@ -228,7 +228,7 @@ rules:
       - "NEVER store Application Insights connection string as a public-facing environment variable — use secrets or Key Vault references"
       - "NEVER use Classic Application Insights (standalone) — always use workspace-based (LogAnalytics ingestion)"
 
-  - id: OBS-002
+  - id: WAF-PERF-OBS-002
     severity: required
     description: "Configure custom metric alerts for key performance indicators — P95 latency, error rate, throughput, and resource utilization"
     rationale: "Metric alerts provide proactive notification before performance degradation becomes user-visible; without alerts, issues are discovered by users"
@@ -489,7 +489,7 @@ rules:
       - "NEVER use only Sev3/Sev4 for error rate alerts — failed requests should be Sev1 or Sev2"
       - "NEVER set CPU alert threshold below 70% — normal load can trigger false alarms"
 
-  - id: OBS-003
+  - id: WAF-PERF-OBS-003
     severity: required
     description: "Enable W3C distributed tracing with trace context propagation across all services in the request chain"
     rationale: "Without distributed tracing, diagnosing performance issues in microservices requires correlating logs across multiple systems manually. W3C traceparent header provides automatic correlation"
@@ -585,7 +585,7 @@ rules:
       - "NEVER use AI-only correlation mode — always use W3C (or AI_AND_W3C for backward compatibility)"
       - "NEVER omit custom span attributes for business-relevant fields (order ID, tenant ID, user ID)"
 
-  - id: OBS-004
+  - id: WAF-PERF-OBS-004
     severity: recommended
     description: "Create standard KQL queries for performance monitoring — P95 latency, error rates, throughput, and slow dependency calls"
     rationale: "Pre-built KQL queries enable rapid diagnosis during incidents; without them, engineers spend 15-30 minutes writing queries instead of investigating"
@@ -713,7 +713,7 @@ rules:
       - "NEVER query across multiple time ranges in a single KQL query — use parameterized time ranges"
       - "NEVER use count() without time bins — unbinned counts hide temporal patterns"
 
-  - id: OBS-005
+  - id: WAF-PERF-OBS-005
     severity: recommended
     description: "Configure availability tests for public endpoints — standard URL ping test and multi-step web tests"
     rationale: "Availability tests detect outages from external perspective (outside Azure network); internal health checks may pass while external access fails"

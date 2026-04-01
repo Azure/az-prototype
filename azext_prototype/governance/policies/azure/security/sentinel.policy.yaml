@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: SNTL-001
+  - id: AZ-SNTL-001
     severity: required
     description: "Deploy Microsoft Sentinel on a dedicated Log Analytics workspace with onboarding state enabled"
     rationale: "Sentinel requires an onboarded Log Analytics workspace for security event correlation and threat detection"
@@ -139,25 +139,25 @@ rules:
       - "Never hardcode tenant IDs in data connector configurations"
       - "Never grant Microsoft Sentinel Contributor to analysts — use Responder for incident management"
 
-  - id: SNTL-002
+  - id: AZ-SNTL-002
     severity: required
     description: "Enable core data connectors for Azure Activity, Entra ID, and Defender for Cloud"
     rationale: "Data connectors feed Sentinel with security signals; missing connectors create blind spots"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
 
-  - id: SNTL-003
+  - id: AZ-SNTL-003
     severity: required
     description: "Enable the Fusion alert rule for ML-based multi-stage attack detection"
     rationale: "Fusion uses ML to correlate low-fidelity signals across data sources into high-confidence incidents"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
 
-  - id: SNTL-004
+  - id: AZ-SNTL-004
     severity: recommended
     description: "Configure automation rules for common incident response playbooks"
     rationale: "Automation rules reduce mean time to respond by executing playbooks on incident creation"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
 
-  - id: SNTL-005
+  - id: AZ-SNTL-005
     severity: recommended
     description: "Set up workspace-level RBAC with Microsoft Sentinel-specific roles"
     rationale: "Sentinel-specific roles (Reader, Responder, Contributor) provide appropriate access levels for SOC tiers"

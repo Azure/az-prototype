@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: AFD-001
+  - id: AZ-AFD-001
     severity: required
     description: "Deploy Azure Front Door Premium with managed identity, WAF policy, and end-to-end TLS"
     rationale: "Front Door is the global entry point; WAF protects against OWASP threats and DDoS; Premium enables private link origins"
@@ -188,19 +188,19 @@ rules:
       - "Never skip health probes on origin groups"
       - "Never use wildcard domains without explicit WAF rules"
 
-  - id: AFD-002
+  - id: AZ-AFD-002
     severity: required
     description: "Enforce HTTPS-only with TLS 1.2 minimum and redirect HTTP to HTTPS"
     rationale: "HTTP traffic is unencrypted and subject to interception"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: AFD-003
+  - id: AZ-AFD-003
     severity: required
     description: "Use private link origins for backend connectivity (Premium SKU)"
     rationale: "Private link origins eliminate public exposure of backend services"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: AFD-004
+  - id: AZ-AFD-004
     severity: recommended
     description: "Configure caching rules with appropriate TTLs per content type"
     rationale: "Proper caching reduces origin load, improves latency, and lowers costs"

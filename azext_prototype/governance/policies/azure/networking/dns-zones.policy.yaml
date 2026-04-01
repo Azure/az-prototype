@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: DNS-001
+  - id: AZ-DNS-001
     severity: required
     description: "Use Azure Private DNS Zones for internal name resolution within virtual networks"
     rationale: "Private DNS zones provide name resolution within VNets without exposing DNS records to the internet"
@@ -32,7 +32,7 @@ rules:
       - "Do not use public DNS zones for internal service discovery"
       - "Do not create private DNS zones without VNet links — they will not resolve"
 
-  - id: DNS-002
+  - id: AZ-DNS-002
     severity: required
     description: "Link Private DNS Zones to all VNets that need resolution"
     rationale: "Without VNet links, VMs and services in the VNet cannot resolve private DNS records"
@@ -71,7 +71,7 @@ rules:
       - "Do not enable registrationEnabled unless auto-registration of VM records is explicitly needed"
       - "Do not create multiple VNet links to the same VNet for the same zone"
 
-  - id: DNS-003
+  - id: AZ-DNS-003
     severity: required
     description: "Use standard private DNS zone names for Azure private endpoints"
     rationale: "Azure services expect specific zone names for private endpoint resolution (e.g., privatelink.blob.core.windows.net)"
@@ -113,7 +113,7 @@ rules:
       - "Do not use custom zone names for private endpoints — Azure expects standard privatelink.* names"
       - "Do not create duplicate private DNS zones for the same service in the same resource group"
 
-  - id: DNS-004
+  - id: AZ-DNS-004
     severity: recommended
     description: "Configure public DNS zones with appropriate TTL values and DNSSEC when available"
     rationale: "Low TTL enables faster failover; DNSSEC prevents DNS spoofing for public zones"
@@ -169,7 +169,7 @@ rules:
       - "Do not set TTL to 0 — it disables caching and increases query load"
       - "Do not create wildcard records unless explicitly required"
 
-  - id: DNS-005
+  - id: AZ-DNS-005
     severity: recommended
     description: "Enable diagnostic settings for DNS zone query logging"
     rationale: "Query logs help with troubleshooting resolution issues and detecting anomalous patterns"

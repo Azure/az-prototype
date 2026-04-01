@@ -25,39 +25,39 @@ services:
     type: container-apps
     tier: consumption
     config:
-      ingress: internal          # INT-003
-      identity: user-assigned    # MI-002 — shared identity across services
+      ingress: internal          # AZ-INT-003
+      identity: user-assigned    # AZ-MI-002 — shared identity across services
       min_replicas: 1
       health_probes: true
-      zone_redundant: true       # HA-001
+      zone_redundant: true       # WAF-REL-HA-001
 
   - name: order-service
     type: container-apps
     tier: consumption
     config:
       ingress: internal
-      identity: user-assigned    # MI-002
-      min_replicas: 0            # CA-004
+      identity: user-assigned    # AZ-MI-002
+      min_replicas: 0            # AZ-CA-004
       health_probes: true
-      zone_redundant: true       # HA-001
+      zone_redundant: true       # WAF-REL-HA-001
 
   - name: notification-service
     type: container-apps
     tier: consumption
     config:
       ingress: internal
-      identity: user-assigned    # MI-002
-      min_replicas: 0            # CA-004
+      identity: user-assigned    # AZ-MI-002
+      min_replicas: 0            # AZ-CA-004
       health_probes: true
-      zone_redundant: true       # HA-001
+      zone_redundant: true       # WAF-REL-HA-001
 
   - name: messaging
     type: service-bus
     tier: standard
     config:
       identity: user-assigned
-      private_endpoint: true     # NET-001
-      zone_redundant: true       # HA-001
+      private_endpoint: true     # AZ-NET-001
+      zone_redundant: true       # WAF-REL-HA-001
       queues:
         - name: orders
         - name: notifications
@@ -65,7 +65,7 @@ services:
   - name: shared-identity
     type: managed-identity
     config:
-      type: user-assigned        # MI-002 — shared across resources
+      type: user-assigned        # AZ-MI-002 — shared across resources
 
   - name: secrets
     type: key-vault
@@ -75,7 +75,7 @@ services:
       soft_delete: true
       purge_protection: true
       private_endpoint: true
-      diagnostics: true          # KV-004 — Log Analytics
+      diagnostics: true          # AZ-KV-004 — Log Analytics
 
   - name: registry
     type: container-registry
@@ -96,7 +96,7 @@ services:
   - name: app-insights
     type: application-insights
     config:
-      workspace_based: true      # MS-003 — distributed tracing
+      workspace_based: true      # CC-INT-MS-003 — distributed tracing
 
   - name: monitoring
     type: log-analytics

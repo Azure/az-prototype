@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: HSM-001
+  - id: AZ-HSM-001
     severity: required
     description: "Deploy Managed HSM with multiple administrators, RBAC authorization, and no public access"
     rationale: "HSM protects the highest-value cryptographic keys; multiple admins prevent lockout, RBAC enables fine-grained control"
@@ -173,25 +173,25 @@ rules:
       - "Never combine Crypto Officer and Crypto User roles on the same identity"
       - "Never skip security domain download after initial activation"
 
-  - id: HSM-002
+  - id: AZ-HSM-002
     severity: required
     description: "Enable soft delete with 90-day retention and purge protection"
     rationale: "HSM keys are irrecoverable if permanently deleted; purge protection prevents malicious or accidental permanent deletion"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
 
-  - id: HSM-003
+  - id: AZ-HSM-003
     severity: required
     description: "Download and securely store the security domain immediately after HSM activation"
     rationale: "The security domain is required for disaster recovery; without it, the HSM and its keys are permanently lost"
     applies_to: [cloud-architect, security-reviewer]
 
-  - id: HSM-004
+  - id: AZ-HSM-004
     severity: required
     description: "Separate Crypto Officer and Crypto User roles — enforce dual control"
     rationale: "Dual control prevents any single identity from both creating and using keys, reducing insider threat risk"
     applies_to: [cloud-architect, security-reviewer]
 
-  - id: HSM-005
+  - id: AZ-HSM-005
     severity: recommended
     description: "Enable diagnostic logging for all key operations to Log Analytics"
     rationale: "HSM audit logs provide compliance evidence and anomaly detection for cryptographic operations"

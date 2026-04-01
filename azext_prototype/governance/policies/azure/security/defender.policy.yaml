@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: DEF-001
+  - id: AZ-DEF-001
     severity: required
     description: "Enable Microsoft Defender for Cloud on all resource types used in the deployment"
     rationale: "Defender provides continuous threat detection, vulnerability assessment, and security recommendations"
@@ -158,7 +158,7 @@ rules:
       - "Never skip Defender for Key Vault when Key Vault is deployed"
       - "Never disable Defender for Storage when storage accounts exist"
 
-  - id: DEF-002
+  - id: AZ-DEF-002
     severity: required
     description: "Enable auto-provisioning of security agents and vulnerability assessment"
     rationale: "Auto-provisioning ensures all new resources are automatically protected"
@@ -185,7 +185,7 @@ rules:
         }
       }
 
-  - id: DEF-003
+  - id: AZ-DEF-003
     severity: required
     description: "Configure security contact for alert notifications"
     rationale: "Security alerts must reach the operations team promptly for incident response"
@@ -231,7 +231,7 @@ rules:
       - "Never disable alert notifications for Owner and ServiceAdmin roles"
       - "Never set minimalSeverity to High — Medium ensures broader coverage"
 
-  - id: DEF-004
+  - id: AZ-DEF-004
     severity: recommended
     description: "Enable continuous export of Defender alerts to Log Analytics"
     rationale: "Continuous export enables SIEM integration, custom alerting, and long-term retention beyond Defender"

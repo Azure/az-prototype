@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: LA-001
+  - id: AZ-LA-001
     severity: required
     description: "Deploy Logic Apps Standard with managed identity, VNet integration, and disabled public access"
     rationale: "Logic Apps process business workflows that often handle sensitive data; managed identity eliminates connection credentials"
@@ -152,19 +152,19 @@ rules:
       - "Never disable managed identity — it is required for secure API connections"
       - "Never use shared access signature (SAS) trigger URLs without IP restrictions"
 
-  - id: LA-002
+  - id: AZ-LA-002
     severity: required
     description: "Use managed identity for all API connections instead of connection strings"
     rationale: "Connection strings are shared secrets; managed identity provides per-connection, auditable access"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, app-developer]
 
-  - id: LA-003
+  - id: AZ-LA-003
     severity: recommended
     description: "Configure IP-based access control for triggers, actions, and management endpoints"
     rationale: "IP restrictions limit who can invoke workflows and access run history"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, security-reviewer]
 
-  - id: LA-004
+  - id: AZ-LA-004
     severity: recommended
     description: "Enable diagnostic logging for workflow runs and trigger history"
     rationale: "Workflow logs provide audit trail and troubleshooting data for business process execution"

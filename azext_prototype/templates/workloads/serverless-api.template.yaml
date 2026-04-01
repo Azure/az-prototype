@@ -19,10 +19,10 @@ services:
     tier: consumption
     config:
       runtime: dotnet-isolated
-      identity: system-assigned  # MI-001
-      vnet_integrated: true      # NET-002
-      https_only: true           # AS-001
-      min_tls_version: "1.2"     # AS-002
+      identity: system-assigned  # AZ-MI-001
+      vnet_integrated: true      # AZ-NET-002
+      https_only: true           # AZ-AS-001
+      min_tls_version: "1.2"     # AZ-AS-002
 
   - name: gateway
     type: api-management
@@ -35,13 +35,13 @@ services:
     type: sql-database
     tier: serverless
     config:
-      entra_auth_only: true      # SQL-001
-      tde_enabled: true          # SQL-002
-      threat_protection: true    # SQL-003
-      auto_pause_delay: 60       # SQL-004 — serverless auto-pause
-      geo_replication: false     # SQL-005 — enabled in prod override
-      private_endpoint: true     # NET-001
-      zone_redundant: true       # HA-001
+      entra_auth_only: true      # AZ-SQL-001
+      tde_enabled: true          # AZ-SQL-002
+      threat_protection: true    # AZ-SQL-003
+      auto_pause_delay: 60       # AZ-SQL-004 — serverless auto-pause
+      geo_replication: false     # AZ-SQL-005 — enabled in prod override
+      private_endpoint: true     # AZ-NET-001
+      zone_redundant: true       # WAF-REL-HA-001
 
   - name: secrets
     type: key-vault

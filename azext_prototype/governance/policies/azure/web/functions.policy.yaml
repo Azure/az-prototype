@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: FN-001
+  - id: AZ-FN-001
     severity: required
     description: "Create Azure Functions app with HTTPS-only, TLS 1.2, managed identity, and Key Vault references"
     rationale: "Baseline security configuration prevents cleartext transmission, enables identity-based access, and eliminates secret sprawl"
@@ -147,7 +147,7 @@ rules:
       require_config: [https_only, identity]
       error_message: "Service '{service_name}' ({service_type}) missing {config_key}: true"
 
-  - id: FN-002
+  - id: AZ-FN-002
     severity: required
     description: "C# Azure Functions must use the isolated worker model (not in-process)"
     rationale: "In-process model is deprecated; isolated worker provides better performance, dependency isolation, and long-term support"
@@ -156,25 +156,25 @@ rules:
       - "NEVER use FUNCTIONS_WORKER_RUNTIME=dotnet (in-process) — use FUNCTIONS_WORKER_RUNTIME=dotnet-isolated"
       - "NEVER reference Microsoft.NET.Sdk.Functions — use Microsoft.Azure.Functions.Worker.Sdk"
 
-  - id: FN-003
+  - id: AZ-FN-003
     severity: recommended
     description: "Use Consumption plan for event-driven, variable workloads; Premium for VNet or sustained load"
     rationale: "Consumption plan has cold starts but costs nothing at idle; Premium (EP1+) provides VNet integration"
     applies_to: [cloud-architect, cost-analyst]
 
-  - id: FN-004
+  - id: AZ-FN-004
     severity: recommended
     description: "Enable Application Insights for function monitoring and distributed tracing"
     rationale: "Functions are inherently distributed — observability is critical for debugging"
     applies_to: [cloud-architect, terraform-agent, bicep-agent, monitoring-agent, app-developer]
 
-  - id: FN-005
+  - id: AZ-FN-005
     severity: recommended
     description: "Use durable functions or Service Bus for long-running orchestrations"
     rationale: "Regular functions have a 5-10 minute timeout; durable functions handle complex workflows"
     applies_to: [cloud-architect, app-developer]
 
-  - id: FN-006
+  - id: AZ-FN-006
     severity: recommended
     description: "Use Premium plan (EP1+) or Flex Consumption when VNet integration is required"
     rationale: "WAF Security: Consumption plan does not support VNet integration or private endpoints; Premium/Flex Consumption provides private networking and prewarmed instances to minimize cold starts"
@@ -182,7 +182,7 @@ rules:
     prohibitions:
       - "NEVER use Consumption plan when VNet integration or private endpoints are required"
 
-  - id: FN-007
+  - id: AZ-FN-007
     severity: recommended
     description: "Enable availability zone support for critical function apps"
     rationale: "WAF Reliability: Zone-redundant deployment provides protection against datacenter-level failures through automatic failover across availability zones"
@@ -200,13 +200,13 @@ rules:
       //   }
       // Note: Requires Premium v3 plan or Flex Consumption plan
 
-  - id: FN-008
+  - id: AZ-FN-008
     severity: recommended
     description: "Configure automatic retries for transient errors on function triggers"
     rationale: "WAF Reliability: Automatic retries reduce the likelihood of data loss or interruption from transient failures, improving reliability without custom code"
     applies_to: [cloud-architect, app-developer]
 
-  - id: FN-009
+  - id: AZ-FN-009
     severity: recommended
     description: "Enable diagnostic settings to Log Analytics workspace"
     rationale: "Captures function execution logs, errors, and performance metrics"

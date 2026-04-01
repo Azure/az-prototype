@@ -15,7 +15,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: CACHE-001
+  - id: WAF-PERF-CACHE-001
     severity: required
     description: "Configure Azure Cache for Redis with managed identity authentication, connection multiplexing, and appropriate eviction policy"
     rationale: "Redis is the backbone of distributed caching; misconfigured connections cause connection exhaustion and managed identity eliminates key rotation burden"
@@ -112,7 +112,7 @@ rules:
       - "NEVER create one connection per request — use connection multiplexing (StackExchange.Redis ConnectionMultiplexer or equivalent)"
       - "NEVER store cache entries without TTL — all cache entries must have explicit expiration"
 
-  - id: CACHE-002
+  - id: WAF-PERF-CACHE-002
     severity: required
     description: "Configure Front Door or CDN caching with appropriate TTL, cache key customization, and compression"
     rationale: "Edge caching reduces origin load by 70-90% for static content and improves latency from seconds to milliseconds"
@@ -373,7 +373,7 @@ rules:
       - "NEVER use the same cache TTL for static assets and API responses — static assets should be 30+ days, API responses 1-15 minutes"
       - "NEVER skip compression for text-based content types (HTML, CSS, JS, JSON, SVG)"
 
-  - id: CACHE-003
+  - id: WAF-PERF-CACHE-003
     severity: recommended
     description: "Implement application-level cache-aside pattern with distributed cache and local memory fallback"
     rationale: "Cache-aside reduces database load by 80-95% for read-heavy workloads; layered caching (L1 memory + L2 Redis) minimizes network round-trips"
@@ -452,7 +452,7 @@ rules:
       - "NEVER cache sensitive data (PII, credentials, tokens) in shared/distributed cache without encryption"
       - "NEVER use cache as primary data store — cache is volatile and can be evicted at any time"
 
-  - id: CACHE-004
+  - id: WAF-PERF-CACHE-004
     severity: recommended
     description: "Configure API Management caching policies for frequently accessed API responses"
     rationale: "APIM built-in cache reduces backend load and latency without application code changes; external Redis cache provides persistence"
@@ -527,7 +527,7 @@ rules:
       - "NEVER omit vary-by-header for Accept and Accept-Encoding — different representations must be cached separately"
       - "NEVER cache responses with Set-Cookie or Authorization headers"
 
-  - id: CACHE-005
+  - id: WAF-PERF-CACHE-005
     severity: recommended
     description: "Enable Cosmos DB integrated cache for read-heavy workloads to reduce RU consumption"
     rationale: "Cosmos DB integrated cache provides item and query cache at the gateway level, reducing RU consumption by 50-90% for repeated reads"

@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: MYSQL-001
+  - id: AZ-MYSQL-001
     severity: required
     description: "Deploy MySQL Flexible Server with Microsoft Entra authentication and TLS 1.2 enforcement"
     rationale: "Entra auth eliminates password management; TLS 1.2 prevents protocol downgrade attacks"
@@ -95,7 +95,7 @@ rules:
       - "Do not hardcode administratorLoginPassword in templates — use Key Vault references"
       - "Do not use Burstable tier for production workloads with HA requirements"
 
-  - id: MYSQL-002
+  - id: AZ-MYSQL-002
     severity: required
     description: "Enforce TLS 1.2 via server configuration parameters"
     rationale: "TLS version enforcement must be set at the server parameter level in addition to network config"
@@ -147,7 +147,7 @@ rules:
       - "Do not allow TLS 1.0 or 1.1 — they have known vulnerabilities"
       - "Do not set require_secure_transport to OFF"
 
-  - id: MYSQL-003
+  - id: AZ-MYSQL-003
     severity: required
     description: "Enable audit logging for MySQL Flexible Server"
     rationale: "Audit logs track connection attempts, DDL changes, and DML operations for compliance"
@@ -229,7 +229,7 @@ rules:
     prohibitions:
       - "Do not disable audit logging in production"
 
-  - id: MYSQL-004
+  - id: AZ-MYSQL-004
     severity: recommended
     description: "Enable zone-redundant high availability for production"
     rationale: "Zone-redundant HA provides automatic failover across availability zones"

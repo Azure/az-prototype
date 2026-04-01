@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: VPN-001
+  - id: AZ-VPN-001
     severity: required
     description: "Deploy VPN Gateway with VpnGw2AZ or higher SKU for zone redundancy"
     rationale: "AZ SKUs provide availability zone support; VpnGw1 lacks zone redundancy and has limited bandwidth"
@@ -109,7 +109,7 @@ rules:
       - "Do not use PolicyBased VPN type — RouteBased is required for most scenarios"
       - "Do not deploy single-instance VPN Gateway in production — use active-active"
 
-  - id: VPN-002
+  - id: AZ-VPN-002
     severity: required
     description: "Use IKEv2 with custom IPsec/IKE policy for site-to-site connections"
     rationale: "Default policies use weaker algorithms; custom policies enforce strong encryption"
@@ -187,7 +187,7 @@ rules:
       - "Do not hardcode sharedKey in templates — use Key Vault references or parameters"
       - "Do not use DHGroup1 or DHGroup2 — use DHGroup14 or higher"
 
-  - id: VPN-003
+  - id: AZ-VPN-003
     severity: required
     description: "Deploy GatewaySubnet with /27 or larger prefix for VPN Gateway"
     rationale: "VPN Gateway requires a dedicated GatewaySubnet; /27 allows for future growth and active-active"
@@ -218,7 +218,7 @@ rules:
       - "Do not attach NSG to GatewaySubnet — it is not supported for VPN Gateway"
       - "Do not attach route tables to GatewaySubnet unless specifically required"
 
-  - id: VPN-004
+  - id: AZ-VPN-004
     severity: recommended
     description: "Enable diagnostic settings for VPN Gateway tunnel and route logs"
     rationale: "Tunnel diagnostics are critical for troubleshooting connectivity and monitoring BGP sessions"

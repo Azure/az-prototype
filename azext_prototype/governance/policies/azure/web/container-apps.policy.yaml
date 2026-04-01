@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: CA-001
+  - id: AZ-CA-001
     severity: required
     description: "Create Container Apps Environment with VNet integration and Log Analytics"
     rationale: "Network isolation is mandatory; environment-level logging enables centralized observability"
@@ -61,7 +61,7 @@ rules:
       require_service: [virtual-network]
       error_message: "Template with container-apps must include a virtual-network service for VNet integration"
 
-  - id: CA-002
+  - id: AZ-CA-002
     severity: required
     description: "Create Container App with user-assigned managed identity, health probes, and Key Vault secret references"
     rationale: "User-assigned identity enables shared identity across services; probes ensure reliability; Key Vault refs eliminate secret sprawl"
@@ -233,19 +233,19 @@ rules:
       require_config: [identity]
       error_message: "Service '{service_name}' ({service_type}) missing managed identity configuration"
 
-  - id: CA-003
+  - id: AZ-CA-003
     severity: recommended
     description: "Use consumption plan for dev/test, dedicated for production"
     rationale: "Cost optimization without sacrificing production reliability"
     applies_to: [cloud-architect, cost-analyst]
 
-  - id: CA-004
+  - id: AZ-CA-004
     severity: recommended
     description: "Set min replicas to 0 for non-critical services in dev"
     rationale: "Avoids unnecessary spend during idle periods"
     applies_to: [terraform-agent, bicep-agent, cost-analyst]
 
-  - id: CA-005
+  - id: AZ-CA-005
     severity: recommended
     description: "Enable Container Apps system logs and console logs via environment logging"
     rationale: "Container Apps require explicit log configuration for stdout/stderr capture"

@@ -8,25 +8,25 @@ metadata:
   last_reviewed: "2026-02-01"
 
 rules:
-  - id: DP-001
+  - id: WAF-SEC-DP-001
     severity: required
     description: "Enable encryption at rest for all data services (TDE, SSE, or service-managed keys)"
     rationale: "Encryption at rest is enabled by default on most Azure services; ensure it is not disabled"
     applies_to: [cloud-architect, terraform-agent, bicep-agent, biz-analyst]
 
-  - id: DP-002
+  - id: WAF-SEC-DP-002
     severity: required
     description: "Enforce TLS 1.2+ for all data-in-transit connections"
     rationale: "Older TLS versions have known vulnerabilities"
     applies_to: [cloud-architect, terraform-agent, bicep-agent]
 
-  - id: DP-003
+  - id: WAF-SEC-DP-003
     severity: recommended
     description: "Store application secrets and connection configuration in Azure Key Vault, not in code or environment variables"
     rationale: "Key Vault provides auditing, rotation support, and access control for secrets"
     applies_to: [cloud-architect, app-developer, biz-analyst]
 
-  - id: DP-004
+  - id: WAF-SEC-DP-004
     severity: recommended
     description: "Use Azure Key Vault references in App Service and Container Apps configuration instead of plaintext secrets"
     rationale: "Key Vault references are resolved at runtime, avoiding secret sprawl"

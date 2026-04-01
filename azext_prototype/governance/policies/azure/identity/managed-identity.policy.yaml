@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: MI-001
+  - id: AZ-MI-001
     severity: required
     description: "Create User-Assigned Managed Identity for shared identity across services"
     rationale: "User-assigned identities can be shared across multiple resources and survive resource recreation"
@@ -45,7 +45,7 @@ rules:
       - "NEVER use system-assigned identity as the sole identity for multi-resource architectures — use user-assigned for shared access"
       - "NEVER hardcode principal IDs — always reference the identity resource output"
 
-  - id: MI-002
+  - id: AZ-MI-002
     severity: required
     description: "Use deterministic names for RBAC role assignments using uuidv5"
     rationale: "Role assignment names must be GUIDs; uuidv5 generates deterministic UUIDs from a namespace + name, ensuring idempotent deployments"
@@ -83,13 +83,13 @@ rules:
       - "NEVER use guid() in Terraform — it does not exist; use uuidv5() instead"
       - "NEVER hardcode role assignment GUIDs as literal strings — always generate deterministically with uuidv5"
 
-  - id: MI-003
+  - id: AZ-MI-003
     severity: required
     description: "Always output client_id and principal_id from the identity module"
     rationale: "Downstream resources need both IDs: client_id for SDK configuration, principal_id for RBAC assignments"
     applies_to: [terraform-agent, bicep-agent, cloud-architect]
 
-  - id: MI-004
+  - id: AZ-MI-004
     severity: recommended
     description: "Create one identity per logical application boundary"
     rationale: "Sharing identity across all services simplifies RBAC management while maintaining security boundaries per application"

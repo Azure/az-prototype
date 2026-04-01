@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: DBR-001
+  - id: AZ-DBR-001
     severity: required
     description: "Deploy Databricks workspace with Premium SKU, VNet injection, and public access disabled"
     rationale: "Premium SKU provides RBAC, audit logging, and CMK; VNet injection isolates cluster traffic"
@@ -88,7 +88,7 @@ rules:
       - "Do not set enableNoPublicIp to false — cluster nodes should not have public IPs"
       - "Do not deploy Databricks without VNet injection"
 
-  - id: DBR-002
+  - id: AZ-DBR-002
     severity: required
     description: "Create two dedicated subnets delegated to Databricks with required NSG rules"
     rationale: "Databricks requires separate public and private subnets with specific NSG rules for cluster communication"
@@ -181,7 +181,7 @@ rules:
       - "Do not share Databricks subnets with other resources"
       - "Do not use subnets smaller than /26 — Databricks needs IP space for cluster nodes"
 
-  - id: DBR-003
+  - id: AZ-DBR-003
     severity: recommended
     description: "Create private endpoints for workspace UI/API and browser authentication"
     rationale: "Private endpoints ensure all workspace access stays on the private network"
@@ -276,7 +276,7 @@ rules:
     prohibitions:
       - "Do not skip the browser_authentication private endpoint — web UI access requires it"
 
-  - id: DBR-004
+  - id: AZ-DBR-004
     severity: recommended
     description: "Enable diagnostic settings for Databricks workspace"
     rationale: "Track workspace access, job runs, cluster events, and notebook executions"

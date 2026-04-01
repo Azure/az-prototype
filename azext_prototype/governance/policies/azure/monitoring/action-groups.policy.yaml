@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: AG-001
+  - id: AZ-AG-001
     severity: required
     description: "Create action groups with email and webhook notification channels for critical alerts"
     rationale: "Without action groups, alerts fire but nobody is notified — incidents go undetected"
@@ -92,7 +92,7 @@ rules:
       - "Do not use personal email addresses — use distribution lists or shared mailboxes"
       - "Do not disable action groups without documenting the reason"
 
-  - id: AG-002
+  - id: AZ-AG-002
     severity: required
     description: "Use Common Alert Schema for all receivers"
     rationale: "Common Alert Schema provides a standardized payload format across all alert types for consistent processing"
@@ -107,7 +107,7 @@ rules:
     prohibitions:
       - "Do not set useCommonAlertSchema to false — non-standard payloads require custom parsing per alert type"
 
-  - id: AG-003
+  - id: AZ-AG-003
     severity: required
     description: "Create metric alerts for critical resource health indicators"
     rationale: "Proactive alerting on CPU, memory, response time, and error rate prevents outages from going undetected"
@@ -186,7 +186,7 @@ rules:
       - "Do not create alerts without action groups — unnotified alerts are useless"
       - "Do not set severity to 4 (Verbose) for critical metrics — use 0 (Critical) or 1 (Error)"
 
-  - id: AG-004
+  - id: AZ-AG-004
     severity: recommended
     description: "Create activity log alerts for subscription-level administrative events"
     rationale: "Track resource deletions, role assignments, and policy changes at the subscription level"

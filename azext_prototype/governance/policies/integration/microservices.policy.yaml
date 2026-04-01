@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: MS-001
+  - id: CC-INT-MS-001
     severity: required
     description: "Authenticate service-to-service calls via managed identity and RBAC — never shared keys or hardcoded tokens"
     rationale: "Managed identity eliminates credential management between microservices; RBAC provides auditable access control"
@@ -221,7 +221,7 @@ rules:
       require_config: [identity]
       error_message: "Service '{service_name}' ({service_type}) missing managed identity for service-to-service authentication"
 
-  - id: MS-002
+  - id: CC-INT-MS-002
     severity: recommended
     description: "Enable Dapr sidecar for service invocation, pub/sub, and state management in Container Apps"
     rationale: "Dapr provides service discovery, mTLS, pub/sub abstraction, and state management without application-level implementation"
@@ -438,7 +438,7 @@ rules:
       - "NEVER set appPort incorrectly — Dapr cannot route to the application if the port is wrong"
       - "NEVER use Dapr secrets component to store secrets — use Key Vault references in Container Apps secrets array"
 
-  - id: MS-003
+  - id: CC-INT-MS-003
     severity: required
     description: "Configure distributed tracing with Application Insights and OpenTelemetry for all microservices"
     rationale: "Distributed tracing correlates requests across microservices; without it, debugging cross-service failures is impossible"
@@ -673,7 +673,7 @@ rules:
       severity: warning
       error_message: "Microservices template must include Application Insights for distributed tracing"
 
-  - id: MS-004
+  - id: CC-INT-MS-004
     severity: required
     description: "Configure health checks (liveness and readiness probes) on all Container Apps and App Service instances"
     rationale: "Health probes enable automatic restart of unhealthy instances and prevent traffic routing to unready services"
@@ -858,7 +858,7 @@ rules:
       - "NEVER set failureThreshold to 1 on liveness probes — a single failure will immediately restart the container"
       - "NEVER skip startup probes on slow-starting containers — liveness probes will kill them before they are ready"
 
-  - id: MS-005
+  - id: CC-INT-MS-005
     severity: recommended
     description: "Configure circuit breaker and retry patterns using Dapr resiliency policies"
     rationale: "Circuit breakers prevent cascade failures; retries with backoff handle transient errors gracefully"

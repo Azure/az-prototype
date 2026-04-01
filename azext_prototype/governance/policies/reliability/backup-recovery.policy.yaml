@@ -21,7 +21,7 @@ rules:
   # ------------------------------------------------------------------ #
   # BR-001: Automated backup for all data services (WAF RE-03)
   # ------------------------------------------------------------------ #
-  - id: BR-001
+  - id: WAF-REL-BKP-001
     severity: required
     description: >-
       Configure automated backup for ALL data services.  Every database,
@@ -270,7 +270,7 @@ rules:
   # ------------------------------------------------------------------ #
   # BR-002: Recovery Services vault configuration (WAF RE-03)
   # ------------------------------------------------------------------ #
-  - id: BR-002
+  - id: WAF-REL-BKP-002
     severity: required
     description: >-
       Deploy a Recovery Services vault for VM backups with geo-redundant
@@ -501,7 +501,7 @@ rules:
   # ------------------------------------------------------------------ #
   # BR-003: Point-in-time restore for databases (WAF RE-03)
   # ------------------------------------------------------------------ #
-  - id: BR-003
+  - id: WAF-REL-BKP-003
     severity: required
     description: >-
       Configure point-in-time restore (PITR) for all production databases.
@@ -620,7 +620,7 @@ rules:
   # ------------------------------------------------------------------ #
   # BR-004: Geo-redundant backup (WAF RE-03)
   # ------------------------------------------------------------------ #
-  - id: BR-004
+  - id: WAF-REL-BKP-004
     severity: required
     description: >-
       Configure geo-redundant backup storage for all production data
@@ -753,7 +753,7 @@ rules:
   # ------------------------------------------------------------------ #
   # BR-005: Backup testing and validation (WAF RE-03, RE-04)
   # ------------------------------------------------------------------ #
-  - id: BR-005
+  - id: WAF-REL-BKP-005
     severity: recommended
     description: >-
       Implement backup verification and restore testing automation.

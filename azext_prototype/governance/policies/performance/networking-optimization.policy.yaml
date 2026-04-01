@@ -18,7 +18,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: NETPERF-001
+  - id: WAF-PERF-NET-001
     severity: required
     description: "Serve static content through CDN or Front Door — configure origin groups, caching, and compression for optimal delivery"
     rationale: "Serving static content from origin adds 50-200ms latency per request; CDN/Front Door reduces this to <10ms from edge POPs globally"
@@ -287,7 +287,7 @@ rules:
       - "NEVER set health probe interval > 60 seconds for production origins — slow detection delays failover"
       - "NEVER expose App Service directly to the internet when using Front Door — restrict access via Front Door ID header"
 
-  - id: NETPERF-002
+  - id: WAF-PERF-NET-002
     severity: recommended
     description: "Configure connection keep-alive and HTTP/2 for App Service and API Management to reduce connection overhead"
     rationale: "Each new TCP+TLS connection adds 50-150ms overhead; keep-alive reuses connections and HTTP/2 multiplexes requests on a single connection"
@@ -355,7 +355,7 @@ rules:
       - "NEVER set backend timeout > 120 seconds in APIM — long timeouts cause cascading failures"
       - "NEVER enable WebSockets unless the application requires bidirectional communication — it consumes persistent connections"
 
-  - id: NETPERF-003
+  - id: WAF-PERF-NET-003
     severity: recommended
     description: "Configure multi-region deployment with Traffic Manager or Front Door for latency-sensitive production workloads"
     rationale: "Single-region deployment adds 50-300ms latency for users in distant regions; multi-region deployment ensures <50ms latency globally"
@@ -474,7 +474,7 @@ rules:
       - "NEVER deploy multi-region without data replication strategy — compute failover without data failover is incomplete"
       - "NEVER skip health probes on Traffic Manager endpoints — unhealthy origins must be removed from rotation"
 
-  - id: NETPERF-004
+  - id: WAF-PERF-NET-004
     severity: recommended
     description: "Enable accelerated networking for production VMs and VMSS to reduce latency and increase throughput"
     rationale: "Accelerated networking bypasses the host virtual switch, reducing latency by 50% and increasing throughput by 2-5x. Available on D/E/F/M-series VMs"
@@ -610,7 +610,7 @@ rules:
       - "NEVER enable accelerated networking on B-series (burstable) VMs — they do not support it"
       - "NEVER enable accelerated networking on VMs with fewer than 2 vCPUs — minimum 2 vCPU required"
 
-  - id: NETPERF-005
+  - id: WAF-PERF-NET-005
     severity: recommended
     description: "Select ExpressRoute over VPN Gateway for production workloads requiring predictable latency, high throughput, or private network connectivity"
     rationale: "VPN Gateway traffic traverses the public internet with variable latency; ExpressRoute provides dedicated private connectivity with guaranteed bandwidth and SLA"

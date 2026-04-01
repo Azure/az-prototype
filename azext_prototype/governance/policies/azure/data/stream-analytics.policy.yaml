@@ -7,7 +7,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: ASA-001
+  - id: AZ-ASA-001
     severity: required
     description: "Deploy Stream Analytics job with Standard SKU, managed identity, and secure networking"
     rationale: "Managed identity eliminates connection strings; Standard SKU supports production workloads"
@@ -80,7 +80,7 @@ rules:
       - "Do not set outputErrorPolicy to Drop in production — errors should halt processing for investigation"
       - "Do not use compatibility level below 1.2"
 
-  - id: ASA-002
+  - id: AZ-ASA-002
     severity: required
     description: "Use managed identity for all input and output connections"
     rationale: "Connection strings with keys are insecure and hard to rotate; managed identity is zero-credential"
@@ -140,7 +140,7 @@ rules:
       - "Do not use ConnectionString authentication mode — use Msi"
       - "Do not store Event Hub or Service Bus connection strings in job configuration"
 
-  - id: ASA-003
+  - id: AZ-ASA-003
     severity: recommended
     description: "Deploy Stream Analytics in a dedicated cluster for VNet isolation"
     rationale: "Dedicated clusters support private endpoints and VNet integration for network isolation"
@@ -174,7 +174,7 @@ rules:
     prohibitions:
       - "Do not set capacity below 36 SUs — minimum for dedicated cluster"
 
-  - id: ASA-004
+  - id: AZ-ASA-004
     severity: recommended
     description: "Enable diagnostic settings for Stream Analytics job metrics and logs"
     rationale: "Monitor watermark delay, input/output events, and runtime errors"

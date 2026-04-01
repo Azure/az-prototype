@@ -8,7 +8,7 @@ metadata:
   last_reviewed: "2026-03-27"
 
 rules:
-  - id: FAB-001
+  - id: AZ-FAB-001
     severity: required
     description: "Deploy Microsoft Fabric capacity with managed identity and appropriate SKU sizing"
     rationale: "Fabric capacity is the compute foundation; proper sizing prevents over-provisioning and cost overruns"
@@ -59,25 +59,25 @@ rules:
       - "Never skip Fabric tenant settings configuration — data exfiltration and sharing controls are tenant-level"
       - "Never hardcode admin UPNs — use variables for environment-specific configuration"
 
-  - id: FAB-002
+  - id: AZ-FAB-002
     severity: required
     description: "Configure Fabric tenant settings for data exfiltration prevention and guest access control"
     rationale: "Tenant settings control data sharing, export, and external collaboration — misconfiguration leads to data leakage"
     applies_to: [cloud-architect, security-reviewer]
 
-  - id: FAB-003
+  - id: AZ-FAB-003
     severity: required
     description: "Enable Fabric audit logging and route to Log Analytics"
     rationale: "Audit logs track data access, sharing, and workspace changes for compliance and security monitoring"
     applies_to: [cloud-architect, security-reviewer, monitoring-agent]
 
-  - id: FAB-004
+  - id: AZ-FAB-004
     severity: recommended
     description: "Configure auto-pause and auto-resume for cost optimization"
     rationale: "Fabric capacities incur cost even when idle; auto-pause reduces spend during off-hours"
     applies_to: [terraform-agent, bicep-agent, cloud-architect, cost-analyst]
 
-  - id: FAB-005
+  - id: AZ-FAB-005
     severity: recommended
     description: "Use managed private endpoints for secure data source connectivity"
     rationale: "Managed private endpoints eliminate public exposure of on-premises and Azure data sources"
