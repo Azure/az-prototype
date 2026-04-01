@@ -151,8 +151,8 @@ def generate_anti_patterns_page() -> str:
     return "\n".join(lines)
 
 
-def generate_standards_page() -> str:
-    """Generate the standards wiki page grouped by directory hierarchy."""
+def generate_standards_index() -> str:
+    """Generate the standards index page linking to subpages."""
     lines = ["# Design Standards", ""]
     lines.append(
         "Design standards are injected into agent system messages to guide code quality. "
@@ -171,32 +171,50 @@ def generate_standards_page() -> str:
     lines.append(f"**{len(yaml_files)} documents, {total} principles**\n")
     lines.append("---\n")
 
-    # Group by directory hierarchy
     sections = {
-        "Application": std_dir / "application",
-        "IaC": std_dir / "iac",
-        "Principles": std_dir / "principles",
+        "Application": ("application", "Application code patterns (Python, .NET)"),
+        "IaC": ("iac", "Infrastructure-as-Code patterns (Bicep, Terraform)"),
+        "Principles": ("principles", "Universal design and coding principles"),
     }
 
-    for section_name, section_dir in sections.items():
+    for section_name, (subdir, desc) in sections.items():
+        section_dir = std_dir / subdir
         if not section_dir.is_dir():
             continue
+        file_count = len(list(section_dir.glob("*.yaml")))
+        principle_count = 0
+        for yf in section_dir.glob("*.yaml"):
+            data = load_yaml(yf)
+            principle_count += len(data.get("principles", data.get("standards", [])))
+        lines.append(
+            f"- [[Governance Standards {section_name}]] "
+            f"-- {desc} ({file_count} documents, {principle_count} principles)"
+        )
 
-        lines.append(f"## {section_name}\n")
+    lines.append("")
+    return "\n".join(lines)
 
-        # Check for subdirectories (e.g., iac/bicep, iac/terraform)
-        subdirs = sorted([d for d in section_dir.iterdir() if d.is_dir() and not d.name.startswith("_")])
-        if subdirs:
-            for subdir in subdirs:
-                subdir_files = sorted(subdir.glob("*.yaml"))
-                if subdir_files:
-                    lines.append(f"### {subdir.name.replace('-', ' ').replace('_', ' ').title()}\n")
-                    for yf in subdir_files:
-                        _render_standard_file(yf, lines)
-        else:
-            # Direct YAML files in this section
-            for yf in sorted(section_dir.glob("*.yaml")):
-                _render_standard_file(yf, lines)
+
+def generate_standards_subpage(title: str, section_dir: Path) -> str:
+    """Generate a standards subpage for a single category directory."""
+    lines = [f"# {title}", ""]
+
+    yaml_files = sorted(section_dir.glob("*.yaml"))
+    if not yaml_files:
+        lines.append("No standards files found in this category.")
+        return "\n".join(lines)
+
+    total = 0
+    for yf in yaml_files:
+        data = load_yaml(yf)
+        principles = data.get("principles", data.get("standards", []))
+        total += len(principles)
+
+    lines.append(f"**{len(yaml_files)} documents, {total} principles**\n")
+    lines.append("---\n")
+
+    for yf in yaml_files:
+        _render_standard_file(yf, lines)
 
     return "\n".join(lines)
 
@@ -275,13 +293,33 @@ def main():
     out_path.write_text(content, encoding="utf-8")
     print(f"  {out_path.name}")
 
-    # Standards page
-    content = generate_standards_page()
+    # Standards subpages
+    std_dir = GOVERNANCE_DIR / "standards"
+    standards_categories = {
+        "application": "Application Standards",
+        "iac": "Infrastructure-as-Code Standards",
+        "principles": "Design & Coding Principles",
+    }
+    standards_page_count = 0
+
+    for subdir, title in standards_categories.items():
+        cat_path = std_dir / subdir
+        if cat_path.exists():
+            content = generate_standards_subpage(title, cat_path)
+            out_path = WIKI_DIR / f"Governance-Standards-{subdir.title()}.md"
+            out_path.write_text(content, encoding="utf-8")
+            print(f"  {out_path.name}")
+            standards_page_count += 1
+
+    # Standards index page
+    content = generate_standards_index()
     out_path = WIKI_DIR / "Governance-Standards.md"
     out_path.write_text(content, encoding="utf-8")
     print(f"  {out_path.name}")
+    standards_page_count += 1
 
-    print(f"\nGenerated {len(azure_categories) + len(other_categories) + 2} wiki pages.")
+    total_pages = len(azure_categories) + len(other_categories) + 2 + standards_page_count
+    print(f"\nGenerated {total_pages} wiki pages.")
 
 
 if __name__ == "__main__":
