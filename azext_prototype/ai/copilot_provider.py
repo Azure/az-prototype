@@ -30,6 +30,16 @@ from azext_prototype.ai.copilot_auth import (
 )
 from azext_prototype.ai.provider import AIMessage, AIProvider, AIResponse, ToolCall
 
+
+class CopilotTimeoutError(CLIError):
+    """Raised when the Copilot API request times out.
+
+    Extends ``CLIError`` so it propagates cleanly through the Azure CLI
+    error handling, but can be caught specifically by retry logic in the
+    build session.
+    """
+
+
 logger = logging.getLogger(__name__)
 
 # Copilot API base URL.  The enterprise endpoint exposes the
@@ -189,11 +199,7 @@ class CopilotProvider(AIProvider):
         except requests.Timeout:
             elapsed = _time.perf_counter() - _t0
             _dbg("CopilotProvider.chat", "TIMEOUT", elapsed_s=f"{elapsed:.1f}", timeout=self._timeout)
-            raise CLIError(
-                f"Copilot API timed out after {self._timeout}s.\n"
-                "For very large prompts, increase the timeout:\n"
-                "  set COPILOT_TIMEOUT=600"
-            )
+            raise CopilotTimeoutError(f"Copilot API timed out after {self._timeout}s.")
         except requests.RequestException as exc:
             raise CLIError(f"Failed to reach Copilot API: {exc}") from exc
 
@@ -319,7 +325,7 @@ class CopilotProvider(AIProvider):
             )
             resp.raise_for_status()
         except requests.Timeout:
-            raise CLIError(f"Copilot streaming timed out after {self._timeout}s.")
+            raise CopilotTimeoutError(f"Copilot streaming timed out after {self._timeout}s.")
         except requests.RequestException as exc:
             raise CLIError(f"Copilot streaming request failed: {exc}") from exc
 

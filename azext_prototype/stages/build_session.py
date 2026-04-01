@@ -446,17 +446,21 @@ class BuildSession:
 
         # ---- Phase 3: Staged generation ----
         if skip_generation:
-            pending = []
+            stages_to_process: list[dict] = []
             total_stages = len(self._build_state._state["deployment_stages"])
             generated_count = total_stages
         else:
+            # Stages needing work: pending + generating (interrupted) + validating (user fixes)
             pending = self._build_state.get_pending_stages()
+            validating = self._build_state.get_validating_stages()
+            stages_to_process = validating + pending  # validating first, then pending
             total_stages = len(self._build_state._state["deployment_stages"])
         generated_count = len(self._build_state.get_generated_stages())
 
         from azext_prototype.debug_log import log_flow as _dbg_flow
 
-        for stage in pending:
+        build_stopped = False
+        for stage in stages_to_process:
             stage_num = stage["stage"]
             stage_name = stage["name"]
             category = stage.get("category", "infra")
@@ -467,11 +471,37 @@ class BuildSession:
             if len(svc_names) > 3:
                 svc_display += f" (+{len(svc_names) - 3} more)"
 
+            stage_status = stage.get("status", "pending")
             generated_count += 1
             task_id = f"build-stage-{stage_num}"
             if self._update_task_fn:
                 self._update_task_fn(task_id, "in_progress")
-            _print(f"[{generated_count}/{total_stages}] Stage {stage_num}: {stage_name}")
+
+            # Handle re-entry: "validating" stages need QA re-run only
+            if stage_status == "validating":
+                _print(f"[{generated_count}/{total_stages}] Stage {stage_num}: {stage_name} (re-validating)")
+                if category in ("infra", "data", "integration", "app"):
+                    qa_passed = self._run_stage_qa(stage, architecture, templates, use_styled, _print)
+                    if qa_passed:
+                        self._build_state.mark_stage_generated(stage_num, stage.get("files", []), "user-fix")
+                        self._build_state.cascade_downstream_pending(stage_num)
+                        if self._update_task_fn:
+                            self._update_task_fn(task_id, "completed")
+                        _print("")
+                        continue
+                    else:
+                        build_stopped = True
+                        _print("")
+                        break  # Stop build — stage still needs fixes
+                continue
+
+            # Handle re-entry: "generating" stages need artifact cleanup + fresh generation
+            if stage_status == "generating":
+                _print(f"[{generated_count}/{total_stages}] Stage {stage_num}: {stage_name} (regenerating)")
+                self._build_state.clean_stage_artifacts(stage_num, self._context.project_dir)
+            else:
+                _print(f"[{generated_count}/{total_stages}] Stage {stage_num}: {stage_name}")
+
             if svc_display:
                 _print(f"       Resources: {svc_display}")
 
@@ -497,9 +527,14 @@ class BuildSession:
                     task_full=task,
                 )
 
+                self._build_state.mark_stage_generating(stage_num)
                 try:
                     with self._maybe_spinner(f"Building Stage {stage_num}: {stage_name}...", use_styled):
-                        response = self._execute_with_continuation(agent, task)
+                        response = self._execute_with_retry(agent, task, stage_num, stage_name, _print)
+                    if response is None:
+                        # All retry attempts exhausted — stop build
+                        build_stopped = True
+                        break
                 except Exception as exc:
                     _print(f"       Agent error in Stage {stage_num} — routing to QA for diagnosis...")
                     svc_names_list = [s.get("name", "") for s in services if s.get("name")]
@@ -582,9 +617,8 @@ class BuildSession:
                 paths=written_paths[:5],
             )
 
-            self._build_state.mark_stage_generated(stage_num, written_paths, agent.name)
-            if self._update_task_fn:
-                self._update_task_fn(task_id, "completed")
+            # Files written — mark as validating (ready for QA)
+            self._build_state.mark_stage_validating(stage_num, written_paths)
 
             if written_paths:
                 if use_styled:
@@ -612,7 +646,12 @@ class BuildSession:
 
                     try:
                         with self._maybe_spinner(f"Re-building Stage {stage_num}...", use_styled):
-                            response = self._execute_with_continuation(agent, task + fix_instructions)
+                            response = self._execute_with_retry(
+                                agent, task + fix_instructions, stage_num, stage_name, _print
+                            )
+                        if response is None:
+                            build_stopped = True
+                            break
                     except Exception as exc:
                         svc_names_list = [s.get("name", "") for s in services if s.get("name")]
                         route_error_to_qa(
@@ -633,18 +672,30 @@ class BuildSession:
                         self._token_tracker.record(response)
                     content = response.content if response else ""
                     written_paths = self._write_stage_files(stage, content)
-                    self._build_state.mark_stage_generated(stage_num, written_paths, agent.name)
+                    self._build_state.mark_stage_validating(stage_num, written_paths)
 
             # Per-stage QA validation
+            qa_passed = True
             if category in ("infra", "data", "integration", "app"):
-                self._run_stage_qa(stage, architecture, templates, use_styled, _print)
+                qa_passed = self._run_stage_qa(stage, architecture, templates, use_styled, _print)
+
+            if qa_passed:
+                self._build_state.mark_stage_generated(stage_num, written_paths, agent.name)
+                if self._update_task_fn:
+                    self._update_task_fn(task_id, "completed")
+            else:
+                # QA failed after max attempts — stop build
+                build_stopped = True
+                if use_styled:
+                    self._console.print_token_status(self._token_tracker.format_status())
+                break
 
             if use_styled:
                 self._console.print_token_status(self._token_tracker.format_status())
             _print("")
 
         # ---- Phase 4: Advisory QA review ----
-        if not skip_generation and scope == "all" and self._qa_agent:
+        if not skip_generation and not build_stopped and scope == "all" and self._qa_agent:
             _print("Running advisory review...")
 
             file_content = self._collect_generated_file_content()
@@ -2635,10 +2686,14 @@ class BuildSession:
         templates: list,
         use_styled: bool,
         _print: Callable,
-    ) -> None:
-        """Run QA review + remediation loop for a single generated stage."""
+    ) -> bool:
+        """Run QA review + remediation loop for a single generated stage.
+
+        Returns ``True`` if the stage passed QA, ``False`` if it failed
+        after all remediation attempts.
+        """
         if not self._qa_agent:
-            return
+            return True  # No QA agent = assume pass
 
         from azext_prototype.debug_log import log_flow as _dbg
 
@@ -2653,7 +2708,7 @@ class BuildSession:
             # 1. Collect this stage's files
             file_content = self._collect_stage_file_content(stage)
             if not file_content:
-                return
+                return True  # No files to validate = pass
 
             # 2. Build QA task
             qa_task = self._build_qa_task(stage_num, stage["name"], attempt, file_content, qa_context)
@@ -2685,23 +2740,27 @@ class BuildSession:
 
             if not has_issues:
                 _print(f"       Stage {stage_num} passed QA.")
-                return
+                return True
 
-            # 5. If at max attempts, report and move on
+            # 5. If at max attempts, report issues concisely and fail
             if attempt >= _MAX_STAGE_REMEDIATION_ATTEMPTS:
-                _print(f"       Stage {stage_num}: QA issues remain after {attempt} remediation(s). Proceeding.")
+                _print(f"       Stage {stage_num}: QA issues remain after {attempt} remediation(s).")
+                _print("       Fix the issues below and re-run `az prototype build`.\n")
+                # Extract just the issue summaries, NOT full file contents
                 if qa_content:
-                    _print(f"\n       Remaining — Stage {stage_num} {stage['name']} — Remaining Issues Report:\n")
-                    _print(qa_content)
-                    _print("")
-                return
+                    for line in qa_content.splitlines():
+                        stripped = line.strip()
+                        if stripped.startswith(("CRITICAL", "WARNING", "**CRITICAL", "**WARNING", "- [", "| ")):
+                            _print(f"       {stripped}")
+                _print("")
+                return False
 
             # 6. Remediate — re-invoke IaC agent with focused context + governance + knowledge
             _print(f"       Stage {stage_num}: QA found issues — remediating (attempt {attempt + 1})...")
 
             agent = self._select_agent(stage)
             if not agent:
-                return
+                return False  # Can't remediate without an agent
 
             # Use condensed stage context (cached from one-time condensation)
             cached_contexts = self._build_state._state.get("stage_contexts", {})
@@ -2740,6 +2799,8 @@ class BuildSession:
             written_paths = self._write_stage_files(stage, content)
             self._build_state.mark_stage_generated(stage_num, written_paths, agent.name)
 
+        return True  # All remediation attempts completed without hitting max
+
     def _collect_generated_file_content(self) -> str:
         """Collect complete content of all generated files for QA review."""
         project_root = Path(self._context.project_dir)
@@ -2767,6 +2828,45 @@ class BuildSession:
                 parts.append(block)
 
         return "\n\n".join(parts)
+
+    # ------------------------------------------------------------------ #
+    # Timeout retry with backoff
+    # ------------------------------------------------------------------ #
+
+    _TIMEOUT_BACKOFFS = [15, 30, 60, 120]  # seconds between retries (4 retries + 1 initial = 5 attempts)
+
+    def _execute_with_retry(
+        self,
+        agent: Any,
+        task: str,
+        stage_num: int,
+        stage_name: str,
+        _print: Callable,
+    ) -> Any | None:
+        """Execute agent with timeout retry and exponential backoff.
+
+        Returns the AI response on success, or ``None`` if all retry
+        attempts are exhausted.  Communicates retry status to the user
+        via ``_print`` (routed to the TUI).
+        """
+        from azext_prototype.ai.copilot_provider import CopilotTimeoutError
+
+        for attempt in range(len(self._TIMEOUT_BACKOFFS) + 1):
+            try:
+                return self._execute_with_continuation(agent, task)
+            except CopilotTimeoutError:
+                if attempt < len(self._TIMEOUT_BACKOFFS):
+                    wait = self._TIMEOUT_BACKOFFS[attempt]
+                    _print(f"       API timed out. Retrying in {wait}s... " f"(attempt {attempt + 2}/5)")
+                    import time as _time
+
+                    _time.sleep(wait)
+                else:
+                    _print(
+                        f"       API timed out after 5 attempts. "
+                        f"Stage {stage_num} ({stage_name}) will be retried on next build run."
+                    )
+                    return None
 
     # ------------------------------------------------------------------ #
     # Truncation recovery

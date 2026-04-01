@@ -3,8 +3,40 @@
 Release History
 ===============
 
-0.2.1b6 _(Under active development)_
-++++++++++++++++++++++++++++++++++++   
+0.2.1b6
++++++++
+
+Build resilience
+~~~~~~~~~~~~~~~~~
+* **Timeout retry with exponential backoff** -- Copilot API timeouts
+  now trigger up to 5 retry attempts with escalating wait periods
+  (15s, 30s, 60s, 120s).  Retry status is communicated to the user
+  via the TUI.  The stale "set COPILOT_TIMEOUT=600" error message
+  has been replaced with a clean timeout notification.
+* **Stage completion gating** -- stages are only marked ``"generated"``
+  after passing QA.  New intermediate sub-states:
+
+  - ``"generating"`` -- AI agent is producing files.  If interrupted
+    (timeout, crash), re-entry deletes artifacts and regenerates.
+  - ``"validating"`` -- files on disk, awaiting QA.  If QA fails after
+    max remediation attempts, build stops.  User fixes files manually,
+    re-runs build, and QA re-validates without regenerating.
+  - ``"generated"`` -- QA passed.  Terminal success state.
+
+* **Downstream cascade on re-validation** -- when a ``"validating"``
+  stage passes QA on re-run (user fixed it), all downstream
+  ``"generated"`` stages are reset to ``"pending"`` so they regenerate
+  with updated upstream outputs.
+* **QA failure output cleanup** -- when QA fails and stops the build,
+  only issue descriptions and fix instructions are shown.  Full file
+  contents are no longer printed to the console.
+* **Application code stages** -- Phase 1 prompt now instructs the
+  architect to create ``category: "app"`` stages for source code,
+  with explicit dependency chain documentation ensuring app stages
+  come after all infrastructure stages.
+* **``CopilotTimeoutError``** -- new exception class (extends
+  ``CLIError``) enables retry logic to catch timeouts specifically
+  without catching other API errors.
 
 Benchmark suite
 ~~~~~~~~~~~~~~~~
