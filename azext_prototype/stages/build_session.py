@@ -530,7 +530,9 @@ class BuildSession:
             )
 
             # Debug: scan response for anti-pattern violations before policy resolver
-            if content:
+            # Skip scanning for documentation stages — docs describe the architecture
+            # (including SQL auth, public access, etc.) and will trigger false positives.
+            if content and category != "docs":
                 try:
                     from azext_prototype.governance.anti_patterns import (
                         scan as _ap_scan,
@@ -1847,6 +1849,11 @@ class BuildSession:
                 output_keys = self._extract_output_keys(ps, project_dir)
                 if output_keys:
                     prev_context += f"  Available outputs: {', '.join(output_keys)}\n"
+            prev_context += (
+                "\nCRITICAL: Only add terraform_remote_state blocks for stages listed above.\n"
+                "Do NOT reference any stage not listed in this section. If a stage is not\n"
+                "listed as an upstream dependency, do NOT create a remote state data source for it.\n"
+            )
 
         naming_instructions = self._naming.to_prompt_instructions()
         stage_dir = stage.get("dir", "concept")

@@ -223,6 +223,10 @@ MANDATORY: Use `data "terraform_remote_state"` for ALL upstream references.
 Do NOT define input variables for values that come from prior stages.
 Accept ONLY the state FILE PATH as a variable.
 
+CRITICAL: Only reference stages explicitly listed as upstream dependencies
+in the architecture context. Do NOT proactively add references to networking
+or other stages unless they are listed as dependencies for THIS stage.
+
 When you have a resource ID from `terraform_remote_state`, use it directly as
 `parent_id`. Do NOT create a `data "azapi_resource"` lookup just to validate it.
 
@@ -368,8 +372,9 @@ Do NOT use `ARM_SUBSCRIPTION_ID` or `AZURE_SUBSCRIPTION_ID`.
 
 deploy.sh AUTO-APPROVE PATTERN:
 ```bash
-[[ "${AUTO_APPROVE}" == "true" ]] && APPROVE_FLAG="--auto-approve" || APPROVE_FLAG=""
+[[ "${AUTO_APPROVE}" == "true" ]] && APPROVE_FLAG="-auto-approve" || APPROVE_FLAG=""
 ```
+NOTE: Terraform uses SINGLE dash `-auto-approve` (NOT `--auto-approve`).
 Do NOT use `${VAR:+flag}` expansion for boolean flags.
 
 deploy.sh CONTROL FLOW:

@@ -138,7 +138,7 @@ def resolve_resource_metadata(
             continue
         rt_lower = rt.lower()
 
-        # 1. Service registry lookup
+        # 1. Service registry lookup (exact match)
         service_key = index.get(rt_lower)
         if service_key and service_key in data:
             entry = data[service_key]
@@ -151,6 +151,26 @@ def resolve_resource_metadata(
                     properties_url=_build_learn_url(rt, api_ver),
                 )
                 continue
+
+        # 1b. Child resource lookup — check if a parent service has this sub-resource
+        rt_parts = rt_lower.split("/")
+        if len(rt_parts) >= 3:
+            # Try to find a parent (e.g., Microsoft.Storage/storageAccounts)
+            parent_rt = "/".join(rt_parts[:2])
+            parent_key = index.get(parent_rt)
+            if parent_key and parent_key in data:
+                child_suffix = "/".join(rt_parts[2:])
+                children = data[parent_key].get("child_resources", {})
+                if child_suffix in children:
+                    api_ver = children[child_suffix].get("bicep_api_version", "")
+                    if api_ver:
+                        result[rt] = ResourceMetadata(
+                            resource_type=rt,
+                            api_version=api_ver,
+                            source="service-registry-child",
+                            properties_url=_build_learn_url(rt, api_ver),
+                        )
+                        continue
 
         # 2. Microsoft Learn fetch
         meta = _fetch_from_learn(rt, search_cache)

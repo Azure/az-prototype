@@ -111,6 +111,9 @@ services:
       dotnet: [Azure.Storage.Blobs, Azure.Identity]
       python: [azure-storage-blob, azure-identity]
       nodejs: ["@azure/storage-blob", "@azure/identity"]
+    child_resources:
+      blobServices/containers:
+        bicep_api_version: "2023-05-01"
     special_considerations:
       - Consider access tier (Hot, Cool, Archive) based on access patterns
       - Lifecycle management policies for cost optimization
