@@ -752,9 +752,7 @@ class BuildSession:
                             all_services.add(svc["name"])
                 if all_services and all_advisory_text:
                     for svc in all_services:
-                        finding = build_finding_from_qa(
-                            all_advisory_text, service=svc, source="Build advisory review"
-                        )
+                        finding = build_finding_from_qa(all_advisory_text, service=svc, source="Build advisory review")
                         submit_if_gap(finding, loader, print_fn=_print)
             except Exception:
                 pass

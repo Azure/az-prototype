@@ -222,9 +222,7 @@ class CopilotProvider(AIProvider):
             raise CLIError(f"Failed to reach Copilot API: {exc}") from exc
 
         _elapsed = _time.perf_counter() - _t0
-        request_id = (
-            resp.headers.get("x-request-id", "") or resp.headers.get("x-github-request-id", "")
-        )
+        request_id = resp.headers.get("x-request-id", "") or resp.headers.get("x-github-request-id", "")
         _dbg(
             "CopilotProvider.chat",
             "Response received",
