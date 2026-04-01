@@ -151,7 +151,7 @@ def generate_anti_patterns_page() -> str:
 
 
 def generate_standards_page() -> str:
-    """Generate the standards wiki page."""
+    """Generate the standards wiki page grouped by directory hierarchy."""
     lines = ["# Design Standards", ""]
     lines.append(
         "Design standards are injected into agent system messages to guide code quality. "
@@ -170,30 +170,59 @@ def generate_standards_page() -> str:
     lines.append(f"**{len(yaml_files)} documents, {total} principles**\n")
     lines.append("---\n")
 
-    for yf in yaml_files:
-        data = load_yaml(yf)
-        meta = data.get("metadata", {})
-        name = meta.get("name", yf.stem)
-        description = meta.get("description", "")
-        principles = data.get("principles", data.get("standards", []))
+    # Group by directory hierarchy
+    sections = {
+        "Application": std_dir / "application",
+        "IaC": std_dir / "iac",
+        "Principles": std_dir / "principles",
+    }
 
-        lines.append(f"## {name.replace('-', ' ').replace('_', ' ').title()}")
-        if description:
-            lines.append(f"\n{description}\n")
+    for section_name, section_dir in sections.items():
+        if not section_dir.is_dir():
+            continue
 
-        if principles:
-            lines.append("| ID | Principle | Rationale |")
-            lines.append("|-----|-----------|-----------|")
-            for p in principles:
-                pid = p.get("id", "?")
-                principle = p.get("name", p.get("principle", "?")).replace("|", "\\|")
-                rationale = p.get("rationale", p.get("description", "")).replace("|", "\\|")[:100]
-                lines.append(f"| {pid} | {principle} | {rationale} |")
-            lines.append("")
+        lines.append(f"## {section_name}\n")
 
-        lines.append("---\n")
+        # Check for subdirectories (e.g., iac/bicep, iac/terraform)
+        subdirs = sorted([d for d in section_dir.iterdir() if d.is_dir() and not d.name.startswith("_")])
+        if subdirs:
+            for subdir in subdirs:
+                subdir_files = sorted(subdir.glob("*.yaml"))
+                if subdir_files:
+                    lines.append(f"### {subdir.name.replace('-', ' ').replace('_', ' ').title()}\n")
+                    for yf in subdir_files:
+                        _render_standard_file(yf, lines)
+        else:
+            # Direct YAML files in this section
+            for yf in sorted(section_dir.glob("*.yaml")):
+                _render_standard_file(yf, lines)
 
     return "\n".join(lines)
+
+
+def _render_standard_file(yf: Path, lines: list[str]) -> None:
+    """Render a single standards YAML file into wiki markdown."""
+    data = load_yaml(yf)
+    meta = data.get("metadata", {})
+    name = meta.get("name", yf.stem)
+    description = meta.get("description", "")
+    principles = data.get("principles", data.get("standards", []))
+
+    lines.append(f"#### {name.replace('-', ' ').replace('_', ' ').title()}")
+    if description:
+        lines.append(f"\n{description}\n")
+
+    if principles:
+        lines.append("| ID | Principle | Rationale |")
+        lines.append("|-----|-----------|-----------|")
+        for p in principles:
+            pid = p.get("id", "?")
+            principle = p.get("name", p.get("principle", "?")).replace("|", "\\|")
+            rationale = p.get("rationale", p.get("description", "")).replace("|", "\\|")[:100]
+            lines.append(f"| {pid} | {principle} | {rationale} |")
+        lines.append("")
+
+    lines.append("---\n")
 
 
 def main():

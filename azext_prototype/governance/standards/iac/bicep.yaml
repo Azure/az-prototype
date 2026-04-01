@@ -1,0 +1,113 @@
+# Bicep module structure standards.
+#
+# These standards define how Bicep templates and modules should be
+# organized for consistency across all generated IaC.
+
+domain: Bicep Module Structure
+category: bicep
+description: >-
+  Standards for Bicep template layout, parameter naming, and resource
+  organization that all bicep-agent output must follow.
+
+principles:
+  - id: BCP-001
+    name: Standard File Layout
+    description: >-
+      Bicep templates must follow a consistent ordering: targetScope
+      (if needed), parameters, variables, resources, modules, outputs.
+      Use separate .bicep files for reusable modules.
+    applies_to:
+      - bicep-agent
+    examples:
+      - "main.bicep — orchestration template that calls modules"
+      - "modules/appService.bicep — reusable App Service module"
+      - "modules/networking.bicep — reusable networking module"
+
+  - id: BCP-002
+    name: Parameter Conventions
+    description: >-
+      All parameters must have @description decorators and type
+      annotations.  Use camelCase for parameter names (Bicep convention).
+      Provide @allowed decorators for constrained values.
+    applies_to:
+      - bicep-agent
+    examples:
+      - "@description('Azure region for all resources') param location string = resourceGroup().location"
+      - "@allowed(['dev','staging','prod']) param environment string"
+
+  - id: BCP-003
+    name: Module Composition
+    description: >-
+      Use Bicep modules for logical grouping of related resources.
+      The main.bicep file should orchestrate modules, not define
+      resources directly (except resource groups at subscription scope).
+    applies_to:
+      - bicep-agent
+    examples:
+      - "module networking 'modules/networking.bicep' = { ... }"
+      - "module compute 'modules/compute.bicep' = { ... }"
+
+  - id: BCP-004
+    name: Resource Naming via Variables
+    description: >-
+      Define resource names in variables using a consistent naming
+      pattern.  Never hardcode resource names in resource blocks.
+    applies_to:
+      - bicep-agent
+    examples:
+      - "var rgName = 'rg-${project}-${environment}'"
+      - "var kvName = 'kv-${project}-${take(uniqueString(resourceGroup().id), 6)}'"
+
+  - id: BCP-005
+    name: Output Important Values
+    description: >-
+      Output resource IDs, endpoints, and principal IDs that
+      downstream modules or deployment scripts will need.
+      Use @description decorators on outputs.
+    applies_to:
+      - bicep-agent
+    examples:
+      - "@description('App Service default hostname') output appUrl string = app.properties.defaultHostName"
+      - "@description('Managed identity principal ID') output principalId string = app.identity.principalId"
+
+  - id: BCP-006
+    name: Cross-Stage Dependencies via Parameters
+    description: >-
+      Multi-stage deployments MUST pass prior-stage resource references
+      as parameters. NEVER hardcode resource names, IDs, or keys from
+      other stages. Use the existing keyword to reference resources
+      created in prior stages, with their names provided via parameters
+      populated from prior stage deployment outputs.
+    applies_to:
+      - bicep-agent
+      - cloud-architect
+    examples:
+      - "@description('Resource group from Stage 1') param foundationRgName string"
+      - "resource rg 'Microsoft.Resources/resourceGroups@2023-07-01' existing = { name: foundationRgName }"
+
+  - id: BCP-007
+    name: Complete and Robust deploy.sh
+    description: >-
+      Every stage MUST include a deploy.sh that is syntactically complete
+      and runnable. It must use set -euo pipefail, verify Azure login,
+      run az deployment group create, capture outputs to JSON, and include
+      error handling via trap. NEVER truncate the script.
+    applies_to:
+      - bicep-agent
+    examples:
+      - "az deployment group create --resource-group $RG --template-file main.bicep --parameters main.bicepparam"
+      - "az deployment group show --name $DEPLOYMENT --query properties.outputs > stage-N-outputs.json"
+
+  - id: BCP-008
+    name: Companion Resources for Disabled Auth
+    description: >-
+      When disabling local/key-based auth on any service, the SAME stage
+      MUST also create: (1) a user-assigned managed identity, (2) RBAC
+      role assignments, (3) output the identity clientId and principalId.
+      Without these, applications cannot authenticate.
+    applies_to:
+      - bicep-agent
+      - cloud-architect
+    examples:
+      - "resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = { ... }"
+      - "resource rbac 'Microsoft.Authorization/roleAssignments@2022-04-01' = { ... }"

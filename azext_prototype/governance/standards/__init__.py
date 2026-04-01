@@ -7,12 +7,15 @@ anti-patterns (detection), standards describe *how to build well*.
 Directory layout::
 
     standards/
-        principles/       Design principles (DRY, SOLID, etc.)
-            design.yaml
+        application/          Application code patterns
+            dotnet.yaml
+            python.yaml
+        iac/                  Infrastructure-as-Code patterns
+            bicep.yaml
+            terraform.yaml
+        principles/           Design principles
             coding.yaml
-        terraform/        Reference patterns per service type
-        bicep/            Reference patterns per service type
-        application/      Code patterns per language/framework
+            design.yaml
 """
 
 from __future__ import annotations
