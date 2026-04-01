@@ -917,35 +917,66 @@ class BuildSession:
             "4. Networking is ONE stage: VNet, subnets, NSGs, private DNS zones, and\n"
             "   private endpoints for ALL services — grouped because they share the same VNet.\n\n"
             "5. RBAC role assignments belong in the same stage as their target service.\n\n"
-            "6. Stage ordering:\n"
-            "   - Managed Identity first (shared identity used by other stages)\n"
-            "   - Monitoring (Log Analytics, then App Insights) — needed for diagnostic settings\n"
-            "   - Networking (VNet + all private endpoints)\n"
-            "   - Data services (Key Vault, SQL, Cosmos, Storage, etc.) — one stage each\n"
-            "   - Compute services (Container Apps, App Service, AKS, etc.) — one stage each\n"
-            "   - Integration (APIM, Event Grid, etc.) — one stage each\n"
-            "   - Documentation last\n\n"
+            "6. Stage ordering (CRITICAL — stages deploy in this order, each group\n"
+            "   depends on the groups above it):\n"
+            "   a. Managed Identity — no dependencies; provides principal_id for RBAC\n"
+            "      in all downstream stages\n"
+            "   b. Monitoring (Log Analytics, then App Insights) — depends on (a) for\n"
+            "      resource group; provides workspace_id for diagnostic settings in\n"
+            "      every downstream data/compute stage\n"
+            "   c. Networking (VNet, subnets, NSGs, private DNS, private endpoints) —\n"
+            "      depends on (a) for resource group; provides subnet_id and\n"
+            "      private_dns_zone_ids for all services with private endpoints\n"
+            "   d. Data services (Key Vault, SQL, Cosmos, Storage, Service Bus, Redis,\n"
+            "      etc.) — depends on (a) for identity/RBAC, (b) for diagnostic\n"
+            "      settings, (c) for private endpoints. Each data service is its own\n"
+            "      stage. Key Vault should come first (other services store secrets in it)\n"
+            "   e. Compute infrastructure (Container Apps Environment, Container Apps,\n"
+            "      App Service Plan, AKS cluster, etc.) — depends on (a)-(d) for\n"
+            "      identity, monitoring, networking, and data service endpoints/secrets\n"
+            "   f. Integration (APIM, Event Grid, SignalR, etc.) — depends on the\n"
+            "      services they integrate with\n"
+            "   g. Application code (category 'app') — depends on ALL infrastructure.\n"
+            "      Needs Container Registry (push images), compute environment (deploy\n"
+            "      to), data service endpoints (connection config), Key Vault (secrets).\n"
+            "      Place ALL 'app' stages after ALL 'infra' stages.\n"
+            "   h. Documentation (category 'docs') — depends on all stages above;\n"
+            "      must be last\n\n"
             "7. The LAST stage MUST always be 'Documentation' with category 'docs'.\n"
             "   NEVER omit the Documentation stage.\n\n"
+            "8. CRITICAL: Stage categories determine which agent generates the code:\n"
+            "   - 'infra' — Terraform/Bicep agent generates IaC for Azure resources\n"
+            "   - 'app' — App Developer agent generates source code (Python, Node, .NET)\n"
+            "   - 'docs' — Documentation agent generates architecture and deployment docs\n"
+            "   Container Apps INFRASTRUCTURE (managed environment, container app resources)\n"
+            "   uses category 'infra'. But the APPLICATION SOURCE CODE (APIs, workers,\n"
+            "   Dockerfiles, requirements.txt) that runs IN those containers MUST be a\n"
+            "   separate stage with category 'app'.\n\n"
             "Response format — return ONLY valid JSON:\n"
             "```json\n"
             '{"stages": [\n'
-            '  {"stage": 1, "name": "Managed Identity", "category": "infra",\n'
-            '   "services": ["user-assigned-identity"]},\n'
-            '  {"stage": 2, "name": "Log Analytics", "category": "infra",\n'
-            '   "services": ["log-analytics"]},\n'
-            '  {"stage": 3, "name": "Networking", "category": "infra",\n'
-            '   "services": ["virtual-network", "private-endpoints"]},\n'
-            '  {"stage": 4, "name": "Key Vault", "category": "infra",\n'
-            '   "services": ["key-vault"]},\n'
-            '  {"stage": 5, "name": "Documentation", "category": "docs",\n'
+            '  {"stage": 1, "name": "...", "category": "infra", "services": [...]},\n'
+            "  ...\n"
+            '  {"stage": N, "name": "...", "category": "app", "services": [...]},\n'
+            '  {"stage": N+1, "name": "Documentation", "category": "docs",\n'
             '   "services": ["architecture-doc", "deployment-guide"]}\n'
             "]}\n"
             "```\n"
+            "\n"
+            "Category reference:\n"
+            "  'infra' — Azure resources (VNet, Key Vault, SQL, Container Apps Environment, etc.)\n"
+            "  'app'   — Source code that runs ON infrastructure (APIs, workers, functions,\n"
+            "            web apps, Logic Apps, etc. — includes Dockerfile, source files,\n"
+            "            package manifests, deploy.sh for build+push+update)\n"
+            "  'docs'  — Architecture and deployment documentation\n"
+            "\n"
+            "Create one 'app' stage per deployable application in the architecture.\n"
+            "If the architecture has 3 APIs, create 3 app stages. If it has a React\n"
+            "frontend + a Python API + a worker, create 3 app stages.\n"
         )
 
         # Phase 1 needs no governance — just structuring
-        self._architect_agent.set_governor_brief(" ")
+        self._architect_agent.set_governor_brief("(no governance for this phase)")
         try:
             phase1_response = self._architect_agent.execute(self._context, phase1_task)
         finally:
@@ -1015,7 +1046,7 @@ class BuildSession:
         )
 
         # Phase 2 has policies — suppress the full governance dump
-        self._architect_agent.set_governor_brief(" ")
+        self._architect_agent.set_governor_brief("(no governance for this phase)")
         try:
             phase2_response = self._architect_agent.execute(self._context, phase2_task)
         finally:
