@@ -6,27 +6,6 @@ Release History
 0.2.1b6 _(Under active development)_
 ++++++++++++++++++++++++++++++++++++   
 
-Post-benchmark fixes
-~~~~~~~~~~~~~~~~~~~~~
-* **Upstream dependency enforcement** -- task prompt now explicitly states
-  "CRITICAL: Only add terraform_remote_state blocks for stages listed
-  above."  Prevents unnecessary dependencies (e.g., Stage 10 referencing
-  Stage 4 networking when it has no networking dependency).
-* **Anti-pattern scan skips documentation stages** -- documentation
-  stages describe the architecture (including SQL auth, public access
-  patterns) which triggered false positives.  Scan now skips stages with
-  ``category == "docs"``.
-* **deploy.sh single-dash -auto-approve** -- Terraform uses single dash
-  ``-auto-approve`` not double dash ``--auto-approve``.  Fixed in the
-  TERRAFORM_PROMPT deploy.sh template.
-* **Storage container API version** -- added ``blobServices/containers``
-  child resource entry to service registry with verified ``@2023-05-01``
-  version.  Prevents runtime Learn lookup returning potentially
-  unavailable ``@2025-08-01`` version.
-* **Child resource API version resolution** -- ``resource_metadata.py``
-  now checks parent service ``child_resources`` entries before falling
-  through to Microsoft Learn lookup.
-
 Benchmark suite
 ~~~~~~~~~~~~~~~~
 * **14-benchmark quality suite** -- project-agnostic benchmarks (B-INST
@@ -94,6 +73,11 @@ Build quality improvements
 * **Documentation agent prompt** -- enriched with context handling,
   completeness requirement, and explicit instructions to reference actual
   stage outputs.
+* **Upstream dependency enforcement** -- task prompt and
+  ``TERRAFORM_PROMPT`` now explicitly state "CRITICAL: Only add
+  terraform_remote_state blocks for stages listed as upstream
+  dependencies."  Prevents unnecessary dependencies (e.g., Stage 10
+  referencing Stage 4 networking when it has no networking dependency).
 
 Anti-pattern detection
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -106,6 +90,9 @@ Anti-pattern detection
   ``pc-`` prefixes).
 * **QA scope compliance** -- added Section 8 to QA engineer checklist:
   scope compliance, tag placement, and azurerm resource checks.
+* **Anti-pattern scan skips documentation stages** -- docs describe the
+  architecture (including SQL auth, public access patterns) which triggered
+  false positives.  Scan now skips stages with ``category == "docs"``.
 
 Prompt optimization (58 fixes)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -140,6 +127,14 @@ Prompt optimization (58 fixes)
   and data-plane role name safe_patterns for spurious warning prevention.
 * **Documentation agent** -- added exact directory path guidance, actual
   SKU value guidance, and mandatory deployment guide section list.
+* **deploy.sh single-dash ``-auto-approve``** -- Terraform uses single
+  dash ``-auto-approve`` not double dash.  Fixed in the deploy.sh
+  template.
+* **Storage container API version** -- added ``blobServices/containers``
+  child resource entry to service registry with verified ``@2023-05-01``
+  version.  ``resource_metadata.py`` now checks parent service
+  ``child_resources`` entries before falling through to Microsoft Learn
+  runtime lookup.
 
 Truncation recovery
 ~~~~~~~~~~~~~~~~~~~~
