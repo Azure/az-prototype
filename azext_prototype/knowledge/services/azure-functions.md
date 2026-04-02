@@ -30,57 +30,97 @@
 
 ```hcl
 # Storage account required for Functions runtime
-resource "azurerm_storage_account" "functions" {
-  name                     = var.storage_account_name
-  location                 = var.location
-  resource_group_name      = var.resource_group_name
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
-  min_tls_version          = "TLS1_2"
+resource "azapi_resource" "functions_storage" {
+  type      = "Microsoft.Storage/storageAccounts@2023-05-01"
+  name      = var.storage_account_name
+  location  = var.location
+  parent_id = var.resource_group_id
+
+  body = {
+    kind = "StorageV2"
+    sku = {
+      name = "Standard_LRS"
+    }
+    properties = {
+      minimumTlsVersion        = "TLS1_2"
+      supportsHttpsTrafficOnly = true
+    }
+  }
 
   tags = var.tags
+
+  response_export_values = ["properties.primaryEndpoints", "id"]
 }
 
 # Consumption plan
-resource "azurerm_service_plan" "this" {
-  name                = var.plan_name
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  os_type             = "Linux"
-  sku_name            = "Y1"  # Consumption plan
+resource "azapi_resource" "plan" {
+  type      = "Microsoft.Web/serverfarms@2023-12-01"
+  name      = var.plan_name
+  location  = var.location
+  parent_id = var.resource_group_id
+
+  body = {
+    kind = "linux"
+    sku = {
+      name = "Y1"   # Consumption plan
+      tier = "Dynamic"
+    }
+    properties = {
+      reserved = true
+    }
+  }
 
   tags = var.tags
 }
 
-resource "azurerm_linux_function_app" "this" {
-  name                       = var.name
-  location                   = var.location
-  resource_group_name        = var.resource_group_name
-  service_plan_id            = azurerm_service_plan.this.id
-  storage_account_name       = azurerm_storage_account.functions.name
-  storage_account_access_key = azurerm_storage_account.functions.primary_access_key
-  https_only                 = true
+resource "azapi_resource" "function_app" {
+  type      = "Microsoft.Web/sites@2023-12-01"
+  name      = var.name
+  location  = var.location
+  parent_id = var.resource_group_id
 
   identity {
     type         = "UserAssigned"
     identity_ids = [var.managed_identity_id]
   }
 
-  site_config {
-    minimum_tls_version = "1.2"
-
-    application_stack {
-      python_version = "3.12"  # or node_version, dotnet_version
+  body = {
+    kind = "functionapp,linux"
+    properties = {
+      serverFarmId = azapi_resource.plan.id
+      httpsOnly    = true
+      siteConfig = {
+        minTlsVersion  = "1.2"
+        linuxFxVersion = "PYTHON|3.12"  # or NODE|20, DOTNET-ISOLATED|8.0
+        appSettings = [
+          {
+            name  = "AzureWebJobsStorage"
+            value = "DefaultEndpointsProtocol=https;AccountName=${var.storage_account_name};AccountKey=${data.azapi_resource_action.storage_keys.output.keys[0].value};EndpointSuffix=core.windows.net"
+          },
+          {
+            name  = "FUNCTIONS_EXTENSION_VERSION"
+            value = "~4"
+          },
+          {
+            name  = "FUNCTIONS_WORKER_RUNTIME"
+            value = "python"  # or "node", "dotnet-isolated"
+          },
+          {
+            name  = "AZURE_CLIENT_ID"
+            value = var.managed_identity_client_id
+          },
+          {
+            name  = "AzureWebJobsFeatureFlags"
+            value = "EnableWorkerIndexing"
+          }
+        ]
+      }
     }
   }
 
-  app_settings = merge(var.app_settings, {
-    "AZURE_CLIENT_ID"                  = var.managed_identity_client_id
-    "FUNCTIONS_WORKER_RUNTIME"         = "python"  # or "node", "dotnet-isolated"
-    "AzureWebJobsFeatureFlags"         = "EnableWorkerIndexing"
-  })
-
   tags = var.tags
+
+  response_export_values = ["properties.defaultHostName"]
 }
 ```
 
@@ -88,55 +128,101 @@ resource "azurerm_linux_function_app" "this" {
 
 ```hcl
 # When using managed identity for the functions storage connection:
-resource "azurerm_linux_function_app" "this" {
-  name                       = var.name
-  location                   = var.location
-  resource_group_name        = var.resource_group_name
-  service_plan_id            = azurerm_service_plan.this.id
-  storage_account_name       = azurerm_storage_account.functions.name
-  storage_uses_managed_identity = true
-  https_only                 = true
+resource "azapi_resource" "function_app" {
+  type      = "Microsoft.Web/sites@2023-12-01"
+  name      = var.name
+  location  = var.location
+  parent_id = var.resource_group_id
 
   identity {
     type         = "UserAssigned"
     identity_ids = [var.managed_identity_id]
   }
 
-  site_config {
-    minimum_tls_version = "1.2"
-
-    application_stack {
-      python_version = "3.12"
+  body = {
+    kind = "functionapp,linux"
+    properties = {
+      serverFarmId = azapi_resource.plan.id
+      httpsOnly    = true
+      siteConfig = {
+        minTlsVersion  = "1.2"
+        linuxFxVersion = "PYTHON|3.12"
+        appSettings = [
+          {
+            name  = "AZURE_CLIENT_ID"
+            value = var.managed_identity_client_id
+          },
+          {
+            name  = "AzureWebJobsStorage__accountName"
+            value = var.storage_account_name
+          },
+          {
+            name  = "AzureWebJobsStorage__credential"
+            value = "managedidentity"
+          },
+          {
+            name  = "AzureWebJobsStorage__clientId"
+            value = var.managed_identity_client_id
+          },
+          {
+            name  = "FUNCTIONS_EXTENSION_VERSION"
+            value = "~4"
+          },
+          {
+            name  = "FUNCTIONS_WORKER_RUNTIME"
+            value = "python"
+          }
+        ]
+      }
     }
   }
 
-  app_settings = merge(var.app_settings, {
-    "AZURE_CLIENT_ID"                         = var.managed_identity_client_id
-    "AzureWebJobsStorage__accountName"        = azurerm_storage_account.functions.name
-    "AzureWebJobsStorage__credential"         = "managedidentity"
-    "AzureWebJobsStorage__clientId"           = var.managed_identity_client_id
-  })
-
   tags = var.tags
+
+  response_export_values = ["properties.defaultHostName"]
 }
 
 # Grant the function app's identity Storage Blob Data Owner on its runtime storage
-resource "azurerm_role_assignment" "functions_storage" {
-  scope                = azurerm_storage_account.functions.id
-  role_definition_name = "Storage Blob Data Owner"
-  principal_id         = var.managed_identity_principal_id
+resource "azapi_resource" "functions_storage_blob_role" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.functions_storage.id}${var.managed_identity_principal_id}blob-owner")
+  parent_id = azapi_resource.functions_storage.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/b7e6dc6d-f1e8-4753-8033-0f276bb0955b"  # Storage Blob Data Owner
+      principalId      = var.managed_identity_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 
-resource "azurerm_role_assignment" "functions_storage_queue" {
-  scope                = azurerm_storage_account.functions.id
-  role_definition_name = "Storage Queue Data Contributor"
-  principal_id         = var.managed_identity_principal_id
+resource "azapi_resource" "functions_storage_queue_role" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.functions_storage.id}${var.managed_identity_principal_id}queue-contributor")
+  parent_id = azapi_resource.functions_storage.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/974c5e8b-45b9-4653-ba55-5f855dd0fb88"  # Storage Queue Data Contributor
+      principalId      = var.managed_identity_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 
-resource "azurerm_role_assignment" "functions_storage_table" {
-  scope                = azurerm_storage_account.functions.id
-  role_definition_name = "Storage Table Data Contributor"
-  principal_id         = var.managed_identity_principal_id
+resource "azapi_resource" "functions_storage_table_role" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.functions_storage.id}${var.managed_identity_principal_id}table-contributor")
+  parent_id = azapi_resource.functions_storage.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3"  # Storage Table Data Contributor
+      principalId      = var.managed_identity_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 ```
 
@@ -145,46 +231,83 @@ resource "azurerm_role_assignment" "functions_storage_table" {
 ```hcl
 # Function app's managed identity accessing other resources
 # Example: grant access to Service Bus for queue-triggered functions
-resource "azurerm_role_assignment" "servicebus_receiver" {
-  scope                = var.servicebus_namespace_id
-  role_definition_name = "Azure Service Bus Data Receiver"
-  principal_id         = var.managed_identity_principal_id
+resource "azapi_resource" "servicebus_receiver_role" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${var.servicebus_namespace_id}${var.managed_identity_principal_id}sb-receiver")
+  parent_id = var.servicebus_namespace_id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0"  # Azure Service Bus Data Receiver
+      principalId      = var.managed_identity_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 
-resource "azurerm_role_assignment" "servicebus_sender" {
-  scope                = var.servicebus_namespace_id
-  role_definition_name = "Azure Service Bus Data Sender"
-  principal_id         = var.managed_identity_principal_id
+resource "azapi_resource" "servicebus_sender_role" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${var.servicebus_namespace_id}${var.managed_identity_principal_id}sb-sender")
+  parent_id = var.servicebus_namespace_id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/69a216fc-b8fb-44d8-bc22-1f3c2cd27a39"  # Azure Service Bus Data Sender
+      principalId      = var.managed_identity_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 ```
 
 ### Private Endpoint
 
 ```hcl
-resource "azurerm_private_endpoint" "this" {
-  count = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+resource "azapi_resource" "private_endpoint" {
+  count     = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+  type      = "Microsoft.Network/privateEndpoints@2023-11-01"
+  name      = "pe-${var.name}"
+  location  = var.location
+  parent_id = var.resource_group_id
 
-  name                = "pe-${var.name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  subnet_id           = var.subnet_id
-
-  private_service_connection {
-    name                           = "psc-${var.name}"
-    private_connection_resource_id = azurerm_linux_function_app.this.id
-    subresource_names              = ["sites"]
-    is_manual_connection           = false
-  }
-
-  dynamic "private_dns_zone_group" {
-    for_each = var.private_dns_zone_id != null ? [1] : []
-    content {
-      name                 = "dns-zone-group"
-      private_dns_zone_ids = [var.private_dns_zone_id]
+  body = {
+    properties = {
+      subnet = {
+        id = var.subnet_id
+      }
+      privateLinkServiceConnections = [
+        {
+          name = "psc-${var.name}"
+          properties = {
+            privateLinkServiceId = azapi_resource.function_app.id
+            groupIds             = ["sites"]
+          }
+        }
+      ]
     }
   }
 
   tags = var.tags
+}
+
+resource "azapi_resource" "dns_zone_group" {
+  count     = var.enable_private_endpoint && var.subnet_id != null && var.private_dns_zone_id != null ? 1 : 0
+  type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01"
+  name      = "dns-zone-group"
+  parent_id = azapi_resource.private_endpoint[0].id
+
+  body = {
+    properties = {
+      privateDnsZoneConfigs = [
+        {
+          name = "config"
+          properties = {
+            privateDnsZoneId = var.private_dns_zone_id
+          }
+        }
+      ]
+    }
+  }
 }
 ```
 

@@ -27,24 +27,31 @@ Choose Static Web Apps over App Service when the frontend is static/SPA and the 
 ### Basic Resource
 
 ```hcl
-resource "azurerm_static_web_app" "this" {
-  name                = var.name
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  sku_tier            = "Free"
-  sku_size            = "Free"
+resource "azapi_resource" "this" {
+  type      = "Microsoft.Web/staticSites@2023-12-01"
+  name      = var.name
+  location  = var.location
+  parent_id = var.resource_group_id
+
+  body = {
+    sku = {
+      name = "Free"
+      tier = "Free"
+    }
+    properties = {
+      stagingEnvironmentPolicy  = "Enabled"
+      allowConfigFileUpdates    = true
+    }
+  }
 
   tags = var.tags
+
+  response_export_values = ["*"]
 }
 
-# Output the deployment token for CI/CD
-output "deployment_token" {
-  value     = azurerm_static_web_app.this.api_key
-  sensitive = true
-}
-
+# Output the default hostname
 output "default_hostname" {
-  value = azurerm_static_web_app.this.default_host_name
+  value = azapi_resource.this.output.properties.defaultHostname
 }
 ```
 
@@ -52,20 +59,40 @@ output "default_hostname" {
 
 ```hcl
 # Standard tier required for linked backends
-resource "azurerm_static_web_app" "this" {
-  name                = var.name
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  sku_tier            = "Standard"
-  sku_size            = "Standard"
+resource "azapi_resource" "this" {
+  type      = "Microsoft.Web/staticSites@2023-12-01"
+  name      = var.name
+  location  = var.location
+  parent_id = var.resource_group_id
+
+  body = {
+    sku = {
+      name = "Standard"
+      tier = "Standard"
+    }
+    properties = {
+      stagingEnvironmentPolicy = "Enabled"
+      allowConfigFileUpdates   = true
+    }
+  }
 
   tags = var.tags
+
+  response_export_values = ["*"]
 }
 
 # Link to existing Function App (Standard tier only)
-resource "azurerm_static_web_app_function_app_registration" "this" {
-  static_web_app_id = azurerm_static_web_app.this.id
-  function_app_id   = var.function_app_id
+resource "azapi_resource" "linked_backend" {
+  type      = "Microsoft.Web/staticSites/linkedBackends@2023-12-01"
+  name      = "default"
+  parent_id = azapi_resource.this.id
+
+  body = {
+    properties = {
+      backendResourceId = var.function_app_id
+      region            = var.location
+    }
+  }
 }
 ```
 
@@ -75,10 +102,16 @@ Static Web Apps doesn't use ARM RBAC for data-plane access. Deployment is manage
 
 ```hcl
 # Store deployment token in Key Vault for CI/CD pipelines
-resource "azurerm_key_vault_secret" "swa_token" {
-  name         = "swa-deployment-token"
-  value        = azurerm_static_web_app.this.api_key
-  key_vault_id = var.key_vault_id
+resource "azapi_resource" "swa_token" {
+  type      = "Microsoft.KeyVault/vaults/secrets@2023-07-01"
+  name      = "swa-deployment-token"
+  parent_id = var.key_vault_id
+
+  body = {
+    properties = {
+      value = azapi_resource.this.output.properties.apiKey
+    }
+  }
 }
 ```
 
@@ -86,30 +119,51 @@ resource "azurerm_key_vault_secret" "swa_token" {
 
 ```hcl
 # Private endpoint requires Standard tier
-resource "azurerm_private_endpoint" "swa" {
-  count = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+resource "azapi_resource" "swa_pe" {
+  count     = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+  type      = "Microsoft.Network/privateEndpoints@2023-11-01"
+  name      = "pe-${var.name}"
+  location  = var.location
+  parent_id = var.resource_group_id
 
-  name                = "pe-${var.name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  subnet_id           = var.subnet_id
-
-  private_service_connection {
-    name                           = "psc-${var.name}"
-    private_connection_resource_id = azurerm_static_web_app.this.id
-    subresource_names              = ["staticSites"]
-    is_manual_connection           = false
-  }
-
-  dynamic "private_dns_zone_group" {
-    for_each = var.private_dns_zone_id != null ? [1] : []
-    content {
-      name                 = "dns-zone-group"
-      private_dns_zone_ids = [var.private_dns_zone_id]
+  body = {
+    properties = {
+      subnet = {
+        id = var.subnet_id
+      }
+      privateLinkServiceConnections = [
+        {
+          name = "psc-${var.name}"
+          properties = {
+            privateLinkServiceId = azapi_resource.this.id
+            groupIds             = ["staticSites"]
+          }
+        }
+      ]
     }
   }
 
   tags = var.tags
+}
+
+resource "azapi_resource" "swa_pe_dns" {
+  count     = var.enable_private_endpoint && var.private_dns_zone_id != null ? 1 : 0
+  type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01"
+  name      = "dns-zone-group"
+  parent_id = azapi_resource.swa_pe[0].id
+
+  body = {
+    properties = {
+      privateDnsZoneConfigs = [
+        {
+          name = "config"
+          properties = {
+            privateDnsZoneId = var.private_dns_zone_id
+          }
+        }
+      ]
+    }
+  }
 }
 ```
 

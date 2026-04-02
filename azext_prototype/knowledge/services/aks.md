@@ -30,69 +30,89 @@ Choose AKS over Container Apps when you need full Kubernetes control, custom ope
 ### Basic Resource
 
 ```hcl
-resource "azurerm_kubernetes_cluster" "this" {
-  name                = var.name
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  dns_prefix          = var.dns_prefix
-  kubernetes_version  = var.kubernetes_version  # e.g., "1.29"
-  sku_tier            = "Free"                  # "Standard" for SLA
-
-  default_node_pool {
-    name                = "system"
-    node_count          = 1
-    vm_size             = "Standard_B2s"
-    os_disk_size_gb     = 30
-    temporary_name_for_rotation = "systemtemp"
-
-    upgrade_settings {
-      max_surge = "10%"
-    }
-  }
+resource "azapi_resource" "this" {
+  type      = "Microsoft.ContainerService/managedClusters@2024-03-02-preview"
+  name      = var.name
+  location  = var.location
+  parent_id = var.resource_group_id
 
   identity {
     type = "SystemAssigned"
   }
 
-  network_profile {
-    network_plugin    = "azure"
-    network_policy    = "azure"    # or "calico" for more features
-    network_data_plane = "cilium"  # Azure CNI Overlay with Cilium
-    service_cidr       = "10.0.0.0/16"
-    dns_service_ip     = "10.0.0.10"
-  }
-
-  oidc_issuer_enabled       = true   # Required for workload identity
-  workload_identity_enabled = true   # Pod-level Azure AD auth
-
-  azure_active_directory_role_based_access_control {
-    azure_rbac_enabled     = true
-    managed                = true
-    admin_group_object_ids = var.admin_group_ids
+  body = {
+    sku = {
+      name = "Base"
+      tier = "Free"  # "Standard" for SLA
+    }
+    properties = {
+      kubernetesVersion = var.kubernetes_version  # e.g., "1.29"
+      dnsPrefix         = var.dns_prefix
+      agentPoolProfiles = [
+        {
+          name                = "system"
+          count               = 1
+          vmSize              = "Standard_B2s"
+          osDiskSizeGB        = 30
+          mode                = "System"
+          osType              = "Linux"
+          upgradeSettings = {
+            maxSurge = "10%"
+          }
+        }
+      ]
+      networkProfile = {
+        networkPlugin    = "azure"
+        networkPolicy    = "azure"    # or "calico" for more features
+        networkDataplane = "cilium"   # Azure CNI Overlay with Cilium
+        serviceCidr      = "10.0.0.0/16"
+        dnsServiceIP     = "10.0.0.10"
+      }
+      oidcIssuerProfile = {
+        enabled = true  # Required for workload identity
+      }
+      securityProfile = {
+        workloadIdentity = {
+          enabled = true  # Pod-level Azure AD auth
+        }
+      }
+      aadProfile = {
+        managed            = true
+        enableAzureRBAC    = true
+        adminGroupObjectIDs = var.admin_group_ids
+      }
+    }
   }
 
   tags = var.tags
+
+  response_export_values = ["*"]
 }
 ```
 
 ### User Node Pool
 
 ```hcl
-resource "azurerm_kubernetes_cluster_node_pool" "workload" {
-  name                  = "workload"
-  kubernetes_cluster_id = azurerm_kubernetes_cluster.this.id
-  vm_size               = "Standard_D2s_v5"
-  node_count            = 1
-  min_count             = 1
-  max_count             = 5
-  enable_auto_scaling   = true
-  os_disk_size_gb       = 50
+resource "azapi_resource" "workload_pool" {
+  type      = "Microsoft.ContainerService/managedClusters/agentPools@2024-03-02-preview"
+  name      = "workload"
+  parent_id = azapi_resource.this.id
 
-  node_labels = {
-    "workload" = "app"
+  body = {
+    properties = {
+      vmSize             = "Standard_D2s_v5"
+      count              = 1
+      minCount           = 1
+      maxCount           = 5
+      enableAutoScaling  = true
+      osDiskSizeGB       = 50
+      mode               = "User"
+      osType             = "Linux"
+      nodeLabels = {
+        "workload" = "app"
+      }
+    }
   }
-
-  tags = var.tags
 }
 ```
 
@@ -100,24 +120,45 @@ resource "azurerm_kubernetes_cluster_node_pool" "workload" {
 
 ```hcl
 # AcrPull -- allow AKS to pull images from ACR
-resource "azurerm_role_assignment" "acr_pull" {
-  scope                = var.container_registry_id
-  role_definition_name = "AcrPull"
-  principal_id         = azurerm_kubernetes_cluster.this.kubelet_identity[0].object_id
+resource "azapi_resource" "acr_pull" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${var.container_registry_id}-acr-pull")
+  parent_id = var.container_registry_id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/7f951dda-4ed3-4680-a7ca-43fe172d538d"
+      principalId      = azapi_resource.this.output.properties.identityProfile.kubeletidentity.objectId
+    }
+  }
 }
 
 # Azure Kubernetes Service Cluster User Role -- allows kubectl access
-resource "azurerm_role_assignment" "cluster_user" {
-  scope                = azurerm_kubernetes_cluster.this.id
-  role_definition_name = "Azure Kubernetes Service Cluster User Role"
-  principal_id         = var.developer_group_principal_id
+resource "azapi_resource" "cluster_user" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.this.id}-cluster-user")
+  parent_id = azapi_resource.this.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/4abbcc35-e782-43d8-92c5-2d3f1bd2253f"
+      principalId      = var.developer_group_principal_id
+    }
+  }
 }
 
 # Azure Kubernetes Service RBAC Writer -- namespace-scoped write access
-resource "azurerm_role_assignment" "rbac_writer" {
-  scope                = azurerm_kubernetes_cluster.this.id
-  role_definition_name = "Azure Kubernetes Service RBAC Writer"
-  principal_id         = var.developer_group_principal_id
+resource "azapi_resource" "rbac_writer" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.this.id}-rbac-writer")
+  parent_id = azapi_resource.this.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/a7ffa36f-339b-4b5c-8bdf-e2c188b2c0eb"
+      principalId      = var.developer_group_principal_id
+    }
+  }
 }
 ```
 
@@ -132,11 +173,20 @@ RBAC role IDs:
 AKS uses **private cluster** mode rather than traditional private endpoints:
 
 ```hcl
-resource "azurerm_kubernetes_cluster" "this" {
-  # ... (same as basic, plus:)
-  private_cluster_enabled             = true
-  private_dns_zone_id                 = "System"  # or custom zone ID
-  private_cluster_public_fqdn_enabled = false
+# For private cluster, add these properties to the managedClusters resource:
+resource "azapi_resource" "this" {
+  # ... (same as basic, plus in body.properties:)
+
+  body = {
+    properties = {
+      # ... other properties ...
+      apiServerAccessProfile = {
+        enablePrivateCluster           = true
+        privateDNSZone                 = "system"  # or custom zone resource ID
+        enablePrivateClusterPublicFQDN = false
+      }
+    }
+  }
 }
 ```
 
@@ -307,13 +357,18 @@ metadata:
 ### Federated Credential (Terraform)
 
 ```hcl
-resource "azurerm_federated_identity_credential" "this" {
-  name                = "aks-${var.namespace}-${var.service_account_name}"
-  resource_group_name = var.resource_group_name
-  parent_id           = var.managed_identity_id
-  audience            = ["api://AzureADTokenExchange"]
-  issuer              = azurerm_kubernetes_cluster.this.oidc_issuer_url
-  subject             = "system:serviceaccount:${var.namespace}:${var.service_account_name}"
+resource "azapi_resource" "federated_credential" {
+  type      = "Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2023-01-31"
+  name      = "aks-${var.namespace}-${var.service_account_name}"
+  parent_id = var.managed_identity_id
+
+  body = {
+    properties = {
+      audiences = ["api://AzureADTokenExchange"]
+      issuer    = azapi_resource.this.output.properties.oidcIssuerProfile.issuerURL
+      subject   = "system:serviceaccount:${var.namespace}:${var.service_account_name}"
+    }
+  }
 }
 ```
 

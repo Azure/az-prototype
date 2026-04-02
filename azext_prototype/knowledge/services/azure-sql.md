@@ -20,43 +20,68 @@
 ```hcl
 data "azurerm_client_config" "current" {}
 
-resource "azurerm_mssql_server" "this" {
-  name                         = var.sql_server_name
-  resource_group_name          = azurerm_resource_group.this.name
-  location                     = azurerm_resource_group.this.location
-  version                      = "12.0"
-  minimum_tls_version          = "1.2"
+resource "azapi_resource" "sql_server" {
+  type      = "Microsoft.Sql/servers@2023-08-01-preview"
+  name      = var.sql_server_name
+  location  = azapi_resource.resource_group.output.location
+  parent_id = azapi_resource.resource_group.id
 
-  azuread_administrator {
-    login_username              = var.aad_admin_login
-    object_id                   = var.aad_admin_object_id
-    tenant_id                   = data.azurerm_client_config.current.tenant_id
-    azuread_authentication_only = true   # CRITICAL: Disable SQL authentication entirely
+  body = {
+    properties = {
+      minimalTlsVersion = "1.2"
+      administrators = {
+        administratorType           = "ActiveDirectory"
+        principalType               = "Group"     # or "User", "Application"
+        login                       = var.aad_admin_login
+        sid                         = var.aad_admin_object_id
+        tenantId                    = data.azurerm_client_config.current.tenant_id
+        azureADOnlyAuthentication   = true        # CRITICAL: Disable SQL authentication entirely
+      }
+    }
   }
 
   tags = var.tags
+
+  response_export_values = ["*"]
 }
 
-resource "azurerm_mssql_database" "this" {
+resource "azapi_resource" "sql_database" {
+  type      = "Microsoft.Sql/servers/databases@2023-08-01-preview"
   name      = var.database_name
-  server_id = azurerm_mssql_server.this.id
+  location  = azapi_resource.resource_group.output.location
+  parent_id = azapi_resource.sql_server.id
 
-  # Serverless configuration
-  sku_name                    = "GP_S_Gen5_2"   # General Purpose Serverless, Gen5, max 2 vCores
-  min_capacity                = 0.5
-  auto_pause_delay_in_minutes = 60              # Pause after 60 min idle
-
-  max_size_gb = 32
+  body = {
+    sku = {
+      name     = "GP_S_Gen5"              # General Purpose Serverless
+      tier     = "GeneralPurpose"
+      family   = "Gen5"
+      capacity = 2                         # Max 2 vCores
+    }
+    properties = {
+      minCapacity    = 0.5
+      autoPauseDelay = 60                  # Pause after 60 min idle
+      maxSizeBytes   = 34359738368         # 32 GB
+    }
+  }
 
   tags = var.tags
+
+  response_export_values = ["*"]
 }
 
 # Allow Azure services to connect (for managed identity access)
-resource "azurerm_mssql_firewall_rule" "allow_azure" {
-  name             = "AllowAzureServices"
-  server_id        = azurerm_mssql_server.this.id
-  start_ip_address = "0.0.0.0"
-  end_ip_address   = "0.0.0.0"
+resource "azapi_resource" "sql_firewall_allow_azure" {
+  type      = "Microsoft.Sql/servers/firewallRules@2023-08-01-preview"
+  name      = "AllowAzureServices"
+  parent_id = azapi_resource.sql_server.id
+
+  body = {
+    properties = {
+      startIpAddress = "0.0.0.0"
+      endIpAddress   = "0.0.0.0"
+    }
+  }
 }
 ```
 
@@ -73,44 +98,93 @@ resource "azurerm_mssql_firewall_rule" "allow_azure" {
 # The identity-name is the name of the User-Assigned Managed Identity resource.
 
 # For CONTROL PLANE operations only (not data access):
-resource "azurerm_role_assignment" "sql_contributor" {
-  scope                = azurerm_mssql_server.this.id
-  role_definition_name = "SQL Server Contributor"
-  principal_id         = azurerm_user_assigned_identity.this.principal_id
+resource "azapi_resource" "sql_contributor" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("sha1", "${azapi_resource.sql_server.id}-${azapi_resource.user_assigned_identity.output.properties.principalId}-6d8ee4ec-f05a-4a1d-8b00-a9b17e38b437")
+  parent_id = azapi_resource.sql_server.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/6d8ee4ec-f05a-4a1d-8b00-a9b17e38b437"  # SQL Server Contributor
+      principalId      = azapi_resource.user_assigned_identity.output.properties.principalId
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 ```
 
 ### Private Endpoint
 ```hcl
-resource "azurerm_private_endpoint" "sql" {
-  name                = "${var.sql_server_name}-pe"
-  location            = azurerm_resource_group.this.location
-  resource_group_name = azurerm_resource_group.this.name
-  subnet_id           = azurerm_subnet.private_endpoints.id
+resource "azapi_resource" "sql_private_endpoint" {
+  type      = "Microsoft.Network/privateEndpoints@2023-11-01"
+  name      = "${var.sql_server_name}-pe"
+  location  = azapi_resource.resource_group.output.location
+  parent_id = azapi_resource.resource_group.id
 
-  private_service_connection {
-    name                           = "${var.sql_server_name}-psc"
-    private_connection_resource_id = azurerm_mssql_server.this.id
-    is_manual_connection           = false
-    subresource_names              = ["sqlServer"]
+  body = {
+    properties = {
+      subnet = {
+        id = azapi_resource.private_endpoints_subnet.id
+      }
+      privateLinkServiceConnections = [
+        {
+          name = "${var.sql_server_name}-psc"
+          properties = {
+            privateLinkServiceId = azapi_resource.sql_server.id
+            groupIds             = ["sqlServer"]
+          }
+        }
+      ]
+    }
   }
 
-  private_dns_zone_group {
-    name                 = "default"
-    private_dns_zone_ids = [azurerm_private_dns_zone.sql.id]
+  tags = var.tags
+}
+
+resource "azapi_resource" "sql_dns_zone" {
+  type      = "Microsoft.Network/privateDnsZones@2020-06-01"
+  name      = "privatelink.database.windows.net"
+  location  = "global"
+  parent_id = azapi_resource.resource_group.id
+
+  tags = var.tags
+}
+
+resource "azapi_resource" "sql_dns_zone_link" {
+  type      = "Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01"
+  name      = "sql-dns-link"
+  location  = "global"
+  parent_id = azapi_resource.sql_dns_zone.id
+
+  body = {
+    properties = {
+      virtualNetwork = {
+        id = azapi_resource.virtual_network.id
+      }
+      registrationEnabled = false
+    }
   }
+
+  tags = var.tags
 }
 
-resource "azurerm_private_dns_zone" "sql" {
-  name                = "privatelink.database.windows.net"
-  resource_group_name = azurerm_resource_group.this.name
-}
+resource "azapi_resource" "sql_pe_dns_zone_group" {
+  type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01"
+  name      = "default"
+  parent_id = azapi_resource.sql_private_endpoint.id
 
-resource "azurerm_private_dns_zone_virtual_network_link" "sql" {
-  name                  = "sql-dns-link"
-  resource_group_name   = azurerm_resource_group.this.name
-  private_dns_zone_name = azurerm_private_dns_zone.sql.name
-  virtual_network_id    = azurerm_virtual_network.this.id
+  body = {
+    properties = {
+      privateDnsZoneConfigs = [
+        {
+          name = "config"
+          properties = {
+            privateDnsZoneId = azapi_resource.sql_dns_zone.id
+          }
+        }
+      ]
+    }
+  }
 }
 ```
 
@@ -325,7 +399,7 @@ connection.connect();
 
 ## Common Pitfalls
 - **Trying to use Azure RBAC for data access**: Azure SQL does NOT use `Microsoft.Authorization/roleAssignments` for data-plane access. You MUST create contained database users via T-SQL (`CREATE USER [name] FROM EXTERNAL PROVIDER`). This cannot be done in Terraform or Bicep.
-- **Leaving SQL authentication enabled**: Always set `azuread_authentication_only = true` on the server. Without this, password-based SQL logins remain available.
+- **Leaving SQL authentication enabled**: Always set `azureADOnlyAuthentication = true` in the server's `administrators` properties. Without this, password-based SQL logins remain available.
 - **Forgetting the post-deploy T-SQL step**: Infrastructure deployment creates the server and database, but application identity access requires a separate T-SQL script run by the AAD admin.
 - **Serverless auto-pause latency**: First connection after auto-pause takes 30-60 seconds to resume. Applications need appropriate connection timeout settings.
 - **pyodbc token encoding**: The access token must be encoded as UTF-16-LE with a 2-byte length prefix. This is a common source of authentication failures in Python.

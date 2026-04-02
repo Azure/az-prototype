@@ -33,55 +33,75 @@ Azure OpenAI is the preferred path for enterprise AI workloads. It provides the 
 ### Basic Resource
 
 ```hcl
-resource "azurerm_cognitive_account" "this" {
-  name                          = var.name
-  location                      = var.location
-  resource_group_name           = var.resource_group_name
-  kind                          = "OpenAI"
-  sku_name                      = "S0"
-  custom_subdomain_name         = var.name  # Required for token-based auth
-  public_network_access_enabled = false  # Unless told otherwise, disabled per governance policy
-  local_auth_enabled            = false     # CRITICAL: Disable key-based auth
+resource "azapi_resource" "openai" {
+  type      = "Microsoft.CognitiveServices/accounts@2024-10-01"
+  name      = var.name
+  location  = var.location
+  parent_id = var.resource_group_id
 
   identity {
     type = "SystemAssigned"
   }
 
+  body = {
+    kind = "OpenAI"
+    sku = {
+      name = "S0"
+    }
+    properties = {
+      customSubDomainName = var.name  # Required for token-based auth
+      publicNetworkAccess = "Disabled"  # Unless told otherwise, disabled per governance policy
+      disableLocalAuth    = true        # CRITICAL: Disable key-based auth
+    }
+  }
+
   tags = var.tags
+
+  response_export_values = ["properties.endpoint"]
 }
 
 # Model deployment -- CRITICAL: separate resource
-resource "azurerm_cognitive_deployment" "gpt4o" {
-  name                 = "gpt-4o"
-  cognitive_account_id = azurerm_cognitive_account.this.id
+resource "azapi_resource" "gpt4o" {
+  type      = "Microsoft.CognitiveServices/accounts/deployments@2024-10-01"
+  name      = "gpt-4o"
+  parent_id = azapi_resource.openai.id
 
-  model {
-    format  = "OpenAI"
-    name    = "gpt-4o"
-    version = "2024-11-20"
-  }
-
-  sku {
-    name     = "Standard"
-    capacity = 10  # Thousands of tokens per minute (TPM)
+  body = {
+    sku = {
+      name     = "Standard"
+      capacity = 10  # Thousands of tokens per minute (TPM)
+    }
+    properties = {
+      model = {
+        format  = "OpenAI"
+        name    = "gpt-4o"
+        version = "2024-11-20"
+      }
+    }
   }
 }
 
 # Embeddings deployment
-resource "azurerm_cognitive_deployment" "embeddings" {
-  name                 = "text-embedding-3-small"
-  cognitive_account_id = azurerm_cognitive_account.this.id
+resource "azapi_resource" "embeddings" {
+  type      = "Microsoft.CognitiveServices/accounts/deployments@2024-10-01"
+  name      = "text-embedding-3-small"
+  parent_id = azapi_resource.openai.id
 
-  model {
-    format  = "OpenAI"
-    name    = "text-embedding-3-small"
-    version = "1"
+  body = {
+    sku = {
+      name     = "Standard"
+      capacity = 120  # TPM
+    }
+    properties = {
+      model = {
+        format  = "OpenAI"
+        name    = "text-embedding-3-small"
+        version = "1"
+      }
+    }
   }
 
-  sku {
-    name     = "Standard"
-    capacity = 120  # TPM
-  }
+  depends_on = [azapi_resource.gpt4o]  # Deploy sequentially to avoid conflicts
 }
 ```
 
@@ -89,24 +109,48 @@ resource "azurerm_cognitive_deployment" "embeddings" {
 
 ```hcl
 # Cognitive Services User -- invoke models (inference)
-resource "azurerm_role_assignment" "openai_user" {
-  scope                = azurerm_cognitive_account.this.id
-  role_definition_name = "Cognitive Services User"
-  principal_id         = var.managed_identity_principal_id
+resource "azapi_resource" "openai_user_role" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.openai.id}${var.managed_identity_principal_id}cs-user")
+  parent_id = azapi_resource.openai.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/a97b65f3-24c7-4388-baec-2e87135dc908"  # Cognitive Services User
+      principalId      = var.managed_identity_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 
 # Cognitive Services Contributor -- manage deployments and account settings
-resource "azurerm_role_assignment" "openai_contributor" {
-  scope                = azurerm_cognitive_account.this.id
-  role_definition_name = "Cognitive Services Contributor"
-  principal_id         = var.admin_identity_principal_id
+resource "azapi_resource" "openai_contributor_role" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.openai.id}${var.admin_identity_principal_id}cs-contributor")
+  parent_id = azapi_resource.openai.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/25fbc0a9-bd7c-42a3-aa1a-3b75d497ee68"  # Cognitive Services Contributor
+      principalId      = var.admin_identity_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 
 # Cognitive Services OpenAI User -- specific to OpenAI operations (alternative to generic User)
-resource "azurerm_role_assignment" "openai_specific_user" {
-  scope                = azurerm_cognitive_account.this.id
-  role_definition_name = "Cognitive Services OpenAI User"
-  principal_id         = var.managed_identity_principal_id
+resource "azapi_resource" "openai_specific_user_role" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.openai.id}${var.managed_identity_principal_id}cs-openai-user")
+  parent_id = azapi_resource.openai.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"  # Cognitive Services OpenAI User
+      principalId      = var.managed_identity_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 ```
 
@@ -118,30 +162,51 @@ RBAC role IDs:
 ### Private Endpoint
 
 ```hcl
-resource "azurerm_private_endpoint" "openai" {
-  count = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+resource "azapi_resource" "private_endpoint" {
+  count     = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+  type      = "Microsoft.Network/privateEndpoints@2023-11-01"
+  name      = "pe-${var.name}"
+  location  = var.location
+  parent_id = var.resource_group_id
 
-  name                = "pe-${var.name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  subnet_id           = var.subnet_id
-
-  private_service_connection {
-    name                           = "psc-${var.name}"
-    private_connection_resource_id = azurerm_cognitive_account.this.id
-    subresource_names              = ["account"]
-    is_manual_connection           = false
-  }
-
-  dynamic "private_dns_zone_group" {
-    for_each = var.private_dns_zone_id != null ? [1] : []
-    content {
-      name                 = "dns-zone-group"
-      private_dns_zone_ids = [var.private_dns_zone_id]
+  body = {
+    properties = {
+      subnet = {
+        id = var.subnet_id
+      }
+      privateLinkServiceConnections = [
+        {
+          name = "psc-${var.name}"
+          properties = {
+            privateLinkServiceId = azapi_resource.openai.id
+            groupIds             = ["account"]
+          }
+        }
+      ]
     }
   }
 
   tags = var.tags
+}
+
+resource "azapi_resource" "dns_zone_group" {
+  count     = var.enable_private_endpoint && var.subnet_id != null && var.private_dns_zone_id != null ? 1 : 0
+  type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01"
+  name      = "dns-zone-group"
+  parent_id = azapi_resource.private_endpoint[0].id
+
+  body = {
+    properties = {
+      privateDnsZoneConfigs = [
+        {
+          name = "config"
+          properties = {
+            privateDnsZoneId = var.private_dns_zone_id
+          }
+        }
+      ]
+    }
+  }
 }
 ```
 

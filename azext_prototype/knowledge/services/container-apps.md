@@ -18,107 +18,179 @@
 
 ### Basic Resource
 ```hcl
-resource "azurerm_log_analytics_workspace" "this" {
-  name                = "${var.project_name}-logs"
-  location            = azurerm_resource_group.this.location
-  resource_group_name = azurerm_resource_group.this.name
-  sku                 = "PerGB2018"
-  retention_in_days   = 30
+resource "azapi_resource" "log_analytics" {
+  type      = "Microsoft.OperationalInsights/workspaces@2023-09-01"
+  name      = "${var.project_name}-logs"
+  location  = azapi_resource.resource_group.output.location
+  parent_id = azapi_resource.resource_group.id
+
+  body = {
+    properties = {
+      sku = {
+        name = "PerGB2018"
+      }
+      retentionInDays = 30
+    }
+  }
+
+  tags = var.tags
+
+  response_export_values = ["properties.customerId"]
+}
+
+resource "azapi_resource" "container_app_env" {
+  type      = "Microsoft.App/managedEnvironments@2024-03-01"
+  name      = "${var.project_name}-env"
+  location  = azapi_resource.resource_group.output.location
+  parent_id = azapi_resource.resource_group.id
+
+  body = {
+    properties = {
+      appLogsConfiguration = {
+        destination = "log-analytics"
+        logAnalyticsConfiguration = {
+          customerId = azapi_resource.log_analytics.output.properties.customerId
+          sharedKey  = jsondecode(azapi_resource_action.log_analytics_keys.output).primarySharedKey
+        }
+      }
+    }
+  }
 
   tags = var.tags
 }
 
-resource "azurerm_container_app_environment" "this" {
-  name                       = "${var.project_name}-env"
-  location                   = azurerm_resource_group.this.location
-  resource_group_name        = azurerm_resource_group.this.name
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
+resource "azapi_resource_action" "log_analytics_keys" {
+  type        = "Microsoft.OperationalInsights/workspaces@2023-09-01"
+  resource_id = azapi_resource.log_analytics.id
+  action      = "sharedKeys"
+  method      = "POST"
 
-  tags = var.tags
+  response_export_values = ["*"]
 }
 
-resource "azurerm_container_registry" "this" {
-  name                = var.acr_name   # 5-50 chars, alphanumeric only
-  resource_group_name = azurerm_resource_group.this.name
-  location            = azurerm_resource_group.this.location
-  sku                 = "Basic"
-  admin_enabled       = false   # Use managed identity, not admin credentials
+resource "azapi_resource" "acr" {
+  type      = "Microsoft.ContainerRegistry/registries@2023-11-01-preview"
+  name      = var.acr_name   # 5-50 chars, alphanumeric only
+  location  = azapi_resource.resource_group.output.location
+  parent_id = azapi_resource.resource_group.id
+
+  body = {
+    sku = {
+      name = "Basic"
+    }
+    properties = {
+      adminUserEnabled = false   # Use managed identity, not admin credentials
+    }
+  }
 
   tags = var.tags
+
+  response_export_values = ["properties.loginServer"]
 }
 
-resource "azurerm_user_assigned_identity" "app" {
-  name                = "${var.project_name}-app-id"
-  location            = azurerm_resource_group.this.location
-  resource_group_name = azurerm_resource_group.this.name
+resource "azapi_resource" "app_identity" {
+  type      = "Microsoft.ManagedIdentity/userAssignedIdentities@2023-07-31-preview"
+  name      = "${var.project_name}-app-id"
+  location  = azapi_resource.resource_group.output.location
+  parent_id = azapi_resource.resource_group.id
+
+  response_export_values = ["properties.principalId", "properties.clientId"]
 }
 
 # Grant the managed identity AcrPull on the container registry
-resource "azurerm_role_assignment" "acr_pull" {
-  scope                = azurerm_container_registry.this.id
-  role_definition_name = "AcrPull"
-  principal_id         = azurerm_user_assigned_identity.app.principal_id
+resource "azapi_resource" "acr_pull" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("sha1", "${azapi_resource.acr.id}-${azapi_resource.app_identity.output.properties.principalId}-7f951dda-4ed3-4680-a7ca-43fe172d538d")
+  parent_id = azapi_resource.acr.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/7f951dda-4ed3-4680-a7ca-43fe172d538d"  # AcrPull
+      principalId      = azapi_resource.app_identity.output.properties.principalId
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 
-resource "azurerm_container_app" "this" {
-  name                         = var.app_name
-  container_app_environment_id = azurerm_container_app_environment.this.id
-  resource_group_name          = azurerm_resource_group.this.name
-  revision_mode                = "Single"
+resource "azapi_resource" "container_app" {
+  type      = "Microsoft.App/containerApps@2024-03-01"
+  name      = var.app_name
+  location  = azapi_resource.resource_group.output.location
+  parent_id = azapi_resource.resource_group.id
 
   identity {
     type         = "UserAssigned"
-    identity_ids = [azurerm_user_assigned_identity.app.id]
+    identity_ids = [azapi_resource.app_identity.id]
   }
 
-  registry {
-    server   = azurerm_container_registry.this.login_server
-    identity = azurerm_user_assigned_identity.app.id
-  }
-
-  template {
-    min_replicas = 0
-    max_replicas = 3
-
-    container {
-      name   = var.app_name
-      image  = "${azurerm_container_registry.this.login_server}/${var.image_name}:${var.image_tag}"
-      cpu    = 0.5
-      memory = "1Gi"
-
-      env {
-        name  = "AZURE_CLIENT_ID"
-        value = azurerm_user_assigned_identity.app.client_id
+  body = {
+    properties = {
+      managedEnvironmentId = azapi_resource.container_app_env.id
+      configuration = {
+        registries = [
+          {
+            server   = azapi_resource.acr.output.properties.loginServer
+            identity = azapi_resource.app_identity.id
+          }
+        ]
+        ingress = {
+          external    = true
+          targetPort  = 8080
+          transport   = "auto"
+          traffic = [
+            {
+              weight         = 100
+              latestRevision = true
+            }
+          ]
+        }
       }
-
-      liveness_probe {
-        transport = "HTTP"
-        path      = "/health"
-        port      = 8080
+      template = {
+        containers = [
+          {
+            name  = var.app_name
+            image = "${azapi_resource.acr.output.properties.loginServer}/${var.image_name}:${var.image_tag}"
+            resources = {
+              cpu    = 0.5
+              memory = "1Gi"
+            }
+            env = [
+              {
+                name  = "AZURE_CLIENT_ID"
+                value = azapi_resource.app_identity.output.properties.clientId
+              }
+            ]
+            probes = [
+              {
+                type = "Liveness"
+                httpGet = {
+                  path = "/health"
+                  port = 8080
+                }
+              }
+              {
+                type = "Readiness"
+                httpGet = {
+                  path = "/ready"
+                  port = 8080
+                }
+              }
+            ]
+          }
+        ]
+        scale = {
+          minReplicas = 0
+          maxReplicas = 3
+        }
       }
-
-      readiness_probe {
-        transport = "HTTP"
-        path      = "/ready"
-        port      = 8080
-      }
-    }
-  }
-
-  ingress {
-    external_enabled = true
-    target_port      = 8080
-    transport        = "auto"
-
-    traffic_weight {
-      percentage      = 100
-      latest_revision = true
     }
   }
 
   tags = var.tags
 
-  depends_on = [azurerm_role_assignment.acr_pull]
+  depends_on = [azapi_resource.acr_pull]
+
+  response_export_values = ["properties.configuration.ingress.fqdn"]
 }
 ```
 
@@ -127,26 +199,50 @@ resource "azurerm_container_app" "this" {
 # Container Apps uses standard Azure RBAC for control-plane operations.
 # For data-plane access to OTHER services, assign roles to the app's managed identity.
 
-# AcrPull — required for pulling images from Container Registry
+# AcrPull -- required for pulling images from Container Registry
 # Role ID: 7f951dda-4ed3-4680-a7ca-43fe172d538d
-resource "azurerm_role_assignment" "acr_pull" {
-  scope                = azurerm_container_registry.this.id
-  role_definition_name = "AcrPull"
-  principal_id         = azurerm_user_assigned_identity.app.principal_id
+resource "azapi_resource" "acr_pull" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("sha1", "${azapi_resource.acr.id}-${azapi_resource.app_identity.output.properties.principalId}-7f951dda-4ed3-4680-a7ca-43fe172d538d")
+  parent_id = azapi_resource.acr.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/7f951dda-4ed3-4680-a7ca-43fe172d538d"  # AcrPull
+      principalId      = azapi_resource.app_identity.output.properties.principalId
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 
 # Example: grant access to Key Vault secrets
-resource "azurerm_role_assignment" "kv_secrets_user" {
-  scope                = azurerm_key_vault.this.id
-  role_definition_name = "Key Vault Secrets User"
-  principal_id         = azurerm_user_assigned_identity.app.principal_id
+resource "azapi_resource" "kv_secrets_user" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("sha1", "${azapi_resource.key_vault.id}-${azapi_resource.app_identity.output.properties.principalId}-4633458b-17de-408a-b874-0445c86b69e6")
+  parent_id = azapi_resource.key_vault.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/4633458b-17de-408a-b874-0445c86b69e6"  # Key Vault Secrets User
+      principalId      = azapi_resource.app_identity.output.properties.principalId
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 
 # Example: grant access to Storage blobs
-resource "azurerm_role_assignment" "storage_blob_contributor" {
-  scope                = azurerm_storage_account.this.id
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azurerm_user_assigned_identity.app.principal_id
+resource "azapi_resource" "storage_blob_contributor" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("sha1", "${azapi_resource.storage_account.id}-${azapi_resource.app_identity.output.properties.principalId}-ba92f5b4-2d11-453d-a403-e96b0029c9fe")
+  parent_id = azapi_resource.storage_account.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe"  # Storage Blob Data Contributor
+      principalId      = azapi_resource.app_identity.output.properties.principalId
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 ```
 
@@ -155,29 +251,48 @@ resource "azurerm_role_assignment" "storage_blob_contributor" {
 # Container Apps does NOT use private endpoints.
 # Instead, use VNet integration via the Container Apps Environment.
 
-resource "azurerm_container_app_environment" "this" {
-  name                           = "${var.project_name}-env"
-  location                       = azurerm_resource_group.this.location
-  resource_group_name            = azurerm_resource_group.this.name
-  log_analytics_workspace_id     = azurerm_log_analytics_workspace.this.id
-  infrastructure_subnet_id       = azurerm_subnet.container_apps.id   # VNet integration
-  internal_load_balancer_enabled = false                              # true = internal only
+resource "azapi_resource" "container_app_env_vnet" {
+  type      = "Microsoft.App/managedEnvironments@2024-03-01"
+  name      = "${var.project_name}-env"
+  location  = azapi_resource.resource_group.output.location
+  parent_id = azapi_resource.resource_group.id
+
+  body = {
+    properties = {
+      vnetConfiguration = {
+        infrastructureSubnetId = azapi_resource.container_apps_subnet.id
+        internal               = false   # true = internal only
+      }
+      appLogsConfiguration = {
+        destination = "log-analytics"
+        logAnalyticsConfiguration = {
+          customerId = azapi_resource.log_analytics.output.properties.customerId
+          sharedKey  = jsondecode(azapi_resource_action.log_analytics_keys.output).primarySharedKey
+        }
+      }
+    }
+  }
 
   tags = var.tags
 }
 
 # The subnet must be delegated to Microsoft.App/environments and sized /23 or larger
-resource "azurerm_subnet" "container_apps" {
-  name                 = "snet-container-apps"
-  resource_group_name  = azurerm_resource_group.this.name
-  virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = ["10.0.16.0/23"]   # Minimum /23 for Container Apps
+resource "azapi_resource" "container_apps_subnet" {
+  type      = "Microsoft.Network/virtualNetworks/subnets@2024-01-01"
+  name      = "snet-container-apps"
+  parent_id = azapi_resource.virtual_network.id
 
-  delegation {
-    name = "container-apps"
-    service_delegation {
-      name    = "Microsoft.App/environments"
-      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
+  body = {
+    properties = {
+      addressPrefix = "10.0.16.0/23"   # Minimum /23 for Container Apps
+      delegations = [
+        {
+          name = "container-apps"
+          properties = {
+            serviceName = "Microsoft.App/environments"
+          }
+        }
+      ]
     }
   }
 }
@@ -462,10 +577,10 @@ app.listen(8080, "0.0.0.0", () => {
 ```
 
 ## Common Pitfalls
-- **No private endpoints**: Container Apps does NOT support private endpoints. Network isolation is achieved through VNet integration on the Container Apps Environment. Set `internal_load_balancer_enabled = true` for internal-only access.
+- **No private endpoints**: Container Apps does NOT support private endpoints. Network isolation is achieved through VNet integration on the Container Apps Environment. Set `vnetConfiguration.internal = true` for internal-only access.
 - **Subnet sizing**: The VNet-integrated subnet must be at least /23 (512 addresses). A /27 or /28 will fail. The subnet must be delegated to `Microsoft.App/environments`.
 - **AcrPull role timing**: The role assignment must propagate before the container app tries to pull the image. Use `depends_on` to ensure ordering. Propagation can take up to 10 minutes.
-- **Admin credentials on ACR**: Never set `admin_enabled = true`. Use managed identity with AcrPull role instead.
+- **Admin credentials on ACR**: Never set `adminUserEnabled = true`. Use managed identity with AcrPull role instead.
 - **Missing health probes**: Without liveness and readiness probes, Container Apps cannot properly manage rolling deployments and traffic routing.
 - **Secrets via environment variables**: Do not put secrets directly in environment variables. Use Key Vault references with the managed identity, or use Container Apps' built-in secrets store that pulls from Key Vault.
 - **Scale-to-zero cold start**: When min replicas is 0, the first request after scale-down triggers a cold start (container pull + startup). Set `min_replicas = 1` if latency is critical.
@@ -483,3 +598,9 @@ app.listen(8080, "0.0.0.0", () => {
 - Init containers for startup dependencies
 - Managed certificate with custom domain and DNS validation
 - Integration with Azure Front Door or Application Gateway for WAF
+
+## CRITICAL: Container Apps Identity for ACR Pull
+
+- Container Apps pulling from ACR **MUST** use `UserAssigned` (or `SystemAssigned, UserAssigned`) identity with the UAMI attached in the `identity.userAssignedIdentities` map.
+- ACR `AcrPull` RBAC **MUST** be assigned to the UAMI _before_ the container app is created. Use implicit dependency via the identity resource, **NOT** `depends_on` on the RBAC resource (that creates circular dependencies).
+- When multiple managed identities are attached, set `AZURE_CLIENT_ID` env var to the UAMI's `client_id` for DefaultAzureCredential disambiguation.

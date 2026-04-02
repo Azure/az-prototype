@@ -234,6 +234,23 @@ Anti-pattern detection
 * **deploy.sh correctness rules** -- terraform agent prompt now documents that
   ``terraform output`` has no ``-state=`` flag, and cleanup traps must use
   captured ``$?`` not script-level variables.
+* **Service registry normalization** -- renamed ``bicep_resource`` to
+  ``resource_type`` and ``bicep_api_version`` to ``api_version`` across all
+  30 service entries.  Removed ``terraform_resource`` (listed ``azurerm_*``
+  names which are wrong for azapi).  Added Cosmos DB child resources
+  (``sqlRoleAssignments``, ``sqlDatabases``, ``sqlContainers``).
+* **Knowledge file azapi migration** -- converted 424 ``azurerm_`` references
+  across 25 service knowledge files to ``azapi_resource`` patterns.  This was
+  a major source of incorrect resource patterns in generated code.
+* **Container Apps identity rules** -- added to ``container-apps.md``:
+  UAMI required for ACR pull, no circular ``depends_on``,
+  ``AZURE_CLIENT_ID`` for multi-identity disambiguation.
+* **New anti-patterns**: ANTI-CONT-003 (SystemAssigned-only with ACR),
+  ANTI-AUTH-004 (Key Vault missing Crypto User), ANTI-COMP-009 (Storage
+  Blob Delegator vs Data Contributor).
+* **QA false positive fix** -- Section 10 (Output Consistency) no longer
+  flags cross-stage output keys as "non-standard" when they match the
+  actual exported names from upstream stages.
 * **IaC tool scoping** -- anti-pattern checks now support ``applies_to``
   field (domain-level or pattern-level, never both in the same file).
   Bicep-structure checks only run on Bicep builds, Terraform-structure

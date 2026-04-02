@@ -17,52 +17,77 @@
 
 ### Basic Resource
 ```hcl
-resource "azurerm_cosmosdb_account" "this" {
-  name                          = var.cosmos_account_name
-  location                      = azurerm_resource_group.this.location
-  resource_group_name           = azurerm_resource_group.this.name
-  offer_type                    = "Standard"
-  kind                          = "GlobalDocumentDB"
-  local_authentication_disabled = true   # Enforce RBAC-only access
+resource "azapi_resource" "cosmos_account" {
+  type      = "Microsoft.DocumentDB/databaseAccounts@2024-05-15"
+  name      = var.cosmos_account_name
+  location  = azapi_resource.resource_group.output.location
+  parent_id = azapi_resource.resource_group.id
 
-  capabilities {
-    name = "EnableServerless"
-  }
-
-  consistency_policy {
-    consistency_level = "Session"
-  }
-
-  geo_location {
-    location          = azurerm_resource_group.this.location
-    failover_priority = 0
+  body = {
+    kind = "GlobalDocumentDB"
+    properties = {
+      databaseAccountOfferType = "Standard"
+      disableLocalAuth         = true   # Enforce RBAC-only access
+      capabilities = [
+        {
+          name = "EnableServerless"
+        }
+      ]
+      consistencyPolicy = {
+        defaultConsistencyLevel = "Session"
+      }
+      locations = [
+        {
+          locationName     = azapi_resource.resource_group.output.location
+          failoverPriority = 0
+        }
+      ]
+    }
   }
 
   tags = var.tags
+
+  response_export_values = ["*"]
 }
 
-resource "azurerm_cosmosdb_sql_database" "this" {
-  name                = var.database_name
-  resource_group_name = azurerm_resource_group.this.name
-  account_name        = azurerm_cosmosdb_account.this.name
-}
+resource "azapi_resource" "cosmos_sql_database" {
+  type      = "Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-05-15"
+  name      = var.database_name
+  parent_id = azapi_resource.cosmos_account.id
 
-resource "azurerm_cosmosdb_sql_container" "this" {
-  name                = var.container_name
-  resource_group_name = azurerm_resource_group.this.name
-  account_name        = azurerm_cosmosdb_account.this.name
-  database_name       = azurerm_cosmosdb_sql_database.this.name
-  partition_key_paths = ["/partitionKey"]
-
-  indexing_policy {
-    indexing_mode = "consistent"
-
-    included_path {
-      path = "/*"
+  body = {
+    properties = {
+      resource = {
+        id = var.database_name
+      }
     }
+  }
+}
 
-    excluded_path {
-      path = "/\"_etag\"/?"
+resource "azapi_resource" "cosmos_sql_container" {
+  type      = "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/sqlContainers@2024-05-15"
+  name      = var.container_name
+  parent_id = azapi_resource.cosmos_sql_database.id
+
+  body = {
+    properties = {
+      resource = {
+        id           = var.container_name
+        partitionKey = {
+          paths   = ["/partitionKey"]
+          kind    = "Hash"
+          version = 2
+        }
+        indexingPolicy = {
+          indexingMode  = "consistent"
+          includedPaths = [
+            { path = "/*" }
+          ]
+          excludedPaths = [
+            { path = "/\"_etag\"/?" }
+          ]
+        }
+      }
     }
   }
 }
@@ -70,59 +95,112 @@ resource "azurerm_cosmosdb_sql_container" "this" {
 
 ### RBAC Assignment
 ```hcl
-# CRITICAL: Cosmos DB uses its OWN role assignment resource, NOT azurerm_role_assignment.
+# CRITICAL: Cosmos DB uses its OWN sqlRoleAssignment resource, NOT Microsoft.Authorization/roleAssignments.
 # The built-in role definition IDs are:
 #   Reader:      00000000-0000-0000-0000-000000000001
 #   Contributor: 00000000-0000-0000-0000-000000000002
 
-resource "azurerm_cosmosdb_sql_role_assignment" "data_contributor" {
-  resource_group_name = azurerm_resource_group.this.name
-  account_name        = azurerm_cosmosdb_account.this.name
-  role_definition_id  = "${azurerm_cosmosdb_account.this.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
-  principal_id        = azurerm_user_assigned_identity.this.principal_id
-  scope               = azurerm_cosmosdb_account.this.id
+resource "azapi_resource" "cosmos_data_contributor" {
+  type      = "Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-05-15"
+  name      = uuidv5("sha1", "${azapi_resource.cosmos_account.id}-contributor-${azapi_resource.user_assigned_identity.output.properties.principalId}")
+  parent_id = azapi_resource.cosmos_account.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "${azapi_resource.cosmos_account.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
+      principalId      = azapi_resource.user_assigned_identity.output.properties.principalId
+      scope            = azapi_resource.cosmos_account.id
+    }
+  }
 }
 
-resource "azurerm_cosmosdb_sql_role_assignment" "data_reader" {
-  resource_group_name = azurerm_resource_group.this.name
-  account_name        = azurerm_cosmosdb_account.this.name
-  role_definition_id  = "${azurerm_cosmosdb_account.this.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000001"
-  principal_id        = azurerm_user_assigned_identity.this.principal_id
-  scope               = azurerm_cosmosdb_account.this.id
+resource "azapi_resource" "cosmos_data_reader" {
+  type      = "Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-05-15"
+  name      = uuidv5("sha1", "${azapi_resource.cosmos_account.id}-reader-${azapi_resource.user_assigned_identity.output.properties.principalId}")
+  parent_id = azapi_resource.cosmos_account.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "${azapi_resource.cosmos_account.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000001"
+      principalId      = azapi_resource.user_assigned_identity.output.properties.principalId
+      scope            = azapi_resource.cosmos_account.id
+    }
+  }
 }
 ```
 
 ### Private Endpoint
 ```hcl
-resource "azurerm_private_endpoint" "cosmos" {
-  name                = "${var.cosmos_account_name}-pe"
-  location            = azurerm_resource_group.this.location
-  resource_group_name = azurerm_resource_group.this.name
-  subnet_id           = azurerm_subnet.private_endpoints.id
+resource "azapi_resource" "cosmos_private_endpoint" {
+  type      = "Microsoft.Network/privateEndpoints@2023-11-01"
+  name      = "${var.cosmos_account_name}-pe"
+  location  = azapi_resource.resource_group.output.location
+  parent_id = azapi_resource.resource_group.id
 
-  private_service_connection {
-    name                           = "${var.cosmos_account_name}-psc"
-    private_connection_resource_id = azurerm_cosmosdb_account.this.id
-    is_manual_connection           = false
-    subresource_names              = ["Sql"]   # Capital 'S' — this is required
+  body = {
+    properties = {
+      subnet = {
+        id = azapi_resource.private_endpoints_subnet.id
+      }
+      privateLinkServiceConnections = [
+        {
+          name = "${var.cosmos_account_name}-psc"
+          properties = {
+            privateLinkServiceId = azapi_resource.cosmos_account.id
+            groupIds             = ["Sql"]   # Capital 'S' — this is required
+          }
+        }
+      ]
+    }
   }
 
-  private_dns_zone_group {
-    name                 = "default"
-    private_dns_zone_ids = [azurerm_private_dns_zone.cosmos.id]
+  tags = var.tags
+}
+
+resource "azapi_resource" "cosmos_dns_zone" {
+  type      = "Microsoft.Network/privateDnsZones@2020-06-01"
+  name      = "privatelink.documents.azure.com"
+  location  = "global"
+  parent_id = azapi_resource.resource_group.id
+
+  tags = var.tags
+}
+
+resource "azapi_resource" "cosmos_dns_zone_link" {
+  type      = "Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01"
+  name      = "cosmos-dns-link"
+  location  = "global"
+  parent_id = azapi_resource.cosmos_dns_zone.id
+
+  body = {
+    properties = {
+      virtualNetwork = {
+        id = azapi_resource.virtual_network.id
+      }
+      registrationEnabled = false
+    }
   }
+
+  tags = var.tags
 }
 
-resource "azurerm_private_dns_zone" "cosmos" {
-  name                = "privatelink.documents.azure.com"
-  resource_group_name = azurerm_resource_group.this.name
-}
+resource "azapi_resource" "cosmos_pe_dns_zone_group" {
+  type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01"
+  name      = "default"
+  parent_id = azapi_resource.cosmos_private_endpoint.id
 
-resource "azurerm_private_dns_zone_virtual_network_link" "cosmos" {
-  name                  = "cosmos-dns-link"
-  resource_group_name   = azurerm_resource_group.this.name
-  private_dns_zone_name = azurerm_private_dns_zone.cosmos.name
-  virtual_network_id    = azurerm_virtual_network.this.id
+  body = {
+    properties = {
+      privateDnsZoneConfigs = [
+        {
+          name = "config"
+          properties = {
+            privateDnsZoneId = azapi_resource.cosmos_dns_zone.id
+          }
+        }
+      ]
+    }
+  }
 }
 ```
 
@@ -314,8 +392,8 @@ const { resources } = await container.items
 ```
 
 ## Common Pitfalls
-- **MOST COMMON MISTAKE**: Using `azurerm_role_assignment` for data-plane RBAC. Cosmos DB requires `azurerm_cosmosdb_sql_role_assignment` with its own built-in role definition IDs (`00000000-0000-0000-0000-000000000001` for reader, `00000000-0000-0000-0000-000000000002` for contributor). The scope must be the Cosmos account ID, not a resource group.
-- **Forgetting to disable local auth**: Set `local_authentication_disabled = true` (Terraform) or `disableLocalAuth: true` (Bicep) to enforce RBAC-only. Without this, key-based access remains available.
+- **MOST COMMON MISTAKE**: Using `Microsoft.Authorization/roleAssignments` for data-plane RBAC. Cosmos DB requires `Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments` with its own built-in role definition IDs (`00000000-0000-0000-0000-000000000001` for reader, `00000000-0000-0000-0000-000000000002` for contributor). The scope must be the Cosmos account ID, not a resource group.
+- **Forgetting to disable local auth**: Set `disableLocalAuth = true` in the `body.properties` block (Terraform azapi) or `disableLocalAuth: true` (Bicep) to enforce RBAC-only. Without this, key-based access remains available.
 - **Private endpoint subresource**: The group ID is `Sql` with a capital `S`, not `sql` or `SQL`.
 - **Partition key immutability**: Once a container is created with a partition key, it cannot be changed. Choose carefully before creating containers.
 - **Serverless limitations**: Serverless accounts are single-region only and have a 1 MB max document size. Cannot convert between serverless and provisioned after creation.

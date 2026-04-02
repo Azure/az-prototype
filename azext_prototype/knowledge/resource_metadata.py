@@ -86,7 +86,7 @@ def _load_registry() -> tuple[dict[str, str], dict[str, Any]]:
     for key, entry in data.items():
         if not isinstance(entry, dict):
             continue
-        bicep_res = entry.get("bicep_resource", "")
+        bicep_res = entry.get("resource_type", "") or entry.get("bicep_resource", "")
         if not bicep_res:
             continue
         # Some entries are comma-separated (e.g. "Microsoft.App/containerApps, Microsoft.App/managedEnvironments")
@@ -142,7 +142,7 @@ def resolve_resource_metadata(
         service_key = index.get(rt_lower)
         if service_key and service_key in data:
             entry = data[service_key]
-            api_ver = entry.get("bicep_api_version", "")
+            api_ver = entry.get("api_version", "") or entry.get("bicep_api_version", "")
             if api_ver:
                 result[rt] = ResourceMetadata(
                     resource_type=rt,
@@ -162,7 +162,9 @@ def resolve_resource_metadata(
                 child_suffix = "/".join(rt_parts[2:])
                 children = data[parent_key].get("child_resources", {})
                 if child_suffix in children:
-                    api_ver = children[child_suffix].get("bicep_api_version", "")
+                    api_ver = children[child_suffix].get("api_version", "") or children[child_suffix].get(
+                        "bicep_api_version", ""
+                    )
                     if api_ver:
                         result[rt] = ResourceMetadata(
                             resource_type=rt,

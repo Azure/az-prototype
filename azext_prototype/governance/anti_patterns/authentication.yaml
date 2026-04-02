@@ -61,3 +61,17 @@ patterns:
       - '"Cosmos DB Account Reader Role"'
       - "# Use the most specific built-in role at the narrowest scope"
     warning_message: "Broad role assignment detected (Owner/Contributor at subscription/RG scope) -- use the most specific built-in role at the narrowest scope."
+
+  - id: ANTI-AUTH-004
+    search_patterns:
+      - "key vault secrets user"
+    safe_patterns:
+      - "key vault crypto user"
+    correct_patterns:
+      - "Key Vault Secrets User"
+      - "Key Vault Crypto User"
+      - "# Both Secrets User AND Crypto User roles are required"
+    warning_message: >-
+      Key Vault stage has Secrets User RBAC but is missing Crypto User role
+      (GUID: 12338af0-0e69-4776-bea7-57ae8d297424). Both roles are required
+      per policy AZ-KV-002.

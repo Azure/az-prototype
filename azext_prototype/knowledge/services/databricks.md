@@ -29,39 +29,65 @@ Choose Databricks over Fabric when you need advanced Spark tuning, custom ML pip
 ### Basic Resource
 
 ```hcl
-resource "azurerm_databricks_workspace" "this" {
-  name                          = var.name
-  location                      = var.location
-  resource_group_name           = var.resource_group_name
-  sku                           = "premium"  # Required for Unity Catalog
-  managed_resource_group_name   = "${var.resource_group_name}-databricks-managed"
-  public_network_access_enabled = false  # Unless told otherwise, disabled per governance policy
+resource "azapi_resource" "this" {
+  type      = "Microsoft.Databricks/workspaces@2024-05-01"
+  name      = var.name
+  location  = var.location
+  parent_id = var.resource_group_id
+
+  body = {
+    sku = {
+      name = "premium"  # Required for Unity Catalog
+    }
+    properties = {
+      managedResourceGroupId = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}-databricks-managed"
+      publicNetworkAccess    = "Disabled"  # Unless told otherwise, disabled per governance policy
+    }
+  }
 
   tags = var.tags
+
+  response_export_values = ["*"]
 }
 ```
 
 ### VNet Injection
 
 ```hcl
-resource "azurerm_databricks_workspace" "this" {
-  name                          = var.name
-  location                      = var.location
-  resource_group_name           = var.resource_group_name
-  sku                           = "premium"
-  managed_resource_group_name   = "${var.resource_group_name}-databricks-managed"
-  public_network_access_enabled = false
+resource "azapi_resource" "this" {
+  type      = "Microsoft.Databricks/workspaces@2024-05-01"
+  name      = var.name
+  location  = var.location
+  parent_id = var.resource_group_id
 
-  custom_parameters {
-    virtual_network_id                                   = var.vnet_id
-    public_subnet_name                                   = var.public_subnet_name
-    private_subnet_name                                  = var.private_subnet_name
-    public_subnet_network_security_group_association_id   = var.public_nsg_association_id
-    private_subnet_network_security_group_association_id  = var.private_nsg_association_id
-    no_public_ip                                         = true  # Secure cluster connectivity
+  body = {
+    sku = {
+      name = "premium"
+    }
+    properties = {
+      managedResourceGroupId = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}-databricks-managed"
+      publicNetworkAccess    = "Disabled"
+      requiredNsgRules       = "NoAzureDatabricksRules"
+      parameters = {
+        customVirtualNetworkId = {
+          value = var.vnet_id
+        }
+        customPublicSubnetName = {
+          value = var.public_subnet_name
+        }
+        customPrivateSubnetName = {
+          value = var.private_subnet_name
+        }
+        enableNoPublicIp = {
+          value = true  # Secure cluster connectivity
+        }
+      }
+    }
   }
 
   tags = var.tags
+
+  response_export_values = ["*"]
 }
 ```
 
@@ -69,33 +95,49 @@ resource "azurerm_databricks_workspace" "this" {
 
 ```hcl
 # Storage account for Unity Catalog metastore
-resource "azurerm_storage_account" "unity" {
-  name                     = var.unity_storage_name
-  resource_group_name      = var.resource_group_name
-  location                 = var.location
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
-  is_hns_enabled           = true  # Hierarchical namespace (ADLS Gen2)
+resource "azapi_resource" "unity_storage" {
+  type      = "Microsoft.Storage/storageAccounts@2023-05-01"
+  name      = var.unity_storage_name
+  location  = var.location
+  parent_id = var.resource_group_id
+
+  body = {
+    kind = "StorageV2"
+    sku = {
+      name = "Standard_LRS"
+    }
+    properties = {
+      isHnsEnabled = true  # Hierarchical namespace (ADLS Gen2)
+    }
+  }
 
   tags = var.tags
+
+  response_export_values = ["*"]
 }
 
-resource "azurerm_storage_container" "unity" {
-  name                  = "unity-catalog"
-  storage_account_name  = azurerm_storage_account.unity.name
-  container_access_type = "private"
+resource "azapi_resource" "unity_container" {
+  type      = "Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01"
+  name      = "unity-catalog"
+  parent_id = "${azapi_resource.unity_storage.id}/blobServices/default"
+
+  body = {
+    properties = {
+      publicAccess = "None"
+    }
+  }
 }
 
 # Unity Catalog metastore (via Databricks provider)
 resource "databricks_metastore" "this" {
   name          = "poc-metastore"
-  storage_root  = "abfss://unity-catalog@${azurerm_storage_account.unity.name}.dfs.core.windows.net/"
+  storage_root  = "abfss://unity-catalog@${azapi_resource.unity_storage.name}.dfs.core.windows.net/"
   force_destroy = true  # POC only
   owner         = var.admin_group_name
 }
 
 resource "databricks_metastore_assignment" "this" {
-  workspace_id         = azurerm_databricks_workspace.this.workspace_id
+  workspace_id         = azapi_resource.this.output.properties.workspaceId
   metastore_id         = databricks_metastore.this.id
   default_catalog_name = "main"
 }
@@ -105,17 +147,31 @@ resource "databricks_metastore_assignment" "this" {
 
 ```hcl
 # Contributor on workspace (ARM-level management)
-resource "azurerm_role_assignment" "dbw_contributor" {
-  scope                = azurerm_databricks_workspace.this.id
-  role_definition_name = "Contributor"
-  principal_id         = var.admin_identity_principal_id
+resource "azapi_resource" "dbw_contributor" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.this.id}-contributor")
+  parent_id = azapi_resource.this.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"
+      principalId      = var.admin_identity_principal_id
+    }
+  }
 }
 
 # Grant Databricks managed identity access to storage for Unity Catalog
-resource "azurerm_role_assignment" "unity_blob_contributor" {
-  scope                = azurerm_storage_account.unity.id
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = databricks_metastore.this.delta_sharing_organization_name  # Access connector ID
+resource "azapi_resource" "unity_blob_contributor" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.unity_storage.id}-blob-contributor")
+  parent_id = azapi_resource.unity_storage.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe"
+      principalId      = databricks_metastore.this.delta_sharing_organization_name  # Access connector ID
+    }
+  }
 }
 ```
 
@@ -126,30 +182,51 @@ resource "azurerm_role_assignment" "unity_blob_contributor" {
 Databricks uses **VNet injection** (see above) rather than traditional private endpoints. For additional frontend private endpoint access:
 
 ```hcl
-resource "azurerm_private_endpoint" "databricks" {
-  count = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+resource "azapi_resource" "databricks_pe" {
+  count     = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+  type      = "Microsoft.Network/privateEndpoints@2023-11-01"
+  name      = "pe-${var.name}"
+  location  = var.location
+  parent_id = var.resource_group_id
 
-  name                = "pe-${var.name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  subnet_id           = var.subnet_id
-
-  private_service_connection {
-    name                           = "psc-${var.name}"
-    private_connection_resource_id = azurerm_databricks_workspace.this.id
-    subresource_names              = ["databricks_ui_api"]
-    is_manual_connection           = false
-  }
-
-  dynamic "private_dns_zone_group" {
-    for_each = var.private_dns_zone_id != null ? [1] : []
-    content {
-      name                 = "dns-zone-group"
-      private_dns_zone_ids = [var.private_dns_zone_id]
+  body = {
+    properties = {
+      subnet = {
+        id = var.subnet_id
+      }
+      privateLinkServiceConnections = [
+        {
+          name = "psc-${var.name}"
+          properties = {
+            privateLinkServiceId = azapi_resource.this.id
+            groupIds             = ["databricks_ui_api"]
+          }
+        }
+      ]
     }
   }
 
   tags = var.tags
+}
+
+resource "azapi_resource" "databricks_pe_dns" {
+  count     = var.enable_private_endpoint && var.private_dns_zone_id != null ? 1 : 0
+  type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01"
+  name      = "dns-zone-group"
+  parent_id = azapi_resource.databricks_pe[0].id
+
+  body = {
+    properties = {
+      privateDnsZoneConfigs = [
+        {
+          name = "config"
+          properties = {
+            privateDnsZoneId = var.private_dns_zone_id
+          }
+        }
+      ]
+    }
+  }
 }
 ```
 

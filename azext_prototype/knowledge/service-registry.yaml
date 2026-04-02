@@ -26,9 +26,8 @@ services:
   azure-sql:
     display_name: Azure SQL Database
     resource_provider: Microsoft.Sql
-    terraform_resource: azurerm_mssql_server, azurerm_mssql_database
-    bicep_resource: Microsoft.Sql/servers, Microsoft.Sql/servers/databases
-    bicep_api_version: "2023-08-01-preview"
+    resource_type: Microsoft.Sql/servers, Microsoft.Sql/servers/databases
+    api_version: "2023-08-01-preview"
     private_endpoint:
       dns_zone: privatelink.database.windows.net
       group_id: sqlServer
@@ -56,9 +55,8 @@ services:
   cosmos-db:
     display_name: Azure Cosmos DB
     resource_provider: Microsoft.DocumentDB
-    terraform_resource: azurerm_cosmosdb_account, azurerm_cosmosdb_sql_database
-    bicep_resource: Microsoft.DocumentDB/databaseAccounts
-    bicep_api_version: "2024-05-15"
+    resource_type: Microsoft.DocumentDB/databaseAccounts
+    api_version: "2024-05-15"
     private_endpoint:
       dns_zone: privatelink.documents.azure.com
       group_id: Sql
@@ -79,17 +77,30 @@ services:
       dotnet: [Microsoft.Azure.Cosmos, Azure.Identity]
       python: [azure-cosmos, azure-identity]
       nodejs: ["@azure/cosmos", "@azure/identity"]
+    child_resources:
+      sqlRoleAssignments:
+        resource_type: Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments
+        api_version: "2024-05-15"
+      sqlRoleDefinitions:
+        resource_type: Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions
+        api_version: "2024-05-15"
+      sqlDatabases:
+        resource_type: Microsoft.DocumentDB/databaseAccounts/sqlDatabases
+        api_version: "2024-05-15"
+      sqlContainers:
+        resource_type: Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers
+        api_version: "2024-05-15"
     special_considerations:
       - Partition key design is critical and hard to change
       - Consider throughput mode (provisioned vs serverless)
       - Multiple API types available (NoSQL, MongoDB, Cassandra, Gremlin, Table)
+      - sqlRoleAssignments use Cosmos-specific RBAC, NOT ARM roleAssignments
 
   blob-storage:
     display_name: Azure Blob Storage
     resource_provider: Microsoft.Storage
-    terraform_resource: azurerm_storage_account, azurerm_storage_container
-    bicep_resource: Microsoft.Storage/storageAccounts
-    bicep_api_version: "2023-05-01"
+    resource_type: Microsoft.Storage/storageAccounts
+    api_version: "2023-05-01"
     private_endpoint:
       dns_zone: privatelink.blob.core.windows.net
       group_id: blob
@@ -113,7 +124,7 @@ services:
       nodejs: ["@azure/storage-blob", "@azure/identity"]
     child_resources:
       blobServices/containers:
-        bicep_api_version: "2023-05-01"
+        api_version: "2023-05-01"
     special_considerations:
       - Consider access tier (Hot, Cool, Archive) based on access patterns
       - Lifecycle management policies for cost optimization
@@ -121,9 +132,8 @@ services:
   redis-cache:
     display_name: Azure Cache for Redis
     resource_provider: Microsoft.Cache
-    terraform_resource: azurerm_redis_cache
-    bicep_resource: Microsoft.Cache/redis
-    bicep_api_version: "2024-03-01"
+    resource_type: Microsoft.Cache/redis
+    api_version: "2024-03-01"
     private_endpoint:
       dns_zone: privatelink.redis.cache.windows.net
       group_id: redisCache
@@ -152,9 +162,8 @@ services:
   service-bus:
     display_name: Azure Service Bus
     resource_provider: Microsoft.ServiceBus
-    terraform_resource: azurerm_servicebus_namespace, azurerm_servicebus_queue, azurerm_servicebus_topic
-    bicep_resource: Microsoft.ServiceBus/namespaces
-    bicep_api_version: "2024-01-01"
+    resource_type: Microsoft.ServiceBus/namespaces
+    api_version: "2024-01-01"
     private_endpoint:
       dns_zone: privatelink.servicebus.windows.net
       group_id: namespace
@@ -183,9 +192,8 @@ services:
   event-grid:
     display_name: Azure Event Grid
     resource_provider: Microsoft.EventGrid
-    terraform_resource: azurerm_eventgrid_topic, azurerm_eventgrid_system_topic
-    bicep_resource: Microsoft.EventGrid/topics
-    bicep_api_version: "2024-06-01-preview"
+    resource_type: Microsoft.EventGrid/topics
+    api_version: "2024-06-01-preview"
     private_endpoint:
       dns_zone: privatelink.eventgrid.azure.net
       group_id: topic
@@ -216,9 +224,8 @@ services:
   key-vault:
     display_name: Azure Key Vault
     resource_provider: Microsoft.KeyVault
-    terraform_resource: azurerm_key_vault, azurerm_key_vault_secret
-    bicep_resource: Microsoft.KeyVault/vaults
-    bicep_api_version: "2023-07-01"
+    resource_type: Microsoft.KeyVault/vaults
+    api_version: "2023-07-01"
     private_endpoint:
       dns_zone: privatelink.vaultcore.azure.net
       group_id: vault
@@ -252,9 +259,8 @@ services:
   user-managed-identity:
     display_name: User-Assigned Managed Identity
     resource_provider: Microsoft.ManagedIdentity
-    terraform_resource: azurerm_user_assigned_identity
-    bicep_resource: Microsoft.ManagedIdentity/userAssignedIdentities
-    bicep_api_version: "2023-07-31-preview"
+    resource_type: Microsoft.ManagedIdentity/userAssignedIdentities
+    api_version: "2023-07-31-preview"
     private_endpoint:
       dns_zone: null
       group_id: null
@@ -284,9 +290,8 @@ services:
   azure-openai:
     display_name: Azure OpenAI Service
     resource_provider: Microsoft.CognitiveServices
-    terraform_resource: azurerm_cognitive_account
-    bicep_resource: Microsoft.CognitiveServices/accounts
-    bicep_api_version: "2024-04-01-preview"
+    resource_type: Microsoft.CognitiveServices/accounts
+    api_version: "2024-04-01-preview"
     private_endpoint:
       dns_zone: privatelink.openai.azure.com
       group_id: account
@@ -315,9 +320,8 @@ services:
   cognitive-search:
     display_name: Azure AI Search
     resource_provider: Microsoft.Search
-    terraform_resource: azurerm_search_service
-    bicep_resource: Microsoft.Search/searchServices
-    bicep_api_version: "2024-03-01-preview"
+    resource_type: Microsoft.Search/searchServices
+    api_version: "2024-03-01-preview"
     private_endpoint:
       dns_zone: privatelink.search.windows.net
       group_id: searchService
@@ -352,9 +356,8 @@ services:
   container-apps:
     display_name: Azure Container Apps
     resource_provider: Microsoft.App
-    terraform_resource: azurerm_container_app, azurerm_container_app_environment
-    bicep_resource: Microsoft.App/containerApps, Microsoft.App/managedEnvironments
-    bicep_api_version: "2024-03-01"
+    resource_type: Microsoft.App/containerApps, Microsoft.App/managedEnvironments
+    api_version: "2024-03-01"
     private_endpoint:
       dns_zone: null
       group_id: null
@@ -381,9 +384,8 @@ services:
   container-registry:
     display_name: Azure Container Registry
     resource_provider: Microsoft.ContainerRegistry
-    terraform_resource: azurerm_container_registry
-    bicep_resource: Microsoft.ContainerRegistry/registries
-    bicep_api_version: "2023-11-01-preview"
+    resource_type: Microsoft.ContainerRegistry/registries
+    api_version: "2023-11-01-preview"
     private_endpoint:
       dns_zone: privatelink.azurecr.io
       group_id: registry
@@ -412,9 +414,8 @@ services:
   azure-functions:
     display_name: Azure Functions
     resource_provider: Microsoft.Web
-    terraform_resource: azurerm_linux_function_app, azurerm_windows_function_app
-    bicep_resource: Microsoft.Web/sites
-    bicep_api_version: "2023-12-01"
+    resource_type: Microsoft.Web/sites
+    api_version: "2023-12-01"
     private_endpoint:
       dns_zone: privatelink.azurewebsites.net
       group_id: sites
@@ -440,9 +441,8 @@ services:
   app-service:
     display_name: Azure Web App (App Service)
     resource_provider: Microsoft.Web
-    terraform_resource: azurerm_linux_web_app, azurerm_windows_web_app, azurerm_service_plan
-    bicep_resource: Microsoft.Web/sites, Microsoft.Web/serverfarms
-    bicep_api_version: "2023-12-01"
+    resource_type: Microsoft.Web/sites, Microsoft.Web/serverfarms
+    api_version: "2023-12-01"
     private_endpoint:
       dns_zone: privatelink.azurewebsites.net
       group_id: sites
@@ -472,9 +472,8 @@ services:
   api-management:
     display_name: Azure API Management
     resource_provider: Microsoft.ApiManagement
-    terraform_resource: azurerm_api_management
-    bicep_resource: Microsoft.ApiManagement/service
-    bicep_api_version: "2023-09-01-preview"
+    resource_type: Microsoft.ApiManagement/service
+    api_version: "2023-09-01-preview"
     private_endpoint:
       dns_zone: privatelink.azure-api.net
       group_id: Gateway
@@ -502,9 +501,8 @@ services:
   signalr:
     display_name: Azure SignalR Service
     resource_provider: Microsoft.SignalRService
-    terraform_resource: azurerm_signalr_service
-    bicep_resource: Microsoft.SignalRService/signalR
-    bicep_api_version: "2024-03-01"
+    resource_type: Microsoft.SignalRService/signalR
+    api_version: "2024-03-01"
     private_endpoint:
       dns_zone: privatelink.service.signalr.net
       group_id: signalr
@@ -535,9 +533,8 @@ services:
   app-insights:
     display_name: Application Insights
     resource_provider: Microsoft.Insights
-    terraform_resource: azurerm_application_insights
-    bicep_resource: Microsoft.Insights/components
-    bicep_api_version: "2020-02-02"
+    resource_type: Microsoft.Insights/components
+    api_version: "2020-02-02"
     private_endpoint:
       dns_zone: null
       group_id: null
@@ -564,9 +561,8 @@ services:
   log-analytics:
     display_name: Log Analytics Workspace
     resource_provider: Microsoft.OperationalInsights
-    terraform_resource: azurerm_log_analytics_workspace
-    bicep_resource: Microsoft.OperationalInsights/workspaces
-    bicep_api_version: "2023-09-01"
+    resource_type: Microsoft.OperationalInsights/workspaces
+    api_version: "2023-09-01"
     private_endpoint:
       dns_zone: privatelink.oms.opinsights.azure.com
       group_id: azuremonitor
@@ -596,9 +592,8 @@ services:
   aks:
     display_name: Azure Kubernetes Service
     resource_provider: Microsoft.ContainerService
-    terraform_resource: azurerm_kubernetes_cluster
-    bicep_resource: Microsoft.ContainerService/managedClusters
-    bicep_api_version: "2024-03-02-preview"
+    resource_type: Microsoft.ContainerService/managedClusters
+    api_version: "2024-03-02-preview"
     private_endpoint:
       dns_zone: privatelink.<region>.azmk8s.io
       group_id: management
@@ -632,9 +627,8 @@ services:
   virtual-machines:
     display_name: Azure Virtual Machines
     resource_provider: Microsoft.Compute
-    terraform_resource: azurerm_linux_virtual_machine, azurerm_windows_virtual_machine
-    bicep_resource: Microsoft.Compute/virtualMachines
-    bicep_api_version: "2024-03-01"
+    resource_type: Microsoft.Compute/virtualMachines
+    api_version: "2024-03-01"
     private_endpoint:
       dns_zone: null
       group_id: null
@@ -666,9 +660,8 @@ services:
   static-web-apps:
     display_name: Azure Static Web Apps
     resource_provider: Microsoft.Web
-    terraform_resource: azurerm_static_web_app
-    bicep_resource: Microsoft.Web/staticSites
-    bicep_api_version: "2023-12-01"
+    resource_type: Microsoft.Web/staticSites
+    api_version: "2023-12-01"
     private_endpoint:
       dns_zone: privatelink.azurestaticapps.net
       group_id: staticSites
@@ -699,9 +692,8 @@ services:
   front-door:
     display_name: Azure Front Door
     resource_provider: Microsoft.Cdn
-    terraform_resource: azurerm_cdn_frontdoor_profile, azurerm_cdn_frontdoor_endpoint
-    bicep_resource: Microsoft.Cdn/profiles
-    bicep_api_version: "2024-02-01"
+    resource_type: Microsoft.Cdn/profiles
+    api_version: "2024-02-01"
     private_endpoint:
       dns_zone: null
       group_id: null
@@ -733,9 +725,8 @@ services:
   postgresql:
     display_name: Azure Database for PostgreSQL (Flexible Server)
     resource_provider: Microsoft.DBforPostgreSQL
-    terraform_resource: azurerm_postgresql_flexible_server, azurerm_postgresql_flexible_server_database
-    bicep_resource: Microsoft.DBforPostgreSQL/flexibleServers
-    bicep_api_version: "2023-12-01-preview"
+    resource_type: Microsoft.DBforPostgreSQL/flexibleServers
+    api_version: "2023-12-01-preview"
     private_endpoint:
       dns_zone: privatelink.postgres.database.azure.com
       group_id: postgresqlServer
@@ -764,9 +755,8 @@ services:
   azure-ai-search:
     display_name: Azure AI Search
     resource_provider: Microsoft.Search
-    terraform_resource: azurerm_search_service
-    bicep_resource: Microsoft.Search/searchServices
-    bicep_api_version: "2024-03-01-preview"
+    resource_type: Microsoft.Search/searchServices
+    api_version: "2024-03-01-preview"
     private_endpoint:
       dns_zone: privatelink.search.windows.net
       group_id: searchService
@@ -798,9 +788,8 @@ services:
   databricks:
     display_name: Azure Databricks
     resource_provider: Microsoft.Databricks
-    terraform_resource: azurerm_databricks_workspace
-    bicep_resource: Microsoft.Databricks/workspaces
-    bicep_api_version: "2024-05-01"
+    resource_type: Microsoft.Databricks/workspaces
+    api_version: "2024-05-01"
     private_endpoint:
       dns_zone: privatelink.azuredatabricks.net
       group_id: databricks_ui_api
@@ -827,9 +816,8 @@ services:
   data-factory:
     display_name: Azure Data Factory
     resource_provider: Microsoft.DataFactory
-    terraform_resource: azurerm_data_factory
-    bicep_resource: Microsoft.DataFactory/factories
-    bicep_api_version: "2018-06-01"
+    resource_type: Microsoft.DataFactory/factories
+    api_version: "2018-06-01"
     private_endpoint:
       dns_zone: privatelink.datafactory.azure.net
       group_id: dataFactory
@@ -857,9 +845,8 @@ services:
   fabric:
     display_name: Microsoft Fabric
     resource_provider: Microsoft.Fabric
-    terraform_resource: azurerm_fabric_capacity
-    bicep_resource: Microsoft.Fabric/capacities
-    bicep_api_version: "2023-11-01"
+    resource_type: Microsoft.Fabric/capacities
+    api_version: "2023-11-01"
     private_endpoint:
       dns_zone: null
       group_id: fabric
@@ -891,8 +878,8 @@ services:
   diagnostic-settings:
     display_name: Diagnostic Settings
     resource_provider: Microsoft.Insights
-    bicep_resource: Microsoft.Insights/diagnosticSettings
-    bicep_api_version: "2021-05-01-preview"
+    resource_type: Microsoft.Insights/diagnosticSettings
+    api_version: "2021-05-01-preview"
     notes: |
       - Extension resource — does NOT support tags
       - API version @2021-05-01-preview required for categoryGroup ("allLogs") support
@@ -903,8 +890,8 @@ services:
   role-assignments:
     display_name: Role Assignments
     resource_provider: Microsoft.Authorization
-    bicep_resource: Microsoft.Authorization/roleAssignments
-    bicep_api_version: "2022-04-01"
+    resource_type: Microsoft.Authorization/roleAssignments
+    api_version: "2022-04-01"
     notes: |
       - Extension resource — does NOT support tags
       - Use deterministic names via uuidv5() for idempotent plans

@@ -19,30 +19,47 @@
 ```hcl
 data "azurerm_client_config" "current" {}
 
-resource "azurerm_key_vault" "this" {
-  name                        = var.key_vault_name
-  location                    = azurerm_resource_group.this.location
-  resource_group_name         = azurerm_resource_group.this.name
-  tenant_id                   = data.azurerm_client_config.current.tenant_id
-  sku_name                    = "standard"
-  enable_rbac_authorization   = true    # CRITICAL: Use RBAC, NOT access policies
-  purge_protection_enabled    = true
-  soft_delete_retention_days  = 90
+resource "azapi_resource" "key_vault" {
+  type      = "Microsoft.KeyVault/vaults@2023-07-01"
+  name      = var.key_vault_name
+  location  = azapi_resource.resource_group.output.location
+  parent_id = azapi_resource.resource_group.id
 
-  network_acls {
-    bypass         = "AzureServices"
-    default_action = "Allow"            # Restrict to "Deny" for production
+  body = {
+    properties = {
+      tenantId                 = data.azurerm_client_config.current.tenant_id
+      sku = {
+        family = "A"
+        name   = "standard"
+      }
+      enableRbacAuthorization  = true    # CRITICAL: Use RBAC, NOT access policies
+      enablePurgeProtection    = true
+      enableSoftDelete         = true
+      softDeleteRetentionInDays = 90
+      networkAcls = {
+        bypass        = "AzureServices"
+        defaultAction = "Allow"          # Restrict to "Deny" for production
+      }
+    }
   }
 
   tags = var.tags
+
+  response_export_values = ["*"]
 }
 
-resource "azurerm_key_vault_secret" "example" {
-  name         = "example-secret"
-  value        = var.secret_value
-  key_vault_id = azurerm_key_vault.this.id
+resource "azapi_resource" "key_vault_secret" {
+  type      = "Microsoft.KeyVault/vaults/secrets@2023-07-01"
+  name      = "example-secret"
+  parent_id = azapi_resource.key_vault.id
 
-  depends_on = [azurerm_role_assignment.kv_secrets_officer_deployer]
+  body = {
+    properties = {
+      value = var.secret_value
+    }
+  }
+
+  depends_on = [azapi_resource.kv_secrets_officer_deployer]
 }
 ```
 
@@ -54,51 +71,108 @@ resource "azurerm_key_vault_secret" "example" {
 #   Key Vault Administrator:   00482a5a-887f-4fb3-b363-3b7fe8e74483
 
 # Grant the app's managed identity read access to secrets
-resource "azurerm_role_assignment" "kv_secrets_user" {
-  scope                = azurerm_key_vault.this.id
-  role_definition_name = "Key Vault Secrets User"
-  principal_id         = azurerm_user_assigned_identity.this.principal_id
+resource "azapi_resource" "kv_secrets_user" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("sha1", "${azapi_resource.key_vault.id}-${azapi_resource.user_assigned_identity.output.properties.principalId}-4633458b-17de-408a-b874-0445c86b69e6")
+  parent_id = azapi_resource.key_vault.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/4633458b-17de-408a-b874-0445c86b69e6"
+      principalId      = azapi_resource.user_assigned_identity.output.properties.principalId
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 
 # Grant the deploying principal write access to secrets (needed during deployment)
-resource "azurerm_role_assignment" "kv_secrets_officer_deployer" {
-  scope                = azurerm_key_vault.this.id
-  role_definition_name = "Key Vault Secrets Officer"
-  principal_id         = data.azurerm_client_config.current.object_id
+resource "azapi_resource" "kv_secrets_officer_deployer" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("sha1", "${azapi_resource.key_vault.id}-${data.azurerm_client_config.current.object_id}-b86a8fe4-44ce-4948-aee5-eccb2c155cd7")
+  parent_id = azapi_resource.key_vault.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/b86a8fe4-44ce-4948-aee5-eccb2c155cd7"
+      principalId      = data.azurerm_client_config.current.object_id
+      principalType    = "User"
+    }
+  }
 }
 ```
 
 ### Private Endpoint
 ```hcl
-resource "azurerm_private_endpoint" "kv" {
-  name                = "${var.key_vault_name}-pe"
-  location            = azurerm_resource_group.this.location
-  resource_group_name = azurerm_resource_group.this.name
-  subnet_id           = azurerm_subnet.private_endpoints.id
+resource "azapi_resource" "kv_private_endpoint" {
+  type      = "Microsoft.Network/privateEndpoints@2023-11-01"
+  name      = "${var.key_vault_name}-pe"
+  location  = azapi_resource.resource_group.output.location
+  parent_id = azapi_resource.resource_group.id
 
-  private_service_connection {
-    name                           = "${var.key_vault_name}-psc"
-    private_connection_resource_id = azurerm_key_vault.this.id
-    is_manual_connection           = false
-    subresource_names              = ["vault"]
+  body = {
+    properties = {
+      subnet = {
+        id = azapi_resource.private_endpoints_subnet.id
+      }
+      privateLinkServiceConnections = [
+        {
+          name = "${var.key_vault_name}-psc"
+          properties = {
+            privateLinkServiceId = azapi_resource.key_vault.id
+            groupIds             = ["vault"]
+          }
+        }
+      ]
+    }
   }
 
-  private_dns_zone_group {
-    name                 = "default"
-    private_dns_zone_ids = [azurerm_private_dns_zone.kv.id]
+  tags = var.tags
+}
+
+resource "azapi_resource" "kv_dns_zone" {
+  type      = "Microsoft.Network/privateDnsZones@2020-06-01"
+  name      = "privatelink.vaultcore.azure.net"
+  location  = "global"
+  parent_id = azapi_resource.resource_group.id
+
+  tags = var.tags
+}
+
+resource "azapi_resource" "kv_dns_zone_link" {
+  type      = "Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01"
+  name      = "kv-dns-link"
+  location  = "global"
+  parent_id = azapi_resource.kv_dns_zone.id
+
+  body = {
+    properties = {
+      virtualNetwork = {
+        id = azapi_resource.virtual_network.id
+      }
+      registrationEnabled = false
+    }
   }
+
+  tags = var.tags
 }
 
-resource "azurerm_private_dns_zone" "kv" {
-  name                = "privatelink.vaultcore.azure.net"
-  resource_group_name = azurerm_resource_group.this.name
-}
+resource "azapi_resource" "kv_pe_dns_zone_group" {
+  type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01"
+  name      = "default"
+  parent_id = azapi_resource.kv_private_endpoint.id
 
-resource "azurerm_private_dns_zone_virtual_network_link" "kv" {
-  name                  = "kv-dns-link"
-  resource_group_name   = azurerm_resource_group.this.name
-  private_dns_zone_name = azurerm_private_dns_zone.kv.name
-  virtual_network_id    = azurerm_virtual_network.this.id
+  body = {
+    properties = {
+      privateDnsZoneConfigs = [
+        {
+          name = "config"
+          properties = {
+            privateDnsZoneId = azapi_resource.kv_dns_zone.id
+          }
+        }
+      ]
+    }
+  }
 }
 ```
 
@@ -241,7 +315,7 @@ for await (const secretProperties of client.listPropertiesOfSecrets()) {
 
 ## Common Pitfalls
 - **Using access policies instead of RBAC**: Always set `enable_rbac_authorization = true`. Access policies are the legacy model and do not support fine-grained, identity-based control.
-- **Deployer cannot write secrets**: When using RBAC mode, the Terraform/Bicep deploying principal needs the "Key Vault Secrets Officer" role to create secrets during deployment. Without this, `azurerm_key_vault_secret` resources will fail with 403.
+- **Deployer cannot write secrets**: When using RBAC mode, the Terraform/Bicep deploying principal needs the "Key Vault Secrets Officer" role to create secrets during deployment. Without this, `azapi_resource` secret resources will fail with 403.
 - **Purge protection is irreversible**: Once `purge_protection_enabled = true` is set, it cannot be turned off. Deleted vaults/secrets remain for the full retention period.
 - **Soft-deleted vault name collision**: A deleted vault still occupies its name for the retention period. Use `az keyvault list-deleted` to check for name conflicts.
 - **Secret rotation not automatic**: Key Vault stores secrets but does not rotate them. Rotation requires Azure Function or Event Grid integration.

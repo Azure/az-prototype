@@ -52,4 +52,12 @@ When **ANY** service disables local/key auth, you **MUST** also:
 ## DIAGNOSTIC SETTINGS (MANDATORY)
 Every PaaS data service **MUST** have a diagnostic settings resource using `allLogs`
 category group and `AllMetrics`. NSGs and VNets are exceptions (see Networking rules).
+
+## CRITICAL: deploy.sh STATE DIRECTORY
+deploy.sh **MUST** create the Terraform state directory before `terraform init`:
+```bash
+STATE_DIR="$(cd "$(dirname "$0")/../../.." && pwd)/.terraform-state"
+mkdir -p "${STATE_DIR}"
+```
+Without this, `terraform init` fails on first run in a clean environment.
 """.strip()

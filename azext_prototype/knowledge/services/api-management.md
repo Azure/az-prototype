@@ -28,47 +28,67 @@ Prefer API Management when you have multiple APIs or need centralized governance
 ### Basic Resource
 
 ```hcl
-resource "azurerm_api_management" "this" {
-  name                = var.name
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  publisher_name      = var.publisher_name
-  publisher_email     = var.publisher_email
-  sku_name            = "Consumption_0"  # Or "Developer_1" for full features
+resource "azapi_resource" "this" {
+  type      = "Microsoft.ApiManagement/service@2023-09-01-preview"
+  name      = var.name
+  location  = var.location
+  parent_id = var.resource_group_id
 
   identity {
     type = "SystemAssigned"
   }
 
+  body = {
+    sku = {
+      name     = "Consumption"
+      capacity = 0  # Or "Developer" with capacity 1 for full features
+    }
+    properties = {
+      publisherName  = var.publisher_name
+      publisherEmail = var.publisher_email
+    }
+  }
+
   tags = var.tags
+
+  response_export_values = ["*"]
 }
 
 # API definition
-resource "azurerm_api_management_api" "example" {
-  name                = "example-api"
-  resource_group_name = var.resource_group_name
-  api_management_name = azurerm_api_management.this.name
-  revision            = "1"
-  display_name        = "Example API"
-  path                = "example"
-  protocols           = ["https"]
-  service_url         = var.backend_url  # Backend API endpoint
+resource "azapi_resource" "example_api" {
+  type      = "Microsoft.ApiManagement/service/apis@2023-09-01-preview"
+  name      = "example-api"
+  parent_id = azapi_resource.this.id
 
-  subscription_required = true
+  body = {
+    properties = {
+      displayName           = "Example API"
+      path                  = "example"
+      protocols             = ["https"]
+      serviceUrl            = var.backend_url  # Backend API endpoint
+      apiRevision           = "1"
+      subscriptionRequired  = true
+    }
+  }
 }
 
 # API operation
-resource "azurerm_api_management_api_operation" "get_items" {
-  operation_id        = "get-items"
-  api_name            = azurerm_api_management_api.example.name
-  api_management_name = azurerm_api_management.this.name
-  resource_group_name = var.resource_group_name
-  display_name        = "Get Items"
-  method              = "GET"
-  url_template        = "/items"
+resource "azapi_resource" "get_items" {
+  type      = "Microsoft.ApiManagement/service/apis/operations@2023-09-01-preview"
+  name      = "get-items"
+  parent_id = azapi_resource.example_api.id
 
-  response {
-    status_code = 200
+  body = {
+    properties = {
+      displayName = "Get Items"
+      method      = "GET"
+      urlTemplate = "/items"
+      responses = [
+        {
+          statusCode = 200
+        }
+      ]
+    }
   }
 }
 ```
@@ -77,47 +97,82 @@ resource "azurerm_api_management_api_operation" "get_items" {
 
 ```hcl
 # API Management Service Contributor -- manage APIM instance
-resource "azurerm_role_assignment" "apim_contributor" {
-  scope                = azurerm_api_management.this.id
-  role_definition_name = "API Management Service Contributor"
-  principal_id         = var.managed_identity_principal_id
+resource "azapi_resource" "apim_contributor" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.this.id}-apim-contributor")
+  parent_id = azapi_resource.this.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/312a565d-c81f-4fd8-895a-4e21e48d571c"
+      principalId      = var.managed_identity_principal_id
+    }
+  }
 }
 
 # Grant APIM's managed identity access to backend services
-resource "azurerm_role_assignment" "apim_to_backend" {
-  scope                = var.backend_resource_id
-  role_definition_name = var.backend_role_name  # e.g., "Cognitive Services User"
-  principal_id         = azurerm_api_management.this.identity[0].principal_id
+resource "azapi_resource" "apim_to_backend" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${var.backend_resource_id}-apim-backend")
+  parent_id = var.backend_resource_id
+
+  body = {
+    properties = {
+      roleDefinitionId = var.backend_role_definition_id  # e.g., Cognitive Services User role ID
+      principalId      = azapi_resource.this.output.identity.principalId
+    }
+  }
 }
 ```
 
 ### Private Endpoint
 
 ```hcl
-resource "azurerm_private_endpoint" "apim" {
-  count = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+resource "azapi_resource" "apim_pe" {
+  count     = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+  type      = "Microsoft.Network/privateEndpoints@2023-11-01"
+  name      = "pe-${var.name}"
+  location  = var.location
+  parent_id = var.resource_group_id
 
-  name                = "pe-${var.name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  subnet_id           = var.subnet_id
-
-  private_service_connection {
-    name                           = "psc-${var.name}"
-    private_connection_resource_id = azurerm_api_management.this.id
-    subresource_names              = ["Gateway"]
-    is_manual_connection           = false
-  }
-
-  dynamic "private_dns_zone_group" {
-    for_each = var.private_dns_zone_id != null ? [1] : []
-    content {
-      name                 = "dns-zone-group"
-      private_dns_zone_ids = [var.private_dns_zone_id]
+  body = {
+    properties = {
+      subnet = {
+        id = var.subnet_id
+      }
+      privateLinkServiceConnections = [
+        {
+          name = "psc-${var.name}"
+          properties = {
+            privateLinkServiceId = azapi_resource.this.id
+            groupIds             = ["Gateway"]
+          }
+        }
+      ]
     }
   }
 
   tags = var.tags
+}
+
+resource "azapi_resource" "apim_pe_dns" {
+  count     = var.enable_private_endpoint && var.private_dns_zone_id != null ? 1 : 0
+  type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01"
+  name      = "dns-zone-group"
+  parent_id = azapi_resource.apim_pe[0].id
+
+  body = {
+    properties = {
+      privateDnsZoneConfigs = [
+        {
+          name = "config"
+          properties = {
+            privateDnsZoneId = var.private_dns_zone_id
+          }
+        }
+      ]
+    }
+  }
 }
 ```
 
@@ -128,12 +183,15 @@ Private DNS zone: `privatelink.azure-api.net`
 ### Backend Authentication Policy (Managed Identity)
 
 ```hcl
-resource "azurerm_api_management_api_policy" "managed_identity_auth" {
-  api_name            = azurerm_api_management_api.example.name
-  api_management_name = azurerm_api_management.this.name
-  resource_group_name = var.resource_group_name
+resource "azapi_resource" "managed_identity_auth_policy" {
+  type      = "Microsoft.ApiManagement/service/apis/policies@2023-09-01-preview"
+  name      = "policy"
+  parent_id = azapi_resource.example_api.id
 
-  xml_content = <<XML
+  body = {
+    properties = {
+      format = "xml"
+      value  = <<XML
 <policies>
   <inbound>
     <base />
@@ -150,6 +208,8 @@ resource "azurerm_api_management_api_policy" "managed_identity_auth" {
   </on-error>
 </policies>
 XML
+    }
+  }
 }
 ```
 

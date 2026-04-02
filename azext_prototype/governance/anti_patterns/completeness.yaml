@@ -130,3 +130,17 @@ patterns:
       - "var.resource_group_name"
       - "local.resource_group_name"
     warning_message: "Hardcoded upstream resource name detected — use terraform_remote_state outputs or variables to reference resources from other stages. NEVER hardcode resource names."
+
+  - id: ANTI-COMP-009
+    search_patterns:
+      - "storage blob delegator"
+    safe_patterns:
+      - "storage blob data contributor"
+      - "storage blob data reader"
+    correct_patterns:
+      - "Storage Blob Data Contributor"
+      - "# ba92f5b4-2d11-453d-a403-e96b0029c9fe"
+    warning_message: >-
+      Storage Blob Delegator role detected. This role only grants User Delegation
+      Key access, NOT actual blob read/write. Use Storage Blob Data Contributor
+      (ba92f5b4-2d11-453d-a403-e96b0029c9fe) for blob data access.

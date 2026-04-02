@@ -26,21 +26,33 @@ Azure AI Search is the recommended retrieval engine for RAG patterns on Azure. P
 ### Basic Resource
 
 ```hcl
-resource "azurerm_search_service" "this" {
-  name                          = var.name
-  location                      = var.location
-  resource_group_name           = var.resource_group_name
-  sku                           = "basic"
-  replica_count                 = 1
-  partition_count               = 1
-  public_network_access_enabled = false  # Unless told otherwise, disabled per governance policy
-  local_authentication_enabled  = true  # Set false when using RBAC-only
+resource "azapi_resource" "search" {
+  type      = "Microsoft.Search/searchServices@2024-03-01-preview"
+  name      = var.name
+  location  = var.location
+  parent_id = var.resource_group_id
 
   identity {
     type = "SystemAssigned"
   }
 
+  body = {
+    sku = {
+      name = "basic"
+    }
+    properties = {
+      replicaCount        = 1
+      partitionCount      = 1
+      hostingMode         = "default"
+      publicNetworkAccess = "disabled"  # Unless told otherwise, disabled per governance policy
+      disableLocalAuth    = false       # Set true when using RBAC-only
+      semanticSearch      = "free"
+    }
+  }
+
   tags = var.tags
+
+  response_export_values = ["*"]
 }
 ```
 
@@ -48,24 +60,48 @@ resource "azurerm_search_service" "this" {
 
 ```hcl
 # Search Index Data Contributor -- allows indexing documents
-resource "azurerm_role_assignment" "search_index_contributor" {
-  scope                = azurerm_search_service.this.id
-  role_definition_name = "Search Index Data Contributor"
-  principal_id         = var.managed_identity_principal_id
+resource "azapi_resource" "search_index_contributor_role" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.search.id}${var.managed_identity_principal_id}index-contributor")
+  parent_id = azapi_resource.search.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/8ebe5a00-799e-43f5-93ac-243d3dce84a7"  # Search Index Data Contributor
+      principalId      = var.managed_identity_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 
 # Search Index Data Reader -- allows querying indexes
-resource "azurerm_role_assignment" "search_index_reader" {
-  scope                = azurerm_search_service.this.id
-  role_definition_name = "Search Index Data Reader"
-  principal_id         = var.app_identity_principal_id
+resource "azapi_resource" "search_index_reader_role" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.search.id}${var.app_identity_principal_id}index-reader")
+  parent_id = azapi_resource.search.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/1407120a-92aa-4202-b7e9-c0e197c71c8f"  # Search Index Data Reader
+      principalId      = var.app_identity_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 
 # Search Service Contributor -- allows managing indexes, indexers, skillsets
-resource "azurerm_role_assignment" "search_service_contributor" {
-  scope                = azurerm_search_service.this.id
-  role_definition_name = "Search Service Contributor"
-  principal_id         = var.admin_identity_principal_id
+resource "azapi_resource" "search_service_contributor_role" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.search.id}${var.admin_identity_principal_id}svc-contributor")
+  parent_id = azapi_resource.search.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/7ca78c08-252a-4471-8644-bb5ff32d4ba0"  # Search Service Contributor
+      principalId      = var.admin_identity_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 ```
 
@@ -77,30 +113,51 @@ RBAC role IDs:
 ### Private Endpoint
 
 ```hcl
-resource "azurerm_private_endpoint" "search" {
-  count = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+resource "azapi_resource" "private_endpoint" {
+  count     = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+  type      = "Microsoft.Network/privateEndpoints@2023-11-01"
+  name      = "pe-${var.name}"
+  location  = var.location
+  parent_id = var.resource_group_id
 
-  name                = "pe-${var.name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  subnet_id           = var.subnet_id
-
-  private_service_connection {
-    name                           = "psc-${var.name}"
-    private_connection_resource_id = azurerm_search_service.this.id
-    subresource_names              = ["searchService"]
-    is_manual_connection           = false
-  }
-
-  dynamic "private_dns_zone_group" {
-    for_each = var.private_dns_zone_id != null ? [1] : []
-    content {
-      name                 = "dns-zone-group"
-      private_dns_zone_ids = [var.private_dns_zone_id]
+  body = {
+    properties = {
+      subnet = {
+        id = var.subnet_id
+      }
+      privateLinkServiceConnections = [
+        {
+          name = "psc-${var.name}"
+          properties = {
+            privateLinkServiceId = azapi_resource.search.id
+            groupIds             = ["searchService"]
+          }
+        }
+      ]
     }
   }
 
   tags = var.tags
+}
+
+resource "azapi_resource" "dns_zone_group" {
+  count     = var.enable_private_endpoint && var.subnet_id != null && var.private_dns_zone_id != null ? 1 : 0
+  type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01"
+  name      = "dns-zone-group"
+  parent_id = azapi_resource.private_endpoint[0].id
+
+  body = {
+    properties = {
+      privateDnsZoneConfigs = [
+        {
+          name = "config"
+          properties = {
+            privateDnsZoneId = var.private_dns_zone_id
+          }
+        }
+      ]
+    }
+  }
 }
 ```
 

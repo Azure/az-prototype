@@ -28,21 +28,27 @@ Choose Fabric over individual Azure services (Synapse, ADF, ADLS) when you want 
 Fabric capacities can be deployed via Terraform. Workspaces, lakehouses, and other items are managed through Fabric REST APIs or the Fabric portal.
 
 ```hcl
-resource "azurerm_fabric_capacity" "this" {
-  name                = var.name
-  resource_group_name = var.resource_group_name
-  location            = var.location
+resource "azapi_resource" "this" {
+  type      = "Microsoft.Fabric/capacities@2023-11-01"
+  name      = var.name
+  location  = var.location
+  parent_id = var.resource_group_id
 
-  sku {
-    name = "F2"  # F2, F4, F8, F16, F32, F64, etc.
-    tier = "Fabric"
-  }
-
-  administration {
-    members = var.admin_upns  # UPNs of capacity admins
+  body = {
+    sku = {
+      name = "F2"  # F2, F4, F8, F16, F32, F64, etc.
+      tier = "Fabric"
+    }
+    properties = {
+      administration = {
+        members = var.admin_upns  # UPNs of capacity admins
+      }
+    }
   }
 
   tags = var.tags
+
+  response_export_values = ["*"]
 }
 ```
 
@@ -76,10 +82,17 @@ Fabric uses its own workspace-level role system rather than ARM RBAC:
 
 ```hcl
 # ARM-level: Fabric capacity roles
-resource "azurerm_role_assignment" "fabric_contributor" {
-  scope                = azurerm_fabric_capacity.this.id
-  role_definition_name = "Contributor"
-  principal_id         = var.admin_identity_principal_id
+resource "azapi_resource" "fabric_contributor" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.this.id}-contributor")
+  parent_id = azapi_resource.this.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"
+      principalId      = var.admin_identity_principal_id
+    }
+  }
 }
 ```
 
@@ -90,19 +103,28 @@ Workspace-level roles (Admin, Member, Contributor, Viewer) are managed through t
 Fabric supports private endpoints for the capacity resource:
 
 ```hcl
-resource "azurerm_private_endpoint" "fabric" {
-  count = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+resource "azapi_resource" "fabric_pe" {
+  count     = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+  type      = "Microsoft.Network/privateEndpoints@2023-11-01"
+  name      = "pe-${var.name}"
+  location  = var.location
+  parent_id = var.resource_group_id
 
-  name                = "pe-${var.name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  subnet_id           = var.subnet_id
-
-  private_service_connection {
-    name                           = "psc-${var.name}"
-    private_connection_resource_id = azurerm_fabric_capacity.this.id
-    subresource_names              = ["fabric"]
-    is_manual_connection           = false
+  body = {
+    properties = {
+      subnet = {
+        id = var.subnet_id
+      }
+      privateLinkServiceConnections = [
+        {
+          name = "psc-${var.name}"
+          properties = {
+            privateLinkServiceId = azapi_resource.this.id
+            groupIds             = ["fabric"]
+          }
+        }
+      ]
+    }
   }
 
   tags = var.tags

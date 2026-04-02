@@ -27,68 +27,101 @@ Choose Front Door over Azure Application Gateway when you need global (multi-reg
 ### Basic Resource
 
 ```hcl
-resource "azurerm_cdn_frontdoor_profile" "this" {
-  name                = var.name
-  resource_group_name = var.resource_group_name
-  sku_name            = "Standard_AzureFrontDoor"  # or "Premium_AzureFrontDoor"
+resource "azapi_resource" "profile" {
+  type      = "Microsoft.Cdn/profiles@2024-02-01"
+  name      = var.name
+  location  = "global"
+  parent_id = var.resource_group_id
+
+  body = {
+    sku = {
+      name = "Standard_AzureFrontDoor"  # or "Premium_AzureFrontDoor"
+    }
+  }
 
   tags = var.tags
+
+  response_export_values = ["*"]
 }
 
-resource "azurerm_cdn_frontdoor_endpoint" "this" {
-  name                     = var.endpoint_name
-  cdn_frontdoor_profile_id = azurerm_cdn_frontdoor_profile.this.id
-}
+resource "azapi_resource" "endpoint" {
+  type      = "Microsoft.Cdn/profiles/afdEndpoints@2024-02-01"
+  name      = var.endpoint_name
+  location  = "global"
+  parent_id = azapi_resource.profile.id
 
-resource "azurerm_cdn_frontdoor_origin_group" "this" {
-  name                     = "default-origin-group"
-  cdn_frontdoor_profile_id = azurerm_cdn_frontdoor_profile.this.id
-
-  load_balancing {
-    sample_size                 = 4
-    successful_samples_required = 3
-  }
-
-  health_probe {
-    path                = "/health"
-    protocol            = "Https"
-    request_type        = "HEAD"
-    interval_in_seconds = 30
+  body = {
+    properties = {
+      enabledState = "Enabled"
+    }
   }
 }
 
-resource "azurerm_cdn_frontdoor_origin" "this" {
-  name                          = "primary-origin"
-  cdn_frontdoor_origin_group_id = azurerm_cdn_frontdoor_origin_group.this.id
-  enabled                       = true
+resource "azapi_resource" "origin_group" {
+  type      = "Microsoft.Cdn/profiles/originGroups@2024-02-01"
+  name      = "default-origin-group"
+  parent_id = azapi_resource.profile.id
 
-  host_name          = var.origin_hostname  # e.g., "myapp.azurewebsites.net"
-  http_port          = 80
-  https_port         = 443
-  origin_host_header = var.origin_hostname
-  certificate_name_check_enabled = true
-  priority           = 1
-  weight             = 1000
+  body = {
+    properties = {
+      loadBalancingSettings = {
+        sampleSize                = 4
+        successfulSamplesRequired = 3
+      }
+      healthProbeSettings = {
+        probePath              = "/health"
+        probeProtocol          = "Https"
+        probeRequestType       = "HEAD"
+        probeIntervalInSeconds = 30
+      }
+    }
+  }
 }
 
-resource "azurerm_cdn_frontdoor_route" "this" {
-  name                          = "default-route"
-  cdn_frontdoor_endpoint_id     = azurerm_cdn_frontdoor_endpoint.this.id
-  cdn_frontdoor_origin_group_id = azurerm_cdn_frontdoor_origin_group.this.id
-  cdn_frontdoor_origin_ids      = [azurerm_cdn_frontdoor_origin.this.id]
+resource "azapi_resource" "origin" {
+  type      = "Microsoft.Cdn/profiles/originGroups/origins@2024-02-01"
+  name      = "primary-origin"
+  parent_id = azapi_resource.origin_group.id
 
-  supported_protocols    = ["Http", "Https"]
-  patterns_to_match      = ["/*"]
-  forwarding_protocol    = "HttpsOnly"
-  https_redirect_enabled = true
+  body = {
+    properties = {
+      hostName                      = var.origin_hostname  # e.g., "myapp.azurewebsites.net"
+      httpPort                      = 80
+      httpsPort                     = 443
+      originHostHeader              = var.origin_hostname
+      enforceCertificateNameCheck   = true
+      priority                      = 1
+      weight                        = 1000
+      enabledState                  = "Enabled"
+    }
+  }
+}
 
-  cache {
-    query_string_caching_behavior = "IgnoreQueryString"
-    compression_enabled           = true
-    content_types_to_compress     = [
-      "text/html", "text/css", "application/javascript",
-      "application/json", "image/svg+xml"
-    ]
+resource "azapi_resource" "route" {
+  type      = "Microsoft.Cdn/profiles/afdEndpoints/routes@2024-02-01"
+  name      = "default-route"
+  parent_id = azapi_resource.endpoint.id
+
+  body = {
+    properties = {
+      originGroup = {
+        id = azapi_resource.origin_group.id
+      }
+      supportedProtocols   = ["Http", "Https"]
+      patternsToMatch      = ["/*"]
+      forwardingProtocol   = "HttpsOnly"
+      httpsRedirect        = "Enabled"
+      cacheConfiguration = {
+        queryStringCachingBehavior = "IgnoreQueryString"
+        compressionSettings = {
+          isCompressionEnabled    = true
+          contentTypesToCompress  = [
+            "text/html", "text/css", "application/javascript",
+            "application/json", "image/svg+xml"
+          ]
+        }
+      }
+    }
   }
 }
 ```
@@ -96,40 +129,62 @@ resource "azurerm_cdn_frontdoor_route" "this" {
 ### WAF Policy (Premium tier)
 
 ```hcl
-resource "azurerm_cdn_frontdoor_firewall_policy" "this" {
-  name                = replace(var.name, "-", "")  # No hyphens allowed
-  resource_group_name = var.resource_group_name
-  sku_name            = "Premium_AzureFrontDoor"
-  mode                = "Prevention"
+resource "azapi_resource" "waf_policy" {
+  type      = "Microsoft.Network/FrontDoorWebApplicationFirewallPolicies@2024-02-01"
+  name      = replace(var.name, "-", "")  # No hyphens allowed
+  location  = "global"
+  parent_id = var.resource_group_id
 
-  managed_rule {
-    type    = "Microsoft_DefaultRuleSet"
-    version = "2.1"
-    action  = "Block"
-  }
-
-  managed_rule {
-    type    = "Microsoft_BotManagerRuleSet"
-    version = "1.1"
-    action  = "Block"
+  body = {
+    sku = {
+      name = "Premium_AzureFrontDoor"
+    }
+    properties = {
+      policySettings = {
+        mode = "Prevention"
+      }
+      managedRules = {
+        managedRuleSets = [
+          {
+            ruleSetType    = "Microsoft_DefaultRuleSet"
+            ruleSetVersion = "2.1"
+            ruleSetAction  = "Block"
+          },
+          {
+            ruleSetType    = "Microsoft_BotManagerRuleSet"
+            ruleSetVersion = "1.1"
+            ruleSetAction  = "Block"
+          }
+        ]
+      }
+    }
   }
 
   tags = var.tags
 }
 
-resource "azurerm_cdn_frontdoor_security_policy" "this" {
-  name                     = "waf-policy"
-  cdn_frontdoor_profile_id = azurerm_cdn_frontdoor_profile.this.id
+resource "azapi_resource" "security_policy" {
+  type      = "Microsoft.Cdn/profiles/securityPolicies@2024-02-01"
+  name      = "waf-policy"
+  parent_id = azapi_resource.profile.id
 
-  security_policies {
-    firewall {
-      cdn_frontdoor_firewall_policy_id = azurerm_cdn_frontdoor_firewall_policy.this.id
-
-      association {
-        domain {
-          cdn_frontdoor_domain_id = azurerm_cdn_frontdoor_endpoint.this.id
+  body = {
+    properties = {
+      parameters = {
+        type = "WebApplicationFirewall"
+        wafPolicy = {
+          id = azapi_resource.waf_policy.id
         }
-        patterns_to_match = ["/*"]
+        associations = [
+          {
+            domains = [
+              {
+                id = azapi_resource.endpoint.id
+              }
+            ]
+            patternsToMatch = ["/*"]
+          }
+        ]
       }
     }
   }
@@ -142,10 +197,17 @@ Front Door is typically managed by infrastructure teams. No data-plane RBAC need
 
 ```hcl
 # CDN Profile Contributor -- manage Front Door configuration
-resource "azurerm_role_assignment" "fd_contributor" {
-  scope                = azurerm_cdn_frontdoor_profile.this.id
-  role_definition_name = "CDN Profile Contributor"
-  principal_id         = var.admin_identity_principal_id
+resource "azapi_resource" "fd_contributor" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.profile.id}-cdn-contributor")
+  parent_id = azapi_resource.profile.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/ec156ff8-a8d1-4d15-830c-5b80698ca432"
+      principalId      = var.admin_identity_principal_id
+    }
+  }
 }
 ```
 
@@ -155,22 +217,28 @@ Front Door Premium supports **Private Link origins** -- connecting to backends v
 
 ```hcl
 # Premium tier required for Private Link origins
-resource "azurerm_cdn_frontdoor_origin" "private" {
-  name                          = "private-origin"
-  cdn_frontdoor_origin_group_id = azurerm_cdn_frontdoor_origin_group.this.id
-  enabled                       = true
+resource "azapi_resource" "private_origin" {
+  type      = "Microsoft.Cdn/profiles/originGroups/origins@2024-02-01"
+  name      = "private-origin"
+  parent_id = azapi_resource.origin_group.id
 
-  host_name                      = var.private_origin_hostname
-  origin_host_header             = var.private_origin_hostname
-  certificate_name_check_enabled = true
-  priority                       = 1
-  weight                         = 1000
-
-  private_link {
-    location               = var.location
-    private_link_target_id = var.app_service_id  # or other PL-supported resource
-    request_message        = "Front Door Private Link"
-    target_type            = "sites"  # Depends on origin type
+  body = {
+    properties = {
+      hostName                    = var.private_origin_hostname
+      originHostHeader            = var.private_origin_hostname
+      enforceCertificateNameCheck = true
+      priority                    = 1
+      weight                      = 1000
+      enabledState                = "Enabled"
+      sharedPrivateLinkResource = {
+        privateLink = {
+          id = var.app_service_id  # or other PL-supported resource
+        }
+        privateLinkLocation  = var.location
+        requestMessage       = "Front Door Private Link"
+        groupId              = "sites"  # Depends on origin type
+      }
+    }
   }
 }
 ```

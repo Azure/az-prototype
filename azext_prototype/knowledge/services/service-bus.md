@@ -29,48 +29,72 @@
 ### Basic Resource
 
 ```hcl
-resource "azurerm_servicebus_namespace" "this" {
-  name                = var.name
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  sku                 = "Standard"  # "Basic" lacks topics; "Premium" for private endpoints
-  minimum_tls_version = "1.2"
+resource "azapi_resource" "servicebus_namespace" {
+  type      = "Microsoft.ServiceBus/namespaces@2024-01-01"
+  name      = var.name
+  location  = var.location
+  parent_id = azapi_resource.resource_group.id
 
-  local_auth_enabled  = false  # Disable SAS keys; use RBAC only
+  body = {
+    sku = {
+      name = "Standard"  # "Basic" lacks topics; "Premium" for private endpoints
+    }
+    properties = {
+      minimumTlsVersion = "1.2"
+      disableLocalAuth  = true  # Disable SAS keys; use RBAC only
+    }
+  }
 
   tags = var.tags
+
+  response_export_values = ["*"]
 }
 
-resource "azurerm_servicebus_queue" "this" {
+resource "azapi_resource" "servicebus_queue" {
   for_each = var.queues
 
-  name         = each.key
-  namespace_id = azurerm_servicebus_namespace.this.id
+  type      = "Microsoft.ServiceBus/namespaces/queues@2024-01-01"
+  name      = each.key
+  parent_id = azapi_resource.servicebus_namespace.id
 
-  max_delivery_count          = each.value.max_delivery_count != null ? each.value.max_delivery_count : 10
-  dead_lettering_on_message_expiration = true
-  enable_partitioning         = false  # true for high throughput
-  default_message_ttl         = each.value.ttl != null ? each.value.ttl : "P14D"  # ISO 8601
+  body = {
+    properties = {
+      maxDeliveryCount                 = each.value.max_delivery_count != null ? each.value.max_delivery_count : 10
+      deadLetteringOnMessageExpiration = true
+      enablePartitioning               = false  # true for high throughput
+      defaultMessageTimeToLive         = each.value.ttl != null ? each.value.ttl : "P14D"  # ISO 8601
+    }
+  }
 }
 
-resource "azurerm_servicebus_topic" "this" {
+resource "azapi_resource" "servicebus_topic" {
   for_each = var.topics
 
-  name         = each.key
-  namespace_id = azurerm_servicebus_namespace.this.id
+  type      = "Microsoft.ServiceBus/namespaces/topics@2024-01-01"
+  name      = each.key
+  parent_id = azapi_resource.servicebus_namespace.id
 
-  enable_partitioning = false
-  default_message_ttl = each.value.ttl != null ? each.value.ttl : "P14D"
+  body = {
+    properties = {
+      enablePartitioning       = false
+      defaultMessageTimeToLive = each.value.ttl != null ? each.value.ttl : "P14D"
+    }
+  }
 }
 
-resource "azurerm_servicebus_subscription" "this" {
+resource "azapi_resource" "servicebus_subscription" {
   for_each = var.subscriptions
 
-  name               = each.value.name
-  topic_id           = azurerm_servicebus_topic.this[each.value.topic].id
-  max_delivery_count = each.value.max_delivery_count != null ? each.value.max_delivery_count : 10
+  type      = "Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01"
+  name      = each.value.name
+  parent_id = azapi_resource.servicebus_topic[each.value.topic].id
 
-  dead_lettering_on_message_expiration = true
+  body = {
+    properties = {
+      maxDeliveryCount                 = each.value.max_delivery_count != null ? each.value.max_delivery_count : 10
+      deadLetteringOnMessageExpiration = true
+    }
+  }
 }
 ```
 
@@ -78,54 +102,101 @@ resource "azurerm_servicebus_subscription" "this" {
 
 ```hcl
 # Grant managed identity the ability to send messages
-resource "azurerm_role_assignment" "data_sender" {
-  scope                = azurerm_servicebus_namespace.this.id
-  role_definition_id   = "/providers/Microsoft.Authorization/roleDefinitions/69a216fc-b8fb-44d8-bc22-1f3c2cd27a39"  # Azure Service Bus Data Sender
-  principal_id         = var.sender_principal_id
+resource "azapi_resource" "sb_data_sender" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("sha1", "${azapi_resource.servicebus_namespace.id}-${var.sender_principal_id}-69a216fc-b8fb-44d8-bc22-1f3c2cd27a39")
+  parent_id = azapi_resource.servicebus_namespace.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/69a216fc-b8fb-44d8-bc22-1f3c2cd27a39"  # Azure Service Bus Data Sender
+      principalId      = var.sender_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 
 # Grant managed identity the ability to receive messages
-resource "azurerm_role_assignment" "data_receiver" {
-  scope                = azurerm_servicebus_namespace.this.id
-  role_definition_id   = "/providers/Microsoft.Authorization/roleDefinitions/4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0"  # Azure Service Bus Data Receiver
-  principal_id         = var.receiver_principal_id
+resource "azapi_resource" "sb_data_receiver" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("sha1", "${azapi_resource.servicebus_namespace.id}-${var.receiver_principal_id}-4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0")
+  parent_id = azapi_resource.servicebus_namespace.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0"  # Azure Service Bus Data Receiver
+      principalId      = var.receiver_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 
 # Grant full data owner (send + receive + manage) -- use sparingly
-resource "azurerm_role_assignment" "data_owner" {
-  scope                = azurerm_servicebus_namespace.this.id
-  role_definition_id   = "/providers/Microsoft.Authorization/roleDefinitions/090c5cfd-751d-490a-894a-3ce6f1109419"  # Azure Service Bus Data Owner
-  principal_id         = var.admin_principal_id
+resource "azapi_resource" "sb_data_owner" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("sha1", "${azapi_resource.servicebus_namespace.id}-${var.admin_principal_id}-090c5cfd-751d-490a-894a-3ce6f1109419")
+  parent_id = azapi_resource.servicebus_namespace.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/090c5cfd-751d-490a-894a-3ce6f1109419"  # Azure Service Bus Data Owner
+      principalId      = var.admin_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 ```
 
 ### Private Endpoint
 
 ```hcl
-resource "azurerm_private_endpoint" "this" {
-  count = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+resource "azapi_resource" "sb_private_endpoint" {
+  count     = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
 
-  name                = "pe-${var.name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  subnet_id           = var.subnet_id
+  type      = "Microsoft.Network/privateEndpoints@2023-11-01"
+  name      = "pe-${var.name}"
+  location  = var.location
+  parent_id = azapi_resource.resource_group.id
 
-  private_service_connection {
-    name                           = "psc-${var.name}"
-    private_connection_resource_id = azurerm_servicebus_namespace.this.id
-    subresource_names              = ["namespace"]
-    is_manual_connection           = false
-  }
-
-  dynamic "private_dns_zone_group" {
-    for_each = var.private_dns_zone_id != null ? [1] : []
-    content {
-      name                 = "dns-zone-group"
-      private_dns_zone_ids = [var.private_dns_zone_id]
+  body = {
+    properties = {
+      subnet = {
+        id = var.subnet_id
+      }
+      privateLinkServiceConnections = [
+        {
+          name = "psc-${var.name}"
+          properties = {
+            privateLinkServiceId = azapi_resource.servicebus_namespace.id
+            groupIds             = ["namespace"]
+          }
+        }
+      ]
     }
   }
 
   tags = var.tags
+}
+
+resource "azapi_resource" "sb_pe_dns_zone_group" {
+  count     = var.enable_private_endpoint && var.subnet_id != null && var.private_dns_zone_id != null ? 1 : 0
+
+  type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01"
+  name      = "dns-zone-group"
+  parent_id = azapi_resource.sb_private_endpoint[0].id
+
+  body = {
+    properties = {
+      privateDnsZoneConfigs = [
+        {
+          name = "config"
+          properties = {
+            privateDnsZoneId = var.private_dns_zone_id
+          }
+        }
+      ]
+    }
+  }
 }
 ```
 
@@ -368,7 +439,7 @@ async function startProcessor(queueName) {
 | Pitfall | Impact | Prevention |
 |---------|--------|-----------|
 | Using Basic tier with topics | Deployment fails -- Basic does not support topics | Always use Standard or Premium |
-| Using connection strings instead of RBAC | Secrets in config, no per-identity access control | Set `disableLocalAuth = true`, use managed identity + RBAC roles |
+| Using connection strings instead of RBAC | Secrets in config, no per-identity access control | Set `disableLocalAuth = true` in `body.properties`, use managed identity + RBAC roles |
 | Not handling dead-letter queue | Poisoned messages accumulate silently | Monitor DLQ; implement DLQ processor or alerting |
 | Forgetting `max_delivery_count` | Messages retried indefinitely on transient failures | Set reasonable `max_delivery_count` (default 10) |
 | Not completing/abandoning messages | Messages become invisible until lock expires, then re-appear | Always call `complete_message()` on success or `abandon_message()` on failure |

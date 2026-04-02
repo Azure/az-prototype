@@ -281,11 +281,18 @@ Classify each failure as CRITICAL (must fix before deploy) or WARNING (should fi
 - [ ] `disableLocalAuth` is a top-level property under `properties`, **NOT** inside `features`
 
 ### 10. Output Consistency
-- [ ] Output key names use standard convention (e.g., `principal_id` not
-      `worker_identity_principal_id` or `managed_identity_principal_id`)
-- [ ] Output key names match what downstream stages reference via
-      terraform_remote_state (check "Previously Generated Stages" output keys)
+- [ ] Cross-stage references use the **exact** output key names listed in the
+      "Previously Generated Stages" section — do **NOT** flag keys as "non-standard"
+      if they match what the upstream stage _actually_ exports
 - [ ] Remote state variable defaults match upstream backend paths exactly
+
+### 11. Container Apps
+- [ ] Identity model uses UAMI for ACR pull (**NOT** SystemAssigned alone)
+- [ ] Identity block includes `UserAssigned` or `SystemAssigned, UserAssigned`
+      with the UAMI in `userAssignedIdentities`
+- [ ] No circular `depends_on` between container app and its RBAC assignments
+- [ ] `AZURE_CLIENT_ID` env var set when multiple identities are attached
+- [ ] Cosmos DB `sqlRoleAssignments` uses correct API version (check service registry)
 
 ## Output Format
 

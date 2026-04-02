@@ -27,14 +27,24 @@
 ### Basic Resource
 
 ```hcl
-resource "azurerm_log_analytics_workspace" "this" {
-  name                = var.name
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  sku                 = "PerGB2018"
-  retention_in_days   = var.retention_in_days  # 30 for POC
+resource "azapi_resource" "log_analytics" {
+  type      = "Microsoft.OperationalInsights/workspaces@2023-09-01"
+  name      = var.name
+  location  = var.location
+  parent_id = var.resource_group_id
+
+  body = {
+    properties = {
+      sku = {
+        name = "PerGB2018"
+      }
+      retentionInDays = var.retention_in_days  # 30 for POC
+    }
+  }
 
   tags = var.tags
+
+  response_export_values = ["properties.customerId"]
 }
 ```
 
@@ -42,44 +52,64 @@ resource "azurerm_log_analytics_workspace" "this" {
 
 ```hcl
 # Example: send Key Vault diagnostics to Log Analytics
-resource "azurerm_monitor_diagnostic_setting" "keyvault" {
-  name                       = "diag-${var.keyvault_name}"
-  target_resource_id         = var.keyvault_id
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
+resource "azapi_resource" "diag_keyvault" {
+  type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+  name      = "diag-${var.keyvault_name}"
+  parent_id = var.keyvault_id
 
-  enabled_log {
-    category = "AuditEvent"
-  }
-
-  enabled_log {
-    category = "AzurePolicyEvaluationDetails"
-  }
-
-  metric {
-    category = "AllMetrics"
+  body = {
+    properties = {
+      workspaceId = azapi_resource.log_analytics.id
+      logs = [
+        {
+          category = "AuditEvent"
+          enabled  = true
+        },
+        {
+          category = "AzurePolicyEvaluationDetails"
+          enabled  = true
+        }
+      ]
+      metrics = [
+        {
+          category = "AllMetrics"
+          enabled  = true
+        }
+      ]
+    }
   }
 }
 
 # Example: send App Service diagnostics to Log Analytics
-resource "azurerm_monitor_diagnostic_setting" "webapp" {
-  name                       = "diag-${var.webapp_name}"
-  target_resource_id         = var.webapp_id
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
+resource "azapi_resource" "diag_webapp" {
+  type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+  name      = "diag-${var.webapp_name}"
+  parent_id = var.webapp_id
 
-  enabled_log {
-    category = "AppServiceHTTPLogs"
-  }
-
-  enabled_log {
-    category = "AppServiceConsoleLogs"
-  }
-
-  enabled_log {
-    category = "AppServiceAppLogs"
-  }
-
-  metric {
-    category = "AllMetrics"
+  body = {
+    properties = {
+      workspaceId = azapi_resource.log_analytics.id
+      logs = [
+        {
+          category = "AppServiceHTTPLogs"
+          enabled  = true
+        },
+        {
+          category = "AppServiceConsoleLogs"
+          enabled  = true
+        },
+        {
+          category = "AppServiceAppLogs"
+          enabled  = true
+        }
+      ]
+      metrics = [
+        {
+          category = "AllMetrics"
+          enabled  = true
+        }
+      ]
+    }
   }
 }
 ```
@@ -88,17 +118,33 @@ resource "azurerm_monitor_diagnostic_setting" "webapp" {
 
 ```hcl
 # Grant read access for querying logs
-resource "azurerm_role_assignment" "reader" {
-  scope                = azurerm_log_analytics_workspace.this.id
-  role_definition_name = "Log Analytics Reader"
-  principal_id         = var.reader_principal_id
+resource "azapi_resource" "reader_role" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.log_analytics.id}${var.reader_principal_id}reader")
+  parent_id = azapi_resource.log_analytics.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/73c42c96-874c-492b-b04d-ab87d138a893"  # Log Analytics Reader
+      principalId      = var.reader_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 
 # Grant contributor access for managing workspace settings
-resource "azurerm_role_assignment" "contributor" {
-  scope                = azurerm_log_analytics_workspace.this.id
-  role_definition_name = "Log Analytics Contributor"
-  principal_id         = var.admin_principal_id
+resource "azapi_resource" "contributor_role" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.log_analytics.id}${var.admin_principal_id}contributor")
+  parent_id = azapi_resource.log_analytics.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/92aaf0da-9dab-42b6-94a3-d43ce8d16293"  # Log Analytics Contributor
+      principalId      = var.admin_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 ```
 
@@ -106,39 +152,64 @@ resource "azurerm_role_assignment" "contributor" {
 
 ```hcl
 # Private endpoint for Log Analytics is via Azure Monitor Private Link Scope (AMPLS)
-# Unless told otherwise, private endpoint via AMPLS is required per governance policy —
+# Unless told otherwise, private endpoint via AMPLS is required per governance policy --
 # publicNetworkAccessForIngestion and publicNetworkAccessForQuery should be set to "Disabled"
 
 # For production:
-resource "azurerm_monitor_private_link_scope" "this" {
-  count               = var.enable_private_link ? 1 : 0
-  name                = "ampls-${var.name}"
-  resource_group_name = var.resource_group_name
+resource "azapi_resource" "ampls" {
+  count     = var.enable_private_link ? 1 : 0
+  type      = "Microsoft.Insights/privateLinkScopes@2021-07-01-preview"
+  name      = "ampls-${var.name}"
+  location  = "global"
+  parent_id = var.resource_group_id
+
+  body = {
+    properties = {
+      accessModeSettings = {
+        ingestionAccessMode = "PrivateOnly"
+        queryAccessMode     = "PrivateOnly"
+      }
+    }
+  }
 
   tags = var.tags
 }
 
-resource "azurerm_monitor_private_link_scoped_service" "this" {
-  count               = var.enable_private_link ? 1 : 0
-  name                = "amplsservice-${var.name}"
-  resource_group_name = var.resource_group_name
-  scope_name          = azurerm_monitor_private_link_scope.this[0].name
-  linked_resource_id  = azurerm_log_analytics_workspace.this.id
+resource "azapi_resource" "ampls_scoped_service" {
+  count     = var.enable_private_link ? 1 : 0
+  type      = "Microsoft.Insights/privateLinkScopes/scopedResources@2021-07-01-preview"
+  name      = "amplsservice-${var.name}"
+  parent_id = azapi_resource.ampls[0].id
+
+  body = {
+    properties = {
+      linkedResourceId = azapi_resource.log_analytics.id
+    }
+  }
 }
 
-resource "azurerm_private_endpoint" "this" {
-  count = var.enable_private_link && var.subnet_id != null ? 1 : 0
+resource "azapi_resource" "private_endpoint" {
+  count     = var.enable_private_link && var.subnet_id != null ? 1 : 0
+  type      = "Microsoft.Network/privateEndpoints@2023-11-01"
+  name      = "pe-${var.name}"
+  location  = var.location
+  parent_id = var.resource_group_id
 
-  name                = "pe-${var.name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  subnet_id           = var.subnet_id
-
-  private_service_connection {
-    name                           = "psc-${var.name}"
-    private_connection_resource_id = azurerm_monitor_private_link_scope.this[0].id
-    subresource_names              = ["azuremonitor"]
-    is_manual_connection           = false
+  body = {
+    properties = {
+      subnet = {
+        id = var.subnet_id
+      }
+      privateLinkServiceConnections = [
+        {
+          name = "psc-${var.name}"
+          properties = {
+            privateLinkServiceId = azapi_resource.ampls[0].id
+            groupIds             = ["azuremonitor"]
+          }
+        }
+      ]
+    }
   }
 
   tags = var.tags
@@ -316,7 +387,7 @@ async function queryLogs() {
 | Creating multiple workspaces unnecessarily | Fragmented logs, harder to query across resources | Use a single workspace per environment for most POCs |
 | Not setting retention policy | Default 30 days may be too short for production | Configure retention explicitly; accept 30 days for POC |
 | Ignoring ingestion costs | Unexpected bills from high-volume log sources | Set daily cap for production; monitor ingestion volume |
-| Not enabling diagnostic settings on resources | Resources create no logs in the workspace | Add `azurerm_monitor_diagnostic_setting` for each resource |
+| Not enabling diagnostic settings on resources | Resources create no logs in the workspace | Add an `azapi_resource` of type `Microsoft.Insights/diagnosticSettings` for each resource |
 | Workspace region mismatch | Some diagnostic settings require same-region workspace | Deploy workspace in the same region as the resource group |
 | Querying without proper RBAC | Access denied on workspace queries | Assign `Log Analytics Reader` role for query access |
 | Confusing workspace ID with resource ID | API calls fail | Workspace ID (customerId) is the GUID used for queries; resource ID is the ARM path |

@@ -28,44 +28,71 @@ Choose PostgreSQL Flexible Server over Azure SQL when the team prefers PostgreSQ
 ### Basic Resource
 
 ```hcl
-resource "azurerm_postgresql_flexible_server" "this" {
-  name                          = var.name
-  location                      = var.location
-  resource_group_name           = var.resource_group_name
-  version                       = "16"
-  sku_name                      = "B_Standard_B1ms"  # Burstable tier
-  storage_mb                    = 32768               # 32 GiB
-  auto_grow_enabled             = true
-  backup_retention_days         = 7
-  geo_redundant_backup_enabled  = false
-  public_network_access_enabled = false  # Unless told otherwise, disabled per governance policy
+resource "azapi_resource" "pg_server" {
+  type      = "Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview"
+  name      = var.name
+  location  = var.location
+  parent_id = var.resource_group_id
 
-  authentication {
-    active_directory_auth_enabled = true
-    password_auth_enabled         = true  # Needed for initial admin; disable later
-    tenant_id                     = data.azurerm_client_config.current.tenant_id
+  body = {
+    sku = {
+      name = "Standard_B1ms"
+      tier = "Burstable"
+    }
+    properties = {
+      version                = "16"
+      administratorLogin     = var.admin_username
+      administratorLoginPassword = var.admin_password  # Store in Key Vault
+      storage = {
+        storageSizeGB = 32
+        autoGrow      = "Enabled"
+      }
+      backup = {
+        backupRetentionDays = 7
+        geoRedundantBackup  = "Disabled"
+      }
+      highAvailability = {
+        mode = "Disabled"
+      }
+      authConfig = {
+        activeDirectoryAuth = "Enabled"
+        passwordAuth        = "Enabled"  # Needed for initial admin; disable later
+        tenantId            = data.azurerm_client_config.current.tenant_id
+      }
+    }
   }
 
-  administrator_login    = var.admin_username
-  administrator_password = var.admin_password  # Store in Key Vault
-
   tags = var.tags
+
+  response_export_values = ["properties.fullyQualifiedDomainName"]
 }
 
 # Required: Allow Azure services (for managed identity connections)
-resource "azurerm_postgresql_flexible_server_firewall_rule" "azure_services" {
+resource "azapi_resource" "firewall_azure_services" {
+  type      = "Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-12-01-preview"
   name      = "AllowAzureServices"
-  server_id = azurerm_postgresql_flexible_server.this.id
-  start_ip_address = "0.0.0.0"
-  end_ip_address   = "0.0.0.0"
+  parent_id = azapi_resource.pg_server.id
+
+  body = {
+    properties = {
+      startIpAddress = "0.0.0.0"
+      endIpAddress   = "0.0.0.0"
+    }
+  }
 }
 
 # Create application database
-resource "azurerm_postgresql_flexible_server_database" "app" {
+resource "azapi_resource" "database" {
+  type      = "Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-12-01-preview"
   name      = var.database_name
-  server_id = azurerm_postgresql_flexible_server.this.id
-  charset   = "UTF8"
-  collation = "en_US.utf8"
+  parent_id = azapi_resource.pg_server.id
+
+  body = {
+    properties = {
+      charset   = "UTF8"
+      collation = "en_US.utf8"
+    }
+  }
 }
 ```
 
@@ -91,10 +118,18 @@ ARM-level RBAC (for management operations):
 
 ```hcl
 # Contributor role for managing the server (not data access)
-resource "azurerm_role_assignment" "pg_contributor" {
-  scope                = azurerm_postgresql_flexible_server.this.id
-  role_definition_name = "Contributor"
-  principal_id         = var.admin_identity_principal_id
+resource "azapi_resource" "pg_contributor_role" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.pg_server.id}${var.admin_identity_principal_id}contributor")
+  parent_id = azapi_resource.pg_server.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"  # Contributor
+      principalId      = var.admin_identity_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 ```
 
@@ -104,41 +139,56 @@ PostgreSQL Flexible Server supports **VNet integration** (delegated subnet) as t
 
 ```hcl
 # Delegated subnet for PostgreSQL
-resource "azurerm_subnet" "postgres" {
-  name                 = "snet-postgres"
-  resource_group_name  = var.resource_group_name
-  virtual_network_name = var.vnet_name
-  address_prefixes     = [var.postgres_subnet_cidr]
+resource "azapi_resource" "postgres_subnet" {
+  type      = "Microsoft.Network/virtualNetworks/subnets@2023-11-01"
+  name      = "snet-postgres"
+  parent_id = var.vnet_id
 
-  delegation {
-    name = "postgresql"
-    service_delegation {
-      name    = "Microsoft.DBforPostgreSQL/flexibleServers"
-      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
+  body = {
+    properties = {
+      addressPrefix = var.postgres_subnet_cidr
+      delegations = [
+        {
+          name = "postgresql"
+          properties = {
+            serviceName = "Microsoft.DBforPostgreSQL/flexibleServers"
+          }
+        }
+      ]
     }
   }
 }
 
 # Private DNS zone for VNet-integrated server
-resource "azurerm_private_dns_zone" "postgres" {
-  name                = "${var.name}.private.postgres.database.azure.com"
-  resource_group_name = var.resource_group_name
+resource "azapi_resource" "postgres_dns_zone" {
+  type      = "Microsoft.Network/privateDnsZones@2020-06-01"
+  name      = "${var.name}.private.postgres.database.azure.com"
+  location  = "global"
+  parent_id = var.resource_group_id
+
+  body = {}
 }
 
-resource "azurerm_private_dns_zone_virtual_network_link" "postgres" {
-  name                  = "vnet-link"
-  resource_group_name   = var.resource_group_name
-  private_dns_zone_name = azurerm_private_dns_zone.postgres.name
-  virtual_network_id    = var.vnet_id
+resource "azapi_resource" "postgres_dns_vnet_link" {
+  type      = "Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01"
+  name      = "vnet-link"
+  location  = "global"
+  parent_id = azapi_resource.postgres_dns_zone.id
+
+  body = {
+    properties = {
+      virtualNetwork = {
+        id = var.vnet_id
+      }
+      registrationEnabled = false
+    }
+  }
 }
 
 # Server with VNet integration
-resource "azurerm_postgresql_flexible_server" "this" {
-  # ... (same as basic, plus:)
-  delegated_subnet_id = azurerm_subnet.postgres.id
-  private_dns_zone_id = azurerm_private_dns_zone.postgres.id
-  public_network_access_enabled = false
-}
+# (same as basic resource above, with these additional properties:)
+#   delegatedSubnetResourceId  = azapi_resource.postgres_subnet.id
+#   privateDnsZoneArmResourceId = azapi_resource.postgres_dns_zone.id
 ```
 
 Private DNS zone: `privatelink.postgres.database.azure.com` (for private endpoint) or `<servername>.private.postgres.database.azure.com` (for VNet integration)

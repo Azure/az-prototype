@@ -27,62 +27,98 @@ Choose Data Factory over Fabric Data Pipelines when you need ARM-level control, 
 ### Basic Resource
 
 ```hcl
-resource "azurerm_data_factory" "this" {
-  name                = var.name
-  location            = var.location
-  resource_group_name = var.resource_group_name
+resource "azapi_resource" "this" {
+  type      = "Microsoft.DataFactory/factories@2018-06-01"
+  name      = var.name
+  location  = var.location
+  parent_id = var.resource_group_id
 
   identity {
     type = "SystemAssigned"
   }
 
-  public_network_enabled = false  # Unless told otherwise, disabled per governance policy
+  body = {
+    properties = {
+      publicNetworkAccess = "Disabled"  # Unless told otherwise, disabled per governance policy
+    }
+  }
 
   tags = var.tags
+
+  response_export_values = ["*"]
 }
 ```
 
 ### Linked Service (Azure SQL)
 
 ```hcl
-resource "azurerm_data_factory_linked_service_azure_sql_database" "this" {
-  name              = "ls-azuresql"
-  data_factory_id   = azurerm_data_factory.this.id
-  connection_string = "Integrated Security=False;Data Source=${var.sql_server_fqdn};Initial Catalog=${var.database_name};"
-  use_managed_identity = true  # Authenticate via ADF managed identity
+resource "azapi_resource" "ls_azuresql" {
+  type      = "Microsoft.DataFactory/factories/linkedservices@2018-06-01"
+  name      = "ls-azuresql"
+  parent_id = azapi_resource.this.id
+
+  body = {
+    properties = {
+      type = "AzureSqlDatabase"
+      typeProperties = {
+        connectionString = "Integrated Security=False;Data Source=${var.sql_server_fqdn};Initial Catalog=${var.database_name};"
+        credential = {
+          referenceName = "ManagedIdentityCredential"
+          type          = "CredentialReference"
+        }
+      }
+    }
+  }
 }
 ```
 
 ### Linked Service (Blob Storage)
 
 ```hcl
-resource "azurerm_data_factory_linked_service_azure_blob_storage" "this" {
-  name              = "ls-blob"
-  data_factory_id   = azurerm_data_factory.this.id
-  service_endpoint  = "https://${var.storage_account_name}.blob.core.windows.net"
-  use_managed_identity = true
+resource "azapi_resource" "ls_blob" {
+  type      = "Microsoft.DataFactory/factories/linkedservices@2018-06-01"
+  name      = "ls-blob"
+  parent_id = azapi_resource.this.id
+
+  body = {
+    properties = {
+      type = "AzureBlobStorage"
+      typeProperties = {
+        serviceEndpoint = "https://${var.storage_account_name}.blob.core.windows.net"
+        credential = {
+          referenceName = "ManagedIdentityCredential"
+          type          = "CredentialReference"
+        }
+      }
+    }
+  }
 }
 ```
 
 ### Pipeline with Copy Activity
 
 ```hcl
-resource "azurerm_data_factory_pipeline" "copy" {
-  name            = "pl-copy-data"
-  data_factory_id = azurerm_data_factory.this.id
+resource "azapi_resource" "pipeline_copy" {
+  type      = "Microsoft.DataFactory/factories/pipelines@2018-06-01"
+  name      = "pl-copy-data"
+  parent_id = azapi_resource.this.id
 
-  activities_json = jsonencode([
-    {
-      name = "CopyFromBlobToSQL"
-      type = "Copy"
-      inputs = [{ referenceName = "ds-blob-csv", type = "DatasetReference" }]
-      outputs = [{ referenceName = "ds-sql-table", type = "DatasetReference" }]
-      typeProperties = {
-        source = { type = "DelimitedTextSource" }
-        sink   = { type = "AzureSqlSink", writeBehavior = "upsert", upsertSettings = { useTempDB = true } }
-      }
+  body = {
+    properties = {
+      activities = [
+        {
+          name = "CopyFromBlobToSQL"
+          type = "Copy"
+          inputs = [{ referenceName = "ds-blob-csv", type = "DatasetReference" }]
+          outputs = [{ referenceName = "ds-sql-table", type = "DatasetReference" }]
+          typeProperties = {
+            source = { type = "DelimitedTextSource" }
+            sink   = { type = "AzureSqlSink", writeBehavior = "upsert", upsertSettings = { useTempDB = true } }
+          }
+        }
+      ]
     }
-  ])
+  }
 }
 ```
 
@@ -90,23 +126,44 @@ resource "azurerm_data_factory_pipeline" "copy" {
 
 ```hcl
 # Data Factory Contributor -- manage pipelines and triggers
-resource "azurerm_role_assignment" "adf_contributor" {
-  scope                = azurerm_data_factory.this.id
-  role_definition_name = "Data Factory Contributor"
-  principal_id         = var.admin_identity_principal_id
+resource "azapi_resource" "adf_contributor" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.this.id}-adf-contributor")
+  parent_id = azapi_resource.this.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/673868aa-7521-48a0-acc6-0f60742d39f5"
+      principalId      = var.admin_identity_principal_id
+    }
+  }
 }
 
 # Grant ADF's managed identity access to data sources
-resource "azurerm_role_assignment" "adf_blob_reader" {
-  scope                = var.storage_account_id
-  role_definition_name = "Storage Blob Data Reader"
-  principal_id         = azurerm_data_factory.this.identity[0].principal_id
+resource "azapi_resource" "adf_blob_reader" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${var.storage_account_id}-blob-reader")
+  parent_id = var.storage_account_id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"
+      principalId      = azapi_resource.this.output.identity.principalId
+    }
+  }
 }
 
-resource "azurerm_role_assignment" "adf_blob_contributor" {
-  scope                = var.storage_account_id
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azurerm_data_factory.this.identity[0].principal_id
+resource "azapi_resource" "adf_blob_contributor" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${var.storage_account_id}-blob-contributor")
+  parent_id = var.storage_account_id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe"
+      principalId      = azapi_resource.this.output.identity.principalId
+    }
+  }
 }
 ```
 
@@ -116,30 +173,51 @@ RBAC role IDs:
 ### Private Endpoint
 
 ```hcl
-resource "azurerm_private_endpoint" "adf" {
-  count = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+resource "azapi_resource" "adf_pe" {
+  count     = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+  type      = "Microsoft.Network/privateEndpoints@2023-11-01"
+  name      = "pe-${var.name}"
+  location  = var.location
+  parent_id = var.resource_group_id
 
-  name                = "pe-${var.name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  subnet_id           = var.subnet_id
-
-  private_service_connection {
-    name                           = "psc-${var.name}"
-    private_connection_resource_id = azurerm_data_factory.this.id
-    subresource_names              = ["dataFactory"]
-    is_manual_connection           = false
-  }
-
-  dynamic "private_dns_zone_group" {
-    for_each = var.private_dns_zone_id != null ? [1] : []
-    content {
-      name                 = "dns-zone-group"
-      private_dns_zone_ids = [var.private_dns_zone_id]
+  body = {
+    properties = {
+      subnet = {
+        id = var.subnet_id
+      }
+      privateLinkServiceConnections = [
+        {
+          name = "psc-${var.name}"
+          properties = {
+            privateLinkServiceId = azapi_resource.this.id
+            groupIds             = ["dataFactory"]
+          }
+        }
+      ]
     }
   }
 
   tags = var.tags
+}
+
+resource "azapi_resource" "adf_pe_dns" {
+  count     = var.enable_private_endpoint && var.private_dns_zone_id != null ? 1 : 0
+  type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01"
+  name      = "dns-zone-group"
+  parent_id = azapi_resource.adf_pe[0].id
+
+  body = {
+    properties = {
+      privateDnsZoneConfigs = [
+        {
+          name = "config"
+          properties = {
+            privateDnsZoneId = var.private_dns_zone_id
+          }
+        }
+      ]
+    }
+  }
 }
 ```
 

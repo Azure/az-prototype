@@ -27,127 +27,190 @@ Virtual Network is a **Stage 1 foundation service** -- it is created first and r
 ### Basic Resource
 
 ```hcl
-resource "azurerm_virtual_network" "this" {
-  name                = var.name
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  address_space       = [var.address_space]  # e.g., "10.0.0.0/16"
+resource "azapi_resource" "virtual_network" {
+  type      = "Microsoft.Network/virtualNetworks@2024-01-01"
+  name      = var.name
+  location  = var.location
+  parent_id = azapi_resource.resource_group.id
+
+  body = {
+    properties = {
+      addressSpace = {
+        addressPrefixes = [var.address_space]  # e.g., "10.0.0.0/16"
+      }
+    }
+  }
 
   tags = var.tags
 }
 
 # Compute subnet -- for App Service / Container Apps VNet integration
-resource "azurerm_subnet" "compute" {
-  name                 = "snet-compute"
-  resource_group_name  = var.resource_group_name
-  virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = [var.compute_subnet_prefix]  # e.g., "10.0.1.0/24"
+resource "azapi_resource" "compute_subnet" {
+  type      = "Microsoft.Network/virtualNetworks/subnets@2024-01-01"
+  name      = "snet-compute"
+  parent_id = azapi_resource.virtual_network.id
 
-  delegation {
-    name = "app-service-delegation"
-    service_delegation {
-      name    = "Microsoft.Web/serverFarms"
-      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
+  body = {
+    properties = {
+      addressPrefix = var.compute_subnet_prefix  # e.g., "10.0.1.0/24"
+      delegations = [
+        {
+          name = "app-service-delegation"
+          properties = {
+            serviceName = "Microsoft.Web/serverFarms"
+          }
+        }
+      ]
     }
   }
 }
 
 # Data subnet -- for private endpoints to data services
-resource "azurerm_subnet" "data" {
-  name                 = "snet-data"
-  resource_group_name  = var.resource_group_name
-  virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = [var.data_subnet_prefix]  # e.g., "10.0.2.0/24"
+resource "azapi_resource" "data_subnet" {
+  type      = "Microsoft.Network/virtualNetworks/subnets@2024-01-01"
+  name      = "snet-data"
+  parent_id = azapi_resource.virtual_network.id
+
+  body = {
+    properties = {
+      addressPrefix = var.data_subnet_prefix  # e.g., "10.0.2.0/24"
+    }
+  }
+
+  depends_on = [azapi_resource.compute_subnet]
 }
 
 # Private endpoint subnet -- dedicated for all private endpoints
-resource "azurerm_subnet" "private_endpoints" {
-  name                 = "snet-private-endpoints"
-  resource_group_name  = var.resource_group_name
-  virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = [var.pe_subnet_prefix]  # e.g., "10.0.3.0/24"
+resource "azapi_resource" "private_endpoints_subnet" {
+  type      = "Microsoft.Network/virtualNetworks/subnets@2024-01-01"
+  name      = "snet-private-endpoints"
+  parent_id = azapi_resource.virtual_network.id
+
+  body = {
+    properties = {
+      addressPrefix = var.pe_subnet_prefix  # e.g., "10.0.3.0/24"
+    }
+  }
+
+  depends_on = [azapi_resource.data_subnet]
 }
 ```
 
 ### Network Security Groups
 
 ```hcl
-resource "azurerm_network_security_group" "compute" {
-  name                = "nsg-compute"
-  location            = var.location
-  resource_group_name = var.resource_group_name
+resource "azapi_resource" "nsg_compute" {
+  type      = "Microsoft.Network/networkSecurityGroups@2024-01-01"
+  name      = "nsg-compute"
+  location  = var.location
+  parent_id = azapi_resource.resource_group.id
 
-  # Default: deny all inbound
-  security_rule {
-    name                       = "DenyAllInbound"
-    priority                   = 4096
-    direction                  = "Inbound"
-    access                     = "Deny"
-    protocol                   = "*"
-    source_port_range          = "*"
-    destination_port_range     = "*"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
-
-  # Allow HTTPS inbound from Internet (for public-facing apps)
-  security_rule {
-    name                       = "AllowHTTPS"
-    priority                   = 100
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "443"
-    source_address_prefix      = "Internet"
-    destination_address_prefix = "*"
-  }
-
-  tags = var.tags
-}
-
-resource "azurerm_subnet_network_security_group_association" "compute" {
-  subnet_id                 = azurerm_subnet.compute.id
-  network_security_group_id = azurerm_network_security_group.compute.id
-}
-
-resource "azurerm_network_security_group" "data" {
-  name                = "nsg-data"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-
-  # Default: deny all inbound from outside VNet
-  security_rule {
-    name                       = "DenyAllInbound"
-    priority                   = 4096
-    direction                  = "Inbound"
-    access                     = "Deny"
-    protocol                   = "*"
-    source_port_range          = "*"
-    destination_port_range     = "*"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
-
-  # Allow inbound from VNet only
-  security_rule {
-    name                       = "AllowVNetInbound"
-    priority                   = 100
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "*"
-    source_port_range          = "*"
-    destination_port_range     = "*"
-    source_address_prefix      = "VirtualNetwork"
-    destination_address_prefix = "VirtualNetwork"
+  body = {
+    properties = {
+      securityRules = [
+        {
+          name = "DenyAllInbound"
+          properties = {
+            priority                 = 4096
+            direction                = "Inbound"
+            access                   = "Deny"
+            protocol                 = "*"
+            sourcePortRange          = "*"
+            destinationPortRange     = "*"
+            sourceAddressPrefix      = "*"
+            destinationAddressPrefix = "*"
+          }
+        }
+        {
+          name = "AllowHTTPS"
+          properties = {
+            priority                 = 100
+            direction                = "Inbound"
+            access                   = "Allow"
+            protocol                 = "Tcp"
+            sourcePortRange          = "*"
+            destinationPortRange     = "443"
+            sourceAddressPrefix      = "Internet"
+            destinationAddressPrefix = "*"
+          }
+        }
+      ]
+    }
   }
 
   tags = var.tags
 }
 
-resource "azurerm_subnet_network_security_group_association" "data" {
-  subnet_id                 = azurerm_subnet.data.id
-  network_security_group_id = azurerm_network_security_group.data.id
+# Associate NSG with compute subnet by updating the subnet
+resource "azapi_update_resource" "compute_subnet_nsg" {
+  type        = "Microsoft.Network/virtualNetworks/subnets@2024-01-01"
+  resource_id = azapi_resource.compute_subnet.id
+
+  body = {
+    properties = {
+      addressPrefix = var.compute_subnet_prefix
+      networkSecurityGroup = {
+        id = azapi_resource.nsg_compute.id
+      }
+    }
+  }
+}
+
+resource "azapi_resource" "nsg_data" {
+  type      = "Microsoft.Network/networkSecurityGroups@2024-01-01"
+  name      = "nsg-data"
+  location  = var.location
+  parent_id = azapi_resource.resource_group.id
+
+  body = {
+    properties = {
+      securityRules = [
+        {
+          name = "DenyAllInbound"
+          properties = {
+            priority                 = 4096
+            direction                = "Inbound"
+            access                   = "Deny"
+            protocol                 = "*"
+            sourcePortRange          = "*"
+            destinationPortRange     = "*"
+            sourceAddressPrefix      = "*"
+            destinationAddressPrefix = "*"
+          }
+        }
+        {
+          name = "AllowVNetInbound"
+          properties = {
+            priority                 = 100
+            direction                = "Inbound"
+            access                   = "Allow"
+            protocol                 = "*"
+            sourcePortRange          = "*"
+            destinationPortRange     = "*"
+            sourceAddressPrefix      = "VirtualNetwork"
+            destinationAddressPrefix = "VirtualNetwork"
+          }
+        }
+      ]
+    }
+  }
+
+  tags = var.tags
+}
+
+# Associate NSG with data subnet by updating the subnet
+resource "azapi_update_resource" "data_subnet_nsg" {
+  type        = "Microsoft.Network/virtualNetworks/subnets@2024-01-01"
+  resource_id = azapi_resource.data_subnet.id
+
+  body = {
+    properties = {
+      addressPrefix = var.data_subnet_prefix
+      networkSecurityGroup = {
+        id = azapi_resource.nsg_data.id
+      }
+    }
+  }
 }
 ```
 
@@ -174,23 +237,33 @@ locals {
   }
 }
 
-resource "azurerm_private_dns_zone" "zones" {
+resource "azapi_resource" "private_dns_zones" {
   for_each = var.private_dns_zones  # Pass subset of the map above based on services used
 
-  name                = each.value
-  resource_group_name = var.resource_group_name
+  type      = "Microsoft.Network/privateDnsZones@2020-06-01"
+  name      = each.value
+  location  = "global"
+  parent_id = azapi_resource.resource_group.id
 
   tags = var.tags
 }
 
-resource "azurerm_private_dns_zone_virtual_network_link" "links" {
-  for_each = azurerm_private_dns_zone.zones
+resource "azapi_resource" "private_dns_zone_links" {
+  for_each = azapi_resource.private_dns_zones
 
-  name                  = "link-${each.key}"
-  resource_group_name   = var.resource_group_name
-  private_dns_zone_name = each.value.name
-  virtual_network_id    = azurerm_virtual_network.this.id
-  registration_enabled  = false
+  type      = "Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01"
+  name      = "link-${each.key}"
+  location  = "global"
+  parent_id = each.value.id
+
+  body = {
+    properties = {
+      virtualNetwork = {
+        id = azapi_resource.virtual_network.id
+      }
+      registrationEnabled = false
+    }
+  }
 
   tags = var.tags
 }
@@ -200,10 +273,18 @@ resource "azurerm_private_dns_zone_virtual_network_link" "links" {
 
 ```hcl
 # Network Contributor -- manage networks but not access
-resource "azurerm_role_assignment" "network_contributor" {
-  scope                = azurerm_virtual_network.this.id
-  role_definition_name = "Network Contributor"
-  principal_id         = var.managed_identity_principal_id
+resource "azapi_resource" "network_contributor" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("sha1", "${azapi_resource.virtual_network.id}-${var.managed_identity_principal_id}-4d97b98b-1d4f-4787-a291-c67834d212e7")
+  parent_id = azapi_resource.virtual_network.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/4d97b98b-1d4f-4787-a291-c67834d212e7"  # Network Contributor
+      principalId      = var.managed_identity_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 ```
 
@@ -305,7 +386,7 @@ No application code patterns -- Azure Virtual Network is a pure infrastructure s
 2. **Subnet sizing** -- Each subnet reserves 5 addresses (Azure platform). A /24 gives 251 usable addresses. Private endpoint subnets can fill up in large deployments.
 3. **Subnet delegation conflicts** -- A subnet can only have one delegation type. Do not mix App Service delegation with Container Apps delegation in the same subnet.
 4. **Forgetting private DNS zones** -- Private endpoints require DNS resolution. Without a linked private DNS zone, applications cannot resolve the private endpoint hostname.
-5. **NSG on private endpoint subnets** -- NSGs on subnets with private endpoints require special handling. Network policies for private endpoints must be enabled: `private_endpoint_network_policies = "Enabled"` (Terraform) or `privateEndpointNetworkPolicies: 'Enabled'` (Bicep).
+5. **NSG on private endpoint subnets** -- NSGs on subnets with private endpoints require special handling. Network policies for private endpoints must be enabled: `privateEndpointNetworkPolicies = "Enabled"` in the subnet properties (Terraform azapi) or `privateEndpointNetworkPolicies: 'Enabled'` (Bicep).
 6. **Not creating separate subnets** -- Putting all resources in one subnet limits NSG granularity and causes delegation conflicts. Always use dedicated subnets per tier.
 7. **DNS zone link registration** -- Set `registration_enabled = false` for private DNS zone VNet links unless you specifically need auto-registration of VM DNS records.
 

@@ -25,15 +25,25 @@ Container Registry is a foundational infrastructure service. Any architecture us
 ### Basic Resource
 
 ```hcl
-resource "azurerm_container_registry" "this" {
-  name                          = var.name  # Must be globally unique, alphanumeric only
-  location                      = var.location
-  resource_group_name           = var.resource_group_name
-  sku                           = "Basic"
-  admin_enabled                 = false  # CRITICAL: Never enable admin user
-  public_network_access_enabled = false  # Unless told otherwise, disabled per governance policy
+resource "azapi_resource" "acr" {
+  type      = "Microsoft.ContainerRegistry/registries@2023-11-01-preview"
+  name      = var.name  # Must be globally unique, alphanumeric only
+  location  = var.location
+  parent_id = azapi_resource.resource_group.id
+
+  body = {
+    sku = {
+      name = "Basic"
+    }
+    properties = {
+      adminUserEnabled    = false  # CRITICAL: Never enable admin user
+      publicNetworkAccess = "Disabled"  # Unless told otherwise, disabled per governance policy
+    }
+  }
 
   tags = var.tags
+
+  response_export_values = ["properties.loginServer"]
 }
 ```
 
@@ -41,17 +51,33 @@ resource "azurerm_container_registry" "this" {
 
 ```hcl
 # AcrPull -- allows container runtimes to pull images
-resource "azurerm_role_assignment" "acr_pull" {
-  scope                = azurerm_container_registry.this.id
-  role_definition_name = "AcrPull"
-  principal_id         = var.managed_identity_principal_id
+resource "azapi_resource" "acr_pull" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("sha1", "${azapi_resource.acr.id}-${var.managed_identity_principal_id}-7f951dda-4ed3-4680-a7ca-43fe172d538d")
+  parent_id = azapi_resource.acr.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/7f951dda-4ed3-4680-a7ca-43fe172d538d"  # AcrPull
+      principalId      = var.managed_identity_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 
 # AcrPush -- allows CI/CD pipelines to push images
-resource "azurerm_role_assignment" "acr_push" {
-  scope                = azurerm_container_registry.this.id
-  role_definition_name = "AcrPush"
-  principal_id         = var.ci_identity_principal_id
+resource "azapi_resource" "acr_push" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("sha1", "${azapi_resource.acr.id}-${var.ci_identity_principal_id}-8311e382-0749-4cb8-b61a-304f252e45ec")
+  parent_id = azapi_resource.acr.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/8311e382-0749-4cb8-b61a-304f252e45ec"  # AcrPush
+      principalId      = var.ci_identity_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 ```
 
@@ -62,30 +88,53 @@ RBAC role IDs:
 ### Private Endpoint
 
 ```hcl
-resource "azurerm_private_endpoint" "acr" {
-  count = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+resource "azapi_resource" "acr_private_endpoint" {
+  count     = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
 
-  name                = "pe-${var.name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  subnet_id           = var.subnet_id
+  type      = "Microsoft.Network/privateEndpoints@2023-11-01"
+  name      = "pe-${var.name}"
+  location  = var.location
+  parent_id = azapi_resource.resource_group.id
 
-  private_service_connection {
-    name                           = "psc-${var.name}"
-    private_connection_resource_id = azurerm_container_registry.this.id
-    subresource_names              = ["registry"]
-    is_manual_connection           = false
-  }
-
-  dynamic "private_dns_zone_group" {
-    for_each = var.private_dns_zone_id != null ? [1] : []
-    content {
-      name                 = "dns-zone-group"
-      private_dns_zone_ids = [var.private_dns_zone_id]
+  body = {
+    properties = {
+      subnet = {
+        id = var.subnet_id
+      }
+      privateLinkServiceConnections = [
+        {
+          name = "psc-${var.name}"
+          properties = {
+            privateLinkServiceId = azapi_resource.acr.id
+            groupIds             = ["registry"]
+          }
+        }
+      ]
     }
   }
 
   tags = var.tags
+}
+
+resource "azapi_resource" "acr_pe_dns_zone_group" {
+  count     = var.enable_private_endpoint && var.subnet_id != null && var.private_dns_zone_id != null ? 1 : 0
+
+  type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01"
+  name      = "dns-zone-group"
+  parent_id = azapi_resource.acr_private_endpoint[0].id
+
+  body = {
+    properties = {
+      privateDnsZoneConfigs = [
+        {
+          name = "config"
+          properties = {
+            privateDnsZoneId = var.private_dns_zone_id
+          }
+        }
+      ]
+    }
+  }
 }
 ```
 
@@ -217,12 +266,21 @@ az acr login --name myregistry --expose-token
 Container Apps pull images using the managed identity assigned to the Container App with `AcrPull` role. No explicit login is needed -- configure the registry in the Container App environment:
 
 ```hcl
-# Terraform: Container App referencing ACR
-resource "azurerm_container_app" "this" {
+# Terraform (azapi): Container App referencing ACR via registries in configuration
+resource "azapi_resource" "container_app" {
   # ...
-  registry {
-    server   = azurerm_container_registry.this.login_server
-    identity = azurerm_user_assigned_identity.this.id
+  body = {
+    properties = {
+      configuration = {
+        registries = [
+          {
+            server   = azapi_resource.acr.output.properties.loginServer
+            identity = azapi_resource.user_assigned_identity.id
+          }
+        ]
+      }
+      # ...
+    }
   }
 }
 ```

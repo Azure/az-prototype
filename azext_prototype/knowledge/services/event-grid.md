@@ -27,65 +27,93 @@ Prefer Event Grid over Service Bus when you need **event notification** (somethi
 
 ```hcl
 # Custom Topic
-resource "azurerm_eventgrid_topic" "this" {
-  name                = var.name
-  location            = var.location
-  resource_group_name = var.resource_group_name
-
-  input_schema = "CloudEventSchemaV1_0"  # Recommended schema
+resource "azapi_resource" "topic" {
+  type      = "Microsoft.EventGrid/topics@2024-06-01-preview"
+  name      = var.name
+  location  = var.location
+  parent_id = var.resource_group_id
 
   identity {
     type = "SystemAssigned"
   }
 
-  public_network_access_enabled = false  # Unless told otherwise, disabled per governance policy
-
-  tags = var.tags
-}
-
-# Event Subscription (e.g., to Azure Function)
-resource "azurerm_eventgrid_event_subscription" "function" {
-  name  = "sub-${var.name}-function"
-  scope = azurerm_eventgrid_topic.this.id
-
-  azure_function_endpoint {
-    function_id = var.function_id  # Resource ID of the Azure Function
-  }
-
-  # Optional: filter events
-  advanced_filter {
-    string_contains {
-      key    = "subject"
-      values = ["orders/"]
+  body = {
+    properties = {
+      inputSchema         = "CloudEventSchemaV1_0"  # Recommended schema
+      publicNetworkAccess = "Disabled"  # Unless told otherwise, disabled per governance policy
     }
   }
 
-  retry_policy {
-    max_delivery_attempts = 30
-    event_time_to_live    = 1440  # 24 hours in minutes
+  tags = var.tags
+
+  response_export_values = ["properties.endpoint"]
+}
+
+# Event Subscription (e.g., to Azure Function)
+resource "azapi_resource" "sub_function" {
+  type      = "Microsoft.EventGrid/topics/eventSubscriptions@2024-06-01-preview"
+  name      = "sub-${var.name}-function"
+  parent_id = azapi_resource.topic.id
+
+  body = {
+    properties = {
+      destination = {
+        endpointType = "AzureFunction"
+        properties = {
+          resourceId = var.function_id  # Resource ID of the Azure Function
+        }
+      }
+      filter = {
+        advancedFilters = [
+          {
+            operatorType = "StringContains"
+            key          = "subject"
+            values       = ["orders/"]
+          }
+        ]
+      }
+      retryPolicy = {
+        maxDeliveryAttempts = 30
+        eventTimeToLiveInMinutes = 1440  # 24 hours
+      }
+    }
   }
 }
 
 # Event Subscription (to webhook)
-resource "azurerm_eventgrid_event_subscription" "webhook" {
-  name  = "sub-${var.name}-webhook"
-  scope = azurerm_eventgrid_topic.this.id
+resource "azapi_resource" "sub_webhook" {
+  type      = "Microsoft.EventGrid/topics/eventSubscriptions@2024-06-01-preview"
+  name      = "sub-${var.name}-webhook"
+  parent_id = azapi_resource.topic.id
 
-  webhook_endpoint {
-    url = var.webhook_url
+  body = {
+    properties = {
+      destination = {
+        endpointType = "WebHook"
+        properties = {
+          endpointUrl = var.webhook_url
+        }
+      }
+    }
   }
 }
 
 # System Topic (for Azure resource events)
-resource "azurerm_eventgrid_system_topic" "storage" {
-  name                   = "systopic-${var.name}-storage"
-  location               = var.location
-  resource_group_name    = var.resource_group_name
-  source_arm_resource_id = var.storage_account_id
-  topic_type             = "Microsoft.Storage.StorageAccounts"
+resource "azapi_resource" "system_topic" {
+  type      = "Microsoft.EventGrid/systemTopics@2024-06-01-preview"
+  name      = "systopic-${var.name}-storage"
+  location  = var.location
+  parent_id = var.resource_group_id
 
   identity {
     type = "SystemAssigned"
+  }
+
+  body = {
+    properties = {
+      source    = var.storage_account_id
+      topicType = "Microsoft.Storage.StorageAccounts"
+    }
   }
 
   tags = var.tags
@@ -96,10 +124,18 @@ resource "azurerm_eventgrid_system_topic" "storage" {
 
 ```hcl
 # EventGrid Data Sender -- allows publishing events to topic
-resource "azurerm_role_assignment" "event_sender" {
-  scope                = azurerm_eventgrid_topic.this.id
-  role_definition_name = "EventGrid Data Sender"
-  principal_id         = var.managed_identity_principal_id
+resource "azapi_resource" "event_sender_role" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.topic.id}${var.managed_identity_principal_id}eg-sender")
+  parent_id = azapi_resource.topic.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/d5a91429-5739-47e2-a06b-3470a27159e7"  # EventGrid Data Sender
+      principalId      = var.managed_identity_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 ```
 
@@ -109,30 +145,51 @@ RBAC role IDs:
 ### Private Endpoint
 
 ```hcl
-resource "azurerm_private_endpoint" "eventgrid" {
-  count = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+resource "azapi_resource" "private_endpoint" {
+  count     = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+  type      = "Microsoft.Network/privateEndpoints@2023-11-01"
+  name      = "pe-${var.name}"
+  location  = var.location
+  parent_id = var.resource_group_id
 
-  name                = "pe-${var.name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  subnet_id           = var.subnet_id
-
-  private_service_connection {
-    name                           = "psc-${var.name}"
-    private_connection_resource_id = azurerm_eventgrid_topic.this.id
-    subresource_names              = ["topic"]
-    is_manual_connection           = false
-  }
-
-  dynamic "private_dns_zone_group" {
-    for_each = var.private_dns_zone_id != null ? [1] : []
-    content {
-      name                 = "dns-zone-group"
-      private_dns_zone_ids = [var.private_dns_zone_id]
+  body = {
+    properties = {
+      subnet = {
+        id = var.subnet_id
+      }
+      privateLinkServiceConnections = [
+        {
+          name = "psc-${var.name}"
+          properties = {
+            privateLinkServiceId = azapi_resource.topic.id
+            groupIds             = ["topic"]
+          }
+        }
+      ]
     }
   }
 
   tags = var.tags
+}
+
+resource "azapi_resource" "dns_zone_group" {
+  count     = var.enable_private_endpoint && var.subnet_id != null && var.private_dns_zone_id != null ? 1 : 0
+  type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01"
+  name      = "dns-zone-group"
+  parent_id = azapi_resource.private_endpoint[0].id
+
+  body = {
+    properties = {
+      privateDnsZoneConfigs = [
+        {
+          name = "config"
+          properties = {
+            privateDnsZoneId = var.private_dns_zone_id
+          }
+        }
+      ]
+    }
+  }
 }
 ```
 

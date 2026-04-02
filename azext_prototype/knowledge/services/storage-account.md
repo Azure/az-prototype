@@ -17,34 +17,60 @@
 
 ### Basic Resource
 ```hcl
-resource "azurerm_storage_account" "this" {
-  name                            = var.storage_account_name   # 3-24 chars, lowercase alphanumeric only
-  resource_group_name             = azurerm_resource_group.this.name
-  location                        = azurerm_resource_group.this.location
-  account_tier                    = "Standard"
-  account_replication_type        = "LRS"
-  account_kind                    = "StorageV2"
-  access_tier                     = "Hot"
-  min_tls_version                 = "TLS1_2"
-  shared_access_key_enabled       = false   # CRITICAL: Enforce RBAC-only access
-  allow_nested_items_to_be_public = false   # CRITICAL: Prevent anonymous public access
+resource "azapi_resource" "storage_account" {
+  type      = "Microsoft.Storage/storageAccounts@2023-05-01"
+  name      = var.storage_account_name   # 3-24 chars, lowercase alphanumeric only
+  location  = azapi_resource.resource_group.output.location
+  parent_id = azapi_resource.resource_group.id
 
-  blob_properties {
-    delete_retention_policy {
-      days = 7
+  body = {
+    kind = "StorageV2"
+    sku = {
+      name = "Standard_LRS"
     }
-    container_delete_retention_policy {
-      days = 7
+    properties = {
+      accessTier              = "Hot"
+      minimumTlsVersion       = "TLS1_2"
+      allowSharedKeyAccess    = false   # CRITICAL: Enforce RBAC-only access
+      allowBlobPublicAccess   = false   # CRITICAL: Prevent anonymous public access
+      supportsHttpsTrafficOnly = true
     }
   }
 
   tags = var.tags
+
+  response_export_values = ["*"]
 }
 
-resource "azurerm_storage_container" "this" {
-  name                  = var.container_name
-  storage_account_id    = azurerm_storage_account.this.id
-  container_access_type = "private"
+resource "azapi_resource" "blob_service" {
+  type      = "Microsoft.Storage/storageAccounts/blobServices@2023-05-01"
+  name      = "default"
+  parent_id = azapi_resource.storage_account.id
+
+  body = {
+    properties = {
+      deleteRetentionPolicy = {
+        enabled = true
+        days    = 7
+      }
+      containerDeleteRetentionPolicy = {
+        enabled = true
+        days    = 7
+      }
+    }
+  }
+}
+
+resource "azapi_resource" "storage_container" {
+  type      = "Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01"
+  name      = var.container_name
+  parent_id = azapi_resource.blob_service.id
+
+  body = {
+    properties = {
+      publicAccess = "None"
+    }
+  }
 }
 ```
 
@@ -55,51 +81,108 @@ resource "azurerm_storage_container" "this" {
 #   Storage Blob Data Contributor: ba92f5b4-2d11-453d-a403-e96b0029c9fe
 #   Storage Blob Data Owner:       b7e6dc6d-f1e8-4753-8033-0f276bb0955b
 
-resource "azurerm_role_assignment" "storage_blob_contributor" {
-  scope                = azurerm_storage_account.this.id
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azurerm_user_assigned_identity.this.principal_id
+resource "azapi_resource" "storage_blob_contributor" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("sha1", "${azapi_resource.storage_account.id}-${azapi_resource.user_assigned_identity.output.properties.principalId}-ba92f5b4-2d11-453d-a403-e96b0029c9fe")
+  parent_id = azapi_resource.storage_account.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe"  # Storage Blob Data Contributor
+      principalId      = azapi_resource.user_assigned_identity.output.properties.principalId
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 
 # If only read access is needed:
-resource "azurerm_role_assignment" "storage_blob_reader" {
-  scope                = azurerm_storage_account.this.id
-  role_definition_name = "Storage Blob Data Reader"
-  principal_id         = azurerm_user_assigned_identity.this.principal_id
+resource "azapi_resource" "storage_blob_reader" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("sha1", "${azapi_resource.storage_account.id}-${azapi_resource.user_assigned_identity.output.properties.principalId}-2a2b9908-6ea1-4ae2-8e65-a410df84e7d1")
+  parent_id = azapi_resource.storage_account.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"  # Storage Blob Data Reader
+      principalId      = azapi_resource.user_assigned_identity.output.properties.principalId
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 ```
 
 ### Private Endpoint
 ```hcl
-resource "azurerm_private_endpoint" "blob" {
-  name                = "${var.storage_account_name}-blob-pe"
-  location            = azurerm_resource_group.this.location
-  resource_group_name = azurerm_resource_group.this.name
-  subnet_id           = azurerm_subnet.private_endpoints.id
+resource "azapi_resource" "blob_private_endpoint" {
+  type      = "Microsoft.Network/privateEndpoints@2023-11-01"
+  name      = "${var.storage_account_name}-blob-pe"
+  location  = azapi_resource.resource_group.output.location
+  parent_id = azapi_resource.resource_group.id
 
-  private_service_connection {
-    name                           = "${var.storage_account_name}-blob-psc"
-    private_connection_resource_id = azurerm_storage_account.this.id
-    is_manual_connection           = false
-    subresource_names              = ["blob"]   # Also: "queue", "table", "file" for other sub-resources
+  body = {
+    properties = {
+      subnet = {
+        id = azapi_resource.private_endpoints_subnet.id
+      }
+      privateLinkServiceConnections = [
+        {
+          name = "${var.storage_account_name}-blob-psc"
+          properties = {
+            privateLinkServiceId = azapi_resource.storage_account.id
+            groupIds             = ["blob"]   # Also: "queue", "table", "file" for other sub-resources
+          }
+        }
+      ]
+    }
   }
 
-  private_dns_zone_group {
-    name                 = "default"
-    private_dns_zone_ids = [azurerm_private_dns_zone.blob.id]
+  tags = var.tags
+}
+
+resource "azapi_resource" "blob_dns_zone" {
+  type      = "Microsoft.Network/privateDnsZones@2020-06-01"
+  name      = "privatelink.blob.core.windows.net"
+  location  = "global"
+  parent_id = azapi_resource.resource_group.id
+
+  tags = var.tags
+}
+
+resource "azapi_resource" "blob_dns_zone_link" {
+  type      = "Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01"
+  name      = "blob-dns-link"
+  location  = "global"
+  parent_id = azapi_resource.blob_dns_zone.id
+
+  body = {
+    properties = {
+      virtualNetwork = {
+        id = azapi_resource.virtual_network.id
+      }
+      registrationEnabled = false
+    }
   }
+
+  tags = var.tags
 }
 
-resource "azurerm_private_dns_zone" "blob" {
-  name                = "privatelink.blob.core.windows.net"
-  resource_group_name = azurerm_resource_group.this.name
-}
+resource "azapi_resource" "blob_pe_dns_zone_group" {
+  type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01"
+  name      = "default"
+  parent_id = azapi_resource.blob_private_endpoint.id
 
-resource "azurerm_private_dns_zone_virtual_network_link" "blob" {
-  name                  = "blob-dns-link"
-  resource_group_name   = azurerm_resource_group.this.name
-  private_dns_zone_name = azurerm_private_dns_zone.blob.name
-  virtual_network_id    = azurerm_virtual_network.this.id
+  body = {
+    properties = {
+      privateDnsZoneConfigs = [
+        {
+          name = "config"
+          properties = {
+            privateDnsZoneId = azapi_resource.blob_dns_zone.id
+          }
+        }
+      ]
+    }
+  }
 }
 ```
 
@@ -279,11 +362,11 @@ async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
 ```
 
 ## Common Pitfalls
-- **Shared access keys still enabled**: Set `shared_access_key_enabled = false` (Terraform) or `allowSharedKeyAccess: false` (Bicep). Without this, anyone with the storage key bypasses RBAC entirely.
-- **Public blob access**: Set `allow_nested_items_to_be_public = false` (Terraform) or `allowBlobPublicAccess: false` (Bicep) to prevent accidental anonymous access to containers.
+- **Shared access keys still enabled**: Set `allowSharedKeyAccess = false` in `body.properties` (Terraform azapi) or `allowSharedKeyAccess: false` (Bicep). Without this, anyone with the storage key bypasses RBAC entirely.
+- **Public blob access**: Set `allowBlobPublicAccess = false` in `body.properties` (Terraform azapi) or `allowBlobPublicAccess: false` (Bicep) to prevent accidental anonymous access to containers.
 - **Storage account naming**: Names must be 3-24 characters, lowercase letters and numbers only. No hyphens, underscores, or uppercase. This is more restrictive than most Azure resources.
-- **TLS version**: Always set `min_tls_version = "TLS1_2"`. Older TLS versions are insecure.
-- **Deployer needs RBAC too**: When `shared_access_key_enabled = false`, the deploying principal needs "Storage Blob Data Contributor" to upload blobs during deployment.
+- **TLS version**: Always set `minimumTlsVersion = "TLS1_2"`. Older TLS versions are insecure.
+- **Deployer needs RBAC too**: When `allowSharedKeyAccess = false`, the deploying principal needs "Storage Blob Data Contributor" to upload blobs during deployment.
 - **Private endpoint per sub-resource**: Blob, Queue, Table, and File each need separate private endpoints if all are used.
 - **Firewall timing**: Setting `default_action = "Deny"` on network rules before adding exceptions will block the deployer.
 

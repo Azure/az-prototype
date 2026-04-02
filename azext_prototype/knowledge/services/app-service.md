@@ -28,88 +28,120 @@
 ### Basic Resource
 
 ```hcl
-resource "azurerm_service_plan" "this" {
-  name                = var.plan_name
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  os_type             = "Linux"
-  sku_name            = var.sku_name  # "B1" for POC
+resource "azapi_resource" "plan" {
+  type      = "Microsoft.Web/serverfarms@2023-12-01"
+  name      = var.plan_name
+  location  = var.location
+  parent_id = var.resource_group_id
+
+  body = {
+    kind = "linux"
+    sku = {
+      name = var.sku_name  # "B1" for POC
+    }
+    properties = {
+      reserved = true  # Required for Linux
+    }
+  }
 
   tags = var.tags
 }
 
-resource "azurerm_linux_web_app" "this" {
-  name                = var.name
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  service_plan_id     = azurerm_service_plan.this.id
-  https_only          = true
+resource "azapi_resource" "web_app" {
+  type      = "Microsoft.Web/sites@2023-12-01"
+  name      = var.name
+  location  = var.location
+  parent_id = var.resource_group_id
 
   identity {
     type         = "UserAssigned"
     identity_ids = [var.managed_identity_id]
   }
 
-  site_config {
-    always_on        = true
-    minimum_tls_version = "1.2"
-    health_check_path   = "/health"
-
-    application_stack {
-      python_version = "3.12"  # or node_version, dotnet_version
+  body = {
+    kind = "app,linux"
+    properties = {
+      serverFarmId = azapi_resource.plan.id
+      httpsOnly    = true
+      siteConfig = {
+        alwaysOn        = true
+        minTlsVersion   = "1.2"
+        healthCheckPath = "/health"
+        linuxFxVersion  = "PYTHON|3.12"  # or NODE|20-lts, DOTNETCORE|8.0
+        appSettings = [
+          {
+            name  = "AZURE_CLIENT_ID"
+            value = var.managed_identity_client_id
+          }
+          # Use Key Vault references for secrets:
+          # { name = "SECRET_NAME", value = "@Microsoft.KeyVault(SecretUri=https://kv-name.vault.azure.net/secrets/secret-name)" }
+        ]
+      }
     }
   }
 
-  app_settings = merge(var.app_settings, {
-    "AZURE_CLIENT_ID" = var.managed_identity_client_id
-    # Use Key Vault references for secrets:
-    # "SECRET_NAME" = "@Microsoft.KeyVault(SecretUri=https://kv-name.vault.azure.net/secrets/secret-name)"
-  })
-
   tags = var.tags
+
+  response_export_values = ["properties.defaultHostName"]
 }
 ```
 
 ### Windows Web App (for .NET Framework)
 
 ```hcl
-resource "azurerm_service_plan" "this" {
-  name                = var.plan_name
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  os_type             = "Windows"
-  sku_name            = var.sku_name
+resource "azapi_resource" "plan" {
+  type      = "Microsoft.Web/serverfarms@2023-12-01"
+  name      = var.plan_name
+  location  = var.location
+  parent_id = var.resource_group_id
+
+  body = {
+    kind = "windows"
+    sku = {
+      name = var.sku_name
+    }
+    properties = {
+      reserved = false
+    }
+  }
 
   tags = var.tags
 }
 
-resource "azurerm_windows_web_app" "this" {
-  name                = var.name
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  service_plan_id     = azurerm_service_plan.this.id
-  https_only          = true
+resource "azapi_resource" "web_app" {
+  type      = "Microsoft.Web/sites@2023-12-01"
+  name      = var.name
+  location  = var.location
+  parent_id = var.resource_group_id
 
   identity {
     type         = "UserAssigned"
     identity_ids = [var.managed_identity_id]
   }
 
-  site_config {
-    always_on           = true
-    minimum_tls_version = "1.2"
-    health_check_path   = "/health"
-
-    application_stack {
-      dotnet_version = "v8.0"
+  body = {
+    kind = "app"
+    properties = {
+      serverFarmId = azapi_resource.plan.id
+      httpsOnly    = true
+      siteConfig = {
+        alwaysOn      = true
+        minTlsVersion = "1.2"
+        healthCheckPath = "/health"
+        netFrameworkVersion = "v8.0"
+        appSettings = [
+          {
+            name  = "AZURE_CLIENT_ID"
+            value = var.managed_identity_client_id
+          }
+        ]
+      }
     }
   }
 
-  app_settings = merge(var.app_settings, {
-    "AZURE_CLIENT_ID" = var.managed_identity_client_id
-  })
-
   tags = var.tags
+
+  response_export_values = ["properties.defaultHostName"]
 }
 ```
 
@@ -119,17 +151,33 @@ resource "azurerm_windows_web_app" "this" {
 # App Service itself does not typically receive RBAC roles;
 # instead, its managed identity is granted roles on OTHER resources.
 # Example: grant the web app's identity access to Key Vault secrets
-resource "azurerm_role_assignment" "keyvault_secrets" {
-  scope                = var.key_vault_id
-  role_definition_name = "Key Vault Secrets User"
-  principal_id         = var.managed_identity_principal_id
+resource "azapi_resource" "keyvault_secrets_role" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${var.key_vault_id}${var.managed_identity_principal_id}keyvault-secrets-user")
+  parent_id = var.key_vault_id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/4633458b-17de-408a-b874-0445c86b69e6"  # Key Vault Secrets User
+      principalId      = var.managed_identity_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 
 # Example: grant the web app's identity access to Storage
-resource "azurerm_role_assignment" "storage_blob" {
-  scope                = var.storage_account_id
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = var.managed_identity_principal_id
+resource "azapi_resource" "storage_blob_role" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${var.storage_account_id}${var.managed_identity_principal_id}storage-blob-contributor")
+  parent_id = var.storage_account_id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe"  # Storage Blob Data Contributor
+      principalId      = var.managed_identity_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 ```
 
@@ -137,37 +185,64 @@ resource "azurerm_role_assignment" "storage_blob" {
 
 ```hcl
 # Unless told otherwise, private endpoint for INBOUND access is required per governance policy
-resource "azurerm_private_endpoint" "this" {
-  count = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+resource "azapi_resource" "private_endpoint" {
+  count     = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+  type      = "Microsoft.Network/privateEndpoints@2023-11-01"
+  name      = "pe-${var.name}"
+  location  = var.location
+  parent_id = var.resource_group_id
 
-  name                = "pe-${var.name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  subnet_id           = var.subnet_id
-
-  private_service_connection {
-    name                           = "psc-${var.name}"
-    private_connection_resource_id = azurerm_linux_web_app.this.id
-    subresource_names              = ["sites"]
-    is_manual_connection           = false
-  }
-
-  dynamic "private_dns_zone_group" {
-    for_each = var.private_dns_zone_id != null ? [1] : []
-    content {
-      name                 = "dns-zone-group"
-      private_dns_zone_ids = [var.private_dns_zone_id]
+  body = {
+    properties = {
+      subnet = {
+        id = var.subnet_id
+      }
+      privateLinkServiceConnections = [
+        {
+          name = "psc-${var.name}"
+          properties = {
+            privateLinkServiceId = azapi_resource.web_app.id
+            groupIds             = ["sites"]
+          }
+        }
+      ]
     }
   }
 
   tags = var.tags
 }
 
+resource "azapi_resource" "dns_zone_group" {
+  count     = var.enable_private_endpoint && var.subnet_id != null && var.private_dns_zone_id != null ? 1 : 0
+  type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01"
+  name      = "dns-zone-group"
+  parent_id = azapi_resource.private_endpoint[0].id
+
+  body = {
+    properties = {
+      privateDnsZoneConfigs = [
+        {
+          name = "config"
+          properties = {
+            privateDnsZoneId = var.private_dns_zone_id
+          }
+        }
+      ]
+    }
+  }
+}
+
 # VNet integration for OUTBOUND traffic (connects to private endpoints of backend services)
-resource "azurerm_app_service_virtual_network_swift_connection" "this" {
-  count          = var.integration_subnet_id != null ? 1 : 0
-  app_service_id = azurerm_linux_web_app.this.id
-  subnet_id      = var.integration_subnet_id
+resource "azapi_update_resource" "vnet_integration" {
+  count       = var.integration_subnet_id != null ? 1 : 0
+  type        = "Microsoft.Web/sites@2023-12-01"
+  resource_id = azapi_resource.web_app.id
+
+  body = {
+    properties = {
+      virtualNetworkSubnetId = var.integration_subnet_id
+    }
+  }
 }
 ```
 

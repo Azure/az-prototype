@@ -30,100 +30,170 @@ Choose VMs only when PaaS alternatives (App Service, Container Apps, Functions) 
 ### Basic Resource (Linux)
 
 ```hcl
-resource "azurerm_linux_virtual_machine" "this" {
-  name                  = var.name
-  location              = var.location
-  resource_group_name   = var.resource_group_name
-  size                  = "Standard_B2s"
-  admin_username        = var.admin_username
-  network_interface_ids = [azurerm_network_interface.this.id]
+resource "azapi_resource" "nic" {
+  type      = "Microsoft.Network/networkInterfaces@2023-11-01"
+  name      = "nic-${var.name}"
+  location  = var.location
+  parent_id = var.resource_group_id
 
-  admin_ssh_key {
-    username   = var.admin_username
-    public_key = var.ssh_public_key  # Never use password auth
-  }
-
-  os_disk {
-    caching              = "ReadWrite"
-    storage_account_type = "StandardSSD_LRS"
-    disk_size_gb         = 30
-  }
-
-  source_image_reference {
-    publisher = "Canonical"
-    offer     = "0001-com-ubuntu-server-jammy"
-    sku       = "22_04-lts-gen2"
-    version   = "latest"
-  }
-
-  identity {
-    type = "SystemAssigned"
+  body = {
+    properties = {
+      ipConfigurations = [
+        {
+          name = "internal"
+          properties = {
+            subnet = {
+              id = var.subnet_id
+            }
+            privateIPAllocationMethod = "Dynamic"
+          }
+        }
+      ]
+    }
   }
 
   tags = var.tags
 }
 
-resource "azurerm_network_interface" "this" {
-  name                = "nic-${var.name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
+resource "azapi_resource" "this" {
+  type      = "Microsoft.Compute/virtualMachines@2024-03-01"
+  name      = var.name
+  location  = var.location
+  parent_id = var.resource_group_id
 
-  ip_configuration {
-    name                          = "internal"
-    subnet_id                     = var.subnet_id
-    private_ip_address_allocation = "Dynamic"
+  identity {
+    type = "SystemAssigned"
+  }
+
+  body = {
+    properties = {
+      hardwareProfile = {
+        vmSize = "Standard_B2s"
+      }
+      osProfile = {
+        computerName  = var.name
+        adminUsername  = var.admin_username
+        linuxConfiguration = {
+          disablePasswordAuthentication = true
+          ssh = {
+            publicKeys = [
+              {
+                path    = "/home/${var.admin_username}/.ssh/authorized_keys"
+                keyData = var.ssh_public_key  # Never use password auth
+              }
+            ]
+          }
+        }
+      }
+      storageProfile = {
+        imageReference = {
+          publisher = "Canonical"
+          offer     = "0001-com-ubuntu-server-jammy"
+          sku       = "22_04-lts-gen2"
+          version   = "latest"
+        }
+        osDisk = {
+          createOption = "FromImage"
+          caching      = "ReadWrite"
+          managedDisk = {
+            storageAccountType = "StandardSSD_LRS"
+          }
+          diskSizeGB = 30
+        }
+      }
+      networkProfile = {
+        networkInterfaces = [
+          {
+            id = azapi_resource.nic.id
+          }
+        ]
+      }
+    }
   }
 
   tags = var.tags
+
+  response_export_values = ["*"]
 }
 ```
 
 ### Basic Resource (Windows)
 
 ```hcl
-resource "azurerm_windows_virtual_machine" "this" {
-  name                  = var.name  # Max 15 chars for Windows
-  location              = var.location
-  resource_group_name   = var.resource_group_name
-  size                  = "Standard_B2s"
-  admin_username        = var.admin_username
-  admin_password        = var.admin_password  # Store in Key Vault
-  network_interface_ids = [azurerm_network_interface.this.id]
-
-  os_disk {
-    caching              = "ReadWrite"
-    storage_account_type = "StandardSSD_LRS"
-    disk_size_gb         = 128
-  }
-
-  source_image_reference {
-    publisher = "MicrosoftWindowsServer"
-    offer     = "WindowsServer"
-    sku       = "2022-datacenter-g2"
-    version   = "latest"
-  }
+resource "azapi_resource" "windows_vm" {
+  type      = "Microsoft.Compute/virtualMachines@2024-03-01"
+  name      = var.name  # Max 15 chars for Windows
+  location  = var.location
+  parent_id = var.resource_group_id
 
   identity {
     type = "SystemAssigned"
   }
 
+  body = {
+    properties = {
+      hardwareProfile = {
+        vmSize = "Standard_B2s"
+      }
+      osProfile = {
+        computerName  = var.name
+        adminUsername  = var.admin_username
+        adminPassword = var.admin_password  # Store in Key Vault
+      }
+      storageProfile = {
+        imageReference = {
+          publisher = "MicrosoftWindowsServer"
+          offer     = "WindowsServer"
+          sku       = "2022-datacenter-g2"
+          version   = "latest"
+        }
+        osDisk = {
+          createOption = "FromImage"
+          caching      = "ReadWrite"
+          managedDisk = {
+            storageAccountType = "StandardSSD_LRS"
+          }
+          diskSizeGB = 128
+        }
+      }
+      networkProfile = {
+        networkInterfaces = [
+          {
+            id = azapi_resource.nic.id
+          }
+        ]
+      }
+    }
+  }
+
   tags = var.tags
+
+  response_export_values = ["*"]
 }
 ```
 
 ### Auto-Shutdown (Cost Control)
 
 ```hcl
-resource "azurerm_dev_test_global_vm_shutdown_schedule" "this" {
-  virtual_machine_id = azurerm_linux_virtual_machine.this.id
-  location           = var.location
-  enabled            = true
+resource "azapi_resource" "auto_shutdown" {
+  type      = "Microsoft.DevTestLab/schedules@2018-09-15"
+  name      = "shutdown-computevm-${var.name}"
+  location  = var.location
+  parent_id = var.resource_group_id
 
-  daily_recurrence_time = "1900"  # 7 PM
-  timezone              = "UTC"
-
-  notification_settings {
-    enabled = false
+  body = {
+    properties = {
+      status           = "Enabled"
+      taskType         = "ComputeVmShutdownTask"
+      dailyRecurrence = {
+        time = "1900"  # 7 PM
+      }
+      timeZoneId       = "UTC"
+      targetResourceId = azapi_resource.this.id
+      notificationSettings = {
+        status = "Disabled"
+      }
+    }
   }
 }
 ```
@@ -132,24 +202,45 @@ resource "azurerm_dev_test_global_vm_shutdown_schedule" "this" {
 
 ```hcl
 # Virtual Machine Contributor -- manage VMs (not login access)
-resource "azurerm_role_assignment" "vm_contributor" {
-  scope                = azurerm_linux_virtual_machine.this.id
-  role_definition_name = "Virtual Machine Contributor"
-  principal_id         = var.admin_identity_principal_id
+resource "azapi_resource" "vm_contributor" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.this.id}-vm-contributor")
+  parent_id = azapi_resource.this.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/9980e02c-c2be-4d73-94e8-173b1dc7cf3c"
+      principalId      = var.admin_identity_principal_id
+    }
+  }
 }
 
 # Virtual Machine Administrator Login -- AAD-based SSH/RDP access
-resource "azurerm_role_assignment" "vm_admin_login" {
-  scope                = azurerm_linux_virtual_machine.this.id
-  role_definition_name = "Virtual Machine Administrator Login"
-  principal_id         = var.admin_identity_principal_id
+resource "azapi_resource" "vm_admin_login" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.this.id}-vm-admin-login")
+  parent_id = azapi_resource.this.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/1c0163c0-47e6-4577-8991-ea5c82e286e4"
+      principalId      = var.admin_identity_principal_id
+    }
+  }
 }
 
 # Grant VM's managed identity access to other resources
-resource "azurerm_role_assignment" "vm_blob_reader" {
-  scope                = var.storage_account_id
-  role_definition_name = "Storage Blob Data Reader"
-  principal_id         = azurerm_linux_virtual_machine.this.identity[0].principal_id
+resource "azapi_resource" "vm_blob_reader" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${var.storage_account_id}-vm-blob-reader")
+  parent_id = var.storage_account_id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"
+      principalId      = azapi_resource.this.output.identity.principalId
+    }
+  }
 }
 ```
 
@@ -163,27 +254,49 @@ RBAC role IDs:
 VMs don't use private endpoints -- they are deployed directly into subnets. Network security is controlled via NSGs and Azure Bastion:
 
 ```hcl
-# Azure Bastion for secure VM access (no public IPs needed)
-resource "azurerm_bastion_host" "this" {
-  name                = "bastion-${var.name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
+# Public IP for Azure Bastion
+resource "azapi_resource" "bastion_pip" {
+  type      = "Microsoft.Network/publicIPAddresses@2023-11-01"
+  name      = "pip-bastion"
+  location  = var.location
+  parent_id = var.resource_group_id
 
-  ip_configuration {
-    name                 = "configuration"
-    subnet_id            = var.bastion_subnet_id  # Must be named "AzureBastionSubnet"
-    public_ip_address_id = azurerm_public_ip.bastion.id
+  body = {
+    sku = {
+      name = "Standard"
+    }
+    properties = {
+      publicIPAllocationMethod = "Static"
+    }
   }
 
   tags = var.tags
 }
 
-resource "azurerm_public_ip" "bastion" {
-  name                = "pip-bastion"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  allocation_method   = "Static"
-  sku                 = "Standard"
+# Azure Bastion for secure VM access (no public IPs needed)
+resource "azapi_resource" "bastion" {
+  type      = "Microsoft.Network/bastionHosts@2023-11-01"
+  name      = "bastion-${var.name}"
+  location  = var.location
+  parent_id = var.resource_group_id
+
+  body = {
+    properties = {
+      ipConfigurations = [
+        {
+          name = "configuration"
+          properties = {
+            subnet = {
+              id = var.bastion_subnet_id  # Must be named "AzureBastionSubnet"
+            }
+            publicIPAddress = {
+              id = azapi_resource.bastion_pip.id
+            }
+          }
+        }
+      ]
+    }
+  }
 
   tags = var.tags
 }
@@ -333,16 +446,23 @@ write_files:
 ### Custom Script Extension (Terraform)
 
 ```hcl
-resource "azurerm_virtual_machine_extension" "setup" {
-  name                 = "setup-script"
-  virtual_machine_id   = azurerm_linux_virtual_machine.this.id
-  publisher            = "Microsoft.Azure.Extensions"
-  type                 = "CustomScript"
-  type_handler_version = "2.1"
+resource "azapi_resource" "setup_script" {
+  type      = "Microsoft.Compute/virtualMachines/extensions@2024-03-01"
+  name      = "setup-script"
+  location  = var.location
+  parent_id = azapi_resource.this.id
 
-  settings = jsonencode({
-    commandToExecute = "apt-get update && apt-get install -y docker.io && systemctl enable docker"
-  })
+  body = {
+    properties = {
+      publisher               = "Microsoft.Azure.Extensions"
+      type                    = "CustomScript"
+      typeHandlerVersion      = "2.1"
+      autoUpgradeMinorVersion = true
+      settings = {
+        commandToExecute = "apt-get update && apt-get install -y docker.io && systemctl enable docker"
+      }
+    }
+  }
 }
 ```
 
