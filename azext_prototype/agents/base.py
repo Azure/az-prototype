@@ -190,7 +190,8 @@ class BaseAgent:
             response = self._resolve_searches(response, messages, context)
 
         # Post-response governance check
-        warnings = self.validate_response(response.content)
+        iac_tool = context.project_config.get("project", {}).get("iac_tool") if context.project_config else None
+        warnings = self.validate_response(response.content, iac_tool=iac_tool)
         if warnings:
             for w in warnings:
                 logger.warning("Governance: %s", w)
@@ -266,7 +267,7 @@ class BaseAgent:
 
         return messages
 
-    def validate_response(self, response_text: str) -> list[str]:
+    def validate_response(self, response_text: str, iac_tool: str | None = None) -> list[str]:
         """Check AI output for obvious governance violations.
 
         Returns a list of warning strings (empty = clean).  Called
@@ -279,7 +280,7 @@ class BaseAgent:
             from azext_prototype.agents.governance import GovernanceContext
 
             ctx = GovernanceContext()
-            return ctx.check_response_for_violations(self.name, response_text)
+            return ctx.check_response_for_violations(self.name, response_text, iac_tool=iac_tool)
         except Exception:  # pragma: no cover — never let validation break the agent
             return []
 

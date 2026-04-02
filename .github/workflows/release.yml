@@ -71,13 +71,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install "setuptools<70" wheel==0.30.0
 
-      - name: Validate governance policies
+      - name: Validate governance (policies, anti-patterns, standards, workloads)
         run: |
           pip install pyyaml
-          python -m azext_prototype.governance.policies.validate --dir azext_prototype/governance/policies/ --strict
-
-      - name: Validate workload templates against policies
-        run: python -m azext_prototype.templates.validate --dir azext_prototype/templates/workloads/ --strict
+          python -m azext_prototype.governance.validate --all --strict
 
       - name: Stamp version into metadata
         run: |

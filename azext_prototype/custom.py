@@ -863,6 +863,75 @@ def _deploy_generate_scripts(
     return {"status": "generated", "scripts": generated, "deploy_type": deploy_type}
 
 
+@track("prototype validate")
+def prototype_validate(
+    cmd,
+    all_areas=False,
+    policies=False,
+    anti_patterns=False,
+    standards=False,
+    workloads=False,
+    strict=False,
+    json_output=False,
+):
+    """Validate governance YAML files (policies, anti-patterns, standards, workloads)."""
+    from azext_prototype.governance.validate import (
+        validate_anti_patterns,
+        validate_policies,
+        validate_standards,
+        validate_workloads,
+    )
+
+    # Default to --all if no specific flags
+    if not all_areas and not policies and not anti_patterns and not standards and not workloads:
+        all_areas = True
+
+    errors = []
+    areas = []
+
+    if all_areas or policies:
+        areas.append("policies")
+        errors.extend(validate_policies())
+
+    if all_areas or anti_patterns:
+        areas.append("anti-patterns")
+        errors.extend(validate_anti_patterns())
+
+    if all_areas or standards:
+        areas.append("standards")
+        errors.extend(validate_standards())
+
+    if all_areas or workloads:
+        areas.append("workloads")
+        errors.extend(validate_workloads())
+
+    actual_errors = [e for e in errors if e.severity == "error"]
+    warnings = [e for e in errors if e.severity == "warning"]
+
+    if json_output:
+        return {
+            "areas": areas,
+            "errors": [{"file": e.file, "message": e.message, "severity": e.severity} for e in errors],
+            "error_count": len(actual_errors),
+            "warning_count": len(warnings),
+            "valid": len(actual_errors) == 0 and (not strict or len(warnings) == 0),
+        }
+
+    print(f"Validating: {', '.join(areas)}")
+
+    if not errors:
+        print("All governance files are valid.")
+        return
+
+    for err in errors:
+        print(str(err))
+
+    print(f"\n{len(actual_errors)} error(s), {len(warnings)} warning(s)")
+
+    if actual_errors or (strict and warnings):
+        raise CLIError(f"Governance validation failed: {len(actual_errors)} error(s), {len(warnings)} warning(s)")
+
+
 @_quiet_output
 @track("prototype status")
 def prototype_status(cmd, detailed=False, json_output=False):

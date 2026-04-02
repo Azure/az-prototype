@@ -112,6 +112,12 @@ def generate_anti_pattern_leaf_page(yf: Path) -> str:
     )
     if description:
         lines.append(f"{description}\n")
+
+    applies_to = data.get("applies_to")
+    if applies_to and isinstance(applies_to, list):
+        tools = ", ".join(f"`{t}`" for t in applies_to)
+        lines.append(f"**Applies to**: {tools}\n")
+
     lines.append(f"**{len(patterns)} checks**\n")
     lines.append("---\n")
 

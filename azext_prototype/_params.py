@@ -224,6 +224,51 @@ def load_arguments(self, _):
             default=False,
         )
 
+    # --- az prototype validate ---
+    with self.argument_context("prototype validate") as c:
+        c.argument(
+            "all_areas",
+            options_list=["--all"],
+            help="Validate policies, anti-patterns, and standards.",
+            action="store_true",
+            default=False,
+        )
+        c.argument(
+            "policies",
+            options_list=["--policies"],
+            help="Validate policy files.",
+            action="store_true",
+            default=False,
+        )
+        c.argument(
+            "anti_patterns",
+            options_list=["--anti-patterns"],
+            help="Validate anti-pattern files.",
+            action="store_true",
+            default=False,
+        )
+        c.argument(
+            "standards",
+            options_list=["--standards"],
+            help="Validate standards files.",
+            action="store_true",
+            default=False,
+        )
+        c.argument(
+            "workloads",
+            options_list=["--workloads"],
+            help="Validate workload templates against policies.",
+            action="store_true",
+            default=False,
+        )
+        c.argument(
+            "strict",
+            options_list=["--strict"],
+            help="Treat warnings as errors.",
+            action="store_true",
+            default=False,
+        )
+
     # --- az prototype analyze ---
     with self.argument_context("prototype analyze error") as c:
         c.argument(

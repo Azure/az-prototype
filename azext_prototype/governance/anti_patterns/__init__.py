@@ -58,6 +58,7 @@ class AntiPatternCheck:
     safe_patterns: list[str] = field(default_factory=list)
     correct_patterns: list[str] = field(default_factory=list)
     warning_message: str = ""
+    applies_to: list[str] = field(default_factory=list)
 
 
 def load(directory: Path | None = None) -> list[AntiPatternCheck]:
@@ -89,7 +90,21 @@ def load(directory: Path | None = None) -> list[AntiPatternCheck]:
             continue
 
         domain = data.get("domain", yaml_file.stem)
-        for idx, entry in enumerate(data.get("patterns", []), 1):
+        domain_applies_to = data.get("applies_to", [])
+        if not isinstance(domain_applies_to, list):
+            domain_applies_to = []
+
+        # Warn if both domain-level and any pattern-level applies_to exist
+        patterns_list = data.get("patterns", [])
+        has_pattern_applies = any(isinstance(e, dict) and "applies_to" in e for e in patterns_list)
+        if domain_applies_to and has_pattern_applies:
+            logger.warning(
+                "Anti-pattern file %s has both domain-level and pattern-level "
+                "applies_to — domain-level takes precedence, pattern-level ignored.",
+                yaml_file.name,
+            )
+
+        for idx, entry in enumerate(patterns_list, 1):
             if not isinstance(entry, dict):
                 continue
             search = entry.get("search_patterns", [])
@@ -99,6 +114,15 @@ def load(directory: Path | None = None) -> list[AntiPatternCheck]:
                 continue
             correct = entry.get("correct_patterns", [])
             check_id = entry.get("id", f"{domain.upper()}-{idx:03d}")
+
+            # Domain-level applies_to wins; otherwise use pattern-level
+            if domain_applies_to:
+                check_applies_to = domain_applies_to
+            else:
+                check_applies_to = entry.get("applies_to", [])
+                if not isinstance(check_applies_to, list):
+                    check_applies_to = []
+
             checks.append(
                 AntiPatternCheck(
                     id=check_id,
@@ -107,6 +131,7 @@ def load(directory: Path | None = None) -> list[AntiPatternCheck]:
                     safe_patterns=[s.lower() for s in safe],
                     correct_patterns=correct,  # Preserve original case for brief display
                     warning_message=message,
+                    applies_to=check_applies_to,
                 )
             )
 
@@ -114,8 +139,17 @@ def load(directory: Path | None = None) -> list[AntiPatternCheck]:
     return _cache
 
 
-def scan(text: str) -> list[str]:
+def scan(text: str, iac_tool: str | None = None) -> list[str]:
     """Scan *text* for anti-pattern matches.
+
+    Parameters
+    ----------
+    text:
+        The AI-generated output to scan.
+    iac_tool:
+        If provided (e.g., ``"terraform"`` or ``"bicep"``), skip checks
+        whose ``applies_to`` list is non-empty and does not contain
+        this tool.  If ``None``, all checks run (backward compatible).
 
     Returns a list of human-readable warning strings (empty = clean).
     """
@@ -124,6 +158,10 @@ def scan(text: str) -> list[str]:
     lower = text.lower()
 
     for check in checks:
+        # Skip checks scoped to a different IaC tool
+        if iac_tool and check.applies_to and iac_tool not in check.applies_to:
+            continue
+
         for pattern in check.search_patterns:
             if pattern in lower:
                 # Check safe patterns — if any match, skip this check

@@ -161,7 +161,8 @@ class QAEngineerAgent(BaseAgent):
                 finish_reason=choice.finish_reason or "stop",
             )
             # Post-response governance check
-            warnings = self.validate_response(result.content)
+            iac_tool = context.project_config.get("project", {}).get("iac_tool") if context.project_config else None
+            warnings = self.validate_response(result.content, iac_tool=iac_tool)
             if warnings:
                 for w in warnings:
                     logger.warning("Governance: %s", w)

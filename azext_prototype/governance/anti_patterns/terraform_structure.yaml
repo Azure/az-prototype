@@ -5,6 +5,7 @@
 
 domain: terraform_structure
 description: Provider hygiene, version consistency, tag placement, and azapi conventions
+applies_to: ["terraform"]
 
 patterns:
   # Detect azurerm provider declarations (should use azapi only)

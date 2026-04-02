@@ -43,6 +43,7 @@ patterns:
     warning_message: "Incomplete color echo statement in deploy script — use uppercase color variables and close with ${NC}."
 
   - id: ANTI-COMP-003
+    applies_to: ["terraform"]
     search_patterns:
       - "terraform_remote_state"
     safe_patterns: []
@@ -51,6 +52,7 @@ patterns:
     warning_message: ""
 
   - id: ANTI-COMP-004
+    applies_to: ["terraform"]
     search_patterns:
       - "data \"azurerm_resource_group\""
       - "data \"azurerm_log_analytics_workspace\""
@@ -66,6 +68,7 @@ patterns:
     warning_message: "Data source references existing resource by hardcoded name — use terraform_remote_state or variables to reference resources from prior stages."
 
   - id: ANTI-COMP-005
+    applies_to: ["terraform"]
     search_patterns:
       - "versions.tf"
     safe_patterns:
@@ -76,6 +79,7 @@ patterns:
     warning_message: "Terraform config uses versions.tf — this WILL cause deployment failure. Provider configuration (terraform {}, required_providers, backend) must be in providers.tf only. Using both files causes duplicate required_providers blocks that break terraform init. Remove versions.tf and consolidate into providers.tf."
 
   - id: ANTI-COMP-006
+    applies_to: ["terraform"]
     search_patterns:
       - "var.tfstate_storage_account"
       - "var.backend_storage_account"
@@ -88,6 +92,7 @@ patterns:
     warning_message: "Backend config uses variable references — Terraform does not support variables in backend blocks. Use literal values or omit the backend to use local state."
 
   - id: ANTI-COMP-007
+    applies_to: ["terraform"]
     search_patterns:
       - "storage_account_name = \"\""
       - "container_name = \"\""

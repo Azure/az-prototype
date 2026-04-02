@@ -58,6 +58,18 @@ class CopilotPromptTooLargeError(CLIError):
         self.token_limit = token_limit
 
 
+class CopilotRateLimitError(CLIError):
+    """Raised when the Copilot API returns HTTP 429 (rate limited).
+
+    Attributes:
+        retry_after: Seconds to wait before retrying (from Retry-After header).
+    """
+
+    def __init__(self, message: str, retry_after: int = 0):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
 logger = logging.getLogger(__name__)
 
 # Copilot API base URL.  The enterprise endpoint exposes the
@@ -245,6 +257,25 @@ class CopilotProvider(AIProvider):
             except requests.RequestException as exc:
                 raise CLIError(f"Copilot API retry failed: {exc}") from exc
             request_id = resp.headers.get("x-request-id", "")
+
+        # 429 → rate limited; extract Retry-After header
+        if resp.status_code == 429:
+            retry_after = 0
+            ra_header = resp.headers.get("Retry-After", resp.headers.get("retry-after", ""))
+            try:
+                retry_after = int(ra_header)
+            except (ValueError, TypeError):
+                retry_after = 60  # Default if header missing or unparseable
+            _dbg(
+                "CopilotProvider.chat",
+                "RATE_LIMITED",
+                retry_after=retry_after,
+                request_id=request_id,
+            )
+            raise CopilotRateLimitError(
+                f"Copilot API rate limited (HTTP 429). Retry after {retry_after}s.",
+                retry_after=retry_after,
+            )
 
         if resp.status_code != 200:
             body = ""

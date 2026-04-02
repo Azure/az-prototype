@@ -502,7 +502,7 @@ class TestMarkerInterception:
         # Mock validate_response to track what gets checked
         validated = []
         original_validate = agent.validate_response  # noqa: F841
-        agent.validate_response = lambda text: (validated.append(text), [])[1]
+        agent.validate_response = lambda text, iac_tool=None: (validated.append(text), [])[1]
 
         context, provider = self._make_context(
             first_content="[SEARCH: test]",

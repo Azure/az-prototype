@@ -430,3 +430,80 @@ class TestScannerIdPrefix:
         assert len(warnings) > 0
         # Should be "[ANTI-SEC-002] Admin credentials detected..."
         assert warnings[0].startswith("[ANTI-SEC-002]")
+
+
+# ------------------------------------------------------------------ #
+# Scanner — iac_tool filtering
+# ------------------------------------------------------------------ #
+
+
+class TestIacToolFiltering:
+    """Test that scan() filters checks by IaC tool via applies_to."""
+
+    def test_terraform_skips_bicep_checks(self):
+        """Terraform scan should not trigger ANTI-BCS checks."""
+        # 'resource ' triggers ANTI-BCS-001 when unfiltered
+        text = 'resource "azapi_resource" "test" {}'
+        all_warnings = scan(text)
+        tf_warnings = scan(text, iac_tool="terraform")
+        bcs_in_all = [w for w in all_warnings if "ANTI-BCS" in w]
+        bcs_in_tf = [w for w in tf_warnings if "ANTI-BCS" in w]
+        assert len(bcs_in_all) > 0, "BCS checks should fire without iac_tool filter"
+        assert len(bcs_in_tf) == 0, "BCS checks should NOT fire for terraform"
+
+    def test_bicep_skips_terraform_checks(self):
+        """Bicep scan should not trigger ANTI-TFS checks."""
+        # azurerm provider triggers ANTI-TFS-001
+        text = 'source = "hashicorp/azurerm"'
+        all_warnings = scan(text)
+        bcp_warnings = scan(text, iac_tool="bicep")
+        tfs_in_all = [w for w in all_warnings if "ANTI-TFS" in w]
+        tfs_in_bcp = [w for w in bcp_warnings if "ANTI-TFS" in w]
+        assert len(tfs_in_all) > 0, "TFS checks should fire without iac_tool filter"
+        assert len(tfs_in_bcp) == 0, "TFS checks should NOT fire for bicep"
+
+    def test_bicep_skips_tf_completeness_checks(self):
+        """Bicep scan should skip TF-specific completeness checks."""
+        # COMP-006 triggers on var.tfstate_storage_account (no safe pattern exempts it)
+        text = "var.tfstate_storage_account"
+        all_warnings = scan(text)
+        bcp_warnings = scan(text, iac_tool="bicep")
+        comp6_all = [w for w in all_warnings if "ANTI-COMP-006" in w]
+        comp6_bcp = [w for w in bcp_warnings if "ANTI-COMP-006" in w]
+        assert len(comp6_all) > 0, "COMP-006 should fire without filter"
+        assert len(comp6_bcp) == 0, "COMP-006 should NOT fire for bicep"
+
+    def test_bicep_still_runs_generic_completeness(self):
+        """Bicep scan should still run generic completeness checks (COMP-001)."""
+        text = "local_authentication_disabled = true"
+        warnings = scan(text, iac_tool="bicep")
+        comp1 = [w for w in warnings if "ANTI-COMP-001" in w]
+        assert len(comp1) > 0, "Generic COMP-001 should fire for bicep"
+
+    def test_no_iac_tool_runs_all(self):
+        """scan() without iac_tool should run all checks."""
+        text = 'resource "test" source = "hashicorp/azurerm"'
+        warnings = scan(text)
+        has_bcs = any("ANTI-BCS" in w for w in warnings)
+        has_tfs = any("ANTI-TFS" in w for w in warnings)
+        assert has_bcs, "BCS checks should fire without filter"
+        assert has_tfs, "TFS checks should fire without filter"
+
+    def test_generic_domains_always_run(self):
+        """Security/networking checks should run regardless of iac_tool."""
+        text = "connection_string = bad"
+        tf_warnings = scan(text, iac_tool="terraform")
+        bcp_warnings = scan(text, iac_tool="bicep")
+        assert any("ANTI-SEC" in w for w in tf_warnings)
+        assert any("ANTI-SEC" in w for w in bcp_warnings)
+
+    def test_applies_to_loaded_on_checks(self):
+        """Verify applies_to is populated on loaded checks."""
+        checks = load()
+        bcs_checks = [c for c in checks if c.domain == "bicep_structure"]
+        tfs_checks = [c for c in checks if c.domain == "terraform_structure"]
+        assert all(c.applies_to == ["bicep"] for c in bcs_checks)
+        assert all(c.applies_to == ["terraform"] for c in tfs_checks)
+        # Generic domains should have empty applies_to
+        sec_checks = [c for c in checks if c.domain == "security"]
+        assert all(c.applies_to == [] for c in sec_checks)

@@ -579,7 +579,7 @@ class BuildSession:
                         scan as _ap_scan,
                     )
 
-                    _ap_violations = _ap_scan(content)
+                    _ap_violations = _ap_scan(content, iac_tool=self._iac_tool)
                     if _ap_violations:
                         _dbg_flow(
                             "build_session.generate",
@@ -2695,13 +2695,38 @@ class BuildSession:
             # 2. Build QA task
             qa_task = self._build_qa_task(stage_num, stage["name"], attempt, file_content, qa_context)
 
-            # 3. Run QA
-            with self._maybe_spinner(f"QA reviewing Stage {stage_num}...", use_styled):
-                qa_result = orchestrator.delegate(
-                    from_agent="build-session",
-                    to_agent_name=self._qa_agent.name,
-                    sub_task=qa_task,
-                )
+            # 3. Run QA (with timeout/rate-limit retry)
+            from azext_prototype.ai.copilot_provider import (
+                CopilotRateLimitError,
+                CopilotTimeoutError,
+            )
+
+            qa_result = None
+            max_attempts = len(self._TIMEOUT_BACKOFFS) + 1
+            for qa_attempt in range(max_attempts):
+                try:
+                    with self._maybe_spinner(f"QA reviewing Stage {stage_num}...", use_styled):
+                        qa_result = orchestrator.delegate(
+                            from_agent="build-session",
+                            to_agent_name=self._qa_agent.name,
+                            sub_task=qa_task,
+                        )
+                    break
+                except CopilotRateLimitError as exc:
+                    wait = exc.retry_after or self._TIMEOUT_BACKOFFS[min(qa_attempt, len(self._TIMEOUT_BACKOFFS) - 1)]
+                    _print(f"       QA rate limited. Waiting {wait}s...")
+                    self._countdown(wait, qa_attempt + 2, max_attempts, stage["name"], _print)
+                except CopilotTimeoutError:
+                    if qa_attempt < len(self._TIMEOUT_BACKOFFS):
+                        wait = self._TIMEOUT_BACKOFFS[qa_attempt]
+                        self._countdown(wait, qa_attempt + 2, max_attempts, stage["name"], _print)
+                    else:
+                        _print(
+                            f"       QA timed out after {max_attempts} attempts. "
+                            f"Stage {stage_num} will be retried on next build."
+                        )
+                        return False
+
             if qa_result:
                 self._token_tracker.record(qa_result)
 
@@ -2773,7 +2798,7 @@ class BuildSession:
                 )
 
                 with self._maybe_spinner(f"Remediating Stage {stage_num} (attempt {attempt + 1})...", use_styled):
-                    response = self._execute_with_continuation(agent, task)
+                    response = self._execute_with_retry(agent, task, stage_num, stage["name"], _print)
 
             if response:
                 self._token_tracker.record(response)
@@ -2895,24 +2920,55 @@ class BuildSession:
         attempts are exhausted.  Communicates retry status to the user
         via ``_print`` (routed to the TUI).
         """
-        from azext_prototype.ai.copilot_provider import CopilotTimeoutError
+        from azext_prototype.ai.copilot_provider import (
+            CopilotRateLimitError,
+            CopilotTimeoutError,
+        )
 
-        for attempt in range(len(self._TIMEOUT_BACKOFFS) + 1):
+        max_attempts = len(self._TIMEOUT_BACKOFFS) + 1
+
+        for attempt in range(max_attempts):
             try:
                 return self._execute_with_continuation(agent, task)
+            except CopilotRateLimitError as exc:
+                wait = exc.retry_after or self._TIMEOUT_BACKOFFS[min(attempt, len(self._TIMEOUT_BACKOFFS) - 1)]
+                _print(f"       API rate limited. Waiting {wait}s...")
+                self._countdown(wait, attempt + 2, max_attempts, stage_name, _print)
             except CopilotTimeoutError:
                 if attempt < len(self._TIMEOUT_BACKOFFS):
                     wait = self._TIMEOUT_BACKOFFS[attempt]
-                    _print(f"       API timed out. Retrying in {wait}s... " f"(attempt {attempt + 2}/5)")
-                    import time as _time
-
-                    _time.sleep(wait)
+                    self._countdown(wait, attempt + 2, max_attempts, stage_name, _print)
                 else:
                     _print(
-                        f"       API timed out after 5 attempts. "
+                        f"       API timed out after {max_attempts} attempts. "
                         f"Stage {stage_num} ({stage_name}) will be retried on next build run."
                     )
                     return None
+
+    def _countdown(
+        self,
+        seconds: int,
+        attempt_num: int,
+        max_attempts: int,
+        stage_name: str,
+        _print: Callable,
+    ) -> None:
+        """Display a countdown timer before retrying."""
+        import time as _time
+
+        for remaining in range(seconds, 0, -1):
+            if self._status_fn:
+                self._status_fn(
+                    f"API timed out. Retrying in {remaining}s... (attempt {attempt_num}/{max_attempts})",
+                    "update",
+                )
+            elif remaining == seconds:
+                # Non-TUI: print once at the start
+                _print(f"       API timed out. Retrying in {remaining}s... " f"(attempt {attempt_num}/{max_attempts})")
+            _time.sleep(1)
+
+        if self._status_fn:
+            self._status_fn(f"Retrying {stage_name}...", "update")
 
     # ------------------------------------------------------------------ #
     # Truncation recovery

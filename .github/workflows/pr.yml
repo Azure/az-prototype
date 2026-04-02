@@ -58,11 +58,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyyaml
 
-      - name: Validate policy files (strict)
-        run: python -m azext_prototype.governance.policies.validate --dir azext_prototype/governance/policies/ --strict
-
-      - name: Validate workload templates against policies (strict)
-        run: python -m azext_prototype.templates.validate --dir azext_prototype/templates/workloads/ --strict
+      - name: Validate governance (policies, anti-patterns, standards, workloads)
+        run: python -m azext_prototype.governance.validate --all --strict
 
   test:
     name: Test (Python ${{ matrix.python-version }})

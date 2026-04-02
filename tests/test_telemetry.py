@@ -1183,7 +1183,7 @@ class TestCommandTelemetryIntegration:
             name for name in dir(custom_mod) if name.startswith("prototype_") and callable(getattr(custom_mod, name))
         ]
 
-        assert len(command_functions) == 24
+        assert len(command_functions) == 25
 
 
 # ======================================================================

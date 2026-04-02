@@ -11,6 +11,7 @@ def load_command_table(self, _):
         g.custom_command("build", "prototype_build")
         g.custom_command("deploy", "prototype_deploy")
         g.custom_command("status", "prototype_status")
+        g.custom_command("validate", "prototype_validate")
 
     with self.command_group("prototype analyze", is_preview=True) as g:
         g.custom_command("error", "prototype_analyze_error")

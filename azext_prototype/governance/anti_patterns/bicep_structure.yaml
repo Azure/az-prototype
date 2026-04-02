@@ -5,6 +5,7 @@
 
 domain: bicep_structure
 description: Bicep file structure, module conventions, and deployment script patterns
+applies_to: ["bicep"]
 
 patterns:
   # Detect inline resources instead of modules

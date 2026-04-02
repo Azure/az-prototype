@@ -26,11 +26,15 @@ Build resilience
 * **Request ID logging** -- ``x-request-id`` response header from the
   Copilot API is now captured in the debug log for every request,
   enabling correlation with GitHub support.
-* **Timeout retry with exponential backoff** -- Copilot API timeouts
-  now trigger up to 5 retry attempts with escalating wait periods
-  (15s, 30s, 60s, 120s).  Retry status is communicated to the user
-  via the TUI.  The stale "set COPILOT_TIMEOUT=600" error message
-  has been replaced with a clean timeout notification.
+* **Timeout retry with countdown** -- Copilot API timeouts trigger up
+  to 5 retry attempts with escalating wait periods (15s, 30s, 60s, 120s).
+  A live countdown timer shows seconds remaining before each retry,
+  preventing the UI from appearing to hang.  Retry coverage includes
+  generation, QA review, and remediation calls.
+* **Rate limit handling (HTTP 429)** -- ``CopilotRateLimitError`` raised
+  when the API returns 429.  The ``Retry-After`` header value is used for
+  the countdown wait, falling back to the backoff schedule if missing.
+  Rate limit events are logged with request ID for correlation.
 * **Stage completion gating** -- stages are only marked ``"generated"``
   after passing QA.  New intermediate sub-states:
 
@@ -206,6 +210,17 @@ Anti-pattern detection
 * **Anti-pattern scan skips documentation stages** -- docs describe the
   architecture (including SQL auth, public access patterns) which triggered
   false positives.  Scan now skips stages with ``category == "docs"``.
+* **IaC tool scoping** -- anti-pattern checks now support ``applies_to``
+  field (domain-level or pattern-level, never both in the same file).
+  Bicep-structure checks only run on Bicep builds, Terraform-structure
+  and TF-specific completeness checks only on Terraform.  Generic domains
+  (security, networking, etc.) run on all builds.  ``scan()`` accepts
+  optional ``iac_tool`` parameter.
+* **``az prototype validate``** -- new CLI command to validate all
+  governance files (policies, anti-patterns, standards, workloads).
+  Flags: ``--all``, ``--policies``, ``--anti-patterns``, ``--standards``,
+  ``--workloads``, ``--strict``.  CI pipelines consolidated to a single
+  validation step.
 
 Prompt optimization (58 fixes)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
