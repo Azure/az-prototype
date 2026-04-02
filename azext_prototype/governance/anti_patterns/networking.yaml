@@ -92,3 +92,19 @@ patterns:
       VNet or NSG diagnostic settings detected. These resources only support
       AllMetrics for diagnostics, not log categories. Using categoryGroup =
       "allLogs" on VNet/NSG causes ARM HTTP 400. Use category = "AllMetrics" only.
+
+  - id: ANTI-NET-008
+    search_patterns:
+      - "nsg_pe_diag"
+      - "nsg_aca_diag"
+      - "nsg_diag"
+      - "diagnosticsettings\" {\n"
+    safe_patterns:
+      - "# NSGs do not support diagnostic settings"
+    correct_patterns:
+      - "# NSGs do NOT support diagnostic settings — no log or metric categories"
+    warning_message: >-
+      Diagnostic settings created for NSG resource. NSGs do NOT support any
+      diagnostic setting categories (no logs, no metrics). ARM will reject with
+      HTTP 400. Remove the diagnostic settings resource for NSGs entirely.
+

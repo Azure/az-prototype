@@ -221,6 +221,19 @@ Anti-pattern detection
   anti-pattern domains.  Removed ``"production"``, ``"development"``,
   ``"identity"``, ``"least privilege"`` and other single-word patterns that
   caused cross-contamination at the whole-text scan level.
+* **ANTI-NET-008** -- detect diagnostic settings on NSG resources (NSGs have
+  no log or metric categories; ARM rejects with HTTP 400).
+* **ANTI-MON-003** -- detect deprecated ``InstrumentationKey`` outputs (use
+  ``connection_string`` instead).
+* **Private DNS zone lookup** (``knowledge/private_dns_zones.py``) -- static
+  mapping of ARM resource types to exact private DNS zone FQDNs, injected
+  into the networking stage task prompt.  Eliminates DNS zone naming errors.
+* **Extension resource tag guidance** -- terraform and bicep agent prompts now
+  explicitly prohibit ``tags`` on ``diagnosticSettings``, ``roleAssignments``,
+  and ``locks`` (ARM extension resources that reject tags with HTTP 400).
+* **deploy.sh correctness rules** -- terraform agent prompt now documents that
+  ``terraform output`` has no ``-state=`` flag, and cleanup traps must use
+  captured ``$?`` not script-level variables.
 * **IaC tool scoping** -- anti-pattern checks now support ``applies_to``
   field (domain-level or pattern-level, never both in the same file).
   Bicep-structure checks only run on Bicep builds, Terraform-structure

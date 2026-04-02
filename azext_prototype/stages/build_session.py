@@ -1931,6 +1931,12 @@ class BuildSession(SessionMixin):
         if svc_lines:
             task += f"## Services in This Stage\n{svc_lines}\n\n"
 
+        # For networking stages, inject the exact DNS zone names needed
+        if stage_name.lower() == "networking":
+            dns_note = self._build_dns_zone_note()
+            if dns_note:
+                task += dns_note + "\n"
+
         # Directive hierarchy — ensures NEVER directives override architecture
         task += (
             "## CRITICAL: DIRECTIVE HIERARCHY (GENERATION-TIME)\n"
@@ -2510,6 +2516,38 @@ class BuildSession(SessionMixin):
             sections.append("")
 
         return "\n".join(sections)
+
+    def _build_dns_zone_note(self) -> str:
+        """Build a DNS zone reference for the networking stage.
+
+        Looks up all services across ALL deployment stages and returns
+        the private DNS zones needed, so the networking stage creates
+        exactly the right zones with correct FQDNs.
+        """
+        try:
+            from azext_prototype.knowledge.private_dns_zones import (
+                get_zones_for_services,
+            )
+
+            all_services = []
+            for stage in self._build_state._state.get("deployment_stages", []):
+                all_services.extend(stage.get("services", []))
+
+            zones = get_zones_for_services(all_services)
+            if not zones:
+                return ""
+
+            lines = [
+                "## REQUIRED PRIVATE DNS ZONES",
+                "Create these **exact** DNS zone FQDNs (from Microsoft documentation).",
+                "Do **NOT** use computed naming convention patterns for DNS zone names.\n",
+            ]
+            for zone_fqdn, resource_type in sorted(zones.items()):
+                lines.append(f"- `{zone_fqdn}` (for {resource_type})")
+            lines.append("")
+            return "\n".join(lines)
+        except Exception:
+            return ""
 
     def _get_networking_stage_note(self) -> str:
         """Return a QA note about the networking stage if one exists in the plan."""

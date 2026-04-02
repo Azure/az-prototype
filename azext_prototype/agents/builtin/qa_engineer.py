@@ -272,10 +272,13 @@ Classify each failure as CRITICAL (must fix before deploy) or WARNING (should fi
 
 ### 9. Networking Stage
 - [ ] No placeholder private endpoints — PEs belong in service stages
-- [ ] VNet/NSG diagnostic settings use ONLY `AllMetrics` category, NOT `allLogs`
-      categoryGroup (VNets and NSGs have no log categories in ARM)
-- [ ] Private endpoints not created in networking stage — only subnet IDs and
+- [ ] NSGs must **NOT** have diagnostic settings resources (no log or metric categories)
+- [ ] VNet diagnostic settings use **ONLY** `AllMetrics` category, **NOT** `allLogs`
+- [ ] Diagnostic settings resources must **NOT** have `tags` attribute (extension resources)
+- [ ] Private DNS zone names are exact Azure FQDNs (e.g., `privatelink.vaultcore.azure.net`)
+- [ ] Private endpoints **NOT** created in networking stage — only subnet IDs and
       DNS zone IDs are exported for downstream stages
+- [ ] `disableLocalAuth` is a top-level property under `properties`, **NOT** inside `features`
 
 ### 10. Output Consistency
 - [ ] Output key names use standard convention (e.g., `principal_id` not

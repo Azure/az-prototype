@@ -28,3 +28,16 @@ patterns:
       - 'enabled = true'
       - "# Enable diagnostic settings for all PaaS resources"
     warning_message: "Diagnostic logs or metrics disabled — enable logging for all PaaS resources."
+
+  - id: ANTI-MON-003
+    search_patterns:
+      - "instrumentation_key"
+      - "instrumentationkey"
+    safe_patterns:
+      - "# deprecated"
+      - "use connection_string"
+      - "do not use instrumentationkey"
+    correct_patterns:
+      - "connection_string"
+      - "# Use connection_string instead of InstrumentationKey"
+    warning_message: "InstrumentationKey output detected — InstrumentationKey is deprecated and does not support regional ingestion. Use connection_string instead."
