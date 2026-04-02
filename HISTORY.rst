@@ -237,6 +237,13 @@ DRY refactoring
   ``_extract_tool_calls()`` from 3 provider files into ``ai/provider.py``
   as ``messages_to_dicts()`` and ``extract_tool_calls_from_openai()``.
   Copilot provider uses ``filter_empty=True`` for its specific need.
+* **``SessionMixin``** -- extracted shared ``_maybe_spinner()``,
+  ``_countdown()``, ``_setup_token_tracker()``, and
+  ``_setup_escalation_tracker()`` into ``stages/session_mixin.py``.
+  All 4 session classes (build, deploy, discovery, backlog) inherit it.
+* **``safe_load_yaml()``** -- shared YAML loading helper in
+  ``governance/__init__.py`` replaces duplicated try/except blocks
+  in anti-patterns and standards loaders.
 
 Prompt optimization (58 fixes)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

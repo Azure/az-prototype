@@ -21,13 +21,11 @@ from __future__ import annotations
 import logging
 import re
 import subprocess
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from typing import Any, Callable
 
 from azext_prototype.agents.base import AgentCapability, AgentContext
 from azext_prototype.agents.registry import AgentRegistry
-from azext_prototype.ai.token_tracker import TokenTracker
 from azext_prototype.config import ProjectConfig
 from azext_prototype.parsers.file_extractor import parse_file_blocks, write_parsed_files
 from azext_prototype.stages.deploy_helpers import (
@@ -49,9 +47,9 @@ from azext_prototype.stages.deploy_helpers import (
     whatif_bicep,
 )
 from azext_prototype.stages.deploy_state import DeployState
-from azext_prototype.stages.escalation import EscalationTracker
 from azext_prototype.stages.intent import IntentKind, build_deploy_classifier
 from azext_prototype.stages.qa_router import route_error_to_qa
+from azext_prototype.stages.session_mixin import SessionMixin
 from azext_prototype.tracking import ChangeTracker
 from azext_prototype.ui.console import Console, DiscoveryPrompt
 from azext_prototype.ui.console import console as default_console
@@ -151,7 +149,7 @@ class DeployResult:
 # -------------------------------------------------------------------- #
 
 
-class DeploySession:
+class DeploySession(SessionMixin):
     """Interactive, multi-phase deploy conversation.
 
     Manages the full deploy lifecycle: preflight checks, staged deployment
@@ -203,10 +201,7 @@ class DeploySession:
         architect_agents = registry.find_by_capability(AgentCapability.ARCHITECT)
         self._architect_agent = architect_agents[0] if architect_agents else None
 
-        # Escalation tracker
-        self._escalation_tracker = EscalationTracker(agent_context.project_dir)
-        if self._escalation_tracker.exists:
-            self._escalation_tracker.load()
+        self._setup_escalation_tracker(agent_context.project_dir)
 
         # Project config
         config = ProjectConfig(agent_context.project_dir)
@@ -214,12 +209,7 @@ class DeploySession:
         self._config = config
         self._iac_tool: str = config.get("project.iac_tool", "terraform")
 
-        # Token tracker — auto-pushes status to UI after every AI call
-        self._token_tracker = TokenTracker()
-        if self._status_fn:
-            self._token_tracker._on_update = lambda text: self._status_fn(text, "tokens")
-        elif self._console:
-            self._token_tracker._on_update = self._console.print_token_status
+        self._setup_token_tracker(status_fn=self._status_fn)
 
         # Intent classifier for natural language command detection
         self._intent_classifier = build_deploy_classifier(
@@ -2095,22 +2085,3 @@ class DeploySession:
             ],
             captured_outputs=self._deploy_state._state.get("captured_outputs", {}),
         )
-
-    @contextmanager
-    def _maybe_spinner(self, message: str, use_styled: bool, *, status_fn: Callable | None = None) -> Iterator[None]:
-        """Show a spinner/status when using styled output or TUI."""
-        _sfn = status_fn or self._status_fn
-        if use_styled:
-            with self._console.spinner(message):
-                yield
-        elif _sfn:
-            _sfn(message, "start")
-            try:
-                yield
-            finally:
-                _sfn(message, "end")
-                token_text = self._token_tracker.format_status()
-                if token_text:
-                    _sfn(token_text, "tokens")
-        else:
-            yield

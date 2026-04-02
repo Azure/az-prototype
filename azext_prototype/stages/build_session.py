@@ -31,12 +31,10 @@ from azext_prototype.agents.base import AgentCapability, AgentContext
 from azext_prototype.agents.governance import GovernanceContext
 from azext_prototype.agents.orchestrator import AgentOrchestrator
 from azext_prototype.agents.registry import AgentRegistry
-from azext_prototype.ai.token_tracker import TokenTracker
 from azext_prototype.config import ProjectConfig
 from azext_prototype.naming import create_naming_strategy
 from azext_prototype.parsers.file_extractor import parse_file_blocks, write_parsed_files
 from azext_prototype.stages.build_state import BuildState
-from azext_prototype.stages.escalation import EscalationTracker
 from azext_prototype.stages.intent import (
     IntentKind,
     build_build_classifier,
@@ -44,6 +42,7 @@ from azext_prototype.stages.intent import (
 )
 from azext_prototype.stages.policy_resolver import PolicyResolver
 from azext_prototype.stages.qa_router import route_error_to_qa
+from azext_prototype.stages.session_mixin import SessionMixin
 from azext_prototype.ui.console import Console, DiscoveryPrompt
 from azext_prototype.ui.console import console as default_console
 
@@ -132,7 +131,7 @@ class BuildResult:
 # -------------------------------------------------------------------- #
 
 
-class BuildSession:
+class BuildSession(SessionMixin):
     """Interactive, multi-phase build conversation.
 
     Manages the full build lifecycle: deployment plan derivation, staged
@@ -206,17 +205,8 @@ class BuildSession:
         advisory_agents = registry.find_by_capability(AgentCapability.ADVISORY)
         self._advisor_agent = advisory_agents[0] if advisory_agents else None
 
-        # Escalation tracker
-        self._escalation_tracker = EscalationTracker(agent_context.project_dir)
-        if self._escalation_tracker.exists:
-            self._escalation_tracker.load()
-
-        # Token tracker — auto-pushes status to UI after every AI call
-        self._token_tracker = TokenTracker()
-        if self._status_fn:
-            self._token_tracker._on_update = lambda text: self._status_fn(text, "tokens")
-        elif self._console:
-            self._token_tracker._on_update = self._console.print_token_status
+        self._setup_escalation_tracker(agent_context.project_dir)
+        self._setup_token_tracker(status_fn=self._status_fn)
 
         # Intent classifier for natural language command detection
         self._intent_classifier = build_build_classifier(
@@ -2904,8 +2894,6 @@ class BuildSession:
     # Timeout retry with backoff
     # ------------------------------------------------------------------ #
 
-    _TIMEOUT_BACKOFFS = [15, 30, 60, 120]  # seconds between retries (4 retries + 1 initial = 5 attempts)
-
     def _execute_with_retry(
         self,
         agent: Any,
@@ -2944,31 +2932,6 @@ class BuildSession:
                         f"Stage {stage_num} ({stage_name}) will be retried on next build run."
                     )
                     return None
-
-    def _countdown(
-        self,
-        seconds: int,
-        attempt_num: int,
-        max_attempts: int,
-        stage_name: str,
-        _print: Callable,
-    ) -> None:
-        """Display a countdown timer before retrying."""
-        import time as _time
-
-        for remaining in range(seconds, 0, -1):
-            if self._status_fn:
-                self._status_fn(
-                    f"API timed out. Retrying in {remaining}s... (attempt {attempt_num}/{max_attempts})",
-                    "update",
-                )
-            elif remaining == seconds:
-                # Non-TUI: print once at the start
-                _print(f"       API timed out. Retrying in {remaining}s... " f"(attempt {attempt_num}/{max_attempts})")
-            _time.sleep(1)
-
-        if self._status_fn:
-            self._status_fn(f"Retrying {stage_name}...", "update")
 
     # ------------------------------------------------------------------ #
     # Truncation recovery
@@ -3021,23 +2984,3 @@ class BuildSession:
             )
 
         return response
-
-    @contextmanager
-    def _maybe_spinner(self, message: str, use_styled: bool, *, status_fn: Callable | None = None) -> Iterator[None]:
-        """Show a spinner/status when using styled output or TUI."""
-        _sfn = status_fn or self._status_fn
-        if use_styled:
-            with self._console.spinner(message):
-                yield
-        elif _sfn:
-            _sfn(message, "start")
-            try:
-                yield
-            finally:
-                _sfn(message, "end")
-                # Push token counts to replace the final elapsed time
-                token_text = self._token_tracker.format_status()
-                if token_text:
-                    _sfn(token_text, "tokens")
-        else:
-            yield

@@ -24,7 +24,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import yaml
+from azext_prototype.governance import safe_load_yaml
 
 logger = logging.getLogger(__name__)
 
@@ -68,12 +68,7 @@ def load(directory: Path | None = None) -> list[Standard]:
         return _cache
 
     for yaml_file in sorted(target.rglob("*.yaml")):
-        try:
-            data = yaml.safe_load(yaml_file.read_text(encoding="utf-8")) or {}
-        except (OSError, yaml.YAMLError) as exc:
-            logger.warning("Could not load standards file %s: %s", yaml_file.name, exc)
-            continue
-
+        data = safe_load_yaml(yaml_file)
         if not isinstance(data, dict):
             continue
 

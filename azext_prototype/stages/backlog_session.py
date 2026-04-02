@@ -18,13 +18,11 @@ from __future__ import annotations
 
 import json
 import logging
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable, Iterator
+from typing import Callable
 
 from azext_prototype.agents.base import AgentCapability, AgentContext
 from azext_prototype.agents.registry import AgentRegistry
-from azext_prototype.ai.token_tracker import TokenTracker
 from azext_prototype.stages.backlog_push import (
     check_devops_ext,
     check_gh_auth,
@@ -34,9 +32,9 @@ from azext_prototype.stages.backlog_push import (
     push_github_issue,
 )
 from azext_prototype.stages.backlog_state import BacklogState
-from azext_prototype.stages.escalation import EscalationTracker
 from azext_prototype.stages.intent import IntentKind, build_backlog_classifier
 from azext_prototype.stages.qa_router import route_error_to_qa
+from azext_prototype.stages.session_mixin import SessionMixin
 from azext_prototype.ui.console import Console, DiscoveryPrompt
 from azext_prototype.ui.console import console as default_console
 
@@ -100,7 +98,7 @@ class BacklogResult:
 # -------------------------------------------------------------------- #
 
 
-class BacklogSession:
+class BacklogSession(SessionMixin):
     """Interactive, multi-phase backlog conversation.
 
     Manages the full backlog lifecycle: AI generation, review/refinement,
@@ -132,10 +130,8 @@ class BacklogSession:
         self._prompt = DiscoveryPrompt(self._console)
         self._backlog_state = backlog_state or BacklogState(agent_context.project_dir)
 
-        # Token tracker — auto-pushes status to UI after every AI call
-        self._token_tracker = TokenTracker()
-        if self._console:
-            self._token_tracker._on_update = self._console.print_token_status
+        self._status_fn = None  # Backlog doesn't use TUI status
+        self._setup_token_tracker()
 
         # Resolve project-manager agent
         pm_agents = registry.find_by_capability(AgentCapability.BACKLOG_GENERATION)
@@ -145,10 +141,7 @@ class BacklogSession:
         qa_agents = registry.find_by_capability(AgentCapability.QA)
         self._qa_agent = qa_agents[0] if qa_agents else None
 
-        # Escalation tracker
-        self._escalation_tracker = EscalationTracker(agent_context.project_dir)
-        if self._escalation_tracker.exists:
-            self._escalation_tracker.load()
+        self._setup_escalation_tracker(agent_context.project_dir)
 
         # Intent classifier for natural language command detection
         self._intent_classifier = build_backlog_classifier(
@@ -1067,18 +1060,3 @@ class BacklogSession:
         except Exception:
             logger.debug("Could not load production items from knowledge base")
             return ""
-
-    @contextmanager
-    def _maybe_spinner(self, message: str, use_styled: bool, *, status_fn: Callable | None = None) -> Iterator[None]:
-        """Show a spinner when using styled output, otherwise no-op."""
-        if use_styled:
-            with self._console.spinner(message):
-                yield
-        elif status_fn:
-            status_fn(message, "start")
-            try:
-                yield
-            finally:
-                status_fn(message, "end")
-        else:
-            yield

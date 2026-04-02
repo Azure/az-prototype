@@ -22,15 +22,13 @@ from __future__ import annotations
 
 import logging
 import re
-from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date
-from typing import Any, Callable, Iterator
+from typing import Any, Callable
 
 from azext_prototype.agents.base import AgentCapability, AgentContext
 from azext_prototype.agents.registry import AgentRegistry
 from azext_prototype.ai.provider import AIMessage
-from azext_prototype.ai.token_tracker import TokenTracker
 from azext_prototype.stages.discovery_state import DiscoveryState, TrackedItem
 from azext_prototype.stages.intent import (
     IntentKind,
@@ -38,6 +36,7 @@ from azext_prototype.stages.intent import (
     read_files_for_session,
 )
 from azext_prototype.stages.qa_router import route_error_to_qa
+from azext_prototype.stages.session_mixin import SessionMixin
 from azext_prototype.ui.console import Console, DiscoveryPrompt
 from azext_prototype.ui.console import console as default_console
 
@@ -220,7 +219,7 @@ class DiscoveryResult:
 # -------------------------------------------------------------------- #
 
 
-class DiscoverySession:
+class DiscoverySession(SessionMixin):
     """Organic, multi-turn discovery conversation.
 
     Manages a proper multi-turn chat between the user and the
@@ -257,9 +256,8 @@ class DiscoverySession:
         # Conversation state — proper multi-turn history
         self._messages: list[AIMessage] = []
         self._exchange_count: int = 0
-        self._token_tracker = TokenTracker()
-        if self._console:
-            self._token_tracker._on_update = self._console.print_token_status
+        self._status_fn = None  # Discovery doesn't use TUI status
+        self._setup_token_tracker()
 
         # Resolve agents for joint discovery
         biz_agents = registry.find_by_capability(AgentCapability.BIZ_ANALYSIS)
@@ -280,21 +278,6 @@ class DiscoverySession:
     # ------------------------------------------------------------------ #
     # Spinner helper (mirrors build/deploy pattern)
     # ------------------------------------------------------------------ #
-
-    @contextmanager
-    def _maybe_spinner(self, message: str, use_styled: bool, *, status_fn: Callable | None = None) -> Iterator[None]:
-        """Show a spinner when using styled output, otherwise no-op."""
-        if use_styled:
-            with self._console.spinner(message):
-                yield
-        elif status_fn:
-            status_fn(message, "start")
-            try:
-                yield
-            finally:
-                status_fn(message, "end")
-        else:
-            yield
 
     # ------------------------------------------------------------------ #
     # Display helpers
