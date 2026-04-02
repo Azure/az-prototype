@@ -210,6 +210,17 @@ Anti-pattern detection
 * **Anti-pattern scan skips documentation stages** -- docs describe the
   architecture (including SQL auth, public access patterns) which triggered
   false positives.  Scan now skips stages with ``category == "docs"``.
+* **ANTI-NET-006/007** -- new checks for invalid placeholder private endpoints
+  pointing at VNets (ARM 400 at deploy time) and VNet/NSG diagnostic settings
+  using ``allLogs`` category (only ``AllMetrics`` is supported).
+* **Networking stage guidance** -- ``TERRAFORM_PROMPT`` and ``BICEP_PROMPT``
+  now include ``## CRITICAL: NETWORKING STAGE RULES`` preventing placeholder
+  PEs and wrong diagnostic categories.  QA checklist updated with Section 9
+  (Networking Stage) and anti-oscillation guidance.
+* **Safe pattern audit** -- tightened overly broad safe patterns across all
+  anti-pattern domains.  Removed ``"production"``, ``"development"``,
+  ``"identity"``, ``"least privilege"`` and other single-word patterns that
+  caused cross-contamination at the whole-text scan level.
 * **IaC tool scoping** -- anti-pattern checks now support ``applies_to``
   field (domain-level or pattern-level, never both in the same file).
   Bicep-structure checks only run on Bicep builds, Terraform-structure

@@ -32,7 +32,7 @@ patterns:
     safe_patterns:
       - "Microsoft.ManagedIdentity/userAssignedIdentities"
       - "managedIdentity"
-      - "identity"
+      - "identity: {"
     correct_patterns:
       - "Microsoft.ManagedIdentity/userAssignedIdentities"
       - "identity: { type: 'UserAssigned' }"
@@ -48,8 +48,8 @@ patterns:
       - "name: '${'"
       - "name: resourceName"
       - "name: storageAccountName"
-      - "param "
-      - "var "
+      - "var resourceName ="
+      - "var storageAccountName ="
     correct_patterns:
       - "var storageAccountName = '${prefix}-st-${suffix}'"
       - "name: storageAccountName"

@@ -28,8 +28,7 @@ patterns:
       - "application_insights_connection_string"
       - "appinsights_connectionstring"
       - ".properties.connectionstring"
-      - "connection_string_for_"
-      - "instrumentation"
+      - "instrumentationkey"
     correct_patterns:
       - "# Use managed identity via DefaultAzureCredential"
       - "azurerm_user_assigned_identity"

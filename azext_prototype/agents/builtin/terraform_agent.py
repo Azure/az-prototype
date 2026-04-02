@@ -218,6 +218,21 @@ output "principal_id" {
 When creating a VNet with subnets, NEVER define subnets inline in the VNet body.
 Always create subnets as separate `azapi_resource` child resources.
 
+## CRITICAL: NETWORKING STAGE RULES
+When generating a networking stage (VNet, subnets, DNS zones):
+- Do NOT create placeholder private endpoints. PEs belong in their respective
+  service stages (e.g., Key Vault PE in the Key Vault stage), not the networking
+  stage. The networking stage only exports `pe_subnet_id` and `private_dns_zone_ids`
+  for downstream stages to consume.
+- VNet and NSG diagnostic settings support ONLY `AllMetrics` (category), NOT
+  `allLogs` (categoryGroup). Using `categoryGroup = "allLogs"` on VNet/NSG
+  resources causes ARM HTTP 400 at deploy time. Use:
+  ```
+  metrics = [{ category = "AllMetrics", enabled = true }]
+  ```
+- Do NOT add log categories to VNet/NSG diagnostics — these resource types
+  have no log categories in ARM.
+
 ## CRITICAL: CROSS-STAGE DEPENDENCIES
 MANDATORY: Use `data "terraform_remote_state"` for ALL upstream references.
 Do NOT define input variables for values that come from prior stages.

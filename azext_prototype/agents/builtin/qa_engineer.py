@@ -270,7 +270,14 @@ Classify each failure as CRITICAL (must fix before deploy) or WARNING (should fi
 - [ ] No azurerm_* resources — all resources MUST use azapi_resource
 - [ ] Tags placed as top-level attribute on azapi_resource, NOT inside body{}
 
-### 9. Output Consistency
+### 9. Networking Stage
+- [ ] No placeholder private endpoints — PEs belong in service stages
+- [ ] VNet/NSG diagnostic settings use ONLY `AllMetrics` category, NOT `allLogs`
+      categoryGroup (VNets and NSGs have no log categories in ARM)
+- [ ] Private endpoints not created in networking stage — only subnet IDs and
+      DNS zone IDs are exported for downstream stages
+
+### 10. Output Consistency
 - [ ] Output key names use standard convention (e.g., `principal_id` not
       `worker_identity_principal_id` or `managed_identity_principal_id`)
 - [ ] Output key names match what downstream stages reference via
@@ -298,6 +305,11 @@ Name of the agent that should apply this fix.
 ### Redeployment Steps
 1. `az prototype build --scope <scope>`
 2. `az prototype deploy --scope <scope> [--stage N]`
+
+IMPORTANT: Only flag issues that would cause a deployment failure (invalid ARM
+resource types, wrong properties, broken scripts) or violate MANDATORY policies.
+Do NOT request removal of resources listed in the architecture plan's "Services
+in This Stage" unless the resource would cause an ARM error at deploy time.
 
 If the error is ambiguous or more context is needed, ask specific follow-up
 questions and list what additional information would help.

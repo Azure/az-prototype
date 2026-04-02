@@ -15,9 +15,8 @@ patterns:
       - "sku_name = \"p3v3\""
       - "sku_name = \"premium\""
     safe_patterns:
-      - "production"
-      - "high availability"
-      - "performance requirement"
+      - "sku_name = var."
+      - "premium is required for"
     correct_patterns:
       - 'sku_name = "B1"'
       - 'sku_name = "S1"'
@@ -32,9 +31,8 @@ patterns:
       - "min_replicas = 1"
       - "minimum_instance_count = 1"
     safe_patterns:
-      - "production"
-      - "always-on"
-      - "high availability"
+      - "min_replicas = var."
+      - "# always-on required"
     correct_patterns:
       - "min_replicas = 0"
       - "minimum_instance_count = 0"
@@ -46,8 +44,8 @@ patterns:
       - "reserved_capacity"
       - "reserved_instance"
     safe_patterns:
-      - "production"
-      - "cost analysis"
+      - "# reserved capacity justified"
+      - "reserved_capacity = var."
     correct_patterns:
       - "# Use pay-as-you-go pricing for POC workloads"
       - 'capacityReservationLevel = 0'

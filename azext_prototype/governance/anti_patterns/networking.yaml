@@ -14,8 +14,6 @@ patterns:
       - 'publicnetworkaccess = "enabled"'
       - 'publicnetworkaccessforingestion = "enabled"'
       - 'publicnetworkaccessforquery = "enabled"'
-      - "# poc acceptable"
-      - "# production backlog"
     safe_patterns:
       - "public_network_access_enabled = false"
       - 'publicnetworkaccess = "disabled"'
@@ -61,6 +59,36 @@ patterns:
       - "ip_restriction = []"
       - "scm_ip_restriction = []"
     safe_patterns:
-      - "allow all"
-      - "development"
+      - "ip_restriction = var."
     warning_message: "Empty IP restrictions — configure IP restrictions or use VNET integration to limit access."
+
+  - id: ANTI-NET-006
+    search_patterns:
+      - "privateLinkServiceId = azapi_resource.vnet"
+      - "privateLinkServiceId = azapi_resource.virtual_network"
+      - "private_link_service_id = azurerm_virtual_network"
+    safe_patterns: []
+    correct_patterns:
+      - "# Do NOT create placeholder private endpoints"
+      - "# Private endpoints belong in service stages, not the networking stage"
+    warning_message: >-
+      Private endpoint references a VNet as its privateLinkServiceId — VNets
+      are not valid Private Link targets. ARM will reject this with HTTP 400.
+      Do NOT create placeholder private endpoints in the networking stage.
+      Private endpoints belong in their respective service stages.
+
+  - id: ANTI-NET-007
+    search_patterns:
+      - "diag_vnet"
+      - "diag_nsg"
+      - "diagnostics_vnet"
+      - "diagnostics_nsg"
+    safe_patterns:
+      - 'category = "AllMetrics"'
+    correct_patterns:
+      - 'category = "AllMetrics"'
+      - "# VNets and NSGs only support AllMetrics, not log categories"
+    warning_message: >-
+      VNet or NSG diagnostic settings detected. These resources only support
+      AllMetrics for diagnostics, not log categories. Using categoryGroup =
+      "allLogs" on VNet/NSG causes ARM HTTP 400. Use category = "AllMetrics" only.

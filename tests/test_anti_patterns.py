@@ -364,8 +364,15 @@ class TestCostPatterns:
         warnings = scan('sku_name = "premium"')
         assert any("premium" in w.lower() or "sku" in w.lower() for w in warnings)
 
-    def test_premium_with_production_safe(self):
+    def test_premium_still_flagged_with_production_context(self):
+        """Premium SKU should still be flagged even if 'production' appears in text."""
         warnings = scan('sku_name = "premium" for production high availability')
+        cost_warnings = [w for w in warnings if "premium" in w.lower()]
+        assert len(cost_warnings) > 0
+
+    def test_premium_safe_when_parameterized(self):
+        """Premium SKU should not be flagged when using a variable."""
+        warnings = scan('sku_name = var.sku_name  # premium is required for vnet integration')
         cost_warnings = [w for w in warnings if "premium" in w.lower()]
         assert cost_warnings == []
 

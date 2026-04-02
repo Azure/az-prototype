@@ -120,6 +120,18 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@<api_version>' = {
 }
 ```
 
+## CRITICAL: NETWORKING STAGE RULES
+When generating a networking stage (VNet, subnets, DNS zones):
+- Do NOT create placeholder private endpoints. PEs belong in their respective
+  service stages (e.g., Key Vault PE in the Key Vault stage), not the networking
+  stage. The networking stage only exports pe subnet ID and DNS zone IDs
+  for downstream stages to consume.
+- VNet and NSG diagnostic settings support ONLY AllMetrics (category), NOT
+  allLogs (categoryGroup). Using categoryGroup = 'allLogs' on VNet/NSG
+  resources causes ARM HTTP 400 at deploy time.
+- Do NOT add log categories to VNet/NSG diagnostics — these resource types
+  have no log categories in ARM.
+
 ## CRITICAL: CROSS-STAGE DEPENDENCIES
 Accept upstream resource IDs/names as parameters (populated from prior stage outputs).
 NEVER hardcode resource names, IDs, or keys from other stages.
