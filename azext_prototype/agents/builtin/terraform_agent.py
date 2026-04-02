@@ -1,6 +1,7 @@
 """Terraform built-in agent — infrastructure-as-code generation."""
 
 from azext_prototype.agents.base import AgentCapability, AgentContract, BaseAgent
+from azext_prototype.agents.builtin.iac_shared_rules import SHARED_IAC_RULES
 from azext_prototype.ai.provider import AIMessage
 
 
@@ -103,7 +104,8 @@ class TerraformAgent(BaseAgent):
         return messages
 
 
-TERRAFORM_PROMPT = """You are an expert Terraform developer specializing in Azure using the azapi provider.
+TERRAFORM_PROMPT = (
+    """You are an expert Terraform developer specializing in Azure using the azapi provider.
 
 Generate production-quality Terraform modules with this structure:
 ```
@@ -167,10 +169,6 @@ resource "azapi_resource" "example" {
 }
 ```
 
-**EXCEPTION**: Extension resources (`Microsoft.Insights/diagnosticSettings`,
-`Microsoft.Authorization/roleAssignments`, `Microsoft.Authorization/locks`)
-do **NOT** support tags at all. **NEVER** add `tags` to these resource types.
-
 ## CRITICAL: locals.tf TEMPLATE
 ```hcl
 locals {
@@ -218,37 +216,9 @@ output "principal_id" {
 }
 ```
 
-## CRITICAL: SUBNET RESOURCES — PREVENT DRIFT
-When creating a VNet with subnets, NEVER define subnets inline in the VNet body.
-Always create subnets as separate `azapi_resource` child resources.
-
-## CRITICAL: NETWORKING STAGE RULES
-When generating a networking stage (VNet, subnets, DNS zones):
-- Do **NOT** create placeholder private endpoints. PEs belong in their respective
-  service stages (e.g., Key Vault PE in the Key Vault stage), not the networking
-  stage. The networking stage **ONLY** exports `pe_subnet_id` and `private_dns_zone_ids`
-  for downstream stages to consume.
-- NSGs do **NOT** support diagnostic settings at all (no log categories, no metric
-  categories). Do **NOT** create `Microsoft.Insights/diagnosticSettings` for NSG
-  resources — ARM will reject with HTTP 400.
-- VNet diagnostic settings support **ONLY** `AllMetrics` (category), **NOT**
-  `allLogs` (categoryGroup). Use:
-  ```
-  metrics = [{ category = "AllMetrics", enabled = true }]
-  ```
-- Private DNS zone names **MUST** be exact Azure FQDNs from Microsoft documentation
-  (e.g., `privatelink.vaultcore.azure.net`, `privatelink.database.windows.net`).
-  Do **NOT** use computed naming convention patterns for DNS zone names.
-  If the task prompt provides DNS zone names, use them exactly as given.
-
-## CRITICAL: EXTENSION RESOURCES
-`Microsoft.Insights/diagnosticSettings`, `Microsoft.Authorization/roleAssignments`,
-and `Microsoft.Authorization/locks` are ARM extension resources:
-- They do **NOT** support the `tags` property. **NEVER** add `tags = local.tags`.
-- Diagnostic settings **MUST** use API version `@2021-05-01-preview` (required for
-  `categoryGroup` support). Do **NOT** use `@2016-09-01` — it does not support
-  `categoryGroup = "allLogs"`.
-- Role assignments **MUST** use API version `@2022-04-01`.
+"""
+    + SHARED_IAC_RULES
+    + """
 
 ## CRITICAL: deploy.sh CORRECTNESS
 - `terraform output` does **NOT** have a `-state=` flag. To read outputs from a
@@ -256,12 +226,6 @@ and `Microsoft.Authorization/locks` are ARM extension resources:
   or parse the state file directly with `jq`.
 - The cleanup trap **MUST** use the captured `$?` value, **NOT** a script-level
   variable. Pattern: `cleanup() { local code=$?; ...; exit ${code}; }`
-
-## CRITICAL: ARM PROPERTY PLACEMENT
-- `disableLocalAuth` is a **top-level** property under `properties`, **NOT** inside
-  `properties.features`. The ARM API silently drops it if nested inside `features`.
-  CORRECT: `properties = { disableLocalAuth = true, features = { ... } }`
-  WRONG: `properties = { features = { disableLocalAuth = true } }`
 
 ## CRITICAL: CROSS-STAGE DEPENDENCIES
 MANDATORY: Use `data "terraform_remote_state"` for ALL upstream references.
@@ -458,3 +422,4 @@ or `concept/infra/terraform/stage-1/main.tf`).
 
 When uncertain about Azure APIs, emit [SEARCH: your query] (max 2 per response).
 """
+)

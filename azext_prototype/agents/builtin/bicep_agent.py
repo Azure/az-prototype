@@ -1,6 +1,7 @@
 """Bicep built-in agent — infrastructure-as-code generation."""
 
 from azext_prototype.agents.base import AgentCapability, AgentContract, BaseAgent
+from azext_prototype.agents.builtin.iac_shared_rules import SHARED_IAC_RULES
 from azext_prototype.ai.provider import AIMessage
 
 
@@ -79,7 +80,8 @@ class BicepAgent(BaseAgent):
         return messages
 
 
-BICEP_PROMPT = """You are an expert Bicep developer for Azure infrastructure.
+BICEP_PROMPT = (
+    """You are an expert Bicep developer for Azure infrastructure.
 
 Generate production-quality Bicep templates with this structure:
 ```
@@ -109,38 +111,9 @@ Code standards:
 - Use Azure Verified Modules from the Bicep public registry where appropriate
 - Every parameter MUST have a @description decorator
 
-## CRITICAL: SUBNET RESOURCES
-When creating a VNet with subnets, NEVER define subnets inline in the VNet body.
-Always create subnets as separate child resources:
-```bicep
-resource subnet 'Microsoft.Network/virtualNetworks/subnets@<api_version>' = {
-  parent: virtualNetwork
-  name: 'snet-app'
-  properties: { ... }
-}
-```
-
-## CRITICAL: NETWORKING STAGE RULES
-When generating a networking stage (VNet, subnets, DNS zones):
-- Do **NOT** create placeholder private endpoints. PEs belong in their respective
-  service stages. The networking stage **ONLY** exports PE subnet ID and DNS zone IDs
-  for downstream stages to consume.
-- NSGs do **NOT** support diagnostic settings at all. Do **NOT** create
-  diagnosticSettings for NSG resources — ARM will reject with HTTP 400.
-- VNet diagnostic settings support **ONLY** AllMetrics (category), **NOT** allLogs.
-- Private DNS zone names **MUST** be exact Azure FQDNs from Microsoft documentation
-  (e.g., privatelink.vaultcore.azure.net). Do **NOT** use computed naming patterns.
-
-## CRITICAL: EXTENSION RESOURCES
-diagnosticSettings, roleAssignments, and locks are ARM extension resources:
-- They do **NOT** support tags. **NEVER** add tags to these resource types.
-- Diagnostic settings **MUST** use API version @2021-05-01-preview (required for
-  categoryGroup support). Do **NOT** use @2016-09-01.
-- Role assignments **MUST** use API version @2022-04-01.
-
-## CRITICAL: ARM PROPERTY PLACEMENT
-- disableLocalAuth is a **top-level** property under properties, **NOT** inside
-  properties.features. The ARM API silently drops it if nested inside features.
+"""
+    + SHARED_IAC_RULES
+    + """
 
 ## CRITICAL: CROSS-STAGE DEPENDENCIES
 Accept upstream resource IDs/names as parameters (populated from prior stage outputs).
@@ -154,20 +127,10 @@ resource rg 'Microsoft.Resources/resourceGroups@<api_version>' existing = {
 }
 ```
 
-## MANAGED IDENTITY + RBAC (MANDATORY)
-When ANY service disables local/key auth, you MUST ALSO:
-1. Create a user-assigned managed identity in identity.bicep
-2. Create RBAC role assignments granting the identity access
-3. Output the identity's clientId and principalId
-
 ## OUTPUTS (MANDATORY)
 main.bicep MUST output: resource group name(s), all resource IDs, all endpoints,
 managed identity clientId and principalId, workspace IDs, Key Vault URIs.
 Do NOT output sensitive values. Every output MUST have a @description decorator.
-
-## DIAGNOSTIC SETTINGS
-Every data service MUST have a diagnostic settings resource using `allLogs`
-category group and `AllMetrics`.
 
 ## CRITICAL: deploy.sh REQUIREMENTS (SCRIPTS UNDER 150 LINES WILL BE REJECTED)
 deploy.sh MUST include ALL of the following:
@@ -210,3 +173,4 @@ Use SHORT filenames in code block labels (e.g., `main.bicep`, NOT `bicep/main.bi
 
 When uncertain about Azure APIs, emit [SEARCH: your query] (max 2 per response).
 """
+)
