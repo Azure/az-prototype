@@ -634,6 +634,7 @@ class BuildSession(SessionMixin):
                     stage_num,
                     input_fn=input_fn,
                     print_fn=print_fn,
+                    iac_tool=self._iac_tool,
                 )
 
                 if needs_regen:
@@ -854,6 +855,7 @@ class BuildSession(SessionMixin):
                             stage_num,
                             input_fn=input_fn,
                             print_fn=print_fn,
+                            iac_tool=self._iac_tool,
                         )
 
                 _print("")

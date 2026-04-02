@@ -72,6 +72,7 @@ class PolicyResolver:
         *,
         input_fn: Callable[[str], str] | None = None,
         print_fn: Callable[[str], None] | None = None,
+        iac_tool: str | None = None,
     ) -> tuple[list[PolicyResolution], bool]:
         """Check generated content for policy violations and resolve interactively.
 
@@ -102,6 +103,7 @@ class PolicyResolver:
         violations = self._governance.check_response_for_violations(
             agent_name,
             generated_content,
+            iac_tool=iac_tool,
         )
 
         if not violations:
@@ -117,8 +119,7 @@ class PolicyResolver:
         # Auto-accept mode: accept all violations without prompting
         if self._auto_accept:
             for i, violation in enumerate(violations, 1):
-                safe = violation.replace("[", "\\[")
-                _print(f"\\[{i}] {safe}")
+                _print(f"[{i}] {violation}")
                 _print("    Auto-accepted compliant recommendation.")
                 resolutions.append(
                     PolicyResolution(
@@ -130,14 +131,11 @@ class PolicyResolver:
             _print("")
         else:
             for i, violation in enumerate(violations, 1):
-                # Escape brackets in violation text so Rich doesn't interpret
-                # "[policy-name]" as a style tag and silently strip it.
-                safe = violation.replace("[", "\\[")
-                _print(f"\\[{i}] {safe}")
+                _print(f"[{i}] {violation}")
                 _print("")
-                _print("    \\[A] Accept compliant recommendation (default)")
-                _print("    \\[O] Override — provide justification")
-                _print("    \\[R] Regenerate — re-run agent with fix instructions")
+                _print("    [A] Accept compliant recommendation (default)")
+                _print("    [O] Override — provide justification")
+                _print("    [R] Regenerate — re-run agent with fix instructions")
                 _print("")
 
                 choice = _input("    Choice [A/O/R]: ").strip().lower()
