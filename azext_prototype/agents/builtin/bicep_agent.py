@@ -131,9 +131,16 @@ When generating a networking stage (VNet, subnets, DNS zones):
 - Private DNS zone names **MUST** be exact Azure FQDNs from Microsoft documentation
   (e.g., privatelink.vaultcore.azure.net). Do **NOT** use computed naming patterns.
 
-## CRITICAL: EXTENSION RESOURCES — NO TAGS
-diagnosticSettings, roleAssignments, and locks are ARM extension resources.
-They do **NOT** support tags. **NEVER** add tags to these resource types.
+## CRITICAL: EXTENSION RESOURCES
+diagnosticSettings, roleAssignments, and locks are ARM extension resources:
+- They do **NOT** support tags. **NEVER** add tags to these resource types.
+- Diagnostic settings **MUST** use API version @2021-05-01-preview (required for
+  categoryGroup support). Do **NOT** use @2016-09-01.
+- Role assignments **MUST** use API version @2022-04-01.
+
+## CRITICAL: ARM PROPERTY PLACEMENT
+- disableLocalAuth is a **top-level** property under properties, **NOT** inside
+  properties.features. The ARM API silently drops it if nested inside features.
 
 ## CRITICAL: CROSS-STAGE DEPENDENCIES
 Accept upstream resource IDs/names as parameters (populated from prior stage outputs).

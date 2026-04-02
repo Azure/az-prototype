@@ -883,3 +883,29 @@ services:
       - 60-day free trial available per tenant
       - No VNet injection; use managed private endpoints
       - Workspaces cannot be created via Terraform/Bicep
+
+  # ---------------------------------------------------------------------------
+  # Common / Cross-Cutting Resources
+  # ---------------------------------------------------------------------------
+
+  diagnostic-settings:
+    display_name: Diagnostic Settings
+    resource_provider: Microsoft.Insights
+    bicep_resource: Microsoft.Insights/diagnosticSettings
+    bicep_api_version: "2021-05-01-preview"
+    notes: |
+      - Extension resource — does NOT support tags
+      - API version @2021-05-01-preview required for categoryGroup ("allLogs") support
+      - Older @2016-09-01 only supports individual category names, NOT categoryGroup
+      - NSGs do NOT support diagnostic settings (no log or metric categories)
+      - VNets support ONLY AllMetrics, NOT log categories
+
+  role-assignments:
+    display_name: Role Assignments
+    resource_provider: Microsoft.Authorization
+    bicep_resource: Microsoft.Authorization/roleAssignments
+    bicep_api_version: "2022-04-01"
+    notes: |
+      - Extension resource — does NOT support tags
+      - Use deterministic names via uuidv5() for idempotent plans
+      - Scope to the narrowest resource, not resource group or subscription
