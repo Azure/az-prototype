@@ -275,7 +275,7 @@ rules:
           }
       - type: "Microsoft.Authorization/roleAssignments@2022-04-01"
         name: "Key Vault Crypto User"
-        description: "Key Vault Crypto User role (12338af0-0e69-4776-bea7-57ae8d297424) for cryptographic operations"
+        description: "Key Vault Crypto User role (12338af0-0e69-4776-bea7-57ae8d297424) for cryptographic operations — ONLY required when the architecture uses key encrypt/decrypt/wrap/unwrap operations"
         terraform_pattern: |
           resource "azapi_resource" "kv_crypto_user_role" {
             type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
