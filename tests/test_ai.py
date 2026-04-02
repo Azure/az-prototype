@@ -225,13 +225,13 @@ class TestCopilotProvider:
         assert any(m["id"] == "claude-sonnet-4" for m in models)
 
     def test_messages_to_dicts(self):
-        from azext_prototype.ai.copilot_provider import CopilotProvider
+        from azext_prototype.ai.provider import messages_to_dicts
 
         msgs = [
             AIMessage(role="system", content="Be helpful"),
             AIMessage(role="user", content="Hello"),
         ]
-        dicts = CopilotProvider._messages_to_dicts(msgs)
+        dicts = messages_to_dicts(msgs)
         assert dicts == [
             {"role": "system", "content": "Be helpful"},
             {"role": "user", "content": "Hello"},

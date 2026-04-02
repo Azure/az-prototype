@@ -142,21 +142,7 @@ class CloudArchitectAgent(BaseAgent):
             max_tokens=self._max_tokens,
         )
 
-        # Post-response governance check
-        iac_tool = context.project_config.get("project", {}).get("iac_tool") if context.project_config else None
-        warnings = self.validate_response(response.content, iac_tool=iac_tool)
-        if warnings:
-            for w in warnings:
-                logger.warning("Governance: %s", w)
-            warning_block = "\n\n---\n" "**\u26a0 Governance warnings:**\n" + "\n".join(f"- {w}" for w in warnings)
-            response = AIResponse(
-                content=response.content + warning_block,
-                model=response.model,
-                usage=response.usage,
-                finish_reason=response.finish_reason,
-            )
-
-        return response
+        return self._apply_governance_check(response, context)
 
     def _get_naming_instructions(self, config: dict) -> str:
         """Generate naming convention instructions from project config."""

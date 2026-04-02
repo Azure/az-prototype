@@ -189,22 +189,7 @@ class BaseAgent:
         if self._enable_web_search and self._SEARCH_PATTERN.search(response.content):
             response = self._resolve_searches(response, messages, context)
 
-        # Post-response governance check
-        iac_tool = context.project_config.get("project", {}).get("iac_tool") if context.project_config else None
-        warnings = self.validate_response(response.content, iac_tool=iac_tool)
-        if warnings:
-            for w in warnings:
-                logger.warning("Governance: %s", w)
-            # Append warnings as a note in the response
-            warning_block = "\n\n---\n" "**Governance warnings:**\n" + "\n".join(f"- {w}" for w in warnings)
-            response = AIResponse(
-                content=response.content + warning_block,
-                model=response.model,
-                usage=response.usage,
-                finish_reason=response.finish_reason,
-            )
-
-        return response
+        return self._apply_governance_check(response, context)
 
     def can_handle(self, task_description: str) -> float:
         """Score how well this agent can handle a task (0.0 to 1.0).
@@ -283,6 +268,26 @@ class BaseAgent:
             return ctx.check_response_for_violations(self.name, response_text, iac_tool=iac_tool)
         except Exception:  # pragma: no cover — never let validation break the agent
             return []
+
+    def _apply_governance_check(self, response: AIResponse, context: AgentContext) -> AIResponse:
+        """Post-response governance check. Appends warnings if found.
+
+        Call this at the end of custom ``execute()`` overrides to
+        avoid duplicating the governance warning block.
+        """
+        iac_tool = context.project_config.get("project", {}).get("iac_tool") if context.project_config else None
+        warnings = self.validate_response(response.content, iac_tool=iac_tool)
+        if warnings:
+            for w in warnings:
+                logger.warning("Governance: %s", w)
+            warning_block = "\n\n---\n**Governance warnings:**\n" + "\n".join(f"- {w}" for w in warnings)
+            return AIResponse(
+                content=response.content + warning_block,
+                model=response.model,
+                usage=response.usage,
+                finish_reason=response.finish_reason,
+            )
+        return response
 
     def set_governor_brief(self, brief_text: str) -> None:
         """Set a governor-produced policy brief for this agent.

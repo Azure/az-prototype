@@ -28,6 +28,7 @@ from typing import Any
 
 import yaml
 
+from azext_prototype.stages.base_state import BaseState
 from azext_prototype.stages.build_state import _slugify
 
 logger = logging.getLogger(__name__)
@@ -84,7 +85,7 @@ def _enrich_deploy_fields(stage: dict) -> dict:
     return stage
 
 
-class DeployState:
+class DeployState(BaseState):
     """Manages persistent deploy state in YAML format.
 
     Provides:
@@ -98,73 +99,14 @@ class DeployState:
     - Formatting for display
     """
 
-    def __init__(self, project_dir: str):
-        self._project_dir = project_dir
-        self._path = Path(project_dir) / DEPLOY_STATE_FILE
-        self._state: dict[str, Any] = _default_deploy_state()
-        self._loaded = False
+    _STATE_FILE = DEPLOY_STATE_FILE
 
-    @property
-    def exists(self) -> bool:
-        """Check if a deploy.yaml file exists."""
-        return self._path.exists()
+    @staticmethod
+    def _default_state() -> dict[str, Any]:
+        return _default_deploy_state()
 
-    @property
-    def state(self) -> dict[str, Any]:
-        """Get the current state dict."""
-        return self._state
-
-    # ------------------------------------------------------------------ #
-    # Persistence
-    # ------------------------------------------------------------------ #
-
-    def load(self) -> dict[str, Any]:
-        """Load existing deploy state from YAML.
-
-        Returns the state dict (empty structure if file doesn't exist).
-        """
-        if self._path.exists():
-            try:
-                with open(self._path, "r", encoding="utf-8") as f:
-                    loaded = yaml.safe_load(f) or {}
-                self._state = _default_deploy_state()
-                self._deep_merge(self._state, loaded)
-                self._backfill_build_stage_ids()
-                self._loaded = True
-                logger.info("Loaded deploy state from %s", self._path)
-            except (yaml.YAMLError, IOError) as e:
-                logger.warning("Could not load deploy state: %s", e)
-                self._state = _default_deploy_state()
-        else:
-            self._state = _default_deploy_state()
-
-        return self._state
-
-    def save(self) -> None:
-        """Save the current state to YAML."""
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-
-        now = datetime.now(timezone.utc).isoformat()
-        if not self._state["_metadata"]["created"]:
-            self._state["_metadata"]["created"] = now
-        self._state["_metadata"]["last_updated"] = now
-
-        with open(self._path, "w", encoding="utf-8") as f:
-            yaml.dump(
-                self._state,
-                f,
-                default_flow_style=False,
-                allow_unicode=True,
-                sort_keys=False,
-                width=120,
-            )
-        logger.info("Saved deploy state to %s", self._path)
-
-    def reset(self) -> None:
-        """Reset state to defaults and save."""
-        self._state = _default_deploy_state()
-        self._loaded = False
-        self.save()
+    def _post_load(self) -> None:
+        self._backfill_build_stage_ids()
 
     # ------------------------------------------------------------------ #
     # Build-state bridge
@@ -883,14 +825,6 @@ class DeployState:
             if not stage.get("build_stage_id"):
                 stage["build_stage_id"] = _slugify(stage.get("name", "stage"))
             _enrich_deploy_fields(stage)
-
-    def _deep_merge(self, base: dict, updates: dict) -> None:
-        """Deep merge updates into base dict."""
-        for key, value in updates.items():
-            if key in base and isinstance(base[key], dict) and isinstance(value, dict):
-                self._deep_merge(base[key], value)
-            else:
-                base[key] = value
 
 
 # ================================================================== #

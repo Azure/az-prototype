@@ -6,7 +6,13 @@ from typing import Any
 
 from knack.util import CLIError
 
-from azext_prototype.ai.provider import AIMessage, AIProvider, AIResponse, ToolCall
+from azext_prototype.ai.provider import (
+    AIMessage,
+    AIProvider,
+    AIResponse,
+    extract_tool_calls_from_openai,
+    messages_to_dicts,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,40 +49,6 @@ class GitHubModelsProvider(AIProvider):
             api_key=self._token,
         )
 
-    @staticmethod
-    def _messages_to_dicts(messages: list[AIMessage]) -> list[dict[str, Any]]:
-        """Convert AIMessage list to OpenAI-style message dicts."""
-        result = []
-        for m in messages:
-            msg: dict[str, Any] = {"role": m.role, "content": m.content}
-            if m.tool_calls:
-                msg["tool_calls"] = [
-                    {
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {"name": tc.name, "arguments": tc.arguments},
-                    }
-                    for tc in m.tool_calls
-                ]
-            if m.tool_call_id:
-                msg["tool_call_id"] = m.tool_call_id
-            result.append(msg)
-        return result
-
-    @staticmethod
-    def _extract_tool_calls(choice: Any) -> list[ToolCall] | None:
-        """Extract tool calls from an OpenAI SDK response choice."""
-        if not hasattr(choice.message, "tool_calls") or not choice.message.tool_calls:
-            return None
-        return [
-            ToolCall(
-                id=tc.id,
-                name=tc.function.name,
-                arguments=tc.function.arguments or "{}",
-            )
-            for tc in choice.message.tool_calls
-        ]
-
     def chat(
         self,
         messages: list[AIMessage],
@@ -89,7 +61,7 @@ class GitHubModelsProvider(AIProvider):
         """Send a chat completion via GitHub Models API."""
         target_model = model or self._model
 
-        api_messages = self._messages_to_dicts(messages)
+        api_messages = messages_to_dicts(messages)
 
         kwargs: dict[str, Any] = {
             "model": target_model,
@@ -127,7 +99,7 @@ class GitHubModelsProvider(AIProvider):
             model=response.model,
             usage=usage,
             finish_reason=choice.finish_reason or "stop",
-            tool_calls=self._extract_tool_calls(choice),
+            tool_calls=extract_tool_calls_from_openai(choice),
         )
 
     def stream_chat(

@@ -22,10 +22,9 @@ import hashlib
 import logging
 import re
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
-import yaml
+from azext_prototype.stages.base_state import BaseState
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +83,7 @@ def _default_build_state() -> dict[str, Any]:
     }
 
 
-class BuildState:
+class BuildState(BaseState):
     """Manages persistent build state in YAML format.
 
     Provides:
@@ -95,68 +94,14 @@ class BuildState:
     - Build report formatting
     """
 
-    def __init__(self, project_dir: str):
-        self._project_dir = project_dir
-        self._path = Path(project_dir) / BUILD_STATE_FILE
-        self._state: dict[str, Any] = _default_build_state()
-        self._loaded = False
+    _STATE_FILE = BUILD_STATE_FILE
 
-    @property
-    def exists(self) -> bool:
-        """Check if a build.yaml file exists."""
-        return self._path.exists()
+    @staticmethod
+    def _default_state() -> dict[str, Any]:
+        return _default_build_state()
 
-    @property
-    def state(self) -> dict[str, Any]:
-        """Get the current state dict."""
-        return self._state
-
-    def load(self) -> dict[str, Any]:
-        """Load existing build state from YAML.
-
-        Returns the state dict (empty structure if file doesn't exist).
-        """
-        if self._path.exists():
-            try:
-                with open(self._path, "r", encoding="utf-8") as f:
-                    loaded = yaml.safe_load(f) or {}
-                self._state = _default_build_state()
-                self._deep_merge(self._state, loaded)
-                self._backfill_ids()
-                self._loaded = True
-                logger.info("Loaded build state from %s", self._path)
-            except (yaml.YAMLError, IOError) as e:
-                logger.warning("Could not load build state: %s", e)
-                self._state = _default_build_state()
-        else:
-            self._state = _default_build_state()
-
-        return self._state
-
-    def save(self) -> None:
-        """Save the current state to YAML."""
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-
-        now = datetime.now(timezone.utc).isoformat()
-        if not self._state["_metadata"]["created"]:
-            self._state["_metadata"]["created"] = now
-        self._state["_metadata"]["last_updated"] = now
-
-        with open(self._path, "w", encoding="utf-8") as f:
-            yaml.dump(
-                self._state,
-                f,
-                default_flow_style=False,
-                allow_unicode=True,
-                sort_keys=False,
-                width=120,
-            )
-        logger.info("Saved build state to %s", self._path)
-
-    def reset(self) -> None:
-        """Reset state to defaults and save."""
-        self._state = _default_build_state()
-        self._loaded = False
+    def _post_load(self) -> None:
+        self._backfill_ids()
         self.save()
 
     # ------------------------------------------------------------------ #
@@ -713,11 +658,3 @@ class BuildState:
     def _backfill_ids(self) -> None:
         """Backfill ``id``, ``deploy_mode``, and ``manual_instructions`` on legacy state files."""
         self._assign_stable_ids()
-
-    def _deep_merge(self, base: dict, updates: dict) -> None:
-        """Deep merge updates into base dict."""
-        for key, value in updates.items():
-            if key in base and isinstance(base[key], dict) and isinstance(value, dict):
-                self._deep_merge(base[key], value)
-            else:
-                base[key] = value

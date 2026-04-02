@@ -222,6 +222,22 @@ Anti-pattern detection
   ``--workloads``, ``--strict``.  CI pipelines consolidated to a single
   validation step.
 
+DRY refactoring
+~~~~~~~~~~~~~~~~~
+* **``BaseState`` class** -- extracted shared ``__init__``, ``load()``,
+  ``save()``, ``_deep_merge()``, ``exists``/``state`` properties into
+  ``stages/base_state.py``.  All 4 state managers (build, deploy,
+  discovery, backlog) inherit from it.  Post-load hooks via
+  ``_post_load()`` for migrations and backfills.
+* **``_apply_governance_check()``** -- extracted the duplicated 12-line
+  governance warning block from 6 agent ``execute()`` overrides into a
+  single method on ``BaseAgent``.  Each agent now calls
+  ``return self._apply_governance_check(response, context)``.
+* **AI provider shared utilities** -- moved ``_messages_to_dicts()`` and
+  ``_extract_tool_calls()`` from 3 provider files into ``ai/provider.py``
+  as ``messages_to_dicts()`` and ``extract_tool_calls_from_openai()``.
+  Copilot provider uses ``filter_empty=True`` for its specific need.
+
 Prompt optimization (58 fixes)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * **TERRAFORM_PROMPT rewrite** -- complete rewrite with CRITICAL sections for

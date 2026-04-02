@@ -160,20 +160,7 @@ class QAEngineerAgent(BaseAgent):
                 usage=usage,
                 finish_reason=choice.finish_reason or "stop",
             )
-            # Post-response governance check
-            iac_tool = context.project_config.get("project", {}).get("iac_tool") if context.project_config else None
-            warnings = self.validate_response(result.content, iac_tool=iac_tool)
-            if warnings:
-                for w in warnings:
-                    logger.warning("Governance: %s", w)
-                block = "\n\n---\n⚠ **Governance warnings:**\n" + "\n".join(f"- {w}" for w in warnings)
-                result = AIResponse(
-                    content=result.content + block,
-                    model=result.model,
-                    usage=result.usage,
-                    finish_reason=result.finish_reason,
-                )
-            return result
+            return self._apply_governance_check(result, context)
         except Exception as e:
             logger.warning("Vision-based analysis failed, falling back to text: %s", e)
             messages.append(

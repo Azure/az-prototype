@@ -28,7 +28,13 @@ from knack.util import CLIError
 from azext_prototype.ai.copilot_auth import (
     get_copilot_token,
 )
-from azext_prototype.ai.provider import AIMessage, AIProvider, AIResponse, ToolCall
+from azext_prototype.ai.provider import (
+    AIMessage,
+    AIProvider,
+    AIResponse,
+    ToolCall,
+    messages_to_dicts,
+)
 
 
 class CopilotTimeoutError(CLIError):
@@ -137,33 +143,6 @@ class CopilotProvider(AIProvider):
             "X-Request-Id": str(uuid.uuid4()),
         }
 
-    @staticmethod
-    def _messages_to_dicts(messages: list[AIMessage]) -> list[dict[str, Any]]:
-        """Convert ``AIMessage`` list to OpenAI-style message dicts.
-
-        Skips messages with empty or whitespace-only content to avoid
-        HTTP 400 errors from the Copilot API.
-        """
-        result = []
-        for m in messages:
-            # Skip messages with empty/whitespace/None content (API rejects these)
-            if not m.content or (isinstance(m.content, str) and not m.content.strip()):
-                continue
-            msg: dict[str, Any] = {"role": m.role, "content": m.content}
-            if m.tool_calls:
-                msg["tool_calls"] = [
-                    {
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {"name": tc.name, "arguments": tc.arguments},
-                    }
-                    for tc in m.tool_calls
-                ]
-            if m.tool_call_id:
-                msg["tool_call_id"] = m.tool_call_id
-            result.append(msg)
-        return result
-
     # ------------------------------------------------------------------
     # AIProvider interface
     # ------------------------------------------------------------------
@@ -181,7 +160,7 @@ class CopilotProvider(AIProvider):
         target_model = model or self._model
         payload: dict[str, Any] = {
             "model": target_model,
-            "messages": self._messages_to_dicts(messages),
+            "messages": messages_to_dicts(messages, filter_empty=True),
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
@@ -382,7 +361,7 @@ class CopilotProvider(AIProvider):
         target_model = model or self._model
         payload: dict[str, Any] = {
             "model": target_model,
-            "messages": self._messages_to_dicts(messages),
+            "messages": messages_to_dicts(messages, filter_empty=True),
             "temperature": temperature,
             "max_tokens": max_tokens,
             "stream": True,
