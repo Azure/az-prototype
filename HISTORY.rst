@@ -316,8 +316,8 @@ DRY refactoring
   ``governance/__init__.py`` replaces duplicated try/except blocks
   in anti-patterns and standards loaders.
 
-Prompt optimization (58 fixes)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Prompt optimization
+~~~~~~~~~~~~~~~~~~~~
 * **TERRAFORM_PROMPT rewrite** -- complete rewrite with CRITICAL sections for
   ``response_export_values``, state file naming convention, cross-stage
   dependencies via ``terraform_remote_state``, output naming convention,
