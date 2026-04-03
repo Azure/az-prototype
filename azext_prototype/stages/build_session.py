@@ -625,8 +625,8 @@ class BuildSession(SessionMixin):
             else:
                 _print("       No files extracted from response.")
 
-            # Policy check — skip for app/docs stages (no IaC policies apply)
-            if content and category in ("infra", "data", "integration"):
+            # Policy check — runs on all stage categories
+            if content:
                 resolutions, needs_regen = self._policy_resolver.check_and_resolve(
                     agent.name,
                     content,
@@ -671,9 +671,9 @@ class BuildSession(SessionMixin):
                     written_paths = self._write_stage_files(stage, content)
                     self._build_state.mark_stage_validating(stage_num, written_paths)
 
-            # Per-stage QA validation — IaC stages only (app/docs skip IaC QA)
+            # Per-stage QA validation — runs on ALL stage categories
             qa_passed = True
-            if category in ("infra", "data", "integration"):
+            if category in ("infra", "data", "integration", "app", "docs"):
                 qa_passed = self._run_stage_qa(stage, architecture, templates, use_styled, _print)
 
             if qa_passed:
@@ -2149,11 +2149,23 @@ class BuildSession(SessionMixin):
         "terraform": {"versions.tf"},
     }
 
+    # Files that app/docs stages should NEVER generate (defense in depth)
+    _APP_DOCS_BLOCKED_FILES: set[str] = {
+        "deploy.sh",
+        "providers.tf",
+        "variables.tf",
+        "outputs.tf",
+        "locals.tf",
+        "main.tf",
+        "main.bicep",
+        "main.bicepparam",
+    }
+
     def _write_stage_files(self, stage: dict, content: str) -> list[str]:
         """Extract file blocks from AI response and write to disk.
 
-        Filters out blocked filenames (e.g. ``versions.tf`` for Terraform)
-        before writing.
+        Filters out blocked filenames (e.g. ``versions.tf`` for Terraform,
+        ``deploy.sh`` for app/docs stages) before writing.
 
         Returns a list of written file paths relative to the project dir.
         """
@@ -2164,9 +2176,14 @@ class BuildSession(SessionMixin):
         if not files:
             return []
 
+        category = stage.get("category", "infra")
         stage_dir = stage.get("dir", "concept")
         output_dir = Path(self._context.project_dir) / stage_dir
         blocked = self._BLOCKED_FILES.get(self._iac_tool, set())
+
+        # App and docs stages must not write IaC or deployment scripts
+        if category in ("app", "docs"):
+            blocked = blocked | self._APP_DOCS_BLOCKED_FILES
 
         # Strip stage_dir prefix from filenames to avoid path duplication.
         # The AI sometimes includes the full output path in the code block

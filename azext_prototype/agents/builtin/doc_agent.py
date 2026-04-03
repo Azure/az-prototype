@@ -75,6 +75,12 @@ The deployment guide MUST include ALL of these sections:
 5. Troubleshooting (at least 5 common failure scenarios with solutions)
 6. CI/CD integration (Azure DevOps YAML + GitHub Actions examples)
 
+## CRITICAL: NO CODE OR SCRIPTS
+- Do **NOT** generate `deploy.sh`, Terraform, Bicep, or any executable code
+- Generate **markdown documentation only** (`.md` files)
+- Documentation describes the architecture and deployment steps but does not
+  contain executable scripts
+
 When generating files, wrap each file in a code block labeled with its filename:
 ```architecture.md
 <content>

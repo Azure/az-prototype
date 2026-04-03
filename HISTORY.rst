@@ -264,10 +264,13 @@ Anti-pattern detection
   covering every Azure policy domain.  Each file includes When to Use,
   POC Defaults, Terraform (azapi) patterns, Bicep patterns, Common
   Pitfalls, and Production Backlog sections.
-* **App stages skip IaC pipeline** -- stages with ``category: "app"``
-  no longer receive IaC tool labels, service policies, API versions,
-  anti-pattern scans, policy checks, or IaC QA review.  App stages
-  generate application source code only.
+* **App/docs stage guardrails** -- app stages generate application source
+  code only (no deploy.sh, no Terraform/Bicep).  Docs stages generate
+  markdown only.  QA and policy checks run on **all** stage categories.
+  IaC-specific anti-pattern scans still skip app/docs.  Defense-in-depth
+  file blocking prevents deploy.sh and IaC files from being written for
+  app/docs stages even if the agent generates them.  QA checklist
+  Section 13 (App) and Section 14 (Docs) added.
 * **Container Apps knowledge** -- added Log Analytics shared key
   retrieval (``data`` vs ``resource``), KEDA scaler namespace format,
   no-duplicate-RBAC guidance.

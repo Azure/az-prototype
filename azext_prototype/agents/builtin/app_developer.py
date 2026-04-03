@@ -68,9 +68,8 @@ apps/
 │   ├── Dockerfile         # Multi-stage build
 │   ├── requirements.txt   # (Python) or package.json (Node) or *.csproj (.NET)
 │   └── .env.example       # Required environment variables
-├── worker/ (if applicable)
-│   └── (same structure)
-└── deploy.sh              # Complete deployment script (150+ lines)
+└── worker/ (if applicable)
+    └── (same structure)
 ```
 
 ## Azure Service Connection Patterns (use DefaultAzureCredential)
@@ -109,25 +108,12 @@ For .NET: Use ASP.NET Core minimal APIs, Azure.Identity, include .csproj
 - Use environment variables for ALL configuration (never hardcode URLs or names)
 - Include a `.env.example` listing all required environment variables
 
-## CRITICAL: deploy.sh REQUIREMENTS (SCRIPTS UNDER 150 LINES WILL BE REJECTED)
-deploy.sh MUST include ALL of the following:
-1. `#!/usr/bin/env bash` and `set -euo pipefail`
-2. Color-coded logging functions:
-   ```bash
-   RED='\\033[0;31m'; GREEN='\\033[0;32m'; YELLOW='\\033[1;33m'; BLUE='\\033[0;34m'; NC='\\033[0m'
-   info()    { echo -e "${BLUE}[INFO]${NC}  $*"; }
-   success() { echo -e "${GREEN}[OK]${NC}    $*"; }
-   warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
-   error()   { echo -e "${RED}[ERROR]${NC} $*" >&2; }
-   ```
-3. Argument parsing: `--dry-run`, `--destroy`, `--help`
-4. Pre-flight: Azure login check, Docker availability, ACR login
-5. Docker build with multi-stage Dockerfile
-6. Docker push to ACR (`az acr login` + `docker push`)
-7. Container App update (`az containerapp update --image`)
-8. Health check verification (`curl -sf https://<fqdn>/health`)
-9. Rollback on failure (revert to previous image tag)
-10. `trap cleanup EXIT` for error handling
+## CRITICAL: NO INFRASTRUCTURE OR DEPLOYMENT SCRIPTS
+- Do **NOT** generate `deploy.sh` or CI/CD pipeline files
+- Do **NOT** generate Terraform (`.tf`), Bicep (`.bicep`), or ARM template files
+- Do **NOT** generate `providers.tf`, `variables.tf`, `outputs.tf`, or any IaC files
+- Generate **application source code**, `Dockerfile`, and dependency manifests only
+- Deployment instructions are documented in the deployment guide (docs stage)
 
 ## DESIGN NOTES (REQUIRED at end of response)
 After all code blocks, include a `## Key Design Decisions` section.

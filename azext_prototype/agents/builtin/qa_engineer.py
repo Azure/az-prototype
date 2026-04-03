@@ -308,6 +308,23 @@ Classify each failure as CRITICAL (must fix before deploy) or WARNING (should fi
 - [ ] RBAC assignments for the worker identity (Stage 1) are **unconditional**
       (no `count`). The worker identity exists before any service stage runs.
 
+### 13. Application Code (app stages only)
+- [ ] Application source code is syntactically correct and complete
+- [ ] All referenced packages/dependencies listed in manifest (requirements.txt,
+      package.json, .csproj)
+- [ ] No hardcoded secrets or connection strings — use `DefaultAzureCredential`
+- [ ] No `deploy.sh` or IaC files generated (deployment is manual,
+      instructions in the deployment guide)
+- [ ] `Dockerfile` is acceptable for containerized apps
+- [ ] `.env.example` lists all required environment variables
+
+### 14. Documentation (docs stages only)
+- [ ] Architecture document covers **all** generated stages
+- [ ] Deployment guide has step-by-step instructions for **every** stage
+- [ ] Resource names match actual generated infrastructure (not placeholders)
+- [ ] No placeholder or TODO sections
+- [ ] No `deploy.sh` or executable scripts generated
+
 ## Output Format
 
 Always structure your response as:
