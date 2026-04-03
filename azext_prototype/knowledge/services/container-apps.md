@@ -604,3 +604,37 @@ app.listen(8080, "0.0.0.0", () => {
 - Container Apps pulling from ACR **MUST** use `UserAssigned` (or `SystemAssigned, UserAssigned`) identity with the UAMI attached in the `identity.userAssignedIdentities` map.
 - ACR `AcrPull` RBAC **MUST** be assigned to the UAMI _before_ the container app is created. Use implicit dependency via the identity resource, **NOT** `depends_on` on the RBAC resource (that creates circular dependencies).
 - When multiple managed identities are attached, set `AZURE_CLIENT_ID` env var to the UAMI's `client_id` for DefaultAzureCredential disambiguation.
+
+## CRITICAL: Log Analytics Shared Key Retrieval
+
+Use `data "azapi_resource_action"` (**NOT** `resource "azapi_resource_action"`) for
+read-only operations like fetching the Log Analytics workspace shared key.
+Using `resource` causes unnecessary re-execution on every `terraform apply`.
+
+```hcl
+data "azapi_resource_action" "log_analytics_keys" {
+  type        = "Microsoft.OperationalInsights/workspaces@2023-09-01"
+  resource_id = local.workspace_id
+  action      = "sharedKeys"
+  method      = "POST"
+
+  response_export_values = ["primarySharedKey"]
+}
+```
+
+## CRITICAL: KEDA Scaler Configuration
+
+- Service Bus KEDA scalers **MUST** use the `namespace` short name (e.g., `"my-sb-namespace"`),
+  **NOT** the FQDN (`"my-sb-namespace.servicebus.windows.net"`)
+- `secretRef` in KEDA auth blocks **MUST** reference a valid Container Apps secret name.
+  An empty `secretRef` causes ARM validation errors.
+- RBAC for KEDA (e.g., Service Bus Data Receiver) **MUST** be assigned to the Container
+  App's _system-assigned_ identity, not the worker UAMI, because KEDA uses the
+  system identity for scale trigger authentication.
+
+## CRITICAL: No Duplicate RBAC Assignments
+
+Do **NOT** re-create RBAC role assignments that were already created in an upstream
+service stage (e.g., Stage 8 Cosmos DB already assigns Data Contributor to the worker
+identity). Duplicate role assignments cause ARM HTTP 409 Conflict errors on re-apply.
+Only create RBAC assignments for roles that are **NOT** already assigned upstream.

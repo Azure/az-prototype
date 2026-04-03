@@ -264,6 +264,17 @@ Anti-pattern detection
   covering every Azure policy domain.  Each file includes When to Use,
   POC Defaults, Terraform (azapi) patterns, Bicep patterns, Common
   Pitfalls, and Production Backlog sections.
+* **App stages skip IaC pipeline** -- stages with ``category: "app"``
+  no longer receive IaC tool labels, service policies, API versions,
+  anti-pattern scans, policy checks, or IaC QA review.  App stages
+  generate application source code only.
+* **Container Apps knowledge** -- added Log Analytics shared key
+  retrieval (``data`` vs ``resource``), KEDA scaler namespace format,
+  no-duplicate-RBAC guidance.
+* **ANTI-CONT-003 fix** -- narrowed to ``microsoft.app/containerapps``
+  only; no longer fires on Static Web Apps or other resources.
+* **Cosmos DB backup fix** -- serverless accounts should omit
+  ``backupPolicy`` entirely; corrected knowledge file.
 * **IaC tool scoping** -- anti-pattern checks now support ``applies_to``
   field (domain-level or pattern-level, never both in the same file).
   Bicep-structure checks only run on Bicep builds, Terraform-structure

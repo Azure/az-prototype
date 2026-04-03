@@ -395,9 +395,9 @@ const { resources } = await container.items
 - Serverless mode is enabled via `capabilities`, **NOT** a `capacityMode` property
 - CORRECT: `capabilities = [{ name = "EnableServerless" }]`
 - WRONG: `capacityMode = "Serverless"` (this property does **NOT** exist in the ARM schema)
-- Serverless accounts **ONLY** support `Continuous` backup at `Continuous7Days` tier
-- WRONG: `backupPolicy = { type = "Periodic" }` — ARM rejects with "Periodic backup is not supported for serverless accounts"
-- CORRECT: `backupPolicy = { type = "Continuous", continuousModeProperties = { tier = "Continuous7Days" } }`
+- For serverless accounts, **omit** the `backupPolicy` block entirely and let Azure use the
+  default. Specifying an incompatible backup type causes ARM deployment errors.
+- For provisioned accounts, use `backupPolicy = { type = "Continuous", continuousModeProperties = { tier = "Continuous7Days" } }` for POC
 
 ## Common Pitfalls
 - **MOST COMMON MISTAKE**: Using `Microsoft.Authorization/roleAssignments` for data-plane RBAC. Cosmos DB requires `Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments` with its own built-in role definition IDs (`00000000-0000-0000-0000-000000000001` for reader, `00000000-0000-0000-0000-000000000002` for contributor). The scope must be the Cosmos account ID, not a resource group.

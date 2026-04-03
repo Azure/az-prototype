@@ -40,7 +40,7 @@ patterns:
 
   - id: ANTI-CONT-003
     search_patterns:
-      - 'type = "SystemAssigned"'
+      - "microsoft.app/containerapps"
     safe_patterns:
       - "userassignedidentities"
       - "systemassigned, userassigned"
@@ -48,7 +48,7 @@ patterns:
       - 'type = "SystemAssigned, UserAssigned"'
       - "identity.userAssignedIdentities"
     warning_message: >-
-      Container App uses SystemAssigned identity only, but ACR pull requires a
-      User-Assigned Managed Identity (UAMI) attached in the identity block.
-      Use type = "SystemAssigned, UserAssigned" and attach the UAMI in
-      userAssignedIdentities. Otherwise, ACR image pull will fail.
+      Container App detected. Ensure the identity block uses UserAssigned (or
+      SystemAssigned, UserAssigned) with the UAMI attached in
+      userAssignedIdentities for ACR image pull. SystemAssigned alone causes
+      image pull failures on first provision.

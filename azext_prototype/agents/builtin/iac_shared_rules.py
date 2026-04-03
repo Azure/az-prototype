@@ -55,6 +55,8 @@ category group and `AllMetrics`. NSGs and VNets are exceptions (see Networking r
 - Diagnostic settings on blob storage **MUST** target an explicit blob service child
   resource (`Microsoft.Storage/storageAccounts/blobServices`), **NOT** string
   interpolation like `"${storage.id}/blobServices/default"`.
+- When using diagnostic settings API `@2021-05-01-preview`, include `retentionPolicy`
+  in each log/metric category block: `retentionPolicy = { enabled = false, days = 0 }`.
 
 ## CRITICAL: CROSS-STAGE DEPENDENCIES — NO DEAD CODE
 - **ONLY** declare `terraform_remote_state` or parameter inputs for stages whose

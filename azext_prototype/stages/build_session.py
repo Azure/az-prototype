@@ -561,9 +561,9 @@ class BuildSession(SessionMixin):
             )
 
             # Debug: scan response for anti-pattern violations before policy resolver
-            # Skip scanning for documentation stages — docs describe the architecture
-            # (including SQL auth, public access, etc.) and will trigger false positives.
-            if content and category != "docs":
+            # Skip scanning for docs and app stages — docs describe the architecture
+            # and app stages generate source code, not IaC. Both trigger false positives.
+            if content and category not in ("docs", "app"):
                 try:
                     from azext_prototype.governance.anti_patterns import (
                         scan as _ap_scan,
@@ -625,8 +625,8 @@ class BuildSession(SessionMixin):
             else:
                 _print("       No files extracted from response.")
 
-            # Policy check
-            if content:
+            # Policy check — skip for app/docs stages (no IaC policies apply)
+            if content and category in ("infra", "data", "integration"):
                 resolutions, needs_regen = self._policy_resolver.check_and_resolve(
                     agent.name,
                     content,
@@ -671,9 +671,9 @@ class BuildSession(SessionMixin):
                     written_paths = self._write_stage_files(stage, content)
                     self._build_state.mark_stage_validating(stage_num, written_paths)
 
-            # Per-stage QA validation
+            # Per-stage QA validation — IaC stages only (app/docs skip IaC QA)
             qa_passed = True
-            if category in ("infra", "data", "integration", "app"):
+            if category in ("infra", "data", "integration"):
                 qa_passed = self._run_stage_qa(stage, architecture, templates, use_styled, _print)
 
             if qa_passed:
@@ -1937,32 +1937,31 @@ class BuildSession(SessionMixin):
             if dns_note:
                 task += dns_note + "\n"
 
-        # Directive hierarchy — ensures NEVER directives override architecture
-        task += (
-            "## CRITICAL: DIRECTIVE HIERARCHY (GENERATION-TIME)\n"
-            "During code generation, NEVER directives in MANDATORY RESOURCE POLICIES\n"
-            "take precedence over architecture context, POC notes, and configuration\n"
-            "suggestions. When architecture says 'public network' but policy says\n"
-            "NEVER enable public access — generate code that follows the NEVER\n"
-            "directive (disable public access).\n\n"
-            "NOTE: Users can override any policy post-generation via the PolicyResolver\n"
-            "(Accept/Override with justification/Regenerate) or via custom project\n"
-            "policies in .prototype/policies/. Your job is to generate the COMPLIANT\n"
-            "default — the user decides whether to override it.\n\n"
-        )
+        # IaC-specific context — skip for app/docs stages
+        if is_iac:
+            # Directive hierarchy — ensures NEVER directives override architecture
+            task += (
+                "## CRITICAL: DIRECTIVE HIERARCHY (GENERATION-TIME)\n"
+                "During code generation, NEVER directives in MANDATORY RESOURCE POLICIES\n"
+                "take precedence over architecture context, POC notes, and configuration\n"
+                "suggestions. When architecture says 'public network' but policy says\n"
+                "NEVER enable public access — generate code that follows the NEVER\n"
+                "directive (disable public access).\n\n"
+                "NOTE: Users can override any policy post-generation via the PolicyResolver\n"
+                "(Accept/Override with justification/Regenerate) or via custom project\n"
+                "policies in .prototype/policies/. Your job is to generate the COMPLIANT\n"
+                "default — the user decides whether to override it.\n\n"
+            )
 
-        # Inject deterministic service policies FIRST — these are the exact
-        # code templates the agent must use as starting points.  Placing them
-        # early ensures the AI reads the required property values BEFORE it
-        # starts generating code.
-        service_policies = self._resolve_service_policies(services)
-        if service_policies:
-            task += service_policies + "\n\n"
+            # Inject deterministic service policies FIRST
+            service_policies = self._resolve_service_policies(services)
+            if service_policies:
+                task += service_policies + "\n\n"
 
-        # Inject verified API versions for this stage's resource types
-        api_version_brief = self._resolve_api_versions(services)
-        if api_version_brief:
-            task += api_version_brief + "\n"
+            # Inject verified API versions for this stage's resource types
+            api_version_brief = self._resolve_api_versions(services)
+            if api_version_brief:
+                task += api_version_brief + "\n"
 
         if template_context:
             task += f"## Template Configuration\n{template_context}\n\n"
