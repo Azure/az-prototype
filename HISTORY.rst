@@ -275,6 +275,12 @@ Anti-pattern detection
   only; no longer fires on Static Web Apps or other resources.
 * **Cosmos DB backup fix** -- serverless accounts should omit
   ``backupPolicy`` entirely; corrected knowledge file.
+* **Knowledge file resolution fix** -- deployment plan service names
+  (e.g., ``cosmos-account``, ``container-app-api``) now correctly
+  resolve to knowledge files (``cosmos-db.md``, ``container-apps.md``)
+  via a mapping table + fuzzy suffix stripping.  Previously, knowledge
+  files were never loaded because names didn't match, causing the same
+  ARM schema errors every run.  Knowledge cap raised from 12KB to 64KB.
 * **IaC tool scoping** -- anti-pattern checks now support ``applies_to``
   field (domain-level or pattern-level, never both in the same file).
   Bicep-structure checks only run on Bicep builds, Terraform-structure

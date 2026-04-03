@@ -70,8 +70,14 @@ class KnowledgeLoader:
     # ------------------------------------------------------------------
 
     def load_service(self, service_name: str) -> str:
-        """Load a service knowledge file (e.g. ``cosmos-db``)."""
-        return self._read_md("services", f"{service_name}.md")
+        """Load a service knowledge file (e.g. ``cosmos-db``).
+
+        Resolves computed deployment plan names (e.g., ``cosmos-account``,
+        ``container-app-api``) to canonical knowledge file names
+        (``cosmos-db``, ``container-apps``) via fuzzy matching.
+        """
+        resolved = self._resolve_service_file(service_name)
+        return self._read_md("services", f"{resolved}.md")
 
     def load_tool(self, tool_name: str) -> str:
         """Load a tool pattern file (e.g. ``terraform``)."""
@@ -243,6 +249,95 @@ class KnowledgeLoader:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    # Map deployment plan service names to knowledge file names.
+    # The plan uses computed names (e.g., "cosmos-account") but knowledge
+    # files use canonical short names (e.g., "cosmos-db").
+    _SERVICE_FILE_MAP: dict[str, str] = {
+        # Cosmos DB
+        "cosmos-account": "cosmos-db",
+        "cosmos-database": "cosmos-db",
+        "cosmos-container": "cosmos-db",
+        "cosmos-rbac": "cosmos-db",
+        # Azure SQL
+        "sql-server": "azure-sql",
+        "sql-database": "azure-sql",
+        "sql-rbac": "azure-sql",
+        # Container Apps
+        "container-app-api": "container-apps",
+        "container-app-worker": "container-apps",
+        "container-apps-environment": "container-apps",
+        # Log Analytics / App Insights
+        "log-analytics-workspace": "log-analytics",
+        "application-insights": "app-insights",
+        # Managed Identity
+        "worker-managed-identity": "managed-identity",
+        # Storage
+        "storage-container-attachments": "storage-account",
+        "storage-rbac": "storage-account",
+        # Service Bus
+        "servicebus-namespace": "service-bus",
+        "servicebus-queue-board-events": "service-bus",
+        "servicebus-rbac": "service-bus",
+        # SignalR
+        "signalr-service": "signalr",
+        "signalr-connection-string-secret": "signalr",
+        # Redis
+        "redis-connection-string-secret": "redis-cache",
+        # Key Vault
+        "key-vault-rbac": "key-vault",
+        # Networking
+        "subnet-aca": "virtual-network",
+        "subnet-pe": "virtual-network",
+        "nsg-aca": "virtual-network",
+        "nsg-pe": "virtual-network",
+        "private-dns-zones": "dns-zones",
+        # RBAC suffixes
+        "api-keyvault-rbac": "key-vault",
+        "api-servicebus-rbac": "service-bus",
+        "api-storage-rbac": "storage-account",
+        "api-acr-rbac": "container-registry",
+        "worker-servicebus-rbac": "service-bus",
+        "worker-cosmos-rbac": "cosmos-db",
+        "worker-storage-rbac": "storage-account",
+        "worker-keyvault-rbac": "key-vault",
+        "worker-acr-rbac": "container-registry",
+        # Monitoring
+        "monitor-action-group": "action-groups",
+        "alert-dlq-depth": "action-groups",
+        "alert-api-latency": "action-groups",
+        "alert-async-job-latency": "action-groups",
+        "alert-error-rate": "action-groups",
+    }
+
+    def _resolve_service_file(self, service_name: str) -> str:
+        """Resolve a deployment plan service name to a knowledge file name.
+
+        1. Exact match (file exists)
+        2. Static mapping table
+        3. Strip common suffixes (-account, -rbac, -namespace, etc.)
+        """
+        # 1. Exact match
+        if (self._dir / "services" / f"{service_name}.md").exists():
+            return service_name
+
+        # 2. Static mapping
+        mapped = self._SERVICE_FILE_MAP.get(service_name)
+        if mapped:
+            return mapped
+
+        # 3. Strip suffixes and retry
+        for suffix in ("-account", "-rbac", "-namespace", "-database", "-service", "-workspace"):
+            stripped = service_name.removesuffix(suffix)
+            if stripped != service_name and (self._dir / "services" / f"{stripped}.md").exists():
+                return stripped
+
+        # 4. Try prefix match (e.g., "cosmos-container-audit-log" → "cosmos-db")
+        for key, val in self._SERVICE_FILE_MAP.items():
+            if service_name.startswith(key.split("-")[0] + "-"):
+                return val
+
+        return service_name  # fallback to original (will 404 gracefully)
 
     def _read_md(self, subdir: str, filename: str) -> str:
         """Read a markdown file, returning empty string on missing/error."""

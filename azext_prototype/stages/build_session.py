@@ -1719,11 +1719,10 @@ class BuildSession(SessionMixin):
                 include_constraints=True,
                 mode="poc",
             )
-            # Cap knowledge at ~12KB to keep generation prompts focused.
-            # The governance brief + condensed context already provide
-            # stage-specific guidance — knowledge adds general patterns.
-            if len(knowledge) > 12000:
-                knowledge = knowledge[:12000] + "\n\n[Knowledge truncated for prompt efficiency]"
+            # Cap knowledge at 64KB — service-specific knowledge files contain
+            # critical ARM schema guidance that prevents QA remediation failures.
+            if len(knowledge) > 65536:
+                knowledge = knowledge[:65536] + "\n\n[Knowledge truncated for prompt efficiency]"
             if knowledge:
                 agent.set_knowledge_override(knowledge)
         except Exception:
