@@ -1811,7 +1811,7 @@ class TestApplyStageKnowledge:
         mock_tf_agent.set_knowledge_override = MagicMock()
 
         stage = {"services": [{"name": "key-vault"}]}
-        large_knowledge = "x" * 15000  # > 12000 threshold
+        large_knowledge = "x" * 70000  # > 65536 threshold
 
         with patch("azext_prototype.stages.build_session.KnowledgeLoader", create=True) as MockLoader:
             mock_loader = MockLoader.return_value
@@ -1820,7 +1820,7 @@ class TestApplyStageKnowledge:
                 session._apply_stage_knowledge(mock_tf_agent, stage)
 
         call_arg = mock_tf_agent.set_knowledge_override.call_args[0][0]
-        assert len(call_arg) < 15000
+        assert len(call_arg) < 70000
         assert "truncated" in call_arg.lower()
 
     def test_apply_stage_knowledge_handles_import_error(self, build_context, build_registry, mock_tf_agent):
