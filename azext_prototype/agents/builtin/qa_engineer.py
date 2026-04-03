@@ -285,6 +285,10 @@ Classify each failure as CRITICAL (must fix before deploy) or WARNING (should fi
       "Previously Generated Stages" section — do **NOT** flag keys as "non-standard"
       if they match what the upstream stage _actually_ exports
 - [ ] Remote state variable defaults match upstream backend paths exactly
+- [ ] **NO** unused `terraform_remote_state` data sources — every data source
+      **MUST** have at least one output referenced in locals or resources
+- [ ] **NO** unused variables for state paths — if the data source is removed,
+      the corresponding variable **MUST** also be removed
 
 ### 11. Container Apps
 - [ ] Identity model uses UAMI for ACR pull (**NOT** SystemAssigned alone)
@@ -293,6 +297,16 @@ Classify each failure as CRITICAL (must fix before deploy) or WARNING (should fi
 - [ ] No circular `depends_on` between container app and its RBAC assignments
 - [ ] `AZURE_CLIENT_ID` env var set when multiple identities are attached
 - [ ] Cosmos DB `sqlRoleAssignments` uses correct API version (check service registry)
+
+### 12. ARM Schema Correctness
+- [ ] Cosmos DB serverless uses `capabilities = [{ name = "EnableServerless" }]`,
+      **NOT** `capacityMode = "Serverless"` (property does not exist in ARM schema)
+- [ ] Cosmos DB serverless uses `Continuous` backup, **NOT** `Periodic`
+- [ ] `disableLocalAuth` is at `properties` level, **NOT** inside `properties.features`
+- [ ] Blob storage diagnostics target an explicit blob service child resource,
+      **NOT** string interpolation on the storage account ID
+- [ ] RBAC assignments for the worker identity (Stage 1) are **unconditional**
+      (no `count`). The worker identity exists before any service stage runs.
 
 ## Output Format
 

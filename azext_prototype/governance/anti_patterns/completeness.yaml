@@ -144,3 +144,29 @@ patterns:
       Storage Blob Delegator role detected. This role only grants User Delegation
       Key access, NOT actual blob read/write. Use Storage Blob Data Contributor
       (ba92f5b4-2d11-453d-a403-e96b0029c9fe) for blob data access.
+
+  - id: ANTI-COMP-010
+    search_patterns:
+      - 'capacitymode = "serverless"'
+      - "capacitymode"
+    safe_patterns:
+      - "enableserverless"
+    correct_patterns:
+      - 'capabilities = [{ name = "EnableServerless" }]'
+    warning_message: >-
+      capacityMode property does NOT exist in the Cosmos DB ARM schema.
+      Use capabilities = [{ name = "EnableServerless" }] to enable serverless mode.
+
+  - id: ANTI-COMP-011
+    applies_to: ["terraform"]
+    search_patterns:
+      - "/blobservices/default"
+    safe_patterns:
+      - "azapi_resource"
+      - "blob_service"
+    correct_patterns:
+      - "parent_id = azapi_resource.blob_service.id"
+    warning_message: >-
+      Blob service diagnostic settings use string interpolation instead of an
+      explicit blob service child resource. Create an azapi_resource for
+      Microsoft.Storage/storageAccounts/blobServices and reference its .id.

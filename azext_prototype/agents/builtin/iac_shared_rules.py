@@ -52,6 +52,25 @@ When **ANY** service disables local/key auth, you **MUST** also:
 ## DIAGNOSTIC SETTINGS (MANDATORY)
 Every PaaS data service **MUST** have a diagnostic settings resource using `allLogs`
 category group and `AllMetrics`. NSGs and VNets are exceptions (see Networking rules).
+- Diagnostic settings on blob storage **MUST** target an explicit blob service child
+  resource (`Microsoft.Storage/storageAccounts/blobServices`), **NOT** string
+  interpolation like `"${storage.id}/blobServices/default"`.
+
+## CRITICAL: CROSS-STAGE DEPENDENCIES — NO DEAD CODE
+- **ONLY** declare `terraform_remote_state` or parameter inputs for stages whose
+  outputs you _actually reference_ in resource definitions or locals.
+- Do **NOT** declare remote state data sources "for completeness" or "in case needed."
+  Terraform validates state files at plan time — an unreferenced data source pointing
+  to a nonexistent state file causes plan failure.
+- Every `data.terraform_remote_state` block **MUST** have at least one output
+  referenced in `locals.tf` or `main.tf`. If it doesn't, _remove it_.
+
+## CRITICAL: RBAC ROLE ASSIGNMENTS — UNCONDITIONAL FOR KNOWN IDENTITIES
+- RBAC assignments for the _worker managed identity_ (from Stage 1) **MUST** be
+  unconditional (no `count`). The worker identity exists before any service stage runs.
+- RBAC assignments for identities created in _later stages_ (e.g., Container App
+  system identity) may use `count` conditional on a variable, but document that the
+  role must be applied _after_ the identity stage deploys.
 
 ## CRITICAL: deploy.sh STATE DIRECTORY
 deploy.sh **MUST** create the Terraform state directory before `terraform init`:
