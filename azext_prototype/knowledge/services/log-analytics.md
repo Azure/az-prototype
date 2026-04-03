@@ -380,6 +380,12 @@ async function queryLogs() {
 }
 ```
 
+## CRITICAL: ARM Property Placement
+- `disableLocalAuth` is a **top-level** property under `properties`, **NOT** inside `properties.features`
+- The ARM API _silently drops_ `disableLocalAuth` if nested inside `features`
+- CORRECT: `properties = { disableLocalAuth = false, features = { enableLogAccessUsingOnlyResourcePermissions = true } }`
+- WRONG: `properties = { features = { disableLocalAuth = false } }`
+
 ## Common Pitfalls
 
 | Pitfall | Impact | Prevention |

@@ -285,6 +285,13 @@ await client.set("key", "value", "EX", 3600);
 const value = await client.get("key");
 ```
 
+## CRITICAL: Entra Authentication and Access Keys
+- When Entra (AAD) authentication is enabled, access keys are **disabled** by the platform
+- Do **NOT** output or reference `accessKeys`, `primaryKey`, or connection strings when `aad-enabled = true`
+- Do **NOT** create Key Vault secrets containing Redis connection strings when Entra auth is enabled
+- Downstream applications **MUST** authenticate via `DefaultAzureCredential` using the worker identity's `accessPolicyAssignment`
+- Do **NOT** declare `terraform_remote_state` for Key Vault (Stage 6) unless this stage _actually writes_ a secret to it
+
 ## Common Pitfalls
 
 1. **Forgetting to enable AAD auth** -- `"aad-enabled" = "true"` in `redisConfiguration` is required for token-based authentication. Without it, only access key auth works.

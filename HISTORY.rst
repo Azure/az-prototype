@@ -251,6 +251,19 @@ Anti-pattern detection
 * **QA false positive fix** -- Section 10 (Output Consistency) no longer
   flags cross-stage output keys as "non-standard" when they match the
   actual exported names from upstream stages.
+* **Systemic QA fixes** -- added ``SHARED_IAC_RULES`` for cross-stage dead
+  code prohibition (no unused remote state refs), unconditional RBAC for
+  worker identity, blob service diagnostic parent rule.  QA Section 12
+  (ARM Schema Correctness) covers Cosmos serverless, ``disableLocalAuth``
+  nesting, blob diagnostics, unconditional RBAC.
+* **ANTI-COMP-010** -- detect ``capacityMode = "Serverless"`` (does not
+  exist in Cosmos DB ARM schema; use ``capabilities`` instead).
+* **ANTI-COMP-011** -- detect blob diagnostics using string interpolation
+  instead of explicit blob service child resource.
+* **Knowledge file coverage** -- created 44 new service knowledge files
+  covering every Azure policy domain.  Each file includes When to Use,
+  POC Defaults, Terraform (azapi) patterns, Bicep patterns, Common
+  Pitfalls, and Production Backlog sections.
 * **IaC tool scoping** -- anti-pattern checks now support ``applies_to``
   field (domain-level or pattern-level, never both in the same file).
   Bicep-structure checks only run on Bicep builds, Terraform-structure

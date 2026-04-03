@@ -361,6 +361,12 @@ async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
 }
 ```
 
+## CRITICAL: Blob Service Diagnostics
+- Diagnostic settings for blob storage **MUST** target the blob service child resource, **NOT** use string interpolation
+- CORRECT: `parent_id = azapi_resource.blob_service.id`
+- WRONG: `parent_id = "${azapi_resource.storage_account.id}/blobServices/default"` (bypasses Terraform dependency graph)
+- Create an explicit `azapi_resource` for `Microsoft.Storage/storageAccounts/blobServices` with name `"default"` and use its `.id` as the diagnostic settings parent
+
 ## Common Pitfalls
 - **Shared access keys still enabled**: Set `allowSharedKeyAccess = false` in `body.properties` (Terraform azapi) or `allowSharedKeyAccess: false` (Bicep). Without this, anyone with the storage key bypasses RBAC entirely.
 - **Public blob access**: Set `allowBlobPublicAccess = false` in `body.properties` (Terraform azapi) or `allowBlobPublicAccess: false` (Bicep) to prevent accidental anonymous access to containers.
