@@ -624,13 +624,42 @@ data "azapi_resource_action" "log_analytics_keys" {
 
 ## CRITICAL: KEDA Scaler Configuration
 
+- The `identity` field is a **sibling** of `type` and `metadata` on the custom scale rule.
+  It accepts a UAMI resource ID or `"system"` for system-assigned identity.
+- Do **NOT** put `clientId` in `metadata` — that is a raw KEDA concept **NOT** recognized
+  by the Container Apps ARM layer. It will be silently dropped.
 - Service Bus KEDA scalers **MUST** use the `namespace` short name (e.g., `"my-sb-namespace"`),
   **NOT** the FQDN (`"my-sb-namespace.servicebus.windows.net"`)
-- `secretRef` in KEDA auth blocks **MUST** reference a valid Container Apps secret name.
-  An empty `secretRef` causes ARM validation errors.
-- RBAC for KEDA (e.g., Service Bus Data Receiver) **MUST** be assigned to the Container
-  App's _system-assigned_ identity, not the worker UAMI, because KEDA uses the
-  system identity for scale trigger authentication.
+- Source: https://learn.microsoft.com/en-us/azure/container-apps/scale-app
+
+```hcl
+# CORRECT — identity is a sibling of type and metadata
+scale = {
+  minReplicas = 0
+  maxReplicas = 10
+  rules = [
+    {
+      name = "servicebus-rule"
+      custom = {
+        type = "azure-servicebus"
+        metadata = {
+          namespace    = local.servicebus_namespace_name  # short name, NOT FQDN
+          queueName    = local.servicebus_queue_name
+          messageCount = "5"
+        }
+        identity = local.worker_identity_id  # UAMI resource ID
+      }
+    }
+  ]
+}
+```
+
+## CRITICAL: ACR Image Reference
+
+- ACR login server **MUST** come from upstream stage output via `terraform_remote_state`,
+  **NOT** hardcoded (e.g., `"zdacrkanflowdevwus3.azurecr.io"` is **WRONG**)
+- Container image defaults should use a placeholder (`mcr.microsoft.com/k8se/quickstart:latest`)
+  that gets overridden at deploy time with the actual image from the private ACR
 
 ## CRITICAL: No Duplicate RBAC Assignments
 

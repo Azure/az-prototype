@@ -278,6 +278,17 @@ Anti-pattern detection
   only; no longer fires on Static Web Apps or other resources.
 * **Cosmos DB backup fix** -- serverless accounts should omit
   ``backupPolicy`` entirely; corrected knowledge file.
+* **Design notes stripping** -- anti-pattern scanner now strips
+  ``## Key Design Decisions`` sections before scanning, eliminating
+  all false positives from design notes that explain WHY choices were
+  made (e.g., mentioning ``InstrumentationKey`` or ``Blob Delegator``
+  in explanatory context).
+* **KEDA scaler fix** -- Container Apps knowledge file now documents
+  the definitive KEDA managed identity pattern: ``identity`` is a
+  **sibling** of ``type`` and ``metadata`` (not ``clientId`` in
+  metadata).  Sourced from Microsoft docs.
+* **ACR reference guidance** -- login server must come from upstream
+  stage output, not hardcoded.
 * **Knowledge file resolution fix** -- deployment plan service names
   (e.g., ``cosmos-account``, ``container-app-api``) now correctly
   resolve to knowledge files (``cosmos-db.md``, ``container-apps.md``)

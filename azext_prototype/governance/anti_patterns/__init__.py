@@ -150,7 +150,24 @@ def scan(text: str, iac_tool: str | None = None) -> list[str]:
     """
     checks = load()
     warnings: list[str] = []
-    lower = text.lower()
+
+    # Strip design notes — these explain WHY choices were made and contain
+    # terms (e.g., "InstrumentationKey", "Blob Delegator") that trigger
+    # false positives when scanned out of context.
+    _DESIGN_MARKERS = (
+        "## Key Design Decisions",
+        "## Design Notes",
+        "## Key Design Notes",
+        "## Design Decisions",
+    )
+    scan_text = text
+    for marker in _DESIGN_MARKERS:
+        idx = scan_text.find(marker)
+        if idx > 0:
+            scan_text = scan_text[:idx]
+            break
+
+    lower = scan_text.lower()
 
     for check in checks:
         # Skip checks scoped to a different IaC tool
