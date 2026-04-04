@@ -1735,7 +1735,7 @@ class TestAgentBuildContext:
             with session._agent_build_context(mock_tf_agent, stage):
                 pass
 
-            mock_gov.assert_called_once_with(mock_tf_agent, "Data", [{"name": "sql-server"}])
+            mock_gov.assert_called_once_with(mock_tf_agent, "Data", [{"name": "sql-server"}], "infra")
             mock_know.assert_called_once_with(mock_tf_agent, stage)
 
     def test_agent_build_context_restores_on_exception(self, build_context, build_registry, mock_tf_agent):
@@ -3252,7 +3252,8 @@ class TestGetAppScaffoldingRequirements:
         result = BuildSession._get_app_scaffolding_requirements(stage)
         assert "host.json" in result
 
-    def test_webapp_detected_by_resource_type(self):
+    def test_webapp_without_language_hint_gets_generic(self):
+        """Webapp resource type without a language hint falls back to generic."""
         from azext_prototype.stages.build_session import BuildSession
 
         stage = {
@@ -3260,17 +3261,20 @@ class TestGetAppScaffoldingRequirements:
             "services": [{"name": "api", "resource_type": "Microsoft.Web/sites"}],
         }
         result = BuildSession._get_app_scaffolding_requirements(stage)
-        assert "Dockerfile" in result
-        assert "appsettings.json" in result
+        assert "Required Project Files" in result
+        assert "Entry point" in result
 
-    def test_webapp_detected_by_name(self):
+    def test_webapp_with_framework_hint_detected(self):
+        """Webapp with a framework name in the service name returns framework-specific scaffolding."""
         from azext_prototype.stages.build_session import BuildSession
 
         stage = {
             "category": "app",
-            "services": [{"name": "container-app-api", "resource_type": ""}],
+            "services": [{"name": "api-fastapi", "resource_type": "Microsoft.App/containerApps"}],
         }
         result = BuildSession._get_app_scaffolding_requirements(stage)
+        assert "FastAPI" in result
+        assert "requirements.txt" in result
         assert "Dockerfile" in result
 
     def test_generic_app_fallback(self):
@@ -4126,7 +4130,7 @@ class TestBuildSessionRefactored:
             with session._agent_build_context(mock_tf_agent, stage):
                 pass
 
-        mock_gov.assert_called_once_with(mock_tf_agent, "Data Layer", [{"name": "cosmos-db"}])
+        mock_gov.assert_called_once_with(mock_tf_agent, "Data Layer", [{"name": "cosmos-db"}], "infra")
 
     def test_agent_build_context_calls_apply_stage_knowledge(self, build_context, build_registry, mock_tf_agent):
         """_apply_stage_knowledge should be called with agent and stage dict."""

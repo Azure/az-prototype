@@ -510,6 +510,10 @@ class BuildSession(SessionMixin):
                 continue
 
             with self._agent_build_context(agent, stage):
+                # Clear conversation history so prior stage context cannot
+                # bleed into this stage (especially after truncation/continuation).
+                self._context.conversation_history.clear()
+
                 _, task = self._build_stage_task(stage, focused_context, templates)
 
                 _dbg_flow(
@@ -526,7 +530,9 @@ class BuildSession(SessionMixin):
                 self._build_state.mark_stage_generating(stage_num)
                 try:
                     with self._maybe_spinner(f"Building Stage {stage_num}: {stage_name}...", use_styled):
-                        response = self._execute_with_retry(agent, task, stage_num, stage_name, _print)
+                        response = self._execute_with_retry(
+                            agent, task, stage_num, stage_name, _print, stage_category=category
+                        )
                     if response is None:
                         # All retry attempts exhausted — stop build
                         build_stopped = True
@@ -644,7 +650,12 @@ class BuildSession(SessionMixin):
                     try:
                         with self._maybe_spinner(f"Re-building Stage {stage_num}...", use_styled):
                             response = self._execute_with_retry(
-                                agent, task + fix_instructions, stage_num, stage_name, _print
+                                agent,
+                                task + fix_instructions,
+                                stage_num,
+                                stage_name,
+                                _print,
+                                stage_category=category,
                             )
                         if response is None:
                             build_stopped = True
@@ -1690,7 +1701,8 @@ class BuildSession(SessionMixin):
         standards (already covered by the governance brief).  On exit the
         knowledge override is cleared and standards are restored.
         """
-        self._apply_governor_brief(agent, stage.get("name", ""), stage.get("services", []))
+        category = stage.get("category", "infra")
+        self._apply_governor_brief(agent, stage.get("name", ""), stage.get("services", []), category)
         self._apply_stage_knowledge(agent, stage)
         saved_standards = agent._include_standards
         agent._include_standards = False
@@ -1705,17 +1717,23 @@ class BuildSession(SessionMixin):
 
         Composes knowledge for ONLY this stage's services + the IaC tool,
         keeping the prompt focused instead of loading the full 38KB generic
-        knowledge dump.
+        knowledge dump.  Docs stages skip knowledge loading entirely.
         """
+        category = stage.get("category", "infra")
+        # Docs stages don't need service knowledge — they reference prior stage outputs
+        if category == "docs":
+            return
+
         try:
             from azext_prototype.knowledge import KnowledgeLoader
 
             svc_names = [s.get("name", "") for s in stage.get("services", []) if s.get("name")]
+            is_iac = category in ("infra", "data", "integration")
             loader = KnowledgeLoader()
             knowledge = loader.compose_context(
                 services=svc_names,
-                tool=self._iac_tool,
-                role="infrastructure",
+                tool=self._iac_tool if is_iac else None,
+                role="infrastructure" if is_iac else "developer",
                 include_constraints=True,
                 mode="poc",
             )
@@ -1728,7 +1746,7 @@ class BuildSession(SessionMixin):
         except Exception:
             pass  # Never let knowledge errors block generation
 
-    def _apply_governor_brief(self, agent: Any, stage_name: str, services: list[dict]) -> None:
+    def _apply_governor_brief(self, agent: Any, stage_name: str, services: list[dict], category: str = "infra") -> None:
         """Set a governor policy brief on the agent before generation.
 
         Retrieves the most relevant policy rules for this stage's context
@@ -1739,7 +1757,12 @@ class BuildSession(SessionMixin):
             from azext_prototype.governance.governor import brief as governor_brief
 
             svc_names = [s.get("name", "") for s in services if s.get("name")]
-            task_desc = f"Generate {self._iac_tool} code for {stage_name}: {', '.join(svc_names)}"
+            if category in ("infra", "data", "integration"):
+                task_desc = f"Generate {self._iac_tool} code for {stage_name}: {', '.join(svc_names)}"
+            elif category == "app":
+                task_desc = f"Generate application code for {stage_name}: {', '.join(svc_names)}"
+            else:
+                task_desc = f"Generate documentation for {stage_name}: {', '.join(svc_names)}"
             policy_brief = governor_brief(
                 project_dir=self._context.project_dir,
                 task_description=task_desc,
@@ -1885,15 +1908,27 @@ class BuildSession(SessionMixin):
                             for k, v in s.config.items():
                                 template_context += f"    {k}: {v}\n"
 
+        is_iac = category in ("infra", "data", "integration")
+
         # Cross-references to previously generated stages (with output key names)
         prev_stages = self._build_state.get_generated_stages()
         prev_context = ""
         if prev_stages:
             prev_context = "\n## Previously Generated Stages\n"
-            prev_context += (
-                "Use terraform_remote_state (Terraform) or parameter inputs (Bicep) to "
-                "reference resources from these stages. NEVER hardcode their resource names.\n"
-            )
+            if is_iac:
+                prev_context += (
+                    "Use terraform_remote_state (Terraform) or parameter inputs (Bicep) to "
+                    "reference resources from these stages. NEVER hardcode their resource names.\n"
+                )
+            elif category == "app":
+                prev_context += (
+                    "These stages provide the infrastructure your application connects to.\n"
+                    "Reference their outputs via environment variables injected at deploy time "
+                    "(e.g. from Container App settings). Do NOT generate terraform_remote_state "
+                    "blocks or any IaC files.\n"
+                )
+            else:
+                prev_context += "Reference information for documentation purposes.\n"
             project_dir = Path(self._context.project_dir)
             for ps in prev_stages:
                 prev_svcs = ps.get("services", [])
@@ -1904,17 +1939,17 @@ class BuildSession(SessionMixin):
                 output_keys = self._extract_output_keys(ps, project_dir)
                 if output_keys:
                     prev_context += f"  Available outputs: {', '.join(output_keys)}\n"
-            prev_context += (
-                "\nCRITICAL: Only add terraform_remote_state blocks for stages listed above.\n"
-                "Do NOT reference any stage not listed in this section. If a stage is not\n"
-                "listed as an upstream dependency, do NOT create a remote state data source for it.\n"
-            )
+            if is_iac:
+                prev_context += (
+                    "\nCRITICAL: Only add terraform_remote_state blocks for stages listed above.\n"
+                    "Do NOT reference any stage not listed in this section. If a stage is not\n"
+                    "listed as an upstream dependency, do NOT create a remote state data source for it.\n"
+                )
 
         naming_instructions = self._naming.to_prompt_instructions()
         stage_dir = stage.get("dir", "concept")
 
         # Build the task prompt
-        is_iac = category in ("infra", "data", "integration")
         tool_label = f" {self._iac_tool}" if is_iac else ""
 
         task = (
@@ -1976,48 +2011,73 @@ class BuildSession(SessionMixin):
             if docs_context:
                 task += docs_context + "\n"
 
-        networking_note = self._get_networking_stage_note()
-        if networking_note:
-            task += networking_note + "\n"
+        if is_iac:
+            networking_note = self._get_networking_stage_note()
+            if networking_note:
+                task += networking_note + "\n"
 
         task += f"## Naming Convention\n{naming_instructions}\n\n"
 
-        task += (
-            "## Requirements\n"
-            "- Use managed identity (NO connection strings or access keys)\n"
-            "- Include proper resource tagging\n"
-            "- Follow the naming convention exactly\n"
-            "- Reference outputs from prior stages via terraform_remote_state (Terraform) or "
-            "parameters (Bicep) — NEVER hardcode resource names from other stages\n"
-            f"- All files should be relative to {stage_dir}/\n"
-            "- outputs.tf/outputs MUST export ALL resource names, IDs, endpoints, "
-            "and managed identity IDs needed by downstream stages\n"
-            "- If ANY service disables local/key auth, you MUST also create managed identity "
-            "+ RBAC role assignments in the SAME stage\n"
-            "- Do NOT output sensitive values (keys, connection strings) — "
-            "omit them entirely when local auth is disabled\n"
-            "- deploy.sh MUST be complete and syntactically valid — never truncate it\n"
-            "- CRITICAL: deploy.sh MUST include: set -euo pipefail, Azure login check, "
-            "error handling (trap), output export to JSON, AND argument parsing "
-            "(--dry-run, --destroy, --help flags), pre-flight validation of upstream "
-            "stage outputs, and post-deployment verification using az CLI commands. "
-            "Scripts under 100 lines WILL BE REJECTED as incomplete.\n"
-        )
+        task += "## Requirements\n"
+        if is_iac:
+            task += (
+                "- Use managed identity (NO connection strings or access keys)\n"
+                "- Include proper resource tagging\n"
+                "- Follow the naming convention exactly\n"
+                "- Reference outputs from prior stages via terraform_remote_state (Terraform) or "
+                "parameters (Bicep) — NEVER hardcode resource names from other stages\n"
+                f"- All files should be relative to {stage_dir}/\n"
+                "- outputs.tf/outputs MUST export ALL resource names, IDs, endpoints, "
+                "and managed identity IDs needed by downstream stages\n"
+                "- If ANY service disables local/key auth, you MUST also create managed identity "
+                "+ RBAC role assignments in the SAME stage\n"
+                "- Do NOT output sensitive values (keys, connection strings) — "
+                "omit them entirely when local auth is disabled\n"
+                "- deploy.sh MUST be complete and syntactically valid — never truncate it\n"
+                "- CRITICAL: deploy.sh MUST include: set -euo pipefail, Azure login check, "
+                "error handling (trap), output export to JSON, AND argument parsing "
+                "(--dry-run, --destroy, --help flags), pre-flight validation of upstream "
+                "stage outputs, and post-deployment verification using az CLI commands. "
+                "Scripts under 100 lines WILL BE REJECTED as incomplete.\n"
+            )
+        elif category == "app":
+            task += (
+                "- Use managed identity / DefaultAzureCredential (NO connection strings or access keys)\n"
+                "- Do NOT generate any IaC files (.tf, .bicep, .bicepparam, deploy.sh, outputs.tf)\n"
+                "- Do NOT generate terraform_remote_state blocks\n"
+                "- Reference infrastructure endpoints via environment variables\n"
+                f"- All files should be relative to {stage_dir}/\n"
+                "- Include a complete dependency manifest (requirements.txt, package.json, .csproj, etc.)\n"
+                "- Include a Dockerfile for containerized deployment (if applicable)\n"
+                "- Include .env.example listing all required environment variables\n"
+                "- No hardcoded secrets — use DefaultAzureCredential or Key Vault references\n"
+            )
+        elif category == "docs":
+            task += (
+                f"- All files should be relative to {stage_dir}/\n"
+                "- Generate EXACTLY two files: architecture.md and deployment-guide.md\n"
+                "- Do NOT generate any code files, scripts, IaC files, or other artifacts\n"
+                "- Use actual resource names and outputs from the previously generated stages\n"
+                "- No placeholder or TODO sections\n"
+            )
+        else:
+            task += f"- All files should be relative to {stage_dir}/\n"
 
-        # Scope discipline
-        task += (
-            "\n## CRITICAL: SCOPE BOUNDARY\n"
-            "Generate ONLY the resources listed in 'Services in This Stage' above.\n"
-            "Any resource not in that list and not required by a MANDATORY RESOURCE\n"
-            "POLICY companion requirement WILL BE REJECTED.\n"
-            "Do NOT add speculative subnets, firewall rules, patch schedules,\n"
-            "backup policies, alert rules, or resources 'for future use'.\n\n"
-        )
+        # Scope discipline — only relevant for IaC stages that create Azure resources
+        if is_iac:
+            task += (
+                "\n## CRITICAL: SCOPE BOUNDARY\n"
+                "Generate ONLY the resources listed in 'Services in This Stage' above.\n"
+                "Any resource not in that list and not required by a MANDATORY RESOURCE\n"
+                "POLICY companion requirement WILL BE REJECTED.\n"
+                "Do NOT add speculative subnets, firewall rules, patch schedules,\n"
+                "backup policies, alert rules, or resources 'for future use'.\n\n"
+            )
 
-        # Inject companion resource requirements (RBAC, identity, data sources)
-        companion_brief = self._resolve_companion_requirements(services)
-        if companion_brief:
-            task += "\n" + companion_brief + "\n"
+            # Inject companion resource requirements (RBAC, identity, data sources)
+            companion_brief = self._resolve_companion_requirements(services)
+            if companion_brief:
+                task += "\n" + companion_brief + "\n"
 
         # Terraform-specific file structure rules
         if is_iac and self._iac_tool == "terraform":
@@ -2058,19 +2118,45 @@ class BuildSession(SessionMixin):
                 "Generate code that complies with ALL listed rules.\n"
             )
 
+        task += "\n## Output Format\n"
         task += (
-            "\n## Output Format\n"
             "Wrap EACH generated file in a fenced code block whose label is "
             "the filename (not the language). Example:\n\n"
-            "```main.tf\n"
-            "# terraform code here\n"
-            "```\n\n"
-            "```variables.tf\n"
-            "# variables here\n"
-            "```\n\n"
-            "Use short filenames (main.tf, variables.tf, outputs.tf, etc.) — "
-            "do NOT include the directory path in the label.\n"
         )
+        if is_iac:
+            task += (
+                "```main.tf\n"
+                "# terraform code here\n"
+                "```\n\n"
+                "```variables.tf\n"
+                "# variables here\n"
+                "```\n\n"
+                "Use short filenames (main.tf, variables.tf, outputs.tf, etc.) — "
+                "do NOT include the directory path in the label.\n"
+            )
+        elif category == "app":
+            task += (
+                "```main.py\n"
+                "# application code here\n"
+                "```\n\n"
+                "```requirements.txt\n"
+                "# dependencies here\n"
+                "```\n\n"
+                "Use short filenames — do NOT include the directory path in the label.\n"
+                "Do NOT generate any .tf, .bicep, or deploy.sh files.\n"
+            )
+        elif category == "docs":
+            task += (
+                "```architecture.md\n"
+                "# architecture documentation here\n"
+                "```\n\n"
+                "```deployment-guide.md\n"
+                "# deployment guide here\n"
+                "```\n\n"
+                "Generate ONLY these two markdown files. No other files.\n"
+            )
+        else:
+            task += "Use short filenames — do NOT include the directory path in the label.\n"
 
         return agent, task
 
@@ -2081,67 +2167,146 @@ class BuildSession(SessionMixin):
         Examines the services in a stage and returns explicit instructions
         listing the project files that *must* be generated for a complete,
         compilable application.  Returns an empty string for non-app stages.
+
+        The language/framework is detected from service names and stage
+        directory — never hardcoded.
         """
         category = stage.get("category", "infra")
         if category not in ("app", "schema", "external"):
             return ""
 
         services = stage.get("services", [])
-        service_types = {s.get("resource_type", "").lower() for s in services}
         service_names = {s.get("name", "").lower() for s in services}
+        service_types = {s.get("resource_type", "").lower() for s in services}
+        stage_dir = stage.get("dir", "").lower()
 
-        # Detect Azure Functions (by resource type or name heuristic)
-        is_functions = any("function" in t for t in service_types) or any("function" in n for n in service_names)
+        # Detect language/framework from service names, types, and stage directory
+        framework = BuildSession._detect_framework(service_names, stage_dir, service_types)
 
-        # Detect web/container apps
-        is_webapp = any(
-            t for t in service_types if "containerapp" in t or "web/site" in t or "app-service" in t
-        ) or any(n for n in service_names if "container-app" in n or "web-app" in n or "app-service" in n)
+        header = (
+            "\n## Required Project Files\n"
+            "This stage MUST generate a complete, compilable project. "
+            "Include ALL of these files:\n"
+        )
+        footer = (
+            "\nEvery type referenced in the code must be defined in a generated file. "
+            "Do not generate service files that reference undefined classes.\n"
+            "Do NOT generate any IaC files (.tf, .bicep, .bicepparam) or deploy.sh.\n"
+        )
 
-        if is_functions:
-            return (
-                "\n## Required Project Files\n"
-                "This stage MUST generate a complete, compilable project. "
-                "Include ALL of these files:\n"
-                "- .csproj project file with all NuGet PackageReferences "
-                "(Microsoft.Azure.Functions.Worker, Microsoft.Azure.Functions.Worker.Sdk, etc.)\n"
-                "- Program.cs with HostBuilder, DI registration for all services/interfaces\n"
-                "- host.json (Azure Functions host configuration, version 2.0 with extensionBundle)\n"
-                "- local.settings.json (local development settings with FUNCTIONS_WORKER_RUNTIME "
-                "and all required config keys)\n"
-                "- All model/DTO classes referenced by function and service code "
-                "(e.g. Project.cs, User.cs, Draft.cs)\n\n"
-                "Every type referenced in the code must be defined in a generated file. "
-                "Do not generate service files that reference undefined classes.\n"
-                "Use the .NET isolated worker model (Microsoft.Azure.Functions.Worker), "
-                "NOT the in-process model.\n"
+        if framework:
+            return header + framework + footer
+
+        # Generic fallback — language-neutral
+        return (
+            header + "- Project/build file (e.g. .csproj, package.json, requirements.txt)\n"
+            "- Entry point (e.g. Program.cs, main.py, index.ts)\n"
+            "- Dependency manifest with all required packages\n"
+            "- All model/DTO classes referenced by service code\n" + footer
+        )
+
+    @staticmethod
+    def _detect_framework(service_names: set[str], stage_dir: str, service_types: set[str] | None = None) -> str:
+        """Detect language/framework from service names, types, and stage directory.
+
+        Returns framework-specific file requirements or empty string if
+        no framework can be detected.  Never defaults to any language.
+        """
+        # Combine all hints for keyword matching
+        hints = " ".join(service_names) + " " + stage_dir
+        if service_types:
+            hints += " " + " ".join(service_types)
+
+        # Python frameworks
+        if any(kw in hints for kw in ("fastapi", "flask", "django", "python")):
+            framework_name = (
+                "FastAPI"
+                if "fastapi" in hints
+                else ("Flask" if "flask" in hints else ("Django" if "django" in hints else "Python"))
             )
-        elif is_webapp:
             return (
-                "\n## Required Project Files\n"
-                "This stage MUST generate a complete, compilable project. "
-                "Include ALL of these files:\n"
+                f"This is a {framework_name} application. Generate Python files.\n"
+                "- requirements.txt with all pip dependencies\n"
+                "- main.py (application entry point)\n"
+                "- Dockerfile for containerized deployment\n"
+                "- .env.example listing all required environment variables\n"
+                "- All model/service/router modules referenced by the application\n"
+            )
+
+        # Node.js / TypeScript frontend frameworks
+        if any(kw in hints for kw in ("react", "vue", "angular", "next", "nuxt", "svelte", "spa")):
+            framework_name = next(
+                (fw for fw in ("React", "Vue", "Angular", "Next.js", "Nuxt", "Svelte") if fw.lower() in hints),
+                "SPA",
+            )
+            return (
+                f"This is a {framework_name} application. Generate TypeScript/JavaScript files.\n"
+                "- package.json with all dependencies\n"
+                "- tsconfig.json (if TypeScript)\n"
+                "- Application source files (components, pages, etc.)\n"
+                "- Build configuration (vite.config.ts, next.config.js, etc.)\n"
+                "- staticwebapp.config.json (if Azure Static Web Apps)\n"
+            )
+
+        # Node.js / TypeScript backend frameworks
+        if any(kw in hints for kw in ("express", "nest", "node", "koa", "hono")):
+            framework_name = next(
+                (fw for fw in ("Express", "NestJS", "Koa", "Hono") if fw.lower() in hints),
+                "Node.js",
+            )
+            return (
+                f"This is a {framework_name} application. Generate TypeScript/JavaScript files.\n"
+                "- package.json with all dependencies\n"
+                "- tsconfig.json\n"
+                "- Dockerfile for containerized deployment\n"
+                "- Application entry point and service modules\n"
+                "- .env.example listing all required environment variables\n"
+            )
+
+        # .NET / C#
+        if any(kw in hints for kw in ("dotnet", "csharp", "aspnet", "blazor", "function")):
+            is_functions = "function" in hints
+            if is_functions:
+                return (
+                    "This is an Azure Functions (.NET) application. Generate C# files.\n"
+                    "- .csproj project file with all NuGet PackageReferences\n"
+                    "- Program.cs with HostBuilder, DI registration\n"
+                    "- host.json (Azure Functions host configuration)\n"
+                    "- local.settings.json with FUNCTIONS_WORKER_RUNTIME\n"
+                    "- All model/DTO classes referenced by function code\n"
+                    "Use the .NET isolated worker model.\n"
+                )
+            return (
+                "This is a .NET application. Generate C# files.\n"
                 "- .csproj project file with all NuGet PackageReferences\n"
                 "- Program.cs with full DI registration for all services\n"
                 "- appsettings.json with all configuration keys\n"
                 "- Dockerfile for containerized deployment\n"
-                "- All model/DTO classes referenced by controllers/services "
-                "(e.g. Project.cs, User.cs)\n\n"
-                "Every type referenced in the code must be defined in a generated file. "
-                "Do not generate service files that reference undefined classes.\n"
+                "- All model/DTO classes referenced by controllers/services\n"
             )
-        else:
+
+        # Go
+        if any(kw in hints for kw in ("golang", "go-", "-go")):
             return (
-                "\n## Required Project Files\n"
-                "This stage MUST generate a complete, compilable project. "
-                "Include ALL of these files:\n"
-                "- Project/build file (e.g. .csproj, package.json, requirements.txt)\n"
-                "- Entry point (e.g. Program.cs, main.py, index.ts)\n"
-                "- Dependency manifest with all required packages\n"
-                "- All model/DTO classes referenced by service code\n\n"
-                "Every type referenced in the code must be defined in a generated file. "
-                "Do not generate service files that reference undefined classes.\n"
+                "This is a Go application. Generate Go files.\n"
+                "- go.mod with all dependencies\n"
+                "- main.go (application entry point)\n"
+                "- Dockerfile for containerized deployment\n"
+                "- All handler/service/model packages referenced by the application\n"
             )
+
+        # Java / Kotlin
+        if any(kw in hints for kw in ("java", "spring", "kotlin", "quarkus")):
+            return (
+                "This is a Java/Spring application. Generate Java files.\n"
+                "- pom.xml or build.gradle with all dependencies\n"
+                "- Application entry point class\n"
+                "- application.yml/application.properties configuration\n"
+                "- Dockerfile for containerized deployment\n"
+                "- All model/service/controller classes referenced by the application\n"
+            )
+
+        return ""
 
     # Files that should never be written for each IaC tool.
     # The AI occasionally generates these despite prompt instructions.
@@ -2149,23 +2314,22 @@ class BuildSession(SessionMixin):
         "terraform": {"versions.tf"},
     }
 
-    # Files that app/docs stages should NEVER generate (defense in depth)
-    _APP_DOCS_BLOCKED_FILES: set[str] = {
-        "deploy.sh",
-        "providers.tf",
-        "variables.tf",
-        "outputs.tf",
-        "locals.tf",
-        "main.tf",
-        "main.bicep",
-        "main.bicepparam",
-    }
+    # Docs stages produce ONLY these files — everything else is dropped
+    _DOCS_ALLOWED_FILES: set[str] = {"architecture.md", "deployment-guide.md"}
+
+    # IaC file extensions/names blocked in app stages
+    _APP_BLOCKED_EXTENSIONS: tuple[str, ...] = (".tf", ".bicep", ".bicepparam")
+    _APP_BLOCKED_FILES: set[str] = {"deploy.sh"}
 
     def _write_stage_files(self, stage: dict, content: str) -> list[str]:
         """Extract file blocks from AI response and write to disk.
 
-        Filters out blocked filenames (e.g. ``versions.tf`` for Terraform,
-        ``deploy.sh`` for app/docs stages) before writing.
+        Filtering strategy by category:
+        - **docs**: allowlist — only ``architecture.md`` and
+          ``deployment-guide.md`` are written.
+        - **app**: block IaC files (``*.tf``, ``*.bicep``, ``deploy.sh``).
+        - **infra/data/integration**: block tool-specific files (e.g.
+          ``versions.tf``).
 
         Returns a list of written file paths relative to the project dir.
         """
@@ -2181,10 +2345,6 @@ class BuildSession(SessionMixin):
         output_dir = Path(self._context.project_dir) / stage_dir
         blocked = self._BLOCKED_FILES.get(self._iac_tool, set())
 
-        # App and docs stages must not write IaC or deployment scripts
-        if category in ("app", "docs"):
-            blocked = blocked | self._APP_DOCS_BLOCKED_FILES
-
         # Strip stage_dir prefix from filenames to avoid path duplication.
         # The AI sometimes includes the full output path in the code block
         # label (e.g. "concept/infra/terraform/stage-1/main.tf") even though
@@ -2199,8 +2359,24 @@ class BuildSession(SessionMixin):
                 normalized = normalized[len(stage_prefix) :]
             normalized = normalized or filename
 
-            # Drop blocked files (e.g. versions.tf)
-            if normalized in blocked:
+            # Docs stages: allowlist — only exact markdown files
+            if category == "docs":
+                basename = Path(normalized).name
+                if basename not in self._DOCS_ALLOWED_FILES:
+                    logger.info("Dropped non-docs file: %s (docs allowlist)", normalized)
+                    continue
+
+            # App stages: block all IaC files
+            elif category == "app":
+                if any(normalized.endswith(ext) for ext in self._APP_BLOCKED_EXTENSIONS):
+                    logger.info("Dropped IaC file from app stage: %s", normalized)
+                    continue
+                if Path(normalized).name in self._APP_BLOCKED_FILES:
+                    logger.info("Dropped blocked file from app stage: %s", normalized)
+                    continue
+
+            # IaC stages: drop tool-specific blocked files (e.g. versions.tf)
+            elif normalized in blocked:
                 logger.info("Dropped blocked file: %s (IaC tool: %s)", normalized, self._iac_tool)
                 continue
 
@@ -2414,29 +2590,32 @@ class BuildSession(SessionMixin):
     # QA task construction
     # ------------------------------------------------------------------ #
 
-    def _build_qa_context(self, services: list[dict]) -> str:
+    def _build_qa_context(self, services: list[dict], category: str = "infra") -> str:
         """Build context briefs (provider rules, policies, API versions) for QA."""
+        is_iac = category in ("infra", "data", "integration")
         parts: list[str] = []
-        if self._iac_tool == "terraform":
-            parts.append(
-                "## Provider Compliance (Terraform)\n"
-                "ALL resources MUST use `azapi_resource` with ARM resource types.\n"
-                "NEVER suggest `azurerm_*` resources (azurerm_role_assignment, "
-                "azurerm_key_vault, etc.). Use `azapi_resource` with the correct "
-                "Microsoft.Authorization/roleAssignments type instead.\n"
-            )
-        networking_note = self._get_networking_stage_note()
-        if networking_note:
-            parts.append(networking_note)
-        service_policies = self._resolve_service_policies(services)
-        if service_policies:
-            parts.append(service_policies)
-        api_brief = self._resolve_api_versions(services)
-        if api_brief:
-            parts.append(api_brief)
-        companion_brief = self._resolve_companion_requirements(services)
-        if companion_brief:
-            parts.append(companion_brief)
+        # IaC-specific context — skip for app/docs stages
+        if is_iac:
+            if self._iac_tool == "terraform":
+                parts.append(
+                    "## Provider Compliance (Terraform)\n"
+                    "ALL resources MUST use `azapi_resource` with ARM resource types.\n"
+                    "NEVER suggest `azurerm_*` resources (azurerm_role_assignment, "
+                    "azurerm_key_vault, etc.). Use `azapi_resource` with the correct "
+                    "Microsoft.Authorization/roleAssignments type instead.\n"
+                )
+            networking_note = self._get_networking_stage_note()
+            if networking_note:
+                parts.append(networking_note)
+            service_policies = self._resolve_service_policies(services)
+            if service_policies:
+                parts.append(service_policies)
+            api_brief = self._resolve_api_versions(services)
+            if api_brief:
+                parts.append(api_brief)
+            companion_brief = self._resolve_companion_requirements(services)
+            if companion_brief:
+                parts.append(companion_brief)
         return "\n".join(parts)
 
     @staticmethod
@@ -2590,7 +2769,14 @@ class BuildSession(SessionMixin):
         return ""
 
     @staticmethod
-    def _build_qa_task(stage_num: int, stage_name: str, attempt: int, file_content: str, context: str) -> str:
+    def _build_qa_task(
+        stage_num: int,
+        stage_name: str,
+        attempt: int,
+        file_content: str,
+        context: str,
+        category: str = "infra",
+    ) -> str:
         """Build the QA task prompt for a given review attempt."""
         if attempt == 0:
             header = (
@@ -2605,6 +2791,24 @@ class BuildSession(SessionMixin):
                 f"Re-review the REMEDIATED code for Stage {stage_num}: {stage_name}. "
                 "Report ONLY remaining issues that were NOT fixed.\n\n"
             )
+
+        # Inject category-specific QA guidance
+        if category == "app":
+            header += (
+                "Stage category: **app** — Apply checklist section 13 (Application Code).\n"
+                "This stage must NOT contain deploy.sh, .tf files, .bicep files, "
+                "or other IaC artifacts. Focus on application code quality, "
+                "dependency completeness, and security (no hardcoded secrets).\n\n"
+            )
+        elif category == "docs":
+            header += (
+                "Stage category: **docs** — Apply checklist section 14 (Documentation).\n"
+                "This stage must contain ONLY markdown documentation files "
+                "(architecture.md and deployment-guide.md). No code files, "
+                "scripts, or IaC artifacts.\n\n"
+            )
+        else:
+            header += f"Stage category: **{category}** — Apply checklist sections 1-12 " "(infrastructure checks).\n\n"
 
         task = header
         if context:
@@ -2729,7 +2933,8 @@ class BuildSession(SessionMixin):
 
         # Build context briefs once for all QA attempts
         services = stage.get("services", [])
-        qa_context = self._build_qa_context(services)
+        category = stage.get("category", "infra")
+        qa_context = self._build_qa_context(services, category)
 
         for attempt in range(_MAX_STAGE_REMEDIATION_ATTEMPTS + 1):
             # 1. Collect this stage's files
@@ -2738,7 +2943,7 @@ class BuildSession(SessionMixin):
                 return True  # No files to validate = pass
 
             # 2. Build QA task
-            qa_task = self._build_qa_task(stage_num, stage["name"], attempt, file_content, qa_context)
+            qa_task = self._build_qa_task(stage_num, stage["name"], attempt, file_content, qa_context, category)
 
             # 3. Run QA (with timeout/rate-limit retry)
             from azext_prototype.ai.copilot_provider import (
@@ -2843,7 +3048,14 @@ class BuildSession(SessionMixin):
                 )
 
                 with self._maybe_spinner(f"Remediating Stage {stage_num} (attempt {attempt + 1})...", use_styled):
-                    response = self._execute_with_retry(agent, task, stage_num, stage["name"], _print)
+                    response = self._execute_with_retry(
+                        agent,
+                        task,
+                        stage_num,
+                        stage["name"],
+                        _print,
+                        stage_category=stage.get("category", "infra"),
+                    )
 
             if response:
                 self._token_tracker.record(response)
@@ -2956,6 +3168,7 @@ class BuildSession(SessionMixin):
         stage_num: int,
         stage_name: str,
         _print: Callable,
+        stage_category: str = "",
     ) -> Any | None:
         """Execute agent with timeout retry and exponential backoff.
 
@@ -2972,7 +3185,9 @@ class BuildSession(SessionMixin):
 
         for attempt in range(max_attempts):
             try:
-                return self._execute_with_continuation(agent, task)
+                return self._execute_with_continuation(
+                    agent, task, stage_num=stage_num, stage_name=stage_name, stage_category=stage_category
+                )
             except CopilotRateLimitError as exc:
                 wait = exc.retry_after or self._TIMEOUT_BACKOFFS[min(attempt, len(self._TIMEOUT_BACKOFFS) - 1)]
                 _print(f"       API rate limited. Waiting {wait}s...")
@@ -2992,7 +3207,15 @@ class BuildSession(SessionMixin):
     # Truncation recovery
     # ------------------------------------------------------------------ #
 
-    def _execute_with_continuation(self, agent: Any, task: str, max_continuations: int = 3) -> Any:
+    def _execute_with_continuation(
+        self,
+        agent: Any,
+        task: str,
+        max_continuations: int = 3,
+        stage_num: int = 0,
+        stage_name: str = "",
+        stage_category: str = "",
+    ) -> Any:
         """Execute an agent task, automatically continuing if truncated.
 
         When the API returns ``finish_reason="length"`` (token limit hit),
@@ -3018,11 +3241,21 @@ class BuildSession(SessionMixin):
             # model sees what it already generated when continuing.
             self._context.conversation_history.append(AIMessage(role="assistant", content=response.content or ""))
 
+            # Include stage context so the model stays on track
+            stage_hint = ""
+            if stage_num and stage_name:
+                stage_hint = (
+                    f" You are generating Stage {stage_num}: {stage_name} "
+                    f"(category: {stage_category}). "
+                    "Stay within this stage's scope — do not generate content "
+                    "for any other stage."
+                )
+
             cont_task = (
                 "Your previous response was cut off mid-generation. "
                 "Continue EXACTLY where you left off — do not repeat any "
                 "file or content already generated. Pick up mid-line if "
-                "necessary. Maintain the same code block format."
+                f"necessary. Maintain the same code block format.{stage_hint}"
             )
             self._context.conversation_history.append(AIMessage(role="user", content=cont_task))
 

@@ -6,6 +6,43 @@ Release History
 0.2.1b6
 +++++++
 
+Build — category-aware stage generation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Clear conversation history between stages** — conversation history is
+  now reset before each stage generation, preventing truncated content from
+  prior stages bleeding into subsequent stages (e.g. Stage 18 Worker code
+  appearing in Stage 19 Documentation output).
+* **Category-aware prompt construction** — Requirements, Previously
+  Generated Stages, Output Format, and Scope Boundary sections are now
+  tailored to the stage category (infra/app/docs).  App stages no longer
+  receive ``terraform_remote_state``, ``deploy.sh``, or ``outputs.tf``
+  instructions.  Docs stages are told to generate exactly
+  ``architecture.md`` and ``deployment-guide.md``.
+* **Category-aware governor brief** — the governor policy query now uses
+  category-appropriate task descriptions (``"Generate application code"``
+  for app stages, ``"Generate documentation"`` for docs) instead of always
+  including the IaC tool name.
+* **Category-aware QA context** — Terraform provider compliance rules,
+  service policies, API versions, and companion requirements are only
+  injected into QA context for IaC stages.  QA task prompts now include
+  the stage category so QA can apply the correct checklist sections
+  (section 13 for app, section 14 for docs).
+* **Category-aware knowledge loading** — docs stages skip knowledge
+  loading entirely.  App stages load knowledge with ``role="developer"``
+  and ``tool=None`` instead of always using the IaC tool and
+  ``role="infrastructure"``.
+* **Framework-aware app scaffolding** — ``_get_app_scaffolding_requirements``
+  now detects the language/framework from service names and stage directory
+  (e.g. ``api-fastapi`` → Python, ``spa-react`` → TypeScript) instead of
+  hardcoding C#/.NET.  No language is assumed by default.
+* **Stage-aware continuation prompt** — when a response is truncated
+  (``finish_reason=length``), the continuation prompt now includes stage
+  number, name, and category to keep the model on track.
+* **IaC file filtering for app/docs stages** — docs stages use an
+  allowlist (only ``architecture.md`` and ``deployment-guide.md``).
+  App stages block all IaC files (``*.tf``, ``*.bicep``, ``*.bicepparam``,
+  ``deploy.sh``) instead of an incomplete filename blocklist.
+
 Build resilience
 ~~~~~~~~~~~~~~~~~
 * **Per-stage advisory with dedicated advisor agent** -- advisory notes
