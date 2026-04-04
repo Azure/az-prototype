@@ -167,6 +167,11 @@ class KnowledgeLoader:
             content = self.load_tool(tool)
             if content:
                 sections.append((f"TOOL PATTERNS: {tool}", content))
+            # Load azapi provider knowledge alongside terraform
+            if tool == "terraform":
+                azapi = self.load_tool("azapi-provider")
+                if azapi:
+                    sections.append(("TOOL PATTERNS: azapi-provider", azapi))
 
         if language:
             content = self.load_language(language)

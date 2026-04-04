@@ -6,6 +6,15 @@ Release History
 0.2.1b6
 +++++++
 
+Knowledge — azapi provider
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **azapi-provider.md** — new knowledge file documenting the azapi provider
+  configuration pattern: empty ``provider "azapi" {}`` block (subscription
+  from CLI context), ``deploy.sh`` must run ``az account set`` and
+  ``export ARM_SUBSCRIPTION_ID`` before ``terraform init``, and
+  ``var.subscription_id`` is for ARM resource ID construction only.
+  Loaded automatically alongside ``terraform`` tool knowledge.
+
 Build — category-aware stage generation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * **Clear conversation history between stages** — conversation history is
