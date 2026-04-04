@@ -2318,7 +2318,7 @@ class BuildSession(SessionMixin):
     _DOCS_ALLOWED_FILES: set[str] = {"architecture.md", "deployment-guide.md"}
 
     # IaC file extensions/names blocked in app stages
-    _APP_BLOCKED_EXTENSIONS: tuple[str, ...] = (".tf", ".bicep", ".bicepparam")
+    _APP_BLOCKED_EXTENSIONS: tuple[str, ...] = (".tf", ".tfvars", ".bicep", ".bicepparam")
     _APP_BLOCKED_FILES: set[str] = {"deploy.sh"}
 
     def _write_stage_files(self, stage: dict, content: str) -> list[str]:
