@@ -11,7 +11,7 @@ infrastructure/terraform/
 │   │   ├── main.tf
 │   │   ├── variables.tf
 │   │   ├── outputs.tf
-│   │   └── private-endpoint.tf    # if applicable
+│   │   └── (NO private-endpoint.tf — PEs belong in Networking stage)
 │   └── ...
 ├── environments/
 │   ├── dev/
@@ -142,29 +142,18 @@ variable "tags" {
   default     = {}
 }
 
-# Private Endpoint Variables (include if service supports private endpoints)
-variable "enable_private_endpoint" {
-  description = "Enable private endpoint for the resource"
-  type        = bool
-  default     = true
-}
-
-variable "subnet_id" {
-  description = "Subnet ID for private endpoint"
-  type        = string
-  default     = null
-}
-
-variable "private_dns_zone_id" {
-  description = "Private DNS zone ID for private endpoint"
-  type        = string
-  default     = null
-}
+# NOTE: Do NOT include private endpoint variables or resources in service stages.
+# Private endpoints are created ONLY in the dedicated Networking stage.
+# Service stages should only set publicNetworkAccess = "Disabled" on their resources.
 ```
 
-## Private Endpoint Pattern
+## Private Endpoint Pattern (NETWORKING STAGE ONLY)
 
-### private-endpoint.tf
+**This pattern is used ONLY by the Networking stage.** Do NOT include private endpoint
+resources, DNS zone groups, or PE-related variables in any other stage. The Networking
+stage creates all private endpoints for all services in the deployment plan.
+
+### private-endpoint.tf (Networking stage only)
 
 ```hcl
 resource "azurerm_private_endpoint" "this" {
@@ -244,9 +233,8 @@ module "<service>" {
   location            = azurerm_resource_group.main.location
   name                = "<service>-${var.project_name}-${var.environment}"
 
-  enable_private_endpoint = true
-  subnet_id               = module.networking.data_subnet_id
-  private_dns_zone_id     = module.dns.<service>_zone_id
+  # NOTE: Private endpoints are NOT configured here.
+  # The Networking stage creates all PEs centrally.
 
   tags = local.common_tags
 }
@@ -406,7 +394,7 @@ moved {
 All Terraform configurations MUST:
 
 - [ ] Disable public network access where supported
-- [ ] Enable private endpoints for data services
+- [ ] Set `publicNetworkAccess = "Disabled"` (private endpoints are created by the Networking stage)
 - [ ] Use Managed Identity for authentication (avoid keys/secrets)
 - [ ] Enable TLS 1.2+ minimum
 - [ ] Enable diagnostic logging
@@ -434,7 +422,7 @@ Refer to `service-registry.yaml` for per-service details:
 ## Critical Reminders
 
 1. **Direct execution** -- This extension runs `terraform apply` directly. Always validate with `terraform plan` first.
-2. **Always include private endpoint** -- Use the pattern above for any service that supports it.
+2. **Do NOT create private endpoints** -- The dedicated Networking stage creates all PEs and DNS zone groups. Your stage should only set `publicNetworkAccess = "Disabled"` on resources.
 3. **Use variables** -- No hardcoded values in main.tf.
 4. **Export outputs** -- Other modules depend on these values.
 5. **Follow naming conventions** -- Use project/environment prefix from the naming strategy.

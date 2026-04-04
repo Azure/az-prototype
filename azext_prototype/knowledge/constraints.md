@@ -62,7 +62,16 @@ Use Key Vault references in App Service and Container Apps configuration instead
 
 All data and backend services should use private endpoints to eliminate public internet exposure for the data plane.
 
-Unless told otherwise by the user (via discovery directives or custom policies), all environments — including POC — should disable public network access and use private endpoints. A dedicated Networking stage (Stage 2) handles VNet, subnets, private DNS zones, and private endpoints for all services.
+Unless told otherwise by the user (via discovery directives or custom policies), all environments — including POC — should disable public network access and use private endpoints.
+
+**CRITICAL — ARCHITECTURE BOUNDARY: A dedicated Networking stage creates ALL private endpoints, private DNS zones, DNS zone links, and DNS zone groups for the entire deployment.** Non-networking stages MUST NOT create these resources. Instead, non-networking stages should:
+
+- Set `publicNetworkAccess = "Disabled"` on their resources
+- Do NOT create `azapi_resource` blocks for private endpoints or DNS zone groups
+- Do NOT reference the networking stage via `terraform_remote_state` for PE subnet/DNS IDs
+- Do NOT include `private-endpoint.tf` or PE-related variables (`subnet_id`, `private_dns_zone_id`, `enable_private_endpoint`)
+
+The networking stage discovers which services need private endpoints from the deployment plan and creates all PE + DNS resources in one place. Service-specific knowledge files may show PE patterns for reference, but those patterns belong ONLY in the networking stage.
 
 ### 2.2 VNET Integration
 
@@ -94,6 +103,35 @@ The following resources legitimately require public IP addresses or public ingre
 | Container Apps (external ingress) | When no APIM gateway is present (POC only) |
 
 All other services should be internal-only.
+
+### 2.5 ARM Property Placement — `disableLocalAuth`
+
+Many Azure services support `disableLocalAuth` to enforce Entra-only authentication. This property MUST be placed directly under `properties`, NEVER nested inside `properties.features`:
+
+```hcl
+# CORRECT — disableLocalAuth at properties root
+body = {
+  properties = {
+    disableLocalAuth = true
+    features = {
+      enableLogAccessUsingOnlyResourcePermissions = true
+    }
+  }
+}
+```
+
+```hcl
+# WRONG — ARM silently drops disableLocalAuth when nested under features
+body = {
+  properties = {
+    features = {
+      disableLocalAuth = true    # SILENTLY IGNORED — local auth stays enabled
+    }
+  }
+}
+```
+
+This applies to: Log Analytics, Service Bus, Event Hubs, Azure OpenAI, Cognitive Services, Container Registry, and any other service with `disableLocalAuth`.
 
 ---
 

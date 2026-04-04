@@ -6,6 +6,20 @@ Release History
 0.2.1b6
 +++++++
 
+Knowledge — networking boundary and ARM schema
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Private endpoint architecture boundary** — ``constraints.md`` now
+  explicitly forbids creating private endpoint or DNS zone group resources
+  outside the dedicated Networking stage.  ``terraform.md`` updated: PE
+  variables removed from service module template, PE pattern marked
+  "Networking stage only", security checklist changed from "Enable private
+  endpoints" to "Set publicNetworkAccess Disabled", and "Always include
+  private endpoint" replaced with "Do NOT create private endpoints".
+* **``disableLocalAuth`` ARM property placement** — ``constraints.md`` now
+  documents that ``disableLocalAuth`` must be a top-level property under
+  ``properties``, never nested inside ``properties.features``.  ARM
+  silently drops the property at the wrong nesting level.
+
 Knowledge — azapi provider
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * **azapi-provider.md** — new knowledge file documenting the azapi provider
