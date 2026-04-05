@@ -416,19 +416,34 @@ def _generate_sidebar(
     lines.append("**Governance**")
     lines.append("")
 
-    # Policies — outer collapsible with nested category collapsibles
-    lines.append("<details><summary>Policies</summary>")
+    # Split policies into Azure vs non-Azure groups
+    azure_policies = {k: v for k, v in sorted(policy_pages.items()) if k.startswith("Azure")}
+    other_policies = {k: v for k, v in sorted(policy_pages.items()) if not k.startswith("Azure")}
+
+    # Policies — Azure: single collapsible with bold category headers inside
+    lines.append("<details><summary>Policies — Azure</summary>")
     lines.append("")
-    for section_title, pages in sorted(policy_pages.items()):
-        lines.append(f"<details><summary>{section_title}</summary>")
-        lines.append("")
+    for section_title, pages in sorted(azure_policies.items()):
+        # Strip "Azure " prefix for cleaner headers
+        short_title = section_title.removeprefix("Azure ")
+        lines.append(f"**{short_title}**")
         for display, filename in pages:
             lines.append(f"- [{display}]({filename})")
         lines.append("")
-        lines.append("</details>")
-        lines.append("")
     lines.append("</details>")
     lines.append("")
+
+    # Policies — Well-Architected & Cross-Cutting
+    if other_policies:
+        lines.append("<details><summary>Policies — Well-Architected</summary>")
+        lines.append("")
+        for section_title, pages in sorted(other_policies.items()):
+            lines.append(f"**{section_title}**")
+            for display, filename in pages:
+                lines.append(f"- [{display}]({filename})")
+            lines.append("")
+        lines.append("</details>")
+        lines.append("")
 
     # Anti-patterns — single collapsible
     lines.append("<details><summary>Anti-Patterns</summary>")
@@ -439,16 +454,13 @@ def _generate_sidebar(
     lines.append("</details>")
     lines.append("")
 
-    # Standards — outer collapsible with nested section collapsibles
+    # Standards — single collapsible with bold section headers inside
     lines.append("<details><summary>Standards</summary>")
     lines.append("")
     for section_title, pages in sorted(std_pages.items()):
-        lines.append(f"<details><summary>{section_title}</summary>")
-        lines.append("")
+        lines.append(f"**{section_title}**")
         for display, filename in pages:
             lines.append(f"- [{display}]({filename})")
-        lines.append("")
-        lines.append("</details>")
         lines.append("")
     lines.append("</details>")
     lines.append("")
