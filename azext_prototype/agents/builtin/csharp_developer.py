@@ -11,6 +11,8 @@ from azext_prototype.agents.base import (
 from azext_prototype.ai.provider import AIMessage, AIResponse
 
 logger = logging.getLogger(__name__)
+
+
 class CSharpDeveloperAgent(BaseAgent):
     """C#/.NET application code generation.
 
@@ -50,7 +52,6 @@ class CSharpDeveloperAgent(BaseAgent):
             description="C#/.NET application code generation",
             capabilities=[
                 AgentCapability.DEVELOP_CSHARP,
-
             ],
             constraints=[
                 "Generate only C#/.NET code — no other languages",
@@ -116,6 +117,8 @@ class CSharpDeveloperAgent(BaseAgent):
         )
 
         return self._apply_governance_check(response, context)
+
+
 CSHARP_DEVELOPER_PROMPT = """You are an expert C#/.NET developer building Azure applications.
 
 Generate clean, production-quality C# code following .NET conventions and best practices.

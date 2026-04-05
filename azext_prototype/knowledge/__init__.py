@@ -13,7 +13,8 @@ Directory layout::
     ├── services/                # Per-Azure-service knowledge files
     ├── tools/                   # IaC tool patterns (terraform, bicep, deploy-scripts)
     ├── languages/               # Language-specific patterns (python, csharp, nodejs, auth)
-    └── roles/                   # Agent role templates (architect, infrastructure, developer, analyst)
+    ├── roles/                   # Agent role templates (architect, infrastructure, developer, analyst)
+    └── layers/                  # Layer definitions (core, infrastructure, data, application)
 
 Usage::
 
@@ -165,6 +166,14 @@ class KnowledgeLoader:
         """Load a role template file (e.g. ``architect``)."""
         return self._read_md("roles", f"{role_name}.md")
 
+    def load_layer(self, layer_name: str) -> str:
+        """Load a layer definition file (e.g. ``infrastructure``).
+
+        Valid layer names: ``core``, ``infrastructure``, ``data``,
+        ``application``.
+        """
+        return self._read_md("layers", f"{layer_name}.md")
+
     def load_constraints(self) -> str:
         """Load the shared constraints document."""
         return self._read_md(".", "constraints.md")
@@ -199,6 +208,7 @@ class KnowledgeLoader:
         tool: str | None = None,
         language: str | None = None,
         role: str | None = None,
+        layer: str | None = None,
         include_constraints: bool = True,
         include_service_registry: bool = False,
         mode: str = "poc",
@@ -209,15 +219,19 @@ class KnowledgeLoader:
         respecting the token budget.  Files are added in priority order:
 
         1. Role template (highest priority — defines the agent's identity)
-        2. Constraints (shared rules all agents must follow)
-        3. Tool patterns (IaC-specific patterns)
-        4. Language patterns (language-specific patterns)
-        5. Service knowledge files (per-service, loaded in order given)
-        6. Service registry entries (raw reference data, lowest priority)
+        2. Layer definition (service boundaries and ownership)
+        3. Constraints (shared rules all agents must follow)
+        4. Tool patterns (IaC-specific patterns)
+        5. Language patterns (language-specific patterns)
+        6. Service knowledge files (per-service, loaded in order given)
+        7. Service registry entries (raw reference data, lowest priority)
 
         If the budget is exceeded, lower-priority content is truncated.
 
         Args:
+            layer: Layer name (``core``, ``infrastructure``, ``data``,
+                ``application``).  When provided, the layer definition
+                file is included so the agent knows its boundaries.
             mode: Content filtering mode.  ``"poc"`` (default) strips
                 ``## Production Backlog Items`` sections from service
                 files.  ``"production"`` or ``"all"`` keep everything.
@@ -231,6 +245,11 @@ class KnowledgeLoader:
             content = self.load_role(role)
             if content:
                 sections.append((f"ROLE: {role}", content))
+
+        if layer:
+            content = self.load_layer(layer)
+            if content:
+                sections.append((f"LAYER: {layer}", content))
 
         if include_constraints:
             content = self.load_constraints()
@@ -324,6 +343,10 @@ class KnowledgeLoader:
     def list_roles(self) -> list[str]:
         """List available role template file names."""
         return self._list_dir("roles")
+
+    def list_layers(self) -> list[str]:
+        """List available layer definition file names."""
+        return self._list_dir("layers")
 
     # ------------------------------------------------------------------
     # Internal helpers

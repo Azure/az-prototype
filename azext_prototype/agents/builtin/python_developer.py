@@ -11,6 +11,8 @@ from azext_prototype.agents.base import (
 from azext_prototype.ai.provider import AIMessage, AIResponse
 
 logger = logging.getLogger(__name__)
+
+
 class PythonDeveloperAgent(BaseAgent):
     """Python application code generation.
 
@@ -48,7 +50,6 @@ class PythonDeveloperAgent(BaseAgent):
             description="Python application code generation",
             capabilities=[
                 AgentCapability.DEVELOP_PYTHON,
-
             ],
             constraints=[
                 "Generate only Python code — no other languages",
@@ -114,6 +115,8 @@ class PythonDeveloperAgent(BaseAgent):
         )
 
         return self._apply_governance_check(response, context)
+
+
 PYTHON_DEVELOPER_PROMPT = """You are an expert Python developer building Azure applications.
 
 Generate clean, production-quality Python code following Python conventions and best practices.

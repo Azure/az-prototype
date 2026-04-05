@@ -28,7 +28,7 @@ def _quiet_output(fn):
     """Suppress Azure CLI's automatic JSON serialization of return values.
 
     Most commands print formatted output via the console module.  The dict
-    they return is then *also* serialised by Azure CLI as JSON, which is
+    they return is then *also* serialized by Azure CLI as JSON, which is
     extremely noisy for interactive workflows.
 
     This decorator swallows the return value (returning ``None`` so Azure

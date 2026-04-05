@@ -2,7 +2,7 @@
 
 Follows the :class:`~.discovery.DiscoverySession` pattern: bordered prompts,
 progress indicators, slash commands, and a review loop.  The build session
-orchestrates staged code generation through specialised agents and enforces
+orchestrates staged code generation through specialized agents and enforces
 governance policies interactively.
 
 Phases:
@@ -146,11 +146,11 @@ class BuildSession(SessionMixin):
     agent_context:
         Runtime context with AI provider and project config.
     registry:
-        Agent registry for resolving specialised agents.
+        Agent registry for resolving specialized agents.
     console:
         Styled console for output.
     build_state:
-        Pre-initialised build state (for re-entrant builds).
+        Pre-initialized build state (for re-entrant builds).
     """
 
     def __init__(
@@ -980,38 +980,44 @@ class BuildSession(SessionMixin):
             "      identity, monitoring, networking, and data service endpoints/secrets\n"
             "   f. Integration (APIM, Event Grid, SignalR, etc.) — depends on the\n"
             "      services they integrate with\n"
-            "   g. Application code (category 'app') — depends on ALL infrastructure.\n"
+            "   g. Application code (layer 'app', category 'app') — depends on ALL infrastructure.\n"
             "      Needs Container Registry (push images), compute environment (deploy\n"
             "      to), data service endpoints (connection config), Key Vault (secrets).\n"
             "      Place ALL 'app' stages after ALL 'infra' stages.\n"
-            "   h. Documentation (category 'docs') — depends on all stages above;\n"
+            "   h. Documentation (layer 'docs', category 'docs') — depends on all stages above;\n"
             "      must be last\n\n"
-            "7. The LAST stage MUST always be 'Documentation' with category 'docs'.\n"
+            "7. The LAST stage MUST always be 'Documentation' with layer 'docs', category 'docs'.\n"
             "   NEVER omit the Documentation stage.\n\n"
-            "8. CRITICAL: Stage categories determine which agent generates the code:\n"
-            "   - 'infra' — Terraform/Bicep agent generates IaC for Azure resources\n"
-            "   - 'app' — App Developer agent generates source code (Python, Node, .NET)\n"
-            "   - 'docs' — Documentation agent generates architecture and deployment docs\n"
+            "8. CRITICAL: Each stage has BOTH a 'layer' and a 'category'.\n"
+            "   Layers determine which architect owns the stage:\n"
+            "   - 'core'  — cloud-architect (identity, monitoring)\n"
+            "   - 'infra' — infrastructure-architect → terraform/bicep agent\n"
+            "   - 'data'  — data-architect → terraform/bicep agent\n"
+            "   - 'app'   — application-architect → language-specific developer\n"
+            "   - 'docs'  — doc-agent\n"
+            "   Categories sub-classify within layers (infra, data, app, docs).\n"
             "   Container Apps INFRASTRUCTURE (managed environment, container app resources)\n"
-            "   uses category 'infra'. But the APPLICATION SOURCE CODE (APIs, workers,\n"
-            "   Dockerfiles, requirements.txt) that runs IN those containers MUST be a\n"
-            "   separate stage with category 'app'.\n\n"
+            "   uses layer 'infra', category 'infra'. But the APPLICATION SOURCE CODE\n"
+            "   (APIs, workers, Dockerfiles, requirements.txt) that runs IN those\n"
+            "   containers MUST be a separate stage with layer 'app', category 'app'.\n\n"
             "Response format — return ONLY valid JSON:\n"
             "```json\n"
             '{"stages": [\n'
-            '  {"stage": 1, "name": "...", "category": "infra", "services": [...]},\n'
+            '  {"stage": 1, "name": "...", "layer": "core", "category": "infra", "services": [...]},\n'
             "  ...\n"
-            '  {"stage": N, "name": "...", "category": "app", "services": [...]},\n'
-            '  {"stage": N+1, "name": "Documentation", "category": "docs",\n'
+            '  {"stage": N, "name": "...", "layer": "app", "category": "app", "services": [...]},\n'
+            '  {"stage": N+1, "name": "Documentation", "layer": "docs", "category": "docs",\n'
             '   "services": ["architecture-doc", "deployment-guide"]}\n'
             "]}\n"
             "```\n"
             "\n"
-            "Category reference:\n"
-            "  'infra' — Azure resources (VNet, Key Vault, SQL, Container Apps Environment, etc.)\n"
+            "Layer reference:\n"
+            "  'core'  — Identity and observability foundations (Managed Identity, Log Analytics, App Insights)\n"
+            "  'infra' — Azure resource provisioning (VNet, Compute, Supporting services)\n"
+            "  'data'  — Data services (Key Vault, SQL, Cosmos, Storage, Service Bus, Redis)\n"
             "  'app'   — Source code that runs ON infrastructure (APIs, workers, functions,\n"
-            "            web apps, Logic Apps, etc. — includes Dockerfile, source files,\n"
-            "            package manifests, deploy.sh for build+push+update)\n"
+            "            web apps — includes Dockerfile, source files, package manifests,\n"
+            "            deploy.sh for build+push+update)\n"
             "  'docs'  — Architecture and deployment documentation\n"
             "\n"
             "Create one 'app' stage per deployable application in the architecture.\n"
@@ -1078,7 +1084,7 @@ class BuildSession(SessionMixin):
             "Response format — return ONLY valid JSON:\n"
             "```json\n"
             '{"stages": [\n'
-            '  {"stage": 1, "name": "Managed Identity", "category": "infra",\n'
+            '  {"stage": 1, "name": "Managed Identity", "layer": "core", "category": "infra",\n'
             f'   "dir": "concept/infra/{self._iac_tool}/stage-1-managed-identity",\n'
             '   "services": [\n'
             '     {"name": "user-assigned-identity", "computed_name": "zd-id-worker-dev-eus",\n'
@@ -1114,7 +1120,7 @@ class BuildSession(SessionMixin):
             stages = data.get("stages", [])
             if not stages:
                 return []
-            # Normalise: ensure services is a list of strings
+            # Normalize: ensure services is a list of strings
             for s in stages:
                 svcs = s.get("services", [])
                 if svcs and isinstance(svcs[0], dict):
@@ -1127,6 +1133,7 @@ class BuildSession(SessionMixin):
                     {
                         "stage": len(stages) + 1,
                         "name": "Documentation",
+                        "layer": "docs",
                         "category": "docs",
                         "services": ["architecture-doc", "deployment-guide"],
                     }
@@ -1170,6 +1177,7 @@ class BuildSession(SessionMixin):
             {
                 "stage": insert_idx + 1,
                 "name": "Networking",
+                "layer": "infra",
                 "category": "infra",
                 "services": ["virtual-network", "private-endpoints", "private-dns-zones"],
             },
@@ -1188,7 +1196,7 @@ class BuildSession(SessionMixin):
                 data = json.loads(json_match.group(1))
                 stages = data.get("stages", [])
                 if stages:
-                    return self._normalise_stages(stages)
+                    return self._normalize_stages(stages)
             except (json.JSONDecodeError, TypeError):
                 pass
 
@@ -1197,7 +1205,7 @@ class BuildSession(SessionMixin):
             data = json.loads(content.strip())
             stages = data.get("stages", [])
             if stages:
-                return self._normalise_stages(stages)
+                return self._normalize_stages(stages)
         except (json.JSONDecodeError, TypeError):
             pass
 
@@ -1206,16 +1214,44 @@ class BuildSession(SessionMixin):
     # Known second-level directory components for concept/ output.
     _CONCEPT_SUBDIRS = {"infra", "apps", "db", "docs"}
 
-    def _normalise_stages(self, stages: list[dict]) -> list[dict]:
+    # Layer ↔ category mapping.
+    _CATEGORY_TO_LAYER: dict[str, str] = {
+        "infra": "infra",
+        "data": "data",
+        "integration": "infra",
+        "app": "app",
+        "schema": "data",
+        "cicd": "infra",
+        "external": "infra",
+        "docs": "docs",
+    }
+
+    @staticmethod
+    def _infer_layer(stage: dict) -> str:
+        """Derive the ``layer`` field from ``category`` when not explicit."""
+        if stage.get("layer"):
+            return stage["layer"]
+        cat = stage.get("category", "infra")
+        # Identity and monitoring stages are Core layer
+        name_lower = stage.get("name", "").lower()
+        if any(kw in name_lower for kw in ("identity", "managed identity")):
+            return "core"
+        if any(kw in name_lower for kw in ("log analytics", "app insights", "application insights", "monitoring")):
+            return "core"
+        return BuildSession._CATEGORY_TO_LAYER.get(cat, "infra")
+
+    def _normalize_stages(self, stages: list[dict]) -> list[dict]:
         """Ensure every stage has all required keys with sensible defaults."""
-        normalised = []
+        normalized = []
         for s in stages:
             if not isinstance(s, dict):
                 continue
+            category = s.get("category", "infra")
             entry = {
-                "stage": s.get("stage", len(normalised) + 1),
-                "name": s.get("name", f"Stage {len(normalised) + 1}"),
-                "category": s.get("category", "infra"),
+                "stage": s.get("stage", len(normalized) + 1),
+                "name": s.get("name", f"Stage {len(normalized) + 1}"),
+                "layer": self._infer_layer(s),
+                "category": category,
                 "dir": self._enforce_concept_prefix(s.get("dir", "")),
                 "services": s.get("services", []),
                 "status": "pending",
@@ -1223,17 +1259,17 @@ class BuildSession(SessionMixin):
                 "deploy_mode": s.get("deploy_mode", "auto"),
                 "manual_instructions": s.get("manual_instructions"),
             }
-            normalised.append(entry)
-        return normalised
+            normalized.append(entry)
+        return normalized
 
     def _enforce_concept_prefix(self, dir_path: str) -> str:
         """Ensure *dir_path* uses ``concept/`` as its root component."""
         if not dir_path:
             return dir_path
-        normalised = dir_path.replace("\\", "/").strip("/")
-        if normalised.startswith("concept/") or normalised == "concept":
-            return normalised
-        parts = normalised.split("/")
+        normalized = dir_path.replace("\\", "/").strip("/")
+        if normalized.startswith("concept/") or normalized == "concept":
+            return normalized
+        parts = normalized.split("/")
         if len(parts) >= 2 and parts[1] in self._CONCEPT_SUBDIRS:
             parts[0] = "concept"
             fixed = "/".join(parts)
@@ -1258,6 +1294,7 @@ class BuildSession(SessionMixin):
             {
                 "stage": stage_num,
                 "name": "Managed Identity",
+                "layer": "core",
                 "category": "infra",
                 "dir": f"concept/infra/{self._iac_tool}/stage-{stage_num}-managed-identity",
                 "services": [
@@ -1281,7 +1318,7 @@ class BuildSession(SessionMixin):
 
             for t in templates:
                 for svc in t.services:
-                    cat = self._categorise_service(svc.type)
+                    cat = self._categorize_service(svc.type)
                     entry = {
                         "name": svc.name,
                         "type": svc.type,
@@ -1303,6 +1340,7 @@ class BuildSession(SessionMixin):
                     {
                         "stage": stage_num,
                         "name": svc["name"].replace("-", " ").title(),
+                        "layer": "infra",
                         "category": "infra",
                         "dir": f"concept/infra/{self._iac_tool}/stage-{stage_num}-{svc['name']}",
                         "services": [
@@ -1326,6 +1364,7 @@ class BuildSession(SessionMixin):
                     {
                         "stage": stage_num,
                         "name": svc["name"].replace("-", " ").title(),
+                        "layer": "data",
                         "category": "data",
                         "dir": f"concept/infra/{self._iac_tool}/stage-{stage_num}-{svc['name']}",
                         "services": [
@@ -1348,6 +1387,7 @@ class BuildSession(SessionMixin):
                     {
                         "stage": stage_num,
                         "name": svc["name"].replace("-", " ").title(),
+                        "layer": "app",
                         "category": "app",
                         "dir": f"concept/apps/stage-{stage_num}-{svc['name']}",
                         "services": [
@@ -1369,6 +1409,7 @@ class BuildSession(SessionMixin):
             {
                 "stage": stage_num,
                 "name": "Documentation",
+                "layer": "docs",
                 "category": "docs",
                 "dir": "concept/docs",
                 "services": [],
@@ -1430,6 +1471,7 @@ class BuildSession(SessionMixin):
         networking_stage = {
             "stage": insert_idx + 1,
             "name": "Networking",
+            "layer": "infra",
             "category": "infra",
             "dir": f"concept/infra/{self._iac_tool}/stage-{insert_idx + 1}-networking",
             "services": pe_stage_services,
@@ -1453,8 +1495,8 @@ class BuildSession(SessionMixin):
     # _build_plan_governance_summary removed — replaced by two-phase plan derivation
 
     @staticmethod
-    def _categorise_service(service_type: str) -> str:
-        """Categorise a template service type into a stage category."""
+    def _categorize_service(service_type: str) -> str:
+        """Categorize a template service type into a stage category."""
         _INFRA_TYPES = {
             "virtual-network",
             "key-vault",
@@ -1512,7 +1554,7 @@ class BuildSession(SessionMixin):
             f"## User Feedback\n{feedback}\n\n"
             f"## Architecture\n{architecture}\n\n"
             "Return the adjusted plan in the same JSON format.  Keep all "
-            "required keys (stage, name, category, dir, services, status, files).\n"
+            "required keys (stage, name, layer, category, dir, services, status, files).\n"
             '```json\n{"stages": [...]}\n```\n'
         )
 
@@ -1558,6 +1600,7 @@ class BuildSession(SessionMixin):
                 {
                     "stage": s["stage"],
                     "name": s["name"],
+                    "layer": s.get("layer", ""),
                     "category": s.get("category", "infra"),
                     "services": [svc.get("name", "") for svc in s.get("services", [])],
                 }
@@ -1588,7 +1631,7 @@ class BuildSession(SessionMixin):
             '  "unchanged": [1, 2],\n'
             '  "modified": [3],\n'
             '  "removed": [4],\n'
-            '  "added": [{"name": "Redis Cache", "category": "data", "services": '
+            '  "added": [{"name": "Redis Cache", "layer": "data", "category": "data", "services": '
             '[{"name": "redis-cache", "computed_name": "", "resource_type": '
             '"Microsoft.Cache/redis", "sku": "Basic"}]}],\n'
             '  "plan_restructured": false,\n'
@@ -1643,13 +1686,14 @@ class BuildSession(SessionMixin):
         added = data.get("added", [])
         if not isinstance(added, list):
             added = []
-        # Normalise added stages
-        normalised_added = []
+        # Normalize added stages
+        normalized_added = []
         for item in added:
             if isinstance(item, dict) and item.get("name"):
-                normalised_added.append(
+                normalized_added.append(
                     {
                         "name": item["name"],
+                        "layer": item.get("layer", self._infer_layer(item)),
                         "category": item.get("category", "infra"),
                         "services": item.get("services", []),
                         "dir": item.get("dir", ""),
@@ -1660,7 +1704,7 @@ class BuildSession(SessionMixin):
             "unchanged": sorted(unchanged),
             "modified": sorted(modified),
             "removed": sorted(removed),
-            "added": normalised_added,
+            "added": normalized_added,
             "plan_restructured": bool(data.get("plan_restructured", False)),
             "summary": data.get("summary", "Design changes analyzed."),
         }
@@ -1742,11 +1786,20 @@ class BuildSession(SessionMixin):
                 if s.get("resource_type") or s.get("name")
             ]
             is_iac = category in ("infra", "data", "integration")
+            # Map stage layer to knowledge layer name
+            stage_layer = stage.get("layer", "")
+            knowledge_layer = {
+                "core": "core",
+                "infra": "infrastructure",
+                "data": "data",
+                "app": "application",
+            }.get(stage_layer)
             loader = KnowledgeLoader()
             knowledge = loader.compose_context(
                 services=svc_identifiers,
                 tool=self._iac_tool if is_iac else None,
                 role="infrastructure" if is_iac else "developer",
+                layer=knowledge_layer,
                 include_constraints=True,
                 mode="poc",
             )
@@ -1988,12 +2041,15 @@ class BuildSession(SessionMixin):
         # Build the task prompt
         tool_label = f" {self._iac_tool}" if is_iac else ""
 
+        layer = stage.get("layer", "")
+
         task = (
             f"Generate{tool_label} code for deployment "
             f"Stage {stage['stage']}: {stage_name}.\n\n"
             f"## Architecture Context\n{architecture}\n\n"
             f"## This Stage\n"
             f"Name: {stage_name}\n"
+            f"Layer: {layer}\n"
             f"Category: {category}\n"
             f"Output directory: {stage_dir}/\n\n"
         )
@@ -2593,6 +2649,7 @@ class BuildSession(SessionMixin):
 
         _print("")
         _print(f"  Stage {stage_num}: {stage.get('name', '?')}")
+        _print(f"  Layer:    {stage.get('layer', '?')}")
         _print(f"  Category: {stage.get('category', '?')}")
         _print(f"  Status:   {stage.get('status', 'pending')}")
         _print(f"  Dir:      {stage.get('dir', '?')}")

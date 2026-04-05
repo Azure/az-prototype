@@ -704,7 +704,9 @@ class TestBuildSession:
         stages = session._fallback_deployment_plan([])
         assert len(stages) >= 2  # Managed Identity + Documentation at minimum
         assert stages[0]["name"] == "Managed Identity"
+        assert stages[0]["layer"] == "core"
         assert stages[-1]["name"] == "Documentation"
+        assert stages[-1]["layer"] == "docs"
 
     def test_template_matching_web_app(self, project_with_design, sample_config):
         from azext_prototype.stages.build_stage import BuildStage
@@ -882,27 +884,53 @@ class TestBuildSession:
         assert "/files" in output
         assert "done" in output
 
-    def test_categorise_service(self):
+    def test_categorize_service(self):
         from azext_prototype.stages.build_session import BuildSession
 
-        assert BuildSession._categorise_service("key-vault") == "infra"
-        assert BuildSession._categorise_service("sql-database") == "data"
-        assert BuildSession._categorise_service("container-apps") == "app"
-        assert BuildSession._categorise_service("unknown-service") == "app"
+        assert BuildSession._categorize_service("key-vault") == "infra"
+        assert BuildSession._categorize_service("sql-database") == "data"
+        assert BuildSession._categorize_service("container-apps") == "app"
+        assert BuildSession._categorize_service("unknown-service") == "app"
 
-    def test_normalise_stages(self, build_context, build_registry):
+    def test_normalize_stages(self, build_context, build_registry):
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
         raw = [
-            {"stage": 1, "name": "Test"},
+            {"stage": 1, "name": "Test", "category": "infra"},
             {"name": "No Stage Num"},
         ]
-        normalised = session._normalise_stages(raw)
-        assert len(normalised) == 2
-        assert normalised[0]["status"] == "pending"
-        assert normalised[0]["files"] == []
-        assert normalised[1]["stage"] == 2  # Auto-assigned
+        normalized = session._normalize_stages(raw)
+        assert len(normalized) == 2
+        assert normalized[0]["status"] == "pending"
+        assert normalized[0]["files"] == []
+        assert normalized[0]["layer"] == "infra"  # Inferred from category
+        assert normalized[1]["stage"] == 2  # Auto-assigned
+        assert normalized[1]["layer"] == "infra"  # Default
+
+    def test_normalize_stages_preserves_explicit_layer(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        raw = [
+            {"stage": 1, "name": "Key Vault", "layer": "data", "category": "data"},
+            {"stage": 2, "name": "API", "layer": "app", "category": "app"},
+        ]
+        normalized = session._normalize_stages(raw)
+        assert normalized[0]["layer"] == "data"
+        assert normalized[1]["layer"] == "app"
+
+    def test_normalize_stages_infers_core_for_identity(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        raw = [
+            {"stage": 1, "name": "Managed Identity", "category": "infra"},
+            {"stage": 2, "name": "Log Analytics", "category": "infra"},
+        ]
+        normalized = session._normalize_stages(raw)
+        assert normalized[0]["layer"] == "core"
+        assert normalized[1]["layer"] == "core"
 
     def test_reentrant_skips_generated_stages(self, build_context, build_registry, mock_tf_agent, mock_doc_agent):
         from azext_prototype.stages.build_session import BuildSession
@@ -2076,6 +2104,80 @@ class TestSelectAgent:
         session._doc_agent = None
         agent = session._select_agent({"category": "docs"})
         assert agent is None
+
+    def test_select_agent_layer_core(self, build_context, build_registry, mock_architect_agent_for_build):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        agent = session._select_agent({"layer": "core", "category": "infra"})
+        assert agent is mock_architect_agent_for_build
+
+    def test_select_agent_layer_docs(self, build_context, build_registry, mock_doc_agent):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        agent = session._select_agent({"layer": "docs", "category": "docs"})
+        assert agent is mock_doc_agent
+
+
+# ======================================================================
+# _infer_layer tests
+# ======================================================================
+
+
+class TestInferLayer:
+    """Tests for _infer_layer static method."""
+
+    def test_explicit_layer_preserved(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        assert BuildSession._infer_layer({"layer": "data", "category": "infra"}) == "data"
+
+    def test_identity_stage_maps_to_core(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        assert BuildSession._infer_layer({"name": "Managed Identity", "category": "infra"}) == "core"
+
+    def test_monitoring_stage_maps_to_core(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        assert BuildSession._infer_layer({"name": "Log Analytics", "category": "infra"}) == "core"
+        assert BuildSession._infer_layer({"name": "Application Insights", "category": "infra"}) == "core"
+
+    def test_infra_category_maps_to_infra(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        assert BuildSession._infer_layer({"name": "Networking", "category": "infra"}) == "infra"
+
+    def test_data_category_maps_to_data(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        assert BuildSession._infer_layer({"name": "Key Vault", "category": "data"}) == "data"
+
+    def test_app_category_maps_to_app(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        assert BuildSession._infer_layer({"name": "API", "category": "app"}) == "app"
+
+    def test_docs_category_maps_to_docs(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        assert BuildSession._infer_layer({"name": "Documentation", "category": "docs"}) == "docs"
+
+    def test_integration_category_maps_to_infra(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        assert BuildSession._infer_layer({"name": "APIM", "category": "integration"}) == "infra"
+
+    def test_unknown_category_defaults_to_infra(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        assert BuildSession._infer_layer({"name": "Custom", "category": "xyz"}) == "infra"
+
+    def test_empty_stage_defaults_to_infra(self):
+        from azext_prototype.stages.build_session import BuildSession
+
+        assert BuildSession._infer_layer({}) == "infra"
 
 
 # ======================================================================

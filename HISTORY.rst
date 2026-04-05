@@ -6,6 +6,42 @@ Release History
 0.2.1b6
 +++++++
 
+Layer system
+~~~~~~~~~~~~~
+* **Formal layer architecture** — deployment stages now carry both ``layer``
+  and ``category`` fields.  Four layers define service boundaries and agent
+  ownership: Core (cloud-architect — identity, observability), Infrastructure
+  (infrastructure-architect — networking, compute, supporting services), Data
+  (data-architect — databases, storage, messaging), and Application
+  (application-architect — source code with 5 sub-layers).
+* **Layer definition files** — ``knowledge/layers/`` contains authoritative
+  boundary docs for each layer: what belongs, what doesn't, which agents own
+  it, deployment order, inter-layer communication patterns, and governance
+  rules.
+* **Layer-aware knowledge loading** — ``KnowledgeLoader.compose_context()``
+  accepts a ``layer`` parameter.  Layer content is injected between role and
+  constraints in priority order, giving agents clear boundary awareness during
+  generation.  ``_apply_stage_knowledge()`` maps stage layers to knowledge
+  layer files automatically.
+* **Layer inference** — ``_normalize_stages()`` derives ``layer`` from
+  ``category`` and stage name when the AI doesn't provide one.  Identity and
+  monitoring stages map to Core; data/infra/app/docs map to their respective
+  layers.  Fallback deployment plans, networking injection, and incremental
+  rebuild all set ``layer`` explicitly.
+* **Deployment plan prompts** — Phase 1 and Phase 2 prompts now include
+  ``layer`` in the JSON format, examples, and instructions.  The layer
+  reference table documents all 5 layer values and their meanings.
+* **Layer info in constraints** — ``constraints.md`` Section 10 documents the
+  layer architecture, service placement rules, and layer-category mapping
+  table.
+
+Code quality
+~~~~~~~~~~~~~
+* **American English normalization** — renamed ``_normalise_stages()`` to
+  ``_normalize_stages()``, ``_categorise_service()`` to
+  ``_categorize_service()``, and fixed British spellings in comments across
+  8 files (serialise, specialised, initialised, centralises, summarise).
+
 Knowledge
 ~~~~~~~~~~
 * **Private endpoint architecture boundary** — ``constraints.md`` now
@@ -632,7 +668,7 @@ Build session
   POLICIES`` section moved from position 13 (near end) to position 3
   (right after services list).  Ensures the AI reads the exact code
   templates with correct property values before it starts generating.
-* **Enforce ``concept/`` output directory** — ``_normalise_stages()``
+* **Enforce ``concept/`` output directory** — ``_normalize_stages()``
   detects when the AI uses the project name as root and fixes it.
 * **``--reset`` cleans non-concept output dirs** — loads build state
   before reset to find and clean project-named directories.

@@ -773,7 +773,7 @@ class DesignStage(BaseStage):
             )
             if accumulated:
                 # Sliding window: keep the last 3 sections in full,
-                # summarise older ones as headings only to avoid
+                # summarize older ones as headings only to avoid
                 # exceeding the model's context window.
                 _RECENT = 3
                 if len(accumulated) <= _RECENT:

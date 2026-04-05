@@ -376,7 +376,38 @@ When a POC takes an acceptable shortcut, agents must:
 
 ---
 
-## 10. Direct Execution Policy
+## 10. Layer Architecture
+
+All services and stages are assigned to one of four layers. Each layer has a designated owner agent, defined boundaries, and a deployment order. Layer definition files in `knowledge/layers/` are the authoritative source for what belongs where.
+
+| Layer | Owner | Deploys | Contains |
+|-------|-------|---------|----------|
+| **Core** | `cloud-architect` | First | Managed identity, Log Analytics, App Insights |
+| **Infrastructure** | `infrastructure-architect` | After Core | Networking, compute (Container Apps, AKS, App Service), supporting services (APIM, AI, Event Grid) |
+| **Data** | `data-architect` | After Core + Networking | Key Vault, databases (SQL, Cosmos, PostgreSQL), storage, messaging (Service Bus, Event Hubs) |
+| **Application** | `application-architect` | After all infra/data | Source code: APIs, workers, frontends, Dockerfiles, deploy scripts |
+
+### Service Placement Rules
+
+- **Infrastructure provisions, Application consumes.** Infrastructure layer creates the Azure resource (e.g., Service Bus namespace via IaC). Application layer creates the code that uses it (e.g., `IMessageSender` interface). Data layer owns the data model (schemas, indexes, partition keys).
+- **Networking is centralized.** All private endpoints, DNS zones, and VNet resources belong in a single Networking stage within the Infrastructure layer.
+- **Core deploys first.** Identity and observability must exist before any other layer can configure RBAC or diagnostics.
+- **Data deploys before Application.** Application code depends on data service endpoints being available.
+- **Each stage declares both `layer` and `category`.** Layer determines the owning architect; category sub-classifies within the layer.
+
+### Layer-Specific Categories
+
+| Layer | Valid Categories |
+|-------|-----------------|
+| Core | `infra` |
+| Infrastructure | `infra`, `integration` |
+| Data | `data` |
+| Application | `app` |
+| (cross-cutting) | `docs` |
+
+---
+
+## 11. Direct Execution Policy
 
 This extension **executes deployment commands directly** (`terraform apply`, `az deployment group create`, etc.) rather than generating commands for a human to run.
 

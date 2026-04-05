@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 _BUILTIN_CONNECTION_STRING = ""
 
 # ---------------------------------------------------------------
-# Module-level singletons (lazily initialised)
+# Module-level singletons (lazily initialized)
 # ---------------------------------------------------------------
 _ingestion_endpoint: str | None = None
 _instrumentation_key: str | None = None
@@ -414,7 +414,7 @@ def track_build_resources(
     """Send a telemetry event for a build with multiple resources.
 
     Each entry in *resources* should be a dict with ``resourceType`` and
-    ``sku`` keys.  The aggregated list is serialised as a JSON string in
+    ``sku`` keys.  The aggregated list is serialized as a JSON string in
     the ``resources`` property, and ``resourceCount`` records the total.
 
     For backward compatibility the first resource's type and SKU are also

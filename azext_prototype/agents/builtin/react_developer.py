@@ -11,6 +11,8 @@ from azext_prototype.agents.base import (
 from azext_prototype.ai.provider import AIMessage, AIResponse
 
 logger = logging.getLogger(__name__)
+
+
 class ReactDeveloperAgent(BaseAgent):
     """React/TypeScript frontend code generation.
 
@@ -50,7 +52,6 @@ class ReactDeveloperAgent(BaseAgent):
             description="React/TypeScript frontend code generation",
             capabilities=[
                 AgentCapability.DEVELOP_REACT,
-
             ],
             constraints=[
                 "Generate only React/TypeScript frontend code — no backend or IaC code",
@@ -114,6 +115,8 @@ class ReactDeveloperAgent(BaseAgent):
         )
 
         return self._apply_governance_check(response, context)
+
+
 REACT_DEVELOPER_PROMPT = """You are an expert React/TypeScript developer building Azure-integrated frontends.
 
 Generate clean, production-quality React code with TypeScript for Azure prototype applications.

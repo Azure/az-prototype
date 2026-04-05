@@ -51,7 +51,7 @@ class SearchCache:
         return result
 
     def put(self, query: str, result: str) -> None:
-        """Store *result* under normalised *query* with the current timestamp."""
+        """Store *result* under normalized *query* with the current timestamp."""
         key = self._normalize(query)
         # Evict oldest if at capacity (and this is a new key)
         if key not in self._store and len(self._store) >= self._max_entries:

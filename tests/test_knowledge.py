@@ -99,6 +99,25 @@ def knowledge_dir(tmp_path):
         encoding="utf-8",
     )
 
+    # Layer files
+    (kd / "layers").mkdir()
+    (kd / "layers" / "core.md").write_text(
+        "# Core Layer\n\nIdentity and observability foundations.\n",
+        encoding="utf-8",
+    )
+    (kd / "layers" / "infrastructure.md").write_text(
+        "# Infrastructure Layer\n\nAzure resource provisioning via IaC.\n",
+        encoding="utf-8",
+    )
+    (kd / "layers" / "data.md").write_text(
+        "# Data Layer\n\nDatabases, storage, and messaging.\n",
+        encoding="utf-8",
+    )
+    (kd / "layers" / "application.md").write_text(
+        "# Application Layer\n\nSource code: APIs, workers, frontends.\n",
+        encoding="utf-8",
+    )
+
     return kd
 
 
@@ -144,6 +163,25 @@ class TestKnowledgeLoaderIndividual:
 
     def test_load_role_missing(self, loader):
         assert loader.load_role("devops") == ""
+
+    def test_load_layer(self, loader):
+        text = loader.load_layer("core")
+        assert "Core Layer" in text
+
+    def test_load_layer_infrastructure(self, loader):
+        text = loader.load_layer("infrastructure")
+        assert "Infrastructure Layer" in text
+
+    def test_load_layer_data(self, loader):
+        text = loader.load_layer("data")
+        assert "Data Layer" in text
+
+    def test_load_layer_application(self, loader):
+        text = loader.load_layer("application")
+        assert "Application Layer" in text
+
+    def test_load_layer_missing(self, loader):
+        assert loader.load_layer("nonexistent") == ""
 
     def test_load_constraints(self, loader):
         text = loader.load_constraints()
@@ -191,6 +229,13 @@ class TestKnowledgeLoaderList:
         assert "infrastructure" in roles
         assert "developer" in roles
         assert "analyst" in roles
+
+    def test_list_layers(self, loader):
+        layers = loader.list_layers()
+        assert "core" in layers
+        assert "infrastructure" in layers
+        assert "data" in layers
+        assert "application" in layers
 
     def test_list_missing_subdir(self, tmp_path):
         loader = KnowledgeLoader(knowledge_dir=tmp_path)
@@ -261,6 +306,28 @@ class TestKnowledgeLoaderCompose:
         service_pos = ctx.index("SERVICE: cosmos-db")
 
         assert role_pos < constraints_pos < tool_pos < service_pos
+
+    def test_compose_with_layer(self, loader):
+        ctx = loader.compose_context(layer="infrastructure")
+        assert "LAYER: infrastructure" in ctx
+        assert "Infrastructure Layer" in ctx
+
+    def test_compose_layer_priority_after_role(self, loader):
+        """Layer should appear after role but before constraints."""
+        ctx = loader.compose_context(
+            role="cloud-architect",
+            layer="core",
+            tool="terraform",
+        )
+        role_pos = ctx.index("ROLE: cloud-architect")
+        layer_pos = ctx.index("LAYER: core")
+        constraints_pos = ctx.index("SHARED CONSTRAINTS")
+        tool_pos = ctx.index("TOOL PATTERNS: terraform")
+        assert role_pos < layer_pos < constraints_pos < tool_pos
+
+    def test_compose_layer_missing_skipped(self, loader):
+        ctx = loader.compose_context(layer="nonexistent", include_constraints=False)
+        assert ctx == ""
 
     def test_compose_missing_files_skipped(self, loader):
         """Missing files should be silently skipped."""

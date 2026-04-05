@@ -172,7 +172,9 @@ class GovernanceIndex:
 
         # Index anti-patterns
         try:
-            from azext_prototype.governance.anti_patterns import load as load_anti_patterns
+            from azext_prototype.governance.anti_patterns import (
+                load as load_anti_patterns,
+            )
 
             for check in load_anti_patterns():
                 self._items.append(
