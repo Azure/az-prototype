@@ -80,7 +80,7 @@ def _title_case(name: str) -> str:
 
 def _wiki_safe(name: str) -> str:
     """Sanitize a name for use in wiki filenames (no ``&`` or special chars)."""
-    return name.replace("&", "And").replace(" ", "-")
+    return name.replace("&", "&amp;").replace(" ", "-")
 
 
 def _strip_api_version(resource_type: str) -> str:
