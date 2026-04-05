@@ -68,7 +68,7 @@ def _title_case(name: str) -> str:
     result = []
     for w in words:
         if w == "&":
-            result.append("&")
+            result.append("&amp;")
             continue
         lower = w.lower()
         if lower in _ABBREVIATIONS:
@@ -79,8 +79,11 @@ def _title_case(name: str) -> str:
 
 
 def _wiki_safe(name: str) -> str:
-    """Sanitize a name for use in wiki filenames (no ``&`` or special chars)."""
-    return name.replace("&", "&amp;").replace(" ", "-")
+    """Sanitize a raw name for use in wiki filenames (no ``&`` or special chars).
+
+    Operates on raw names BEFORE ``_title_case`` — do not pass display names.
+    """
+    return _title_case(name).replace("&amp;", "And").replace(" ", "-")
 
 
 def _strip_api_version(resource_type: str) -> str:
@@ -547,7 +550,7 @@ def main() -> None:
         for yf in sorted(cat_path.glob("*.policy.yaml")):
             raw_name = yf.stem.replace(".policy", "")
             display_name = _title_case(raw_name)
-            wiki_filename = f"Governance-Policies-Azure-{_wiki_safe(_title_case(subdir))}-{_wiki_safe(display_name)}"
+            wiki_filename = f"Governance-Policies-Azure-{_wiki_safe(subdir)}-{_wiki_safe(raw_name)}"
             content = _render_policy_page(yf)
             out_path = WIKI_DIR / f"{wiki_filename}.md"
             out_path.write_text(content, encoding="utf-8")
@@ -565,7 +568,7 @@ def main() -> None:
         for yf in sorted(cat_path.glob("*.policy.yaml")):
             raw_name = yf.stem.replace(".policy", "")
             display_name = _title_case(raw_name)
-            wiki_filename = f"Governance-Policies-{_wiki_safe(_title_case(subdir))}-{_wiki_safe(display_name)}"
+            wiki_filename = f"Governance-Policies-{_wiki_safe(subdir)}-{_wiki_safe(raw_name)}"
             content = _render_policy_page(yf)
             out_path = WIKI_DIR / f"{wiki_filename}.md"
             out_path.write_text(content, encoding="utf-8")
@@ -581,7 +584,7 @@ def main() -> None:
         data = _load_yaml(yf)
         domain = data.get("domain", yf.stem)
         display_name = _title_case(domain)
-        wiki_filename = f"Governance-Anti-Patterns-{_wiki_safe(display_name)}"
+        wiki_filename = f"Governance-Anti-Patterns-{_wiki_safe(domain)}"
         content = _render_anti_pattern_page(yf)
         out_path = WIKI_DIR / f"{wiki_filename}.md"
         out_path.write_text(content, encoding="utf-8")
@@ -598,7 +601,7 @@ def main() -> None:
         section_pages = []
         for yf in sorted(section_path.glob("*.yaml")):
             display_name = _title_case(yf.stem)
-            wiki_filename = f"Governance-Standards-{_wiki_safe(_title_case(section_subdir))}-{_wiki_safe(display_name)}"
+            wiki_filename = f"Governance-Standards-{_wiki_safe(section_subdir)}-{_wiki_safe(yf.stem)}"
             content = _render_standard_page(yf)
             out_path = WIKI_DIR / f"{wiki_filename}.md"
             out_path.write_text(content, encoding="utf-8")
