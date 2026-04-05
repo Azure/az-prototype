@@ -413,7 +413,7 @@ def _generate_sidebar(
     lines: list[str] = []
     lines.append(marker_start)
     lines.append("")
-    lines.append("**Governance**")
+    lines.append("### Governance")
     lines.append("")
 
     # Split policies into Azure vs non-Azure groups
