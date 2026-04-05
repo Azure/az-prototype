@@ -1,33 +1,24 @@
 # =============================================================================
-# Azure Service Registry - Canonical Reference
+# Azure Service Registry — Keyed by ARM Resource Type Namespace
 # =============================================================================
 #
-# Single source of truth for Azure service configuration used by all agents at
-# runtime. Contains RBAC role IDs, private DNS zones, API versions, SDK
-# packages, and authentication scopes for every supported Azure service.
+# Single source of truth for Azure service configuration. Each entry is keyed
+# by its ARM resource type namespace (e.g., Microsoft.Sql/servers). Contains
+# RBAC role IDs, private DNS zones, API versions, SDK packages, and auth scopes.
 #
-# Ported from the Innovation Factory SERVICE_REGISTRY.yaml and extended with
-# additional services (event-grid, signalr, cognitive-search). Unlike the IF
-# version, this extension deploys infrastructure directly -- there is no
-# execution-policy restriction on running commands.
+# Services sharing an ARM namespace (e.g., Microsoft.Web/sites for both App
+# Service and Functions) use a #kind suffix to disambiguate.
 #
-# Maintenance:
-#   - Keep bicep_api_version entries on current stable versions (2023-xx / 2024-xx)
-#   - When adding a new service, ensure ALL required fields are present
-#   - Validate with: python -m yaml service-registry.yaml
+# The friendly_name field maps back to discovery-phase service names.
+# The architect deployment plan translates friendly names to namespaces.
 # =============================================================================
 
 services:
-
-  # ---------------------------------------------------------------------------
-  # Data & Storage
-  # ---------------------------------------------------------------------------
-
-  azure-sql:
-    display_name: Azure SQL Database
+  Microsoft.Sql/servers:
+    display_name: Azure SQL Server
     resource_provider: Microsoft.Sql
-    resource_type: Microsoft.Sql/servers, Microsoft.Sql/servers/databases
-    api_version: "2023-08-01-preview"
+    resource_type: Microsoft.Sql/servers
+    api_version: 2023-08-01-preview
     private_endpoint:
       dns_zone: privatelink.database.windows.net
       group_id: sqlServer
@@ -44,19 +35,62 @@ services:
         - SQL authentication must be disabled
         - Contained users created via T-SQL after deployment
     sdk_packages:
-      dotnet: [Microsoft.Data.SqlClient, Azure.Identity]
-      python: [pyodbc, azure-identity]
-      nodejs: [tedious, "@azure/identity"]
+      dotnet:
+      - Microsoft.Data.SqlClient
+      - Azure.Identity
+      python:
+      - pyodbc
+      - azure-identity
+      nodejs:
+      - tedious
+      - '@azure/identity'
     special_considerations:
-      - Requires T-SQL script execution for user provisioning
-      - Cannot grant database roles via Terraform/Bicep
-      - Must use AAD admin for initial setup
-
-  cosmos-db:
+    - Requires T-SQL script execution for user provisioning
+    - Cannot grant database roles via Terraform/Bicep
+    - Must use AAD admin for initial setup
+    friendly_name: azure-sql
+  Microsoft.Sql/servers/databases:
+    display_name: Azure SQL Database
+    resource_provider: Microsoft.Sql
+    resource_type: Microsoft.Sql/servers/databases
+    api_version: 2023-08-01-preview
+    private_endpoint:
+      dns_zone: privatelink.database.windows.net
+      group_id: sqlServer
+    rbac_roles:
+      data_read: db_datareader (contained user)
+      data_write: db_datawriter (contained user)
+      admin: db_owner (contained user)
+    rbac_role_ids: {}
+    authentication:
+      method: Azure AD with Managed Identity
+      token_scope: https://database.windows.net/.default
+      notes: |
+        - Azure AD-only authentication must be enabled
+        - SQL authentication must be disabled
+        - Contained users created via T-SQL after deployment
+    sdk_packages:
+      dotnet:
+      - Microsoft.Data.SqlClient
+      - Azure.Identity
+      python:
+      - pyodbc
+      - azure-identity
+      nodejs:
+      - tedious
+      - '@azure/identity'
+    special_considerations:
+    - Requires T-SQL script execution for user provisioning
+    - Cannot grant database roles via Terraform/Bicep
+    - Must use AAD admin for initial setup
+    friendly_name: azure-sql-database
+    depends_on:
+    - Microsoft.Sql/servers
+  Microsoft.DocumentDB/databaseAccounts:
     display_name: Azure Cosmos DB
     resource_provider: Microsoft.DocumentDB
     resource_type: Microsoft.DocumentDB/databaseAccounts
-    api_version: "2024-05-15"
+    api_version: '2024-05-15'
     private_endpoint:
       dns_zone: privatelink.documents.azure.com
       group_id: Sql
@@ -65,8 +99,8 @@ services:
       data_write: Cosmos DB Built-in Data Contributor
       admin: Cosmos DB Account Contributor
     rbac_role_ids:
-      data_read: "00000000-0000-0000-0000-000000000001"
-      data_write: "00000000-0000-0000-0000-000000000002"
+      data_read: 00000000-0000-0000-0000-000000000001
+      data_write: 00000000-0000-0000-0000-000000000002
     authentication:
       method: RBAC with Managed Identity
       token_scope: https://cosmos.azure.com/.default
@@ -74,33 +108,39 @@ services:
         - Disable key-based metadata write access
         - Use built-in RBAC roles (not custom)
     sdk_packages:
-      dotnet: [Microsoft.Azure.Cosmos, Azure.Identity]
-      python: [azure-cosmos, azure-identity]
-      nodejs: ["@azure/cosmos", "@azure/identity"]
+      dotnet:
+      - Microsoft.Azure.Cosmos
+      - Azure.Identity
+      python:
+      - azure-cosmos
+      - azure-identity
+      nodejs:
+      - '@azure/cosmos'
+      - '@azure/identity'
     child_resources:
       sqlRoleAssignments:
         resource_type: Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments
-        api_version: "2024-05-15"
+        api_version: '2024-05-15'
       sqlRoleDefinitions:
         resource_type: Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions
-        api_version: "2024-05-15"
+        api_version: '2024-05-15'
       sqlDatabases:
         resource_type: Microsoft.DocumentDB/databaseAccounts/sqlDatabases
-        api_version: "2024-05-15"
+        api_version: '2024-05-15'
       sqlContainers:
         resource_type: Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers
-        api_version: "2024-05-15"
+        api_version: '2024-05-15'
     special_considerations:
-      - Partition key design is critical and hard to change
-      - Consider throughput mode (provisioned vs serverless)
-      - Multiple API types available (NoSQL, MongoDB, Cassandra, Gremlin, Table)
-      - sqlRoleAssignments use Cosmos-specific RBAC, NOT ARM roleAssignments
-
-  blob-storage:
+    - Partition key design is critical and hard to change
+    - Consider throughput mode (provisioned vs serverless)
+    - Multiple API types available (NoSQL, MongoDB, Cassandra, Gremlin, Table)
+    - sqlRoleAssignments use Cosmos-specific RBAC, NOT ARM roleAssignments
+    friendly_name: cosmos-db
+  Microsoft.Storage/storageAccounts:
     display_name: Azure Blob Storage
     resource_provider: Microsoft.Storage
     resource_type: Microsoft.Storage/storageAccounts
-    api_version: "2023-05-01"
+    api_version: '2023-05-01'
     private_endpoint:
       dns_zone: privatelink.blob.core.windows.net
       group_id: blob
@@ -119,21 +159,27 @@ services:
         - Shared key access should be disabled when using RBAC
         - Use user delegation SAS when temporary access is needed
     sdk_packages:
-      dotnet: [Azure.Storage.Blobs, Azure.Identity]
-      python: [azure-storage-blob, azure-identity]
-      nodejs: ["@azure/storage-blob", "@azure/identity"]
+      dotnet:
+      - Azure.Storage.Blobs
+      - Azure.Identity
+      python:
+      - azure-storage-blob
+      - azure-identity
+      nodejs:
+      - '@azure/storage-blob'
+      - '@azure/identity'
     child_resources:
       blobServices/containers:
-        api_version: "2023-05-01"
+        api_version: '2023-05-01'
     special_considerations:
-      - Consider access tier (Hot, Cool, Archive) based on access patterns
-      - Lifecycle management policies for cost optimization
-
-  redis-cache:
+    - Consider access tier (Hot, Cool, Archive) based on access patterns
+    - Lifecycle management policies for cost optimization
+    friendly_name: blob-storage
+  Microsoft.Cache/redis:
     display_name: Azure Cache for Redis
     resource_provider: Microsoft.Cache
     resource_type: Microsoft.Cache/redis
-    api_version: "2024-03-01"
+    api_version: '2024-03-01'
     private_endpoint:
       dns_zone: privatelink.redis.cache.windows.net
       group_id: redisCache
@@ -148,22 +194,24 @@ services:
         - AAD authentication must be explicitly enabled
         - Access keys should be disabled when using AAD
     sdk_packages:
-      dotnet: [StackExchange.Redis, Azure.Identity]
-      python: [redis, azure-identity]
-      nodejs: [ioredis, "@azure/identity"]
+      dotnet:
+      - StackExchange.Redis
+      - Azure.Identity
+      python:
+      - redis
+      - azure-identity
+      nodejs:
+      - ioredis
+      - '@azure/identity'
     special_considerations:
-      - AAD auth is newer; verify customer's Redis version supports it
-      - Some legacy applications may require access keys
-
-  # ---------------------------------------------------------------------------
-  # Messaging & Events
-  # ---------------------------------------------------------------------------
-
-  service-bus:
+    - AAD auth is newer; verify customer's Redis version supports it
+    - Some legacy applications may require access keys
+    friendly_name: redis-cache
+  Microsoft.ServiceBus/namespaces:
     display_name: Azure Service Bus
     resource_provider: Microsoft.ServiceBus
     resource_type: Microsoft.ServiceBus/namespaces
-    api_version: "2024-01-01"
+    api_version: '2024-01-01'
     private_endpoint:
       dns_zone: privatelink.servicebus.windows.net
       group_id: namespace
@@ -182,18 +230,24 @@ services:
         - Shared access policies should be avoided in favor of RBAC
         - Premium tier required for private endpoints
     sdk_packages:
-      dotnet: [Azure.Messaging.ServiceBus, Azure.Identity]
-      python: [azure-servicebus, azure-identity]
-      nodejs: ["@azure/service-bus", "@azure/identity"]
+      dotnet:
+      - Azure.Messaging.ServiceBus
+      - Azure.Identity
+      python:
+      - azure-servicebus
+      - azure-identity
+      nodejs:
+      - '@azure/service-bus'
+      - '@azure/identity'
     special_considerations:
-      - Premium tier required for private endpoints and large messages
-      - Consider partitioning strategy for high-throughput scenarios
-
-  event-grid:
+    - Premium tier required for private endpoints and large messages
+    - Consider partitioning strategy for high-throughput scenarios
+    friendly_name: service-bus
+  Microsoft.EventGrid/topics:
     display_name: Azure Event Grid
     resource_provider: Microsoft.EventGrid
     resource_type: Microsoft.EventGrid/topics
-    api_version: "2024-06-01-preview"
+    api_version: 2024-06-01-preview
     private_endpoint:
       dns_zone: privatelink.eventgrid.azure.net
       group_id: topic
@@ -209,23 +263,25 @@ services:
         - Use RBAC for publishing; avoid SAS keys in new deployments
         - System topics auto-created for Azure resource events
     sdk_packages:
-      dotnet: [Azure.Messaging.EventGrid, Azure.Identity]
-      python: [azure-eventgrid, azure-identity]
-      nodejs: ["@azure/eventgrid", "@azure/identity"]
+      dotnet:
+      - Azure.Messaging.EventGrid
+      - Azure.Identity
+      python:
+      - azure-eventgrid
+      - azure-identity
+      nodejs:
+      - '@azure/eventgrid'
+      - '@azure/identity'
     special_considerations:
-      - System topics vs custom topics serve different purposes
-      - Event subscriptions support filtering and dead-lettering
-      - CloudEvents schema recommended for new implementations
-
-  # ---------------------------------------------------------------------------
-  # Security & Identity
-  # ---------------------------------------------------------------------------
-
-  key-vault:
+    - System topics vs custom topics serve different purposes
+    - Event subscriptions support filtering and dead-lettering
+    - CloudEvents schema recommended for new implementations
+    friendly_name: event-grid
+  Microsoft.KeyVault/vaults:
     display_name: Azure Key Vault
     resource_provider: Microsoft.KeyVault
     resource_type: Microsoft.KeyVault/vaults
-    api_version: "2023-07-01"
+    api_version: '2023-07-01'
     private_endpoint:
       dns_zone: privatelink.vaultcore.azure.net
       group_id: vault
@@ -248,19 +304,31 @@ services:
         - Use RBAC mode (not access policies) for new vaults
         - Soft delete and purge protection enabled by default
     sdk_packages:
-      dotnet: [Azure.Security.KeyVault.Secrets, Azure.Security.KeyVault.Keys, Azure.Security.KeyVault.Certificates, Azure.Identity]
-      python: [azure-keyvault-secrets, azure-keyvault-keys, azure-keyvault-certificates, azure-identity]
-      nodejs: ["@azure/keyvault-secrets", "@azure/keyvault-keys", "@azure/keyvault-certificates", "@azure/identity"]
+      dotnet:
+      - Azure.Security.KeyVault.Secrets
+      - Azure.Security.KeyVault.Keys
+      - Azure.Security.KeyVault.Certificates
+      - Azure.Identity
+      python:
+      - azure-keyvault-secrets
+      - azure-keyvault-keys
+      - azure-keyvault-certificates
+      - azure-identity
+      nodejs:
+      - '@azure/keyvault-secrets'
+      - '@azure/keyvault-keys'
+      - '@azure/keyvault-certificates'
+      - '@azure/identity'
     special_considerations:
-      - Use RBAC mode (not access policies) for new vaults
-      - Soft delete is enabled by default
-      - Purge protection recommended for production
-
-  user-managed-identity:
+    - Use RBAC mode (not access policies) for new vaults
+    - Soft delete is enabled by default
+    - Purge protection recommended for production
+    friendly_name: key-vault
+  Microsoft.ManagedIdentity/userAssignedIdentities:
     display_name: User-Assigned Managed Identity
     resource_provider: Microsoft.ManagedIdentity
     resource_type: Microsoft.ManagedIdentity/userAssignedIdentities
-    api_version: "2023-07-31-preview"
+    api_version: 2023-07-31-preview
     private_endpoint:
       dns_zone: null
       group_id: null
@@ -275,23 +343,22 @@ services:
         - This resource IS the authentication mechanism for other services
         - No authentication needed for the identity resource itself
     sdk_packages:
-      dotnet: [Azure.Identity]
-      python: [azure-identity]
-      nodejs: ["@azure/identity"]
+      dotnet:
+      - Azure.Identity
+      python:
+      - azure-identity
+      nodejs:
+      - '@azure/identity'
     special_considerations:
-      - Create early in deployment sequence
-      - Assign to resources that need to authenticate
-      - RBAC roles assigned TO this identity for resource access
-
-  # ---------------------------------------------------------------------------
-  # AI & Cognitive Services
-  # ---------------------------------------------------------------------------
-
-  azure-openai:
+    - Create early in deployment sequence
+    - Assign to resources that need to authenticate
+    - RBAC roles assigned TO this identity for resource access
+    friendly_name: user-managed-identity
+  Microsoft.CognitiveServices/accounts:
     display_name: Azure OpenAI Service
     resource_provider: Microsoft.CognitiveServices
     resource_type: Microsoft.CognitiveServices/accounts
-    api_version: "2024-04-01-preview"
+    api_version: 2024-04-01-preview
     private_endpoint:
       dns_zone: privatelink.openai.azure.com
       group_id: account
@@ -308,56 +375,26 @@ services:
         - Disable local (key-based) authentication for production
         - Model deployments managed separately from account
     sdk_packages:
-      dotnet: [Azure.AI.OpenAI, Azure.Identity]
-      python: [openai, azure-identity]
-      nodejs: [openai, "@azure/identity"]
+      dotnet:
+      - Azure.AI.OpenAI
+      - Azure.Identity
+      python:
+      - openai
+      - azure-identity
+      nodejs:
+      - openai
+      - '@azure/identity'
     special_considerations:
-      - Model deployments are separate from account creation
-      - Regional availability varies by model
-      - Quota limits apply per subscription/region
-      - Content filtering policies apply by default
-
-  cognitive-search:
-    display_name: Azure AI Search
-    resource_provider: Microsoft.Search
-    resource_type: Microsoft.Search/searchServices
-    api_version: "2024-03-01-preview"
-    private_endpoint:
-      dns_zone: privatelink.search.windows.net
-      group_id: searchService
-    rbac_roles:
-      data_read: Search Index Data Reader
-      data_write: Search Index Data Contributor
-      admin: Search Service Contributor
-    rbac_role_ids:
-      data_read: 1407120a-92aa-4202-b7e9-c0e197c71c8f
-      data_write: 8ebe5a00-799e-43f5-93ac-243d3dce84a7
-    authentication:
-      method: RBAC with Managed Identity or API key
-      token_scope: https://search.azure.com/.default
-      notes: |
-        - RBAC authentication preferred over API keys for production
-        - Disable API key access when RBAC is fully configured
-        - Supports both data-plane and control-plane RBAC
-    sdk_packages:
-      dotnet: [Azure.Search.Documents, Azure.Identity]
-      python: [azure-search-documents, azure-identity]
-      nodejs: ["@azure/search-documents", "@azure/identity"]
-    special_considerations:
-      - Index schema changes may require reindexing
-      - Semantic ranking requires Standard tier or higher
-      - Integrated vectorization available for AI-enriched search
-      - Skillsets enable AI enrichment during indexing
-
-  # ---------------------------------------------------------------------------
-  # Compute & Containers
-  # ---------------------------------------------------------------------------
-
-  container-apps:
-    display_name: Azure Container Apps
+    - Model deployments are separate from account creation
+    - Regional availability varies by model
+    - Quota limits apply per subscription/region
+    - Content filtering policies apply by default
+    friendly_name: azure-openai
+  Microsoft.App/containerApps:
+    display_name: Azure Container App
     resource_provider: Microsoft.App
-    resource_type: Microsoft.App/containerApps, Microsoft.App/managedEnvironments
-    api_version: "2024-03-01"
+    resource_type: Microsoft.App/containerApps
+    api_version: '2024-03-01'
     private_endpoint:
       dns_zone: null
       group_id: null
@@ -372,20 +409,60 @@ services:
         - Uses workload identity for outbound connections
         - No private endpoint; VNet integration via environment
     sdk_packages:
-      dotnet: [Azure.ResourceManager.AppContainers, Azure.Identity]
-      python: [azure-mgmt-appcontainers, azure-identity]
-      nodejs: ["@azure/arm-appcontainers", "@azure/identity"]
+      dotnet:
+      - Azure.ResourceManager.AppContainers
+      - Azure.Identity
+      python:
+      - azure-mgmt-appcontainers
+      - azure-identity
+      nodejs:
+      - '@azure/arm-appcontainers'
+      - '@azure/identity'
     special_considerations:
-      - Requires Container Apps Environment (with Log Analytics workspace)
-      - Requires Container Registry for images
-      - Ingress configuration determines public/private access
-      - Environment provides VNet integration (not private endpoints)
-
-  container-registry:
+    - Requires Container Apps Environment (with Log Analytics workspace)
+    - Requires Container Registry for images
+    - Ingress configuration determines public/private access
+    - Environment provides VNet integration (not private endpoints)
+    friendly_name: container-app
+  Microsoft.App/managedEnvironments:
+    display_name: Container Apps Environment
+    resource_provider: Microsoft.App
+    resource_type: Microsoft.App/managedEnvironments
+    api_version: '2024-03-01'
+    private_endpoint:
+      dns_zone: null
+      group_id: null
+    rbac_roles:
+      contributor: Contributor (scoped to app)
+    rbac_role_ids: {}
+    authentication:
+      method: User-Assigned Managed Identity attached to app
+      token_scope: null
+      notes: |
+        - Identity assigned at container app level
+        - Uses workload identity for outbound connections
+        - No private endpoint; VNet integration via environment
+    sdk_packages:
+      dotnet:
+      - Azure.ResourceManager.AppContainers
+      - Azure.Identity
+      python:
+      - azure-mgmt-appcontainers
+      - azure-identity
+      nodejs:
+      - '@azure/arm-appcontainers'
+      - '@azure/identity'
+    special_considerations:
+    - Requires Container Apps Environment (with Log Analytics workspace)
+    - Requires Container Registry for images
+    - Ingress configuration determines public/private access
+    - Environment provides VNet integration (not private endpoints)
+    friendly_name: container-app-environment
+  Microsoft.ContainerRegistry/registries:
     display_name: Azure Container Registry
     resource_provider: Microsoft.ContainerRegistry
     resource_type: Microsoft.ContainerRegistry/registries
-    api_version: "2023-11-01-preview"
+    api_version: 2023-11-01-preview
     private_endpoint:
       dns_zone: privatelink.azurecr.io
       group_id: registry
@@ -404,45 +481,24 @@ services:
         - Use AcrPull role for container runtimes
         - Token-based repository-scoped access available
     sdk_packages:
-      dotnet: [Azure.Containers.ContainerRegistry, Azure.Identity]
-      python: [azure-containerregistry, azure-identity]
-      nodejs: ["@azure/container-registry", "@azure/identity"]
+      dotnet:
+      - Azure.Containers.ContainerRegistry
+      - Azure.Identity
+      python:
+      - azure-containerregistry
+      - azure-identity
+      nodejs:
+      - '@azure/container-registry'
+      - '@azure/identity'
     special_considerations:
-      - Premium tier required for private endpoints and geo-replication
-      - Image vulnerability scanning available with Defender for Containers
-
-  azure-functions:
-    display_name: Azure Functions
+    - Premium tier required for private endpoints and geo-replication
+    - Image vulnerability scanning available with Defender for Containers
+    friendly_name: container-registry
+  Microsoft.Web/sites:
+    display_name: Azure App Service
     resource_provider: Microsoft.Web
     resource_type: Microsoft.Web/sites
-    api_version: "2023-12-01"
-    private_endpoint:
-      dns_zone: privatelink.azurewebsites.net
-      group_id: sites
-    rbac_roles:
-      contributor: Website Contributor
-    rbac_role_ids: {}
-    authentication:
-      method: User-Assigned Managed Identity attached to function app
-      token_scope: null
-      notes: |
-        - Identity assigned at function app level
-        - Use managed identity for connections to other Azure services
-    sdk_packages:
-      dotnet: [Microsoft.Azure.Functions.Worker, Azure.Identity]
-      python: [azure-functions, azure-identity]
-      nodejs: ["@azure/functions", "@azure/identity"]
-    special_considerations:
-      - Requires App Service Plan or Consumption plan
-      - Requires Storage Account for runtime
-      - Can use VNet integration for outbound
-      - Flex Consumption plan offers per-function scaling
-
-  app-service:
-    display_name: Azure Web App (App Service)
-    resource_provider: Microsoft.Web
-    resource_type: Microsoft.Web/sites, Microsoft.Web/serverfarms
-    api_version: "2023-12-01"
+    api_version: '2023-12-01'
     private_endpoint:
       dns_zone: privatelink.azurewebsites.net
       group_id: sites
@@ -456,24 +512,60 @@ services:
         - Identity assigned at web app level
         - Easy Auth available for end-user authentication
     sdk_packages:
-      dotnet: [Azure.ResourceManager.AppService, Azure.Identity]
-      python: [azure-mgmt-web, azure-identity]
-      nodejs: ["@azure/arm-appservice", "@azure/identity"]
+      dotnet:
+      - Azure.ResourceManager.AppService
+      - Azure.Identity
+      python:
+      - azure-mgmt-web
+      - azure-identity
+      nodejs:
+      - '@azure/arm-appservice'
+      - '@azure/identity'
     special_considerations:
-      - Requires App Service Plan
-      - Can use VNet integration for outbound
-      - Supports deployment slots
-      - Always-on setting required for production workloads
-
-  # ---------------------------------------------------------------------------
-  # API & Integration
-  # ---------------------------------------------------------------------------
-
-  api-management:
+    - Requires App Service Plan
+    - Can use VNet integration for outbound
+    - Supports deployment slots
+    - Always-on setting required for production workloads
+    friendly_name: app-service
+    kind: app
+  Microsoft.Web/serverfarms:
+    display_name: App Service Plan
+    resource_provider: Microsoft.Web
+    resource_type: Microsoft.Web/serverfarms
+    api_version: '2023-12-01'
+    private_endpoint:
+      dns_zone: privatelink.azurewebsites.net
+      group_id: sites
+    rbac_roles:
+      contributor: Website Contributor
+    rbac_role_ids: {}
+    authentication:
+      method: User-Assigned Managed Identity attached to web app
+      token_scope: null
+      notes: |
+        - Identity assigned at web app level
+        - Easy Auth available for end-user authentication
+    sdk_packages:
+      dotnet:
+      - Azure.ResourceManager.AppService
+      - Azure.Identity
+      python:
+      - azure-mgmt-web
+      - azure-identity
+      nodejs:
+      - '@azure/arm-appservice'
+      - '@azure/identity'
+    special_considerations:
+    - Requires App Service Plan
+    - Can use VNet integration for outbound
+    - Supports deployment slots
+    - Always-on setting required for production workloads
+    friendly_name: app-service-plan
+  Microsoft.ApiManagement/service:
     display_name: Azure API Management
     resource_provider: Microsoft.ApiManagement
     resource_type: Microsoft.ApiManagement/service
-    api_version: "2023-09-01-preview"
+    api_version: 2023-09-01-preview
     private_endpoint:
       dns_zone: privatelink.azure-api.net
       group_id: Gateway
@@ -489,20 +581,26 @@ services:
         - Configure authentication policies in APIM
         - Subscription keys for consumer-facing access control
     sdk_packages:
-      dotnet: [Azure.ResourceManager.ApiManagement, Azure.Identity]
-      python: [azure-mgmt-apimanagement, azure-identity]
-      nodejs: ["@azure/arm-apimanagement", "@azure/identity"]
+      dotnet:
+      - Azure.ResourceManager.ApiManagement
+      - Azure.Identity
+      python:
+      - azure-mgmt-apimanagement
+      - azure-identity
+      nodejs:
+      - '@azure/arm-apimanagement'
+      - '@azure/identity'
     special_considerations:
-      - Long deployment times (30-45 minutes)
-      - Multiple SKU tiers with different capabilities
-      - VNet integration modes (external/internal)
-      - v2 SKUs offer faster deployment and scaling
-
-  signalr:
+    - Long deployment times (30-45 minutes)
+    - Multiple SKU tiers with different capabilities
+    - VNet integration modes (external/internal)
+    - v2 SKUs offer faster deployment and scaling
+    friendly_name: api-management
+  Microsoft.SignalRService/signalR:
     display_name: Azure SignalR Service
     resource_provider: Microsoft.SignalRService
     resource_type: Microsoft.SignalRService/signalR
-    api_version: "2024-03-01"
+    api_version: '2024-03-01'
     private_endpoint:
       dns_zone: privatelink.service.signalr.net
       group_id: signalr
@@ -517,24 +615,24 @@ services:
         - Use AAD authentication instead of connection strings in production
         - SignalR App Server role required for server-side connections
     sdk_packages:
-      dotnet: [Microsoft.Azure.SignalR, Azure.Identity]
+      dotnet:
+      - Microsoft.Azure.SignalR
+      - Azure.Identity
       python: []
-      nodejs: ["@microsoft/signalr", "@azure/identity"]
+      nodejs:
+      - '@microsoft/signalr'
+      - '@azure/identity'
     special_considerations:
-      - No dedicated Python SDK; use REST API or Azure Functions bindings
-      - Serverless mode available for event-driven architectures
-      - Consider connection limits per unit
-      - Upstream URL configuration for serverless mode
-
-  # ---------------------------------------------------------------------------
-  # Monitoring & Observability
-  # ---------------------------------------------------------------------------
-
-  app-insights:
+    - No dedicated Python SDK; use REST API or Azure Functions bindings
+    - Serverless mode available for event-driven architectures
+    - Consider connection limits per unit
+    - Upstream URL configuration for serverless mode
+    friendly_name: signalr
+  Microsoft.Insights/components:
     display_name: Application Insights
     resource_provider: Microsoft.Insights
     resource_type: Microsoft.Insights/components
-    api_version: "2020-02-02"
+    api_version: '2020-02-02'
     private_endpoint:
       dns_zone: null
       group_id: null
@@ -550,19 +648,25 @@ services:
         - Connection string does not contain secrets (just instrumentation key)
         - OpenTelemetry-based SDKs recommended for new projects
     sdk_packages:
-      dotnet: [Microsoft.ApplicationInsights.AspNetCore, Azure.Monitor.OpenTelemetry.AspNetCore]
-      python: [opencensus-ext-azure, azure-monitor-opentelemetry]
-      nodejs: [applicationinsights, "@azure/monitor-opentelemetry"]
+      dotnet:
+      - Microsoft.ApplicationInsights.AspNetCore
+      - Azure.Monitor.OpenTelemetry.AspNetCore
+      python:
+      - opencensus-ext-azure
+      - azure-monitor-opentelemetry
+      nodejs:
+      - applicationinsights
+      - '@azure/monitor-opentelemetry'
     special_considerations:
-      - Requires Log Analytics workspace
-      - Connection string safe to include in config (not a secret)
-      - OpenTelemetry distro is the modern recommended approach
-
-  log-analytics:
+    - Requires Log Analytics workspace
+    - Connection string safe to include in config (not a secret)
+    - OpenTelemetry distro is the modern recommended approach
+    friendly_name: app-insights
+  Microsoft.OperationalInsights/workspaces:
     display_name: Log Analytics Workspace
     resource_provider: Microsoft.OperationalInsights
     resource_type: Microsoft.OperationalInsights/workspaces
-    api_version: "2023-09-01"
+    api_version: '2023-09-01'
     private_endpoint:
       dns_zone: privatelink.oms.opinsights.azure.com
       group_id: azuremonitor
@@ -576,24 +680,26 @@ services:
         - Query/management access via Log Analytics Reader (73c42c96) or Contributor (92aaf0da)
           should be assigned post-deployment to user/operator identities, not application identities
     sdk_packages:
-      dotnet: [Azure.Monitor.Query, Azure.Identity]
-      python: [azure-monitor-query, azure-identity]
-      nodejs: ["@azure/monitor-query", "@azure/identity"]
+      dotnet:
+      - Azure.Monitor.Query
+      - Azure.Identity
+      python:
+      - azure-monitor-query
+      - azure-identity
+      nodejs:
+      - '@azure/monitor-query'
+      - '@azure/identity'
     special_considerations:
-      - Foundation for most monitoring scenarios
-      - Required by App Insights, Container Apps Environment
-      - Consider data retention settings and cost implications
-      - Dedicated clusters available for high-volume scenarios
-
-  # ---------------------------------------------------------------------------
-  # Additional Compute
-  # ---------------------------------------------------------------------------
-
-  aks:
+    - Foundation for most monitoring scenarios
+    - Required by App Insights, Container Apps Environment
+    - Consider data retention settings and cost implications
+    - Dedicated clusters available for high-volume scenarios
+    friendly_name: log-analytics
+  Microsoft.ContainerService/managedClusters:
     display_name: Azure Kubernetes Service
     resource_provider: Microsoft.ContainerService
     resource_type: Microsoft.ContainerService/managedClusters
-    api_version: "2024-03-02-preview"
+    api_version: 2024-03-02-preview
     private_endpoint:
       dns_zone: privatelink.<region>.azmk8s.io
       group_id: management
@@ -615,20 +721,26 @@ services:
         - OIDC issuer must be enabled on cluster
         - Federated identity credentials link K8s service accounts to Azure identities
     sdk_packages:
-      dotnet: [Azure.ResourceManager.ContainerService, Azure.Identity]
-      python: [azure-mgmt-containerservice, azure-identity]
-      nodejs: ["@azure/arm-containerservice", "@azure/identity"]
+      dotnet:
+      - Azure.ResourceManager.ContainerService
+      - Azure.Identity
+      python:
+      - azure-mgmt-containerservice
+      - azure-identity
+      nodejs:
+      - '@azure/arm-containerservice'
+      - '@azure/identity'
     special_considerations:
-      - Network plugin choice (Azure CNI vs kubenet) is permanent
-      - System node pool minimum VM size is Standard_B2s
-      - AcrPull role must be on kubelet identity, not cluster identity
-      - Private cluster requires VPN/bastion for API server access
-
-  virtual-machines:
+    - Network plugin choice (Azure CNI vs kubenet) is permanent
+    - System node pool minimum VM size is Standard_B2s
+    - AcrPull role must be on kubelet identity, not cluster identity
+    - Private cluster requires VPN/bastion for API server access
+    friendly_name: aks
+  Microsoft.Compute/virtualMachines:
     display_name: Azure Virtual Machines
     resource_provider: Microsoft.Compute
     resource_type: Microsoft.Compute/virtualMachines
-    api_version: "2024-03-01"
+    api_version: '2024-03-01'
     private_endpoint:
       dns_zone: null
       group_id: null
@@ -648,20 +760,26 @@ services:
         - Managed identity for Azure service access from VM
         - Azure AD login available as alternative to local accounts
     sdk_packages:
-      dotnet: [Azure.ResourceManager.Compute, Azure.Identity]
-      python: [azure-mgmt-compute, azure-identity]
-      nodejs: ["@azure/arm-compute", "@azure/identity"]
+      dotnet:
+      - Azure.ResourceManager.Compute
+      - Azure.Identity
+      python:
+      - azure-mgmt-compute
+      - azure-identity
+      nodejs:
+      - '@azure/arm-compute'
+      - '@azure/identity'
     special_considerations:
-      - VMs are IaaS -- require OS patching and security hardening
-      - Always configure auto-shutdown for non-production
-      - Use Azure Bastion instead of public IPs for management
-      - Windows VM names limited to 15 characters
-
-  static-web-apps:
+    - VMs are IaaS -- require OS patching and security hardening
+    - Always configure auto-shutdown for non-production
+    - Use Azure Bastion instead of public IPs for management
+    - Windows VM names limited to 15 characters
+    friendly_name: virtual-machines
+  Microsoft.Web/staticSites:
     display_name: Azure Static Web Apps
     resource_provider: Microsoft.Web
     resource_type: Microsoft.Web/staticSites
-    api_version: "2023-12-01"
+    api_version: '2023-12-01'
     private_endpoint:
       dns_zone: privatelink.azurestaticapps.net
       group_id: staticSites
@@ -676,24 +794,26 @@ services:
         - Custom auth available on Standard tier
         - API key used for deployment, not data access
     sdk_packages:
-      dotnet: [Azure.ResourceManager.AppService, Azure.Identity]
-      python: [azure-mgmt-web, azure-identity]
-      nodejs: ["@azure/arm-appservice", "@azure/identity"]
+      dotnet:
+      - Azure.ResourceManager.AppService
+      - Azure.Identity
+      python:
+      - azure-mgmt-web
+      - azure-identity
+      nodejs:
+      - '@azure/arm-appservice'
+      - '@azure/identity'
     special_considerations:
-      - Free tier has no SLA
-      - Managed Functions only support Node.js and Python
-      - All API routes must start with /api/
-      - Standard tier required for private endpoints and linked backends
-
-  # ---------------------------------------------------------------------------
-  # Networking
-  # ---------------------------------------------------------------------------
-
-  front-door:
+    - Free tier has no SLA
+    - Managed Functions only support Node.js and Python
+    - All API routes must start with /api/
+    - Standard tier required for private endpoints and linked backends
+    friendly_name: static-web-apps
+  Microsoft.Cdn/profiles:
     display_name: Azure Front Door
     resource_provider: Microsoft.Cdn
     resource_type: Microsoft.Cdn/profiles
-    api_version: "2024-02-01"
+    api_version: '2024-02-01'
     private_endpoint:
       dns_zone: null
       group_id: null
@@ -709,24 +829,26 @@ services:
         - WAF policies for request filtering (Premium tier)
         - Private Link origins for secure backend connectivity (Premium tier)
     sdk_packages:
-      dotnet: [Azure.ResourceManager.Cdn, Azure.Identity]
-      python: [azure-mgmt-cdn, azure-identity]
-      nodejs: ["@azure/arm-cdn", "@azure/identity"]
+      dotnet:
+      - Azure.ResourceManager.Cdn
+      - Azure.Identity
+      python:
+      - azure-mgmt-cdn
+      - azure-identity
+      nodejs:
+      - '@azure/arm-cdn'
+      - '@azure/identity'
     special_considerations:
-      - Standard = CDN + routing; Premium = WAF + Private Link origins
-      - Profile changes take 10-20 minutes to propagate globally
-      - WAF policy names cannot contain hyphens
-      - DNS CNAME validation required for custom domains
-
-  # ---------------------------------------------------------------------------
-  # Data & Analytics
-  # ---------------------------------------------------------------------------
-
-  postgresql:
+    - Standard = CDN + routing; Premium = WAF + Private Link origins
+    - Profile changes take 10-20 minutes to propagate globally
+    - WAF policy names cannot contain hyphens
+    - DNS CNAME validation required for custom domains
+    friendly_name: front-door
+  Microsoft.DBforPostgreSQL/flexibleServers:
     display_name: Azure Database for PostgreSQL (Flexible Server)
     resource_provider: Microsoft.DBforPostgreSQL
     resource_type: Microsoft.DBforPostgreSQL/flexibleServers
-    api_version: "2023-12-01-preview"
+    api_version: 2023-12-01-preview
     private_endpoint:
       dns_zone: privatelink.postgres.database.azure.com
       group_id: postgresqlServer
@@ -743,20 +865,26 @@ services:
         - Managed identity creates AAD database roles via SQL
         - Token refresh needed for long connections (~1 hour expiry)
     sdk_packages:
-      dotnet: [Npgsql, Azure.Identity]
-      python: [psycopg2-binary, azure-identity]
-      nodejs: [pg, "@azure/identity"]
+      dotnet:
+      - Npgsql
+      - Azure.Identity
+      python:
+      - psycopg2-binary
+      - azure-identity
+      nodejs:
+      - pg
+      - '@azure/identity'
     special_considerations:
-      - VNet integration (delegated subnet) is set at creation time
-      - AAD role creation requires AAD admin to run SQL commands post-deployment
-      - pgvector extension must be explicitly enabled
-      - Burstable tier has limited IOPS
-
-  azure-ai-search:
+    - VNet integration (delegated subnet) is set at creation time
+    - AAD role creation requires AAD admin to run SQL commands post-deployment
+    - pgvector extension must be explicitly enabled
+    - Burstable tier has limited IOPS
+    friendly_name: postgresql
+  Microsoft.Search/searchServices:
     display_name: Azure AI Search
     resource_provider: Microsoft.Search
     resource_type: Microsoft.Search/searchServices
-    api_version: "2024-03-01-preview"
+    api_version: 2024-03-01-preview
     private_endpoint:
       dns_zone: privatelink.search.windows.net
       group_id: searchService
@@ -776,20 +904,26 @@ services:
         - Set disableLocalAuth=true when RBAC fully configured
         - Supports both data-plane and control-plane RBAC
     sdk_packages:
-      dotnet: [Azure.Search.Documents, Azure.Identity]
-      python: [azure-search-documents, azure-identity]
-      nodejs: ["@azure/search-documents", "@azure/identity"]
+      dotnet:
+      - Azure.Search.Documents
+      - Azure.Identity
+      python:
+      - azure-search-documents
+      - azure-identity
+      nodejs:
+      - '@azure/search-documents'
+      - '@azure/identity'
     special_considerations:
-      - Index schema changes may require full reindex
-      - Semantic ranker free tier limited to 1000 queries/month
-      - Vector dimensions must match embedding model
-      - Integrated vectorization is preview; push model more mature
-
-  databricks:
+    - Index schema changes may require full reindex
+    - Semantic ranker free tier limited to 1000 queries/month
+    - Vector dimensions must match embedding model
+    - Integrated vectorization is preview; push model more mature
+    friendly_name: azure-ai-search
+  Microsoft.Databricks/workspaces:
     display_name: Azure Databricks
     resource_provider: Microsoft.Databricks
     resource_type: Microsoft.Databricks/workspaces
-    api_version: "2024-05-01"
+    api_version: '2024-05-01'
     private_endpoint:
       dns_zone: privatelink.azuredatabricks.net
       group_id: databricks_ui_api
@@ -804,20 +938,26 @@ services:
         - Data access via Unity Catalog grants (not ARM RBAC)
         - Databricks secret scopes for credential management
     sdk_packages:
-      dotnet: [Azure.ResourceManager.Databricks, Azure.Identity]
-      python: [databricks-sdk, azure-identity]
-      nodejs: ["@azure/arm-databricks", "@azure/identity"]
+      dotnet:
+      - Azure.ResourceManager.Databricks
+      - Azure.Identity
+      python:
+      - databricks-sdk
+      - azure-identity
+      nodejs:
+      - '@azure/arm-databricks'
+      - '@azure/identity'
     special_considerations:
-      - Premium tier required for Unity Catalog, RBAC, audit logs
-      - VNet injection subnet sizing critical (/26 minimum)
-      - DBU pricing varies by workload type (Jobs < All-Purpose)
-      - Managed resource group must not already exist
-
-  data-factory:
+    - Premium tier required for Unity Catalog, RBAC, audit logs
+    - VNet injection subnet sizing critical (/26 minimum)
+    - DBU pricing varies by workload type (Jobs < All-Purpose)
+    - Managed resource group must not already exist
+    friendly_name: databricks
+  Microsoft.DataFactory/factories:
     display_name: Azure Data Factory
     resource_provider: Microsoft.DataFactory
     resource_type: Microsoft.DataFactory/factories
-    api_version: "2018-06-01"
+    api_version: '2018-06-01'
     private_endpoint:
       dns_zone: privatelink.datafactory.azure.net
       group_id: dataFactory
@@ -833,20 +973,26 @@ services:
         - Grant identity RBAC roles on each connected resource
         - Self-hosted IR for on-premises data sources
     sdk_packages:
-      dotnet: [Azure.ResourceManager.DataFactory, Azure.Identity]
-      python: [azure-mgmt-datafactory, azure-identity]
-      nodejs: ["@azure/arm-datafactory", "@azure/identity"]
+      dotnet:
+      - Azure.ResourceManager.DataFactory
+      - Azure.Identity
+      python:
+      - azure-mgmt-datafactory
+      - azure-identity
+      nodejs:
+      - '@azure/arm-datafactory'
+      - '@azure/identity'
     special_considerations:
-      - Self-hosted integration runtime needed for on-premises
-      - Mapping data flow has 3-5 minute cold start
-      - Pipeline JSON ordering causes Terraform plan drift
-      - Schedule triggers default to UTC timezone
-
-  fabric:
+    - Self-hosted integration runtime needed for on-premises
+    - Mapping data flow has 3-5 minute cold start
+    - Pipeline JSON ordering causes Terraform plan drift
+    - Schedule triggers default to UTC timezone
+    friendly_name: data-factory
+  Microsoft.Fabric/capacities:
     display_name: Microsoft Fabric
     resource_provider: Microsoft.Fabric
     resource_type: Microsoft.Fabric/capacities
-    api_version: "2023-11-01"
+    api_version: '2023-11-01'
     private_endpoint:
       dns_zone: null
       group_id: fabric
@@ -861,38 +1007,75 @@ services:
         - Workspace roles (Admin/Member/Contributor/Viewer) via Fabric API
         - OneLake access governed by workspace permissions
     sdk_packages:
-      dotnet: [Azure.ResourceManager.Fabric, Azure.Identity]
-      python: [azure-mgmt-fabric, azure-identity]
-      nodejs: ["@azure/arm-fabric", "@azure/identity"]
+      dotnet:
+      - Azure.ResourceManager.Fabric
+      - Azure.Identity
+      python:
+      - azure-mgmt-fabric
+      - azure-identity
+      nodejs:
+      - '@azure/arm-fabric'
+      - '@azure/identity'
     special_considerations:
-      - Capacity vs workspace distinction (ARM vs SaaS)
-      - F2 is smallest capacity SKU (~$0.36/hr)
-      - 60-day free trial available per tenant
-      - No VNet injection; use managed private endpoints
-      - Workspaces cannot be created via Terraform/Bicep
-
-  # ---------------------------------------------------------------------------
-  # Common / Cross-Cutting Resources
-  # ---------------------------------------------------------------------------
-
-  diagnostic-settings:
+    - Capacity vs workspace distinction (ARM vs SaaS)
+    - F2 is smallest capacity SKU (~$0.36/hr)
+    - 60-day free trial available per tenant
+    - No VNet injection; use managed private endpoints
+    - Workspaces cannot be created via Terraform/Bicep
+    friendly_name: fabric
+  Microsoft.Insights/diagnosticSettings:
     display_name: Diagnostic Settings
     resource_provider: Microsoft.Insights
     resource_type: Microsoft.Insights/diagnosticSettings
-    api_version: "2021-05-01-preview"
+    api_version: 2021-05-01-preview
     notes: |
       - Extension resource — does NOT support tags
       - API version @2021-05-01-preview required for categoryGroup ("allLogs") support
       - Older @2016-09-01 only supports individual category names, NOT categoryGroup
       - NSGs do NOT support diagnostic settings (no log or metric categories)
       - VNets support ONLY AllMetrics, NOT log categories
-
-  role-assignments:
+    friendly_name: diagnostic-settings
+  Microsoft.Authorization/roleAssignments:
     display_name: Role Assignments
     resource_provider: Microsoft.Authorization
     resource_type: Microsoft.Authorization/roleAssignments
-    api_version: "2022-04-01"
+    api_version: '2022-04-01'
     notes: |
       - Extension resource — does NOT support tags
       - Use deterministic names via uuidv5() for idempotent plans
       - Scope to the narrowest resource, not resource group or subscription
+    friendly_name: role-assignments
+  Microsoft.Web/sites#functionapp:
+    display_name: Azure Functions
+    resource_provider: Microsoft.Web
+    resource_type: Microsoft.Web/sites
+    api_version: '2023-12-01'
+    private_endpoint:
+      dns_zone: privatelink.azurewebsites.net
+      group_id: sites
+    rbac_roles:
+      contributor: Website Contributor
+    rbac_role_ids: {}
+    authentication:
+      method: User-Assigned Managed Identity attached to function app
+      token_scope: null
+      notes: |
+        - Identity assigned at function app level
+        - Use managed identity for connections to other Azure services
+    sdk_packages:
+      dotnet:
+      - Microsoft.Azure.Functions.Worker
+      - Azure.Identity
+      python:
+      - azure-functions
+      - azure-identity
+      nodejs:
+      - '@azure/functions'
+      - '@azure/identity'
+    special_considerations:
+    - Requires App Service Plan or Consumption plan
+    - Requires Storage Account for runtime
+    - Can use VNet integration for outbound
+    - Flex Consumption plan offers per-function scaling
+    friendly_name: azure-functions
+    kind: functionapp
