@@ -18,6 +18,8 @@ patterns:
           - 'sku_name = "p3v3"'
         safe_patterns:
           - "sku_name = var."
+          - 'sku_name = "B1"'
+          - 'sku_name = "S1"'
           - 'sku_name = "Y1"'
         correct_patterns:
           - 'sku_name = "B1"'
