@@ -48,10 +48,11 @@ class TestStandardsLoader:
             for p in s.principles:
                 assert p.id, f"Principle missing id in {s.domain}"
 
-    def test_all_principles_have_name(self):
+    def test_all_principles_have_description_from_name(self):
+        """Name is now merged into description — description is the required field."""
         for s in load():
             for p in s.principles:
-                assert p.name, f"Principle missing name in {s.domain}: {p.id}"
+                assert p.description, f"Principle missing description in {s.domain}: {p.id}"
 
     def test_all_principles_have_description(self):
         for s in load():
@@ -60,13 +61,13 @@ class TestStandardsLoader:
 
     def test_design_principles_loaded(self):
         loaded = load()
-        domains = {s.domain for s in loaded}
-        assert "Design Principles" in domains
+        categories = {s.category for s in loaded}
+        assert "principles" in categories
 
     def test_coding_standards_loaded(self):
         loaded = load()
-        domains = {s.domain for s in loaded}
-        assert "Coding Standards" in domains
+        categories = {s.category for s in loaded}
+        assert "principles" in categories
 
     def test_load_is_cached(self):
         first = load()
@@ -89,18 +90,19 @@ class TestStandardsLoader:
 
     def test_load_from_custom_directory(self, tmp_path):
         yaml_content = (
-            "domain: Custom\n"
+            "kind: standard\n"
             "category: test\n"
+            "description: Custom test standard\n"
+            "last_updated: '2026-04-04'\n"
             "principles:\n"
             "  - id: TST-001\n"
-            "    name: Test Principle\n"
             "    description: A test principle\n"
         )
         (tmp_path / "custom.yaml").write_text(yaml_content)
         reset_cache()
         loaded = load(directory=tmp_path)
         assert len(loaded) == 1
-        assert loaded[0].domain == "Custom"
+        assert loaded[0].category == "test"
         assert loaded[0].principles[0].id == "TST-001"
 
 
@@ -176,22 +178,22 @@ class TestPrincipleContent:
 
     def test_terraform_standards_loaded(self):
         loaded = load()
-        domains = {s.domain for s in loaded}
-        assert "Terraform Module Structure" in domains
+        categories = {s.category for s in loaded}
+        assert "terraform" in categories
 
     def test_bicep_standards_loaded(self):
         loaded = load()
-        domains = {s.domain for s in loaded}
-        assert "Bicep Module Structure" in domains
+        categories = {s.category for s in loaded}
+        assert "bicep" in categories
 
     def test_python_standards_loaded(self):
         loaded = load()
-        domains = {s.domain for s in loaded}
-        assert "Python Application Standards" in domains
+        categories = {s.category for s in loaded}
+        assert "application" in categories
 
     def test_terraform_has_file_layout(self):
         loaded = load()
-        tf_standards = [s for s in loaded if s.domain == "Terraform Module Structure"]
+        tf_standards = [s for s in loaded if s.category == "terraform"]
         assert len(tf_standards) == 1
         ids = {p.id for p in tf_standards[0].principles}
         assert "STAN-TF-001" in ids
@@ -199,7 +201,7 @@ class TestPrincipleContent:
 
     def test_bicep_has_module_composition(self):
         loaded = load()
-        bcp_standards = [s for s in loaded if s.domain == "Bicep Module Structure"]
+        bcp_standards = [s for s in loaded if s.category == "bicep"]
         assert len(bcp_standards) == 1
         ids = {p.id for p in bcp_standards[0].principles}
         assert "STAN-BCP-001" in ids
@@ -207,7 +209,7 @@ class TestPrincipleContent:
 
     def test_python_has_default_credential(self):
         loaded = load()
-        py_standards = [s for s in loaded if s.domain == "Python Application Standards"]
+        py_standards = [s for s in loaded if s.category == "application" and "Python" in s.description]
         assert len(py_standards) == 1
         ids = {p.id for p in py_standards[0].principles}
         assert "STAN-PY-001" in ids

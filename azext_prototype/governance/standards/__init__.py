@@ -37,8 +37,9 @@ class StandardPrinciple:
     """A single design principle or coding standard."""
 
     id: str
-    name: str
+    name: str  # kept for backward compat; new format merges into description
     description: str
+    rationale: str = ""
     applies_to: list[str] = field(default_factory=list)
     examples: list[str] = field(default_factory=list)
 
@@ -47,9 +48,10 @@ class StandardPrinciple:
 class Standard:
     """A loaded standards document."""
 
-    domain: str
+    domain: str  # maps to description in new format
     category: str
     description: str = ""
+    last_updated: str = ""
     principles: list[StandardPrinciple] = field(default_factory=list)
 
 
@@ -81,6 +83,7 @@ def load(directory: Path | None = None) -> list[Standard]:
                     id=entry.get("id", ""),
                     name=entry.get("name", ""),
                     description=entry.get("description", ""),
+                    rationale=entry.get("rationale", ""),
                     applies_to=entry.get("applies_to", []),
                     examples=entry.get("examples", []),
                 )
@@ -89,9 +92,10 @@ def load(directory: Path | None = None) -> list[Standard]:
         if principles:
             standards.append(
                 Standard(
-                    domain=data.get("domain", yaml_file.stem),
+                    domain=data.get("description", yaml_file.stem),
                     category=data.get("category", str(yaml_file.parent.relative_to(target))),
                     description=data.get("description", ""),
+                    last_updated=data.get("last_updated", ""),
                     principles=principles,
                 )
             )

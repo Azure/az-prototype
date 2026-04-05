@@ -33,23 +33,20 @@ def _write_policy(dest: Path, data: dict) -> Path:
 
 
 def _minimal_policy(**overrides) -> dict:
-    """Return a minimal valid policy dict, with optional overrides."""
+    """Return a minimal valid policy dict (unified format), with optional overrides."""
     base = {
-        "apiVersion": "v1",
         "kind": "policy",
-        "metadata": {
-            "name": "test-service",
-            "category": "azure",
-            "services": ["container-apps"],
-            "last_reviewed": "2025-01-01",
-        },
+        "category": "azure",
+        "description": "Test policy for container apps",
+        "last_updated": "2025-01-01",
         "rules": [
             {
                 "id": "T-001",
                 "severity": "required",
                 "description": "Use managed identity",
                 "rationale": "Security best practice",
-                "applies_to": ["cloud-architect", "terraform"],
+                "applies_to": ["cloud-architect", "terraform-agent"],
+                "targets": {"services": ["Microsoft.App/containerApps"]},
             },
         ],
     }
@@ -105,7 +102,7 @@ class TestPolicy:
         assert policy.patterns == []
         assert policy.anti_patterns == []
         assert policy.references == []
-        assert policy.last_reviewed == ""
+        assert policy.last_updated == ""
 
 
 # ================================================================== #
@@ -134,49 +131,19 @@ class TestValidatePolicyFile:
         errors = validate_policy_file(f)
         assert any("Root element" in e.message for e in errors)
 
-    def test_missing_metadata(self, tmp_path: Path) -> None:
+    def test_missing_required_keys_new_format(self, tmp_path: Path) -> None:
+        """New format without metadata: must have kind, category, description, last_updated."""
         f = _write_policy(tmp_path / "no-meta.policy.yaml", {"rules": []})
         errors = validate_policy_file(f)
-        assert any("metadata" in e.message for e in errors)
-
-    def test_metadata_not_dict(self, tmp_path: Path) -> None:
-        f = _write_policy(
-            tmp_path / "bad-meta.policy.yaml",
-            {"metadata": "not-a-dict", "rules": []},
-        )
-        errors = validate_policy_file(f)
-        assert any("must be a mapping" in e.message for e in errors)
-
-    def test_missing_metadata_keys(self, tmp_path: Path) -> None:
-        data = _minimal_policy()
-        del data["metadata"]["name"]
-        del data["metadata"]["services"]
-        f = _write_policy(tmp_path / "missing-keys.policy.yaml", data)
-        errors = validate_policy_file(f)
         msgs = " ".join(e.message for e in errors)
-        assert "'name'" in msgs
-        assert "'services'" in msgs
+        assert "'kind'" in msgs or "'category'" in msgs or "'description'" in msgs
 
-    def test_invalid_category_is_warning(self, tmp_path: Path) -> None:
-        data = _minimal_policy()
-        data["metadata"]["category"] = "nonsense"
-        f = _write_policy(tmp_path / "bad-cat.policy.yaml", data)
+    def test_any_category_accepted(self, tmp_path: Path) -> None:
+        """Categories are open-ended (not restricted to a fixed enum)."""
+        data = _minimal_policy(category="azure-compute")
+        f = _write_policy(tmp_path / "custom-cat.policy.yaml", data)
         errors = validate_policy_file(f)
-        warnings = [e for e in errors if e.severity == "warning"]
-        assert any("category" in w.message for w in warnings)
-
-    def test_services_not_list(self, tmp_path: Path) -> None:
-        data = _minimal_policy()
-        data["metadata"]["services"] = "not-a-list"
-        f = _write_policy(tmp_path / "svc.policy.yaml", data)
-        errors = validate_policy_file(f)
-        assert any("services must be a list" in e.message for e in errors)
-
-    def test_unsupported_api_version(self, tmp_path: Path) -> None:
-        data = _minimal_policy(apiVersion="v99")
-        f = _write_policy(tmp_path / "api.policy.yaml", data)
-        errors = validate_policy_file(f)
-        assert any("apiVersion" in e.message for e in errors)
+        assert not any("category" in e.message for e in errors)
 
     def test_unsupported_kind(self, tmp_path: Path) -> None:
         data = _minimal_policy(kind="something-else")
@@ -203,7 +170,7 @@ class TestValidatePolicyFile:
         msgs = " ".join(e.message for e in errors)
         assert "'severity'" in msgs
         assert "'description'" in msgs
-        assert "'applies_to'" in msgs
+        # applies_to is optional in the new schema
 
     def test_duplicate_rule_id(self, tmp_path: Path) -> None:
         data = _minimal_policy(
@@ -232,12 +199,12 @@ class TestValidatePolicyFile:
         errors = validate_policy_file(f)
         assert any("applies_to must be a list" in e.message for e in errors)
 
-    def test_empty_applies_to_is_warning(self, tmp_path: Path) -> None:
+    def test_empty_applies_to_accepted(self, tmp_path: Path) -> None:
+        """Empty applies_to means the rule applies to all agents (no warning)."""
         data = _minimal_policy(rules=[{"id": "E-001", "severity": "required", "description": "a", "applies_to": []}])
         f = _write_policy(tmp_path / "empty-at.policy.yaml", data)
         errors = validate_policy_file(f)
-        warnings = [e for e in errors if e.severity == "warning"]
-        assert any("applies_to is empty" in w.message for w in warnings)
+        assert not any("applies_to" in e.message for e in errors)
 
     def test_patterns_not_list(self, tmp_path: Path) -> None:
         data = _minimal_policy(patterns="not-a-list")
@@ -304,8 +271,8 @@ class TestValidatePolicyFile:
         f = tmp_path / "empty.policy.yaml"
         f.write_text("")
         errors = validate_policy_file(f)
-        # Empty YAML = None → missing metadata
-        assert any("metadata" in e.message for e in errors)
+        # Empty YAML = None → root not a mapping
+        assert any("must be a mapping" in e.message.lower() or "required key" in e.message for e in errors)
 
     def test_valid_all_sections(self, tmp_path: Path) -> None:
         data = _minimal_policy(
@@ -389,7 +356,8 @@ class TestPolicyEngine:
                         "severity": "required",
                         "description": "Use managed identity",
                         "rationale": "Security best practice",
-                        "applies_to": ["cloud-architect", "terraform"],
+                        "applies_to": ["cloud-architect", "terraform-agent"],
+                        "targets": {"services": ["Microsoft.App/containerApps"]},
                     },
                     {
                         "id": "T-002",
@@ -397,6 +365,7 @@ class TestPolicyEngine:
                         "description": "Enable logging",
                         "rationale": "",
                         "applies_to": ["cloud-architect"],
+                        "targets": {"services": ["Microsoft.App/containerApps"]},
                     },
                     {
                         "id": "T-003",
@@ -404,6 +373,7 @@ class TestPolicyEngine:
                         "description": "Use custom domains",
                         "rationale": "",
                         "applies_to": ["app-developer"],
+                        "targets": {"services": ["Microsoft.App/containerApps"]},
                     },
                 ],
                 patterns=[
@@ -455,14 +425,12 @@ class TestPolicyEngine:
         policies = engine.list_policies()
         assert len(policies) == 1
 
-    def test_load_metadata_not_dict(self, policy_dir: Path) -> None:
-        _write_policy(
-            policy_dir / "bad-meta.policy.yaml",
-            {"metadata": "not-a-dict", "rules": []},
-        )
+    def test_load_not_a_dict(self, policy_dir: Path) -> None:
+        """Non-dict root is skipped by the parser."""
+        f = policy_dir / "bad.policy.yaml"
+        f.write_text("not-a-dict", encoding="utf-8")
         engine = PolicyEngine()
         engine.load([policy_dir])
-        # _parse_policy returns None when metadata is not a dict
         assert engine.list_policies() == []
 
     def test_resolve_by_agent(self, policy_dir: Path, sample_policy_file: Path) -> None:
@@ -478,7 +446,7 @@ class TestPolicyEngine:
     def test_resolve_by_agent_and_service(self, policy_dir: Path, sample_policy_file: Path) -> None:
         engine = PolicyEngine()
         engine.load([policy_dir])
-        policies = engine.resolve("terraform", services=["container-apps"])
+        policies = engine.resolve("terraform-agent", services=["Microsoft.App/containerApps"])
         assert len(policies) == 1
         rule_ids = [r.id for r in policies[0].rules]
         assert "T-001" in rule_ids
@@ -754,14 +722,16 @@ class TestValidateMain:
         exit_code = validate_main(["/nonexistent/file.policy.yaml"])
         assert exit_code == 1
 
-    def test_strict_fails_on_warnings(self, tmp_path: Path) -> None:
-        data = _minimal_policy()
-        data["metadata"]["category"] = "nonsense"
-        f = _write_policy(tmp_path / "warn.policy.yaml", data)
-        # Without strict — warning doesn't cause failure
-        exit_code_normal = validate_main([str(f)])
-        assert exit_code_normal == 0
-        # With strict — warning causes failure
+    def test_strict_fails_on_errors(self, tmp_path: Path) -> None:
+        """Strict mode: any validation error causes exit code 1."""
+        # Create a policy with a duplicate rule ID — triggers an error
+        data = _minimal_policy(
+            rules=[
+                {"id": "DUP-001", "severity": "required", "description": "a", "applies_to": ["terraform-agent"]},
+                {"id": "DUP-001", "severity": "required", "description": "b", "applies_to": ["terraform-agent"]},
+            ]
+        )
+        f = _write_policy(tmp_path / "dup.policy.yaml", data)
         exit_code_strict = validate_main(["--strict", str(f)])
         assert exit_code_strict == 1
 

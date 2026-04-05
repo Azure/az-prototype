@@ -1,90 +1,104 @@
-# yaml-language-server: $schema=../policy.schema.json
-apiVersion: v1
 kind: policy
-metadata:
-  name: network-isolation
-  category: security
-  services: [container-apps, app-service, key-vault, sql-database, cosmos-db, storage]
-  last_reviewed: "2025-12-01"
-
+category: security
+description: Governance policies for Network Isolation
+last_updated: '2025-12-01'
 rules:
-  - id: WAF-SEC-NET-001
-    severity: required
-    description: >-
-      Disable public network access AND use private endpoints for all PaaS
-      data services.  Set publicNetworkAccess to Disabled (or
-      public_network_access_enabled to false) on every PaaS resource.
-      NEVER generate public_network_access_enabled = true or
-      publicNetworkAccess = Enabled.
-    rationale: >-
-      Eliminates public internet exposure for data plane.  Both disabling
-      public access AND adding private endpoints are required — private
-      endpoints alone do not block public access.
-    applies_to: [cloud-architect, terraform-agent, bicep-agent, biz-analyst]
-    template_check:
-      scope: [key-vault, sql-database, cosmos-db, storage]
-      require_config: [private_endpoint]
-      error_message: "Service '{service_name}' ({service_type}) missing private_endpoint: true"
-
-  - id: WAF-SEC-NET-002
-    severity: required
-    description: "Deploy workloads in a dedicated subnet within the landing zone VNET"
-    rationale: "Network segmentation enables NSG and route table controls"
-    applies_to: [cloud-architect, terraform-agent, bicep-agent, biz-analyst]
-    template_check:
-      require_service: [virtual-network]
-      error_message: "Template missing a virtual-network service for network isolation"
-
-  - id: WAF-SEC-NET-005
-    severity: required
-    description: >-
-      Every Azure PaaS resource that supports publicNetworkAccess MUST
-      explicitly set it to Disabled — including publicNetworkAccessForIngestion
-      and publicNetworkAccessForQuery on Log Analytics and Application Insights.
-      This applies to ALL environments including POC and development.
-      There are NO exceptions — POC environments MUST be secure.
-      In Terraform azapi_resource body blocks, set publicNetworkAccess = "Disabled".
-      In Bicep, set properties.publicNetworkAccess = 'Disabled'.
-    rationale: >-
-      Azure PaaS services default to public access enabled.  Omitting the
-      property results in a public endpoint.  This rule applies to POC,
-      development, AND production — there are no security exemptions for
-      non-production environments.
-    applies_to: [terraform-agent, bicep-agent]
-
-  - id: WAF-SEC-NET-003
-    severity: recommended
-    description: "Use NSGs to restrict traffic between subnets to only required ports"
-    rationale: "Defence in depth beyond private endpoints"
-    applies_to: [cloud-architect, terraform-agent, bicep-agent]
-
-  - id: WAF-SEC-NET-004
-    severity: recommended
-    description: "Enable diagnostic logging on NSGs for traffic auditing"
-    rationale: "Required for incident investigation and compliance"
-    applies_to: [cloud-architect, terraform-agent, bicep-agent]
-
+- id: WAF-SEC-NET-001
+  severity: required
+  description: Disable public network access AND use private endpoints for all PaaS data services.  Set publicNetworkAccess
+    to Disabled (or public_network_access_enabled to false) on every PaaS resource. NEVER generate public_network_access_enabled
+    = true or publicNetworkAccess = Enabled.
+  rationale: Eliminates public internet exposure for data plane.  Both disabling public access AND adding private endpoints
+    are required — private endpoints alone do not block public access.
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - biz-analyst
+  template_check:
+    scope:
+    - key-vault
+    - sql-database
+    - cosmos-db
+    - storage
+    require_config:
+    - private_endpoint
+    error_message: 'Service ''{service_name}'' ({service_type}) missing private_endpoint: true'
+  targets:
+    services: &id001
+    - Microsoft.App/containerApps
+    - Microsoft.Web/sites
+    - Microsoft.KeyVault/vaults
+    - Microsoft.Sql/servers/databases
+    - Microsoft.DocumentDB/databaseAccounts
+    - TODO:storage
+- id: WAF-SEC-NET-002
+  severity: required
+  description: Deploy workloads in a dedicated subnet within the landing zone VNET
+  rationale: Network segmentation enables NSG and route table controls
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - biz-analyst
+  template_check:
+    require_service:
+    - virtual-network
+    error_message: Template missing a virtual-network service for network isolation
+  targets:
+    services: *id001
+- id: WAF-SEC-NET-005
+  severity: required
+  description: Every Azure PaaS resource that supports publicNetworkAccess MUST explicitly set it to Disabled — including
+    publicNetworkAccessForIngestion and publicNetworkAccessForQuery on Log Analytics and Application Insights. This applies
+    to ALL environments including POC and development. There are NO exceptions — POC environments MUST be secure. In Terraform
+    azapi_resource body blocks, set publicNetworkAccess = "Disabled". In Bicep, set properties.publicNetworkAccess = 'Disabled'.
+  rationale: Azure PaaS services default to public access enabled.  Omitting the property results in a public endpoint.  This
+    rule applies to POC, development, AND production — there are no security exemptions for non-production environments.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+    services: *id001
+- id: WAF-SEC-NET-003
+  severity: recommended
+  description: Use NSGs to restrict traffic between subnets to only required ports
+  rationale: Defence in depth beyond private endpoints
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  targets:
+    services: *id001
+- id: WAF-SEC-NET-004
+  severity: recommended
+  description: Enable diagnostic logging on NSGs for traffic auditing
+  rationale: Required for incident investigation and compliance
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  targets:
+    services: *id001
 patterns:
-  - name: "Private endpoint for Key Vault"
-    description: "Create private endpoint and disable public access"
-    example: |
-      resource "azurerm_private_endpoint" "kv" {
-        name                = "pe-kv-${var.project}"
-        subnet_id           = azurerm_subnet.private.id
-        private_service_connection {
-          name                           = "kv-connection"
-          private_connection_resource_id = azurerm_key_vault.main.id
-          subresource_names              = ["vault"]
-          is_manual_connection           = false
-        }
+- name: Private endpoint for Key Vault
+  description: Create private endpoint and disable public access
+  example: |
+    resource "azurerm_private_endpoint" "kv" {
+      name                = "pe-kv-${var.project}"
+      subnet_id           = azurerm_subnet.private.id
+      private_service_connection {
+        name                           = "kv-connection"
+        private_connection_resource_id = azurerm_key_vault.main.id
+        subresource_names              = ["vault"]
+        is_manual_connection           = false
       }
-
+    }
 anti_patterns:
-  - description: "Do not allow 0.0.0.0/0 in any NSG or firewall rule"
-    instead: "Use specific IP ranges or service tags"
-  - description: "Do not rely solely on service firewalls without VNET integration"
-    instead: "Use private endpoints + VNET integration for defense in depth"
-
+- description: Do not allow 0.0.0.0/0 in any NSG or firewall rule
+  instead: Use specific IP ranges or service tags
+- description: Do not rely solely on service firewalls without VNET integration
+  instead: Use private endpoints + VNET integration for defense in depth
 references:
-  - title: "Private Link overview"
-    url: "https://learn.microsoft.com/azure/private-link/private-link-overview"
+- title: Private Link overview
+  url: https://learn.microsoft.com/azure/private-link/private-link-overview

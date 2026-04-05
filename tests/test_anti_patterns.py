@@ -372,7 +372,7 @@ class TestCostPatterns:
 
     def test_premium_safe_when_parameterized(self):
         """Premium SKU should not be flagged when using a variable."""
-        warnings = scan('sku_name = var.sku_name  # premium is required for vnet integration')
+        warnings = scan("sku_name = var.sku_name  # premium is required for vnet integration")
         cost_warnings = [w for w in warnings if "premium" in w.lower()]
         assert cost_warnings == []
 
@@ -433,7 +433,7 @@ class TestScannerIdPrefix:
             assert w.startswith("[ANTI-"), f"Warning missing [ANTI-] prefix: {w}"
 
     def test_warning_format(self):
-        warnings = scan('admin_enabled = true')
+        warnings = scan("admin_enabled = true")
         assert len(warnings) > 0
         # Should be "[ANTI-SEC-002] Admin credentials detected..."
         assert warnings[0].startswith("[ANTI-SEC-002]")
@@ -509,8 +509,8 @@ class TestIacToolFiltering:
         checks = load()
         bcs_checks = [c for c in checks if c.domain == "bicep_structure"]
         tfs_checks = [c for c in checks if c.domain == "terraform_structure"]
-        assert all(c.applies_to == ["bicep"] for c in bcs_checks)
-        assert all(c.applies_to == ["terraform"] for c in tfs_checks)
+        assert all(c.applies_to == ["bicep-agent"] for c in bcs_checks)
+        assert all(c.applies_to == ["terraform-agent"] for c in tfs_checks)
         # Generic domains should have empty applies_to
         sec_checks = [c for c in checks if c.domain == "security"]
         assert all(c.applies_to == [] for c in sec_checks)

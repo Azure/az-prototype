@@ -53,12 +53,15 @@ class AntiPatternCheck:
     """A single anti-pattern detection rule."""
 
     id: str
-    domain: str
+    domain: str  # maps to 'category' in new format
     search_patterns: list[str] = field(default_factory=list)
     safe_patterns: list[str] = field(default_factory=list)
     correct_patterns: list[str] = field(default_factory=list)
     warning_message: str = ""
-    applies_to: list[str] = field(default_factory=list)
+    description: str = ""
+    rationale: str = ""
+    applies_to: list[str] = field(default_factory=list)  # agent names
+    target_services: list[str] = field(default_factory=list)  # ARM namespaces
 
 
 def load(directory: Path | None = None) -> list[AntiPatternCheck]:
@@ -84,20 +87,8 @@ def load(directory: Path | None = None) -> list[AntiPatternCheck]:
         if not isinstance(data, dict):
             continue
 
-        domain = data.get("domain", yaml_file.stem)
-        domain_applies_to = data.get("applies_to", [])
-        if not isinstance(domain_applies_to, list):
-            domain_applies_to = []
-
-        # Warn if both domain-level and any pattern-level applies_to exist
+        domain = data.get("category", yaml_file.stem)
         patterns_list = data.get("patterns", [])
-        has_pattern_applies = any(isinstance(e, dict) and "applies_to" in e for e in patterns_list)
-        if domain_applies_to and has_pattern_applies:
-            logger.warning(
-                "Anti-pattern file %s has both domain-level and pattern-level "
-                "applies_to — domain-level takes precedence, pattern-level ignored.",
-                yaml_file.name,
-            )
 
         for idx, entry in enumerate(patterns_list, 1):
             if not isinstance(entry, dict):
@@ -110,13 +101,12 @@ def load(directory: Path | None = None) -> list[AntiPatternCheck]:
             correct = entry.get("correct_patterns", [])
             check_id = entry.get("id", f"{domain.upper()}-{idx:03d}")
 
-            # Domain-level applies_to wins; otherwise use pattern-level
-            if domain_applies_to:
-                check_applies_to = domain_applies_to
-            else:
-                check_applies_to = entry.get("applies_to", [])
-                if not isinstance(check_applies_to, list):
-                    check_applies_to = []
+            check_applies_to = entry.get("applies_to", [])
+            if not isinstance(check_applies_to, list):
+                check_applies_to = []
+
+            targets = entry.get("targets", {})
+            target_services = targets.get("services", []) if isinstance(targets, dict) else []
 
             checks.append(
                 AntiPatternCheck(
@@ -124,9 +114,12 @@ def load(directory: Path | None = None) -> list[AntiPatternCheck]:
                     domain=domain,
                     search_patterns=[s.lower() for s in search],
                     safe_patterns=[s.lower() for s in safe],
-                    correct_patterns=correct,  # Preserve original case for brief display
+                    correct_patterns=correct,
                     warning_message=message,
+                    description=str(entry.get("description", "")),
+                    rationale=str(entry.get("rationale", "")),
                     applies_to=check_applies_to,
+                    target_services=target_services,
                 )
             )
 
@@ -134,7 +127,11 @@ def load(directory: Path | None = None) -> list[AntiPatternCheck]:
     return _cache
 
 
-def scan(text: str, iac_tool: str | None = None) -> list[str]:
+def scan(
+    text: str,
+    iac_tool: str | None = None,
+    agent_name: str | None = None,
+) -> list[str]:
     """Scan *text* for anti-pattern matches.
 
     Parameters
@@ -144,7 +141,11 @@ def scan(text: str, iac_tool: str | None = None) -> list[str]:
     iac_tool:
         If provided (e.g., ``"terraform"`` or ``"bicep"``), skip checks
         whose ``applies_to`` list is non-empty and does not contain
-        this tool.  If ``None``, all checks run (backward compatible).
+        this tool.  Backward compatible — for new format files, use
+        *agent_name* instead.
+    agent_name:
+        If provided, skip checks whose ``applies_to`` list is non-empty
+        and does not contain this agent name.
 
     Returns a list of human-readable warning strings (empty = clean).
     """
@@ -169,9 +170,13 @@ def scan(text: str, iac_tool: str | None = None) -> list[str]:
 
     lower = scan_text.lower()
 
+    # Map iac_tool shorthand to agent name for filtering
+    _TOOL_TO_AGENT = {"terraform": "terraform-agent", "bicep": "bicep-agent"}
+    effective_agent = agent_name or _TOOL_TO_AGENT.get(iac_tool or "", "")
+
     for check in checks:
-        # Skip checks scoped to a different IaC tool
-        if iac_tool and check.applies_to and iac_tool not in check.applies_to:
+        # Skip checks not applicable to this agent
+        if check.applies_to and effective_agent and effective_agent not in check.applies_to:
             continue
 
         for pattern in check.search_patterns:
