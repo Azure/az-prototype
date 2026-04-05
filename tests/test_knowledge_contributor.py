@@ -78,8 +78,11 @@ class TestFormatContributionBody:
         finding = {"service": "redis"}
         body = format_contribution_body(finding)
 
-        assert "**Type:** Pitfall" in body
+        # "redis" doesn't match a knowledge file (it's redis-cache.md),
+        # so it's auto-upgraded to "New service"
+        assert "**Type:** New service" in body
         assert "`knowledge/services/redis.md`" in body
+        assert "NEW FILE" in body
         assert "No context provided." in body
         assert "No rationale provided." in body
         assert "No specific content provided" in body

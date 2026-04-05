@@ -22,6 +22,65 @@ _DEFAULT_REPO = "Azure/az-prototype"
 
 
 # ======================================================================
+# File path resolution
+# ======================================================================
+
+
+def _namespace_to_filename(namespace: str) -> str:
+    """Convert an ARM namespace to a knowledge file name.
+
+    ``Microsoft.Sql/servers/databases`` → ``azure-sql-database``
+    ``Microsoft.App/containerApps`` → ``container-apps``
+
+    Falls back to a hyphenated lowercase version of the namespace.
+    """
+    if not namespace:
+        return "unknown"
+    # Strip Microsoft. prefix, lowercase, replace / and . with hyphens
+    name = namespace.replace("Microsoft.", "").lower()
+    name = name.replace("/", "-").replace(".", "-")
+    # Clean up double hyphens
+    while "--" in name:
+        name = name.replace("--", "-")
+    return name.strip("-")
+
+
+def _resolve_knowledge_file_path(namespace: str, service: str) -> str:
+    """Resolve the knowledge file path for a service.
+
+    Checks if a file exists for the namespace first, then falls back
+    to the friendly service name. If neither exists, generates a path
+    from the namespace for new-service contributions.
+    """
+    from pathlib import Path
+
+    knowledge_dir = Path(__file__).resolve().parent.parent / "knowledge" / "services"
+
+    # 1. Try namespace-based file
+    if namespace:
+        # Check if KnowledgeLoader can resolve it
+        try:
+            from azext_prototype.knowledge import KnowledgeLoader
+
+            loader = KnowledgeLoader()
+            ns_index = loader._build_namespace_index()
+            if namespace in ns_index:
+                return f"knowledge/services/{ns_index[namespace]}"
+        except Exception:
+            pass
+
+        # Generate a filename from the namespace for new services
+        generated = _namespace_to_filename(namespace)
+        return f"knowledge/services/{generated}.md"
+
+    # 2. Fall back to friendly name
+    if service and (knowledge_dir / f"{service}.md").exists():
+        return f"knowledge/services/{service}.md"
+
+    return f"knowledge/services/{service or 'unknown'}.md"
+
+
+# ======================================================================
 # Gap Detection
 # ======================================================================
 
@@ -97,12 +156,22 @@ def format_contribution_body(finding: dict) -> str:
     contribution_type = finding.get("type", "Pitfall")
     service = finding.get("service", "unknown")
     namespace = finding.get("service_namespace", "")
-    file_path = finding.get("file", f"knowledge/services/{service}.md")
+    file_path = finding.get("file", "")
+    if not file_path:
+        file_path = _resolve_knowledge_file_path(namespace, service)
     section = finding.get("section", "")
     context = finding.get("context", "")
     rationale = finding.get("rationale", context)
     content = finding.get("content", "")
     source = finding.get("source", "QA diagnosis")
+
+    # Check if the file exists — if not, this is a new service contribution
+    from pathlib import Path
+
+    project_root = Path(__file__).resolve().parent.parent
+    file_exists = (project_root / file_path).exists() if file_path else False
+    if not file_exists and contribution_type == "Pitfall":
+        contribution_type = "New service"
 
     lines: list[str] = []
     lines.append("## Knowledge Contribution")
@@ -111,6 +180,8 @@ def format_contribution_body(finding: dict) -> str:
     if namespace:
         lines.append(f"**Service Namespace:** `{namespace}`")
     lines.append(f"**File:** `{file_path}`")
+    if not file_exists:
+        lines.append("**Status:** NEW FILE — this knowledge file does not exist yet and must be created")
     if section:
         lines.append(f"**Section to update:** {section}")
     lines.append("")
@@ -256,7 +327,7 @@ def build_finding_from_qa(
         "service": service,
         "service_namespace": service_namespace,
         "type": "Pitfall",
-        "file": f"knowledge/services/{service}.md",
+        "file": _resolve_knowledge_file_path(service_namespace, service),
         "section": section,
         "context": context,
         "rationale": context,
