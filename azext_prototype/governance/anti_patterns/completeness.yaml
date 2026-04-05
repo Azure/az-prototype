@@ -4,185 +4,201 @@ description: Structural gaps, incomplete scripts, and missing companion resource
 last_updated: '2026-04-04'
 patterns:
 - id: ANTI-COMP-001
-  search_patterns:
-  - local_authentication_disabled = true
-  - local_auth_disabled = true
-  - 'disableLocalAuth: true'
-  - shared_access_key_enabled = false
-  - 'allowSharedKeyAccess: false'
-  safe_patterns:
-  - azurerm_user_assigned_identity
-  - azurerm_role_assignment
-  - azurerm_cosmosdb_sql_role_assignment
-  - Microsoft.ManagedIdentity/userAssignedIdentities
-  - roleAssignments
-  - user_assigned_identity
-  correct_patterns:
-  - azurerm_user_assigned_identity
-  - azurerm_role_assignment
-  - Microsoft.ManagedIdentity/userAssignedIdentities
-  - '# Include managed identity AND role assignment when disabling local auth'
   warning_message: Local/key-based authentication is disabled but no managed identity or RBAC role assignment found in the
     same stage. Applications will be unable to authenticate.
   description: Detects placeholder or TODO markers in generated code that indicate incomplete output
   rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  targets:
+    search_patterns:
+    - local_authentication_disabled = true
+    - local_auth_disabled = true
+    - 'disableLocalAuth: true'
+    - shared_access_key_enabled = false
+    - 'allowSharedKeyAccess: false'
+    safe_patterns:
+    - azurerm_user_assigned_identity
+    - azurerm_role_assignment
+    - azurerm_cosmosdb_sql_role_assignment
+    - Microsoft.ManagedIdentity/userAssignedIdentities
+    - roleAssignments
+    - user_assigned_identity
+    correct_patterns:
+    - azurerm_user_assigned_identity
+    - azurerm_role_assignment
+    - Microsoft.ManagedIdentity/userAssignedIdentities
+    - '# Include managed identity AND role assignment when disabling local auth'
+  applies_to: []
 - id: ANTI-COMP-002
-  search_patterns:
-  - echo -e "${yellow}
-  - echo -e "${red}
-  - echo -e "${green}
-  safe_patterns:
-  - ${nc}
-  correct_patterns:
-  - echo -e "${YELLOW}message${NC}"
-  - echo -e "${RED}message${NC}"
-  - echo -e "${GREEN}message${NC}"
   warning_message: Incomplete color echo statement in deploy script — use uppercase color variables and close with ${NC}.
   description: Detects missing error handling or empty catch blocks in generated code
   rationale: Missing outputs or incomplete configurations cause downstream failures in dependent stages.
+  targets:
+    search_patterns:
+    - echo -e "${yellow}
+    - echo -e "${red}
+    - echo -e "${green}
+    safe_patterns:
+    - ${nc}
+    correct_patterns:
+    - echo -e "${YELLOW}message${NC}"
+    - echo -e "${RED}message${NC}"
+    - echo -e "${GREEN}message${NC}"
+  applies_to: []
 - id: ANTI-COMP-003
   applies_to:
   - terraform-agent
-  search_patterns:
-  - terraform_remote_state
-  safe_patterns: []
-  correct_patterns:
-  - '# Use variable inputs or data sources instead of terraform_remote_state'
   warning_message: ''
   description: Detects hardcoded resource names instead of variable references
   rationale: Following established patterns ensures consistency and reduces deployment failures.
+  targets:
+    search_patterns:
+    - terraform_remote_state
+    safe_patterns: []
+    correct_patterns:
+    - '# Use variable inputs or data sources instead of terraform_remote_state'
 - id: ANTI-COMP-004
   applies_to:
   - terraform-agent
-  search_patterns:
-  - data "azurerm_resource_group"
-  - data "azurerm_log_analytics_workspace"
-  - data "azurerm_key_vault"
-  safe_patterns:
-  - terraform_remote_state
-  - data.terraform_remote_state
-  - var.
-  correct_patterns:
-  - data.terraform_remote_state.stage_name.outputs.resource_id
-  - var.resource_group_name
-  - '# Reference prior-stage resources via remote state or input variables'
   warning_message: Data source references existing resource by hardcoded name — use terraform_remote_state or variables to
     reference resources from prior stages.
   description: Detects missing variable type constraints in Terraform variable declarations
   rationale: Hardcoded credentials or access keys create security vulnerabilities and prevent key rotation.
+  targets:
+    search_patterns:
+    - data "azurerm_resource_group"
+    - data "azurerm_log_analytics_workspace"
+    - data "azurerm_key_vault"
+    safe_patterns:
+    - terraform_remote_state
+    - data.terraform_remote_state
+    - var.
+    correct_patterns:
+    - data.terraform_remote_state.stage_name.outputs.resource_id
+    - var.resource_group_name
+    - '# Reference prior-stage resources via remote state or input variables'
 - id: ANTI-COMP-005
   applies_to:
   - terraform-agent
-  search_patterns:
-  - versions.tf
-  safe_patterns:
-  - providers.tf
-  correct_patterns:
-  - providers.tf
-  - '# Consolidate terraform {}, required_providers, and backend into providers.tf only'
   warning_message: Terraform config uses versions.tf — this WILL cause deployment failure. Provider configuration (terraform
     {}, required_providers, backend) must be in providers.tf only. Using both files causes duplicate required_providers blocks
     that break terraform init. Remove versions.tf and consolidate into providers.tf.
   description: Detects missing output descriptions in Terraform output declarations
   rationale: Consistent file structure and modularization improve maintainability and code review efficiency.
+  targets:
+    search_patterns:
+    - versions.tf
+    safe_patterns:
+    - providers.tf
+    correct_patterns:
+    - providers.tf
+    - '# Consolidate terraform {}, required_providers, and backend into providers.tf only'
 - id: ANTI-COMP-006
   applies_to:
   - terraform-agent
-  search_patterns:
-  - var.tfstate_storage_account
-  - var.backend_storage_account
-  - var.state_storage_account
-  safe_patterns: []
-  correct_patterns:
-  - storage_account_name = "mystorageaccount"
-  - '# Use literal values in backend blocks — variables are not supported'
-  - backend "local" {}
   warning_message: Backend config uses variable references — Terraform does not support variables in backend blocks. Use literal
     values or omit the backend to use local state.
   description: Detects empty or commented-out resource blocks that serve no purpose
   rationale: Following established patterns ensures consistency and reduces deployment failures.
+  targets:
+    search_patterns:
+    - var.tfstate_storage_account
+    - var.backend_storage_account
+    - var.state_storage_account
+    safe_patterns: []
+    correct_patterns:
+    - storage_account_name = "mystorageaccount"
+    - '# Use literal values in backend blocks — variables are not supported'
+    - backend "local" {}
 - id: ANTI-COMP-007
   applies_to:
   - terraform-agent
-  search_patterns:
-  - storage_account_name = ""
-  - container_name = ""
-  - key = ""
-  - resource_group_name = ""
-  safe_patterns:
-  - backend "local"
-  correct_patterns:
-  - storage_account_name = "tfstate12345"
-  - container_name = "tfstate"
-  - key = "stage-name.tfstate"
-  - backend "local" {}
-  - '# Provide literal values or use local backend'
   warning_message: Backend config has empty required fields — terraform init will fail. Either provide literal values or omit
     the backend block to use local state.
   description: Detects missing provider version constraints in required_providers block
   rationale: Following established patterns ensures consistency and reduces deployment failures.
+  targets:
+    search_patterns:
+    - storage_account_name = ""
+    - container_name = ""
+    - key = ""
+    - resource_group_name = ""
+    safe_patterns:
+    - backend "local"
+    correct_patterns:
+    - storage_account_name = "tfstate12345"
+    - container_name = "tfstate"
+    - key = "stage-name.tfstate"
+    - backend "local" {}
+    - '# Provide literal values or use local backend'
 - id: ANTI-COMP-008
-  search_patterns:
-  - queueName = "zd-
-  - queueName = "pi-
-  - queueName = "pm-
-  - queueName = "pc-
-  - name = "zdacr
-  - name = "zdst
-  - resource_group_name = "zd-rg-
-  - resource_group_name = "pi-rg-
-  - resource_group_name = "pm-rg-
-  safe_patterns:
-  - var.
-  - local.
-  - data.terraform_remote_state
-  - data.azapi_resource
-  correct_patterns:
-  - data.terraform_remote_state.stage.outputs.queue_name
-  - var.resource_group_name
-  - local.resource_group_name
   warning_message: Hardcoded upstream resource name detected — use terraform_remote_state outputs or variables to reference
     resources from other stages. NEVER hardcode resource names.
   description: Detects missing backend configuration for Terraform state management
   rationale: Hardcoded credentials or access keys create security vulnerabilities and prevent key rotation.
+  targets:
+    search_patterns:
+    - queueName = "zd-
+    - queueName = "pi-
+    - queueName = "pm-
+    - queueName = "pc-
+    - name = "zdacr
+    - name = "zdst
+    - resource_group_name = "zd-rg-
+    - resource_group_name = "pi-rg-
+    - resource_group_name = "pm-rg-
+    safe_patterns:
+    - var.
+    - local.
+    - data.terraform_remote_state
+    - data.azapi_resource
+    correct_patterns:
+    - data.terraform_remote_state.stage.outputs.queue_name
+    - var.resource_group_name
+    - local.resource_group_name
+  applies_to: []
 - id: ANTI-COMP-009
-  search_patterns:
-  - storage blob delegator
-  safe_patterns:
-  - storage blob data contributor
-  - storage blob data reader
-  correct_patterns:
-  - Storage Blob Data Contributor
-  - '# ba92f5b4-2d11-453d-a403-e96b0029c9fe'
   warning_message: Storage Blob Delegator role detected. This role only grants User Delegation Key access, NOT actual blob
     read/write. Use Storage Blob Data Contributor (ba92f5b4-2d11-453d-a403-e96b0029c9fe) for blob data access.
   description: Storage Blob Delegator role detected. This role only grants User Delegation Key access, NOT actual blob read/write.
     Use Storage Blob Data Contributor (ba92f5b4-2d11-453d-a403-e96b0029c9fe) for blob da
   rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  targets:
+    search_patterns:
+    - storage blob delegator
+    safe_patterns:
+    - storage blob data contributor
+    - storage blob data reader
+    correct_patterns:
+    - Storage Blob Data Contributor
+    - '# ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+  applies_to: []
 - id: ANTI-COMP-010
-  search_patterns:
-  - capacitymode = "serverless"
-  - capacitymode
-  safe_patterns:
-  - enableserverless
-  correct_patterns:
-  - capabilities = [{ name = "EnableServerless" }]
   warning_message: capacityMode property does NOT exist in the Cosmos DB ARM schema. Use capabilities = [{ name = "EnableServerless"
     }] to enable serverless mode.
   description: 'Completeness anti-pattern: capacityMode property does NOT exist in the Cosmos DB ARM schema'
   rationale: Following established patterns ensures consistency and reduces deployment failures.
+  targets:
+    search_patterns:
+    - capacitymode = "serverless"
+    - capacitymode
+    safe_patterns:
+    - enableserverless
+    correct_patterns:
+    - capabilities = [{ name = "EnableServerless" }]
+  applies_to: []
 - id: ANTI-COMP-011
   applies_to:
   - terraform-agent
-  search_patterns:
-  - /blobservices/default
-  safe_patterns:
-  - azapi_resource
-  - blob_service
-  correct_patterns:
-  - parent_id = azapi_resource.blob_service.id
   warning_message: Blob service diagnostic settings use string interpolation instead of an explicit blob service child resource.
     Create an azapi_resource for Microsoft.Storage/storageAccounts/blobServices and reference its .id.
   description: 'Blob service diagnostic settings use string interpolation instead of an explicit blob service child resource.
     Create an azapi_resource for Microsoft.Storage/storageAccounts/blobServices and reference '
   rationale: Observability is essential for detecting issues, debugging failures, and ensuring operational health.
+  targets:
+    search_patterns:
+    - /blobservices/default
+    safe_patterns:
+    - azapi_resource
+    - blob_service
+    correct_patterns:
+    - parent_id = azapi_resource.blob_service.id

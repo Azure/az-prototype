@@ -11,33 +11,6 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "cdn_profile" {
-      type      = "Microsoft.Cdn/profiles@2024-02-01"
-      name      = var.cdn_profile_name
-      location  = "global"
-      parent_id = var.resource_group_id
-
-      body = {
-        sku = {
-          name = "Standard_Microsoft"  # "Standard_Microsoft", "Standard_Akamai", "Standard_Verizon", "Premium_Verizon"
-        }
-        properties = {
-          originResponseTimeoutSeconds = 60
-        }
-      }
-    }
-  bicep_pattern: |
-    resource cdnProfile 'Microsoft.Cdn/profiles@2024-02-01' = {
-      name: cdnProfileName
-      location: 'global'
-      sku: {
-        name: 'Standard_Microsoft'
-      }
-      properties: {
-        originResponseTimeoutSeconds: 60
-      }
-    }
   companion_resources:
   - type: Microsoft.Cdn/profiles/endpoints@2024-02-01
     name: cdn-endpoint
@@ -224,15 +197,42 @@ rules:
           ]
         }
       }
-  prohibitions:
-  - Never set isHttpAllowed to true without an HTTPS redirect rule
-  - Never serve content over HTTP without redirecting to HTTPS
-  - Never use wildcard custom domains without explicit security review
-  - Never cache authenticated or personalized content — use cache-control headers
-  - Never expose origin server directly — always serve through CDN endpoint
   targets:
-    services: &id001
+    services:
     - Microsoft.Cdn/profiles
+    terraform_pattern: |
+      resource "azapi_resource" "cdn_profile" {
+        type      = "Microsoft.Cdn/profiles@2024-02-01"
+        name      = var.cdn_profile_name
+        location  = "global"
+        parent_id = var.resource_group_id
+
+        body = {
+          sku = {
+            name = "Standard_Microsoft"  # "Standard_Microsoft", "Standard_Akamai", "Standard_Verizon", "Premium_Verizon"
+          }
+          properties = {
+            originResponseTimeoutSeconds = 60
+          }
+        }
+      }
+    bicep_pattern: |
+      resource cdnProfile 'Microsoft.Cdn/profiles@2024-02-01' = {
+        name: cdnProfileName
+        location: 'global'
+        sku: {
+          name: 'Standard_Microsoft'
+        }
+        properties: {
+          originResponseTimeoutSeconds: 60
+        }
+      }
+    prohibitions:
+    - Never set isHttpAllowed to true without an HTTPS redirect rule
+    - Never serve content over HTTP without redirecting to HTTPS
+    - Never use wildcard custom domains without explicit security review
+    - Never cache authenticated or personalized content — use cache-control headers
+    - Never expose origin server directly — always serve through CDN endpoint
 - id: AZ-CDN-002
   severity: required
   description: Enforce HTTPS-only delivery with HTTP-to-HTTPS redirect
@@ -242,7 +242,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - Microsoft.Cdn/profiles
 - id: AZ-CDN-003
   severity: recommended
   description: Enable compression for text-based content types
@@ -252,7 +253,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - Microsoft.Cdn/profiles
 - id: AZ-CDN-004
   severity: recommended
   description: Configure custom domain with managed HTTPS certificate
@@ -262,7 +264,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - Microsoft.Cdn/profiles
 - id: AZ-CDN-005
   severity: recommended
   description: Set appropriate cache TTLs and query string caching behavior
@@ -272,7 +275,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - Microsoft.Cdn/profiles
 patterns:
 - name: CDN Standard with HTTPS enforcement and compression
   description: CDN profile with HTTPS-only delivery, compression, caching rules, and diagnostic logging

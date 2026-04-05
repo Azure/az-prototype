@@ -13,53 +13,6 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "storage_account" {
-      type      = "Microsoft.Storage/storageAccounts@2023-05-01"
-      name      = var.storage_account_name
-      location  = var.location
-      parent_id = azapi_resource.resource_group.id
-
-      body = {
-        kind = "StorageV2"
-        sku = {
-          name = "Standard_LRS"
-        }
-        properties = {
-          allowSharedKeyAccess      = false
-          allowBlobPublicAccess     = false
-          minimumTlsVersion         = "TLS1_2"
-          supportsHttpsTrafficOnly  = true
-          publicNetworkAccess       = "Disabled"
-          defaultToOAuthAuthentication = true
-          networkAcls = {
-            defaultAction = "Deny"
-            bypass        = "AzureServices"
-          }
-        }
-      }
-    }
-  bicep_pattern: |
-    resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
-      name: storageAccountName
-      location: location
-      kind: 'StorageV2'
-      sku: {
-        name: 'Standard_LRS'
-      }
-      properties: {
-        allowSharedKeyAccess: false
-        allowBlobPublicAccess: false
-        minimumTlsVersion: 'TLS1_2'
-        supportsHttpsTrafficOnly: true
-        publicNetworkAccess: 'Disabled'
-        defaultToOAuthAuthentication: true
-        networkAcls: {
-          defaultAction: 'Deny'
-          bypass: 'AzureServices'
-        }
-      }
-    }
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2024-01-01
     description: Private endpoint for blob storage — required when publicNetworkAccess is Disabled
@@ -210,13 +163,6 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-  prohibitions:
-  - NEVER set allowSharedKeyAccess to true — all access must use Entra RBAC
-  - NEVER set allowBlobPublicAccess to true for internal data
-  - NEVER set minimumTlsVersion below TLS1_2
-  - NEVER set supportsHttpsTrafficOnly to false
-  - NEVER set publicNetworkAccess to Enabled
-  - NEVER use account keys or shared access signatures (SAS) for application access — use managed identity with RBAC
   template_check:
     scope:
     - storage
@@ -225,8 +171,62 @@ rules:
     - public_access_disabled
     error_message: 'Service ''{service_name}'' ({service_type}) missing {config_key}: true'
   targets:
-    services: &id001
+    services:
     - TODO:storage
+    terraform_pattern: |
+      resource "azapi_resource" "storage_account" {
+        type      = "Microsoft.Storage/storageAccounts@2023-05-01"
+        name      = var.storage_account_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          kind = "StorageV2"
+          sku = {
+            name = "Standard_LRS"
+          }
+          properties = {
+            allowSharedKeyAccess      = false
+            allowBlobPublicAccess     = false
+            minimumTlsVersion         = "TLS1_2"
+            supportsHttpsTrafficOnly  = true
+            publicNetworkAccess       = "Disabled"
+            defaultToOAuthAuthentication = true
+            networkAcls = {
+              defaultAction = "Deny"
+              bypass        = "AzureServices"
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+        name: storageAccountName
+        location: location
+        kind: 'StorageV2'
+        sku: {
+          name: 'Standard_LRS'
+        }
+        properties: {
+          allowSharedKeyAccess: false
+          allowBlobPublicAccess: false
+          minimumTlsVersion: 'TLS1_2'
+          supportsHttpsTrafficOnly: true
+          publicNetworkAccess: 'Disabled'
+          defaultToOAuthAuthentication: true
+          networkAcls: {
+            defaultAction: 'Deny'
+            bypass: 'AzureServices'
+          }
+        }
+      }
+    prohibitions:
+    - NEVER set allowSharedKeyAccess to true — all access must use Entra RBAC
+    - NEVER set allowBlobPublicAccess to true for internal data
+    - NEVER set minimumTlsVersion below TLS1_2
+    - NEVER set supportsHttpsTrafficOnly to false
+    - NEVER set publicNetworkAccess to Enabled
+    - NEVER use account keys or shared access signatures (SAS) for application access — use managed identity with RBAC
 - id: AZ-ST-002
   severity: recommended
   description: Enable blob versioning and soft delete for data protection
@@ -235,44 +235,45 @@ rules:
   - cloud-architect
   - terraform-agent
   - bicep-agent
-  terraform_pattern: |
-    resource "azapi_resource" "storage_blob_service" {
-      type      = "Microsoft.Storage/storageAccounts/blobServices@2023-05-01"
-      name      = "default"
-      parent_id = azapi_resource.storage_account.id
-
-      body = {
-        properties = {
-          isVersioningEnabled = true
-          deleteRetentionPolicy = {
-            enabled = true
-            days    = 7
-          }
-          containerDeleteRetentionPolicy = {
-            enabled = true
-            days    = 7
-          }
-        }
-      }
-    }
-  bicep_pattern: |
-    resource storageBlobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
-      parent: storageAccount
-      name: 'default'
-      properties: {
-        isVersioningEnabled: true
-        deleteRetentionPolicy: {
-          enabled: true
-          days: 7
-        }
-        containerDeleteRetentionPolicy: {
-          enabled: true
-          days: 7
-        }
-      }
-    }
   targets:
-    services: *id001
+    services:
+    - TODO:storage
+    terraform_pattern: |
+      resource "azapi_resource" "storage_blob_service" {
+        type      = "Microsoft.Storage/storageAccounts/blobServices@2023-05-01"
+        name      = "default"
+        parent_id = azapi_resource.storage_account.id
+
+        body = {
+          properties = {
+            isVersioningEnabled = true
+            deleteRetentionPolicy = {
+              enabled = true
+              days    = 7
+            }
+            containerDeleteRetentionPolicy = {
+              enabled = true
+              days    = 7
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource storageBlobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+        parent: storageAccount
+        name: 'default'
+        properties: {
+          isVersioningEnabled: true
+          deleteRetentionPolicy: {
+            enabled: true
+            days: 7
+          }
+          containerDeleteRetentionPolicy: {
+            enabled: true
+            days: 7
+          }
+        }
+      }
 - id: AZ-ST-003
   severity: recommended
   description: Enable diagnostic settings to Log Analytics workspace
@@ -330,7 +331,8 @@ rules:
         }
       }
   targets:
-    services: *id001
+    services:
+    - TODO:storage
 - id: AZ-ST-004
   severity: recommended
   description: Configure lifecycle management policies for cost optimization
@@ -341,7 +343,8 @@ rules:
   - bicep-agent
   - cost-analyst
   targets:
-    services: *id001
+    services:
+    - TODO:storage
 - id: AZ-ST-005
   severity: recommended
   description: Configure zone-redundant or geo-zone-redundant storage replication
@@ -351,18 +354,19 @@ rules:
   - cloud-architect
   - terraform-agent
   - bicep-agent
-  terraform_pattern: |
-    # In ST-001, change the sku.name to the appropriate redundancy level:
-    #   sku = {
-    #     name = "Standard_ZRS"   # or "Standard_GZRS" / "Standard_RAGZRS"
-    #   }
-  bicep_pattern: |
-    // In ST-001, change the sku name:
-    //   sku: {
-    //     name: 'Standard_ZRS'   // or 'Standard_GZRS' / 'Standard_RAGZRS'
-    //   }
   targets:
-    services: *id001
+    services:
+    - TODO:storage
+    terraform_pattern: |
+      # In ST-001, change the sku.name to the appropriate redundancy level:
+      #   sku = {
+      #     name = "Standard_ZRS"   # or "Standard_GZRS" / "Standard_RAGZRS"
+      #   }
+    bicep_pattern: |
+      // In ST-001, change the sku name:
+      //   sku: {
+      //     name: 'Standard_ZRS'   // or 'Standard_GZRS' / 'Standard_RAGZRS'
+      //   }
 - id: AZ-ST-006
   severity: recommended
   description: Enable point-in-time restore for block blob data protection
@@ -372,50 +376,51 @@ rules:
   - cloud-architect
   - terraform-agent
   - bicep-agent
-  terraform_pattern: |
-    resource "azapi_resource" "storage_blob_service_restore" {
-      type      = "Microsoft.Storage/storageAccounts/blobServices@2023-05-01"
-      name      = "default"
-      parent_id = azapi_resource.storage_account.id
-
-      body = {
-        properties = {
-          restorePolicy = {
-            enabled = true
-            days    = 7
-          }
-          changeFeed = {
-            enabled = true
-          }
-          isVersioningEnabled = true
-          deleteRetentionPolicy = {
-            enabled = true
-            days    = 14
-          }
-        }
-      }
-    }
-  bicep_pattern: |
-    resource storageBlobServiceRestore 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
-      parent: storageAccount
-      name: 'default'
-      properties: {
-        restorePolicy: {
-          enabled: true
-          days: 7
-        }
-        changeFeed: {
-          enabled: true
-        }
-        isVersioningEnabled: true
-        deleteRetentionPolicy: {
-          enabled: true
-          days: 14
-        }
-      }
-    }
   targets:
-    services: *id001
+    services:
+    - TODO:storage
+    terraform_pattern: |
+      resource "azapi_resource" "storage_blob_service_restore" {
+        type      = "Microsoft.Storage/storageAccounts/blobServices@2023-05-01"
+        name      = "default"
+        parent_id = azapi_resource.storage_account.id
+
+        body = {
+          properties = {
+            restorePolicy = {
+              enabled = true
+              days    = 7
+            }
+            changeFeed = {
+              enabled = true
+            }
+            isVersioningEnabled = true
+            deleteRetentionPolicy = {
+              enabled = true
+              days    = 14
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource storageBlobServiceRestore 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+        parent: storageAccount
+        name: 'default'
+        properties: {
+          restorePolicy: {
+            enabled: true
+            days: 7
+          }
+          changeFeed: {
+            enabled: true
+          }
+          isVersioningEnabled: true
+          deleteRetentionPolicy: {
+            enabled: true
+            days: 14
+          }
+        }
+      }
 - id: AZ-ST-007
   severity: recommended
   description: Apply an Azure Resource Manager lock on the storage account
@@ -424,30 +429,31 @@ rules:
   - cloud-architect
   - terraform-agent
   - bicep-agent
-  terraform_pattern: |
-    resource "azapi_resource" "storage_lock" {
-      type      = "Microsoft.Authorization/locks@2020-05-01"
-      name      = "lock-${var.storage_account_name}"
-      parent_id = azapi_resource.storage_account.id
+  targets:
+    services:
+    - TODO:storage
+    terraform_pattern: |
+      resource "azapi_resource" "storage_lock" {
+        type      = "Microsoft.Authorization/locks@2020-05-01"
+        name      = "lock-${var.storage_account_name}"
+        parent_id = azapi_resource.storage_account.id
 
-      body = {
-        properties = {
-          level = "CanNotDelete"
-          notes = "Prevent accidental deletion of storage account"
+        body = {
+          properties = {
+            level = "CanNotDelete"
+            notes = "Prevent accidental deletion of storage account"
+          }
         }
       }
-    }
-  bicep_pattern: |
-    resource storageLock 'Microsoft.Authorization/locks@2020-05-01' = {
-      scope: storageAccount
-      name: 'lock-${storageAccountName}'
-      properties: {
-        level: 'CanNotDelete'
-        notes: 'Prevent accidental deletion of storage account'
+    bicep_pattern: |
+      resource storageLock 'Microsoft.Authorization/locks@2020-05-01' = {
+        scope: storageAccount
+        name: 'lock-${storageAccountName}'
+        properties: {
+          level: 'CanNotDelete'
+          notes: 'Prevent accidental deletion of storage account'
+        }
       }
-    }
-  targets:
-    services: *id001
 - id: AZ-ST-008
   severity: recommended
   description: Enable immutability policies for compliance-critical blob data
@@ -459,7 +465,8 @@ rules:
   - bicep-agent
   - security-reviewer
   targets:
-    services: *id001
+    services:
+    - TODO:storage
 patterns:
 - name: Storage account with security baseline
   description: Complete storage deployment with RBAC, private endpoint, blob versioning, diagnostics, and role assignment

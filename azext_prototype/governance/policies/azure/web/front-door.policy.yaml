@@ -12,40 +12,6 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "front_door" {
-      type      = "Microsoft.Cdn/profiles@2024-02-01"
-      name      = var.front_door_name
-      location  = "global"
-      parent_id = var.resource_group_id
-
-      identity {
-        type = "SystemAssigned"
-      }
-
-      body = {
-        sku = {
-          name = "Premium_AzureFrontDoor"
-        }
-        properties = {
-          originResponseTimeoutSeconds = 60
-        }
-      }
-    }
-  bicep_pattern: |
-    resource frontDoor 'Microsoft.Cdn/profiles@2024-02-01' = {
-      name: frontDoorName
-      location: 'global'
-      identity: {
-        type: 'SystemAssigned'
-      }
-      sku: {
-        name: 'Premium_AzureFrontDoor'
-      }
-      properties: {
-        originResponseTimeoutSeconds: 60
-      }
-    }
   companion_resources:
   - type: Microsoft.Cdn/profiles/afdEndpoints@2024-02-01
     name: afd-endpoint
@@ -180,15 +146,49 @@ rules:
           ]
         }
       }
-  prohibitions:
-  - Never deploy Front Door without a WAF policy association
-  - Never use Standard SKU when private link origins are required — use Premium
-  - Never allow HTTP-only origins — enforce HTTPS for all origin connections
-  - Never skip health probes on origin groups
-  - Never use wildcard domains without explicit WAF rules
   targets:
-    services: &id001
+    services:
     - Microsoft.Network/frontDoors
+    terraform_pattern: |
+      resource "azapi_resource" "front_door" {
+        type      = "Microsoft.Cdn/profiles@2024-02-01"
+        name      = var.front_door_name
+        location  = "global"
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          sku = {
+            name = "Premium_AzureFrontDoor"
+          }
+          properties = {
+            originResponseTimeoutSeconds = 60
+          }
+        }
+      }
+    bicep_pattern: |
+      resource frontDoor 'Microsoft.Cdn/profiles@2024-02-01' = {
+        name: frontDoorName
+        location: 'global'
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: 'Premium_AzureFrontDoor'
+        }
+        properties: {
+          originResponseTimeoutSeconds: 60
+        }
+      }
+    prohibitions:
+    - Never deploy Front Door without a WAF policy association
+    - Never use Standard SKU when private link origins are required — use Premium
+    - Never allow HTTP-only origins — enforce HTTPS for all origin connections
+    - Never skip health probes on origin groups
+    - Never use wildcard domains without explicit WAF rules
 - id: AZ-AFD-002
   severity: required
   description: Enforce HTTPS-only with TLS 1.2 minimum and redirect HTTP to HTTPS
@@ -198,7 +198,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - Microsoft.Network/frontDoors
 - id: AZ-AFD-003
   severity: required
   description: Use private link origins for backend connectivity (Premium SKU)
@@ -208,7 +209,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - Microsoft.Network/frontDoors
 - id: AZ-AFD-004
   severity: recommended
   description: Configure caching rules with appropriate TTLs per content type
@@ -218,7 +220,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - Microsoft.Network/frontDoors
 patterns:
 - name: Front Door Premium with WAF and private link
   description: Global load balancer with WAF protection, private link origins, and HTTPS enforcement

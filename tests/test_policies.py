@@ -665,11 +665,12 @@ class TestBuiltinPolicies:
                 assert isinstance(rule.applies_to, list)
                 assert len(rule.applies_to) > 0, f"{policy.name}/{rule.id} has empty applies_to"
 
-    def test_no_duplicate_rule_ids_within_policy(self) -> None:
+    def test_no_duplicate_rule_id_target_pairs(self) -> None:
+        """Same ID is allowed for different services, but same ID+services is a duplicate."""
         engine = get_policy_engine()
         for policy in engine.list_policies():
-            ids = [r.id for r in policy.rules]
-            assert len(ids) == len(set(ids)), f"{policy.name} has duplicate rule ids: {ids}"
+            pairs = [(r.id, tuple(sorted(r.targets.get("services", [])))) for r in policy.rules]
+            assert len(pairs) == len(set(pairs)), f"{policy.name} has duplicate rule id+target pairs"
 
     def test_builtin_policies_pass_strict_validation(self) -> None:
         """All built-in .policy.yaml files must pass strict validation."""
@@ -724,11 +725,23 @@ class TestValidateMain:
 
     def test_strict_fails_on_errors(self, tmp_path: Path) -> None:
         """Strict mode: any validation error causes exit code 1."""
-        # Create a policy with a duplicate rule ID — triggers an error
+        # Create a policy with a duplicate rule ID+targets — triggers an error
         data = _minimal_policy(
             rules=[
-                {"id": "DUP-001", "severity": "required", "description": "a", "applies_to": ["terraform-agent"]},
-                {"id": "DUP-001", "severity": "required", "description": "b", "applies_to": ["terraform-agent"]},
+                {
+                    "id": "DUP-001",
+                    "severity": "required",
+                    "description": "a",
+                    "applies_to": ["terraform-agent"],
+                    "targets": {"services": ["Microsoft.App/containerApps"]},
+                },
+                {
+                    "id": "DUP-001",
+                    "severity": "required",
+                    "description": "b",
+                    "applies_to": ["terraform-agent"],
+                    "targets": {"services": ["Microsoft.App/containerApps"]},
+                },
             ]
         )
         f = _write_policy(tmp_path / "dup.policy.yaml", data)

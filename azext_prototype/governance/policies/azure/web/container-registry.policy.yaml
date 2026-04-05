@@ -13,55 +13,6 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "container_registry" {
-      type      = "Microsoft.ContainerRegistry/registries@2023-11-01-preview"
-      name      = var.acr_name
-      location  = var.location
-      parent_id = azapi_resource.resource_group.id
-
-      body = {
-        sku = {
-          name = "Premium"
-        }
-        properties = {
-          adminUserEnabled    = false
-          publicNetworkAccess = "Disabled"
-          networkRuleBypassOptions = "AzureServices"
-          policies = {
-            quarantinePolicy = {
-              status = "disabled"
-            }
-            retentionPolicy = {
-              days   = 7
-              status = "enabled"
-            }
-          }
-        }
-      }
-    }
-  bicep_pattern: |
-    resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' = {
-      name: acrName
-      location: location
-      sku: {
-        name: 'Premium'
-      }
-      properties: {
-        adminUserEnabled: false
-        publicNetworkAccess: 'Disabled'
-        networkRuleBypassOptions: 'AzureServices'
-        policies: {
-          quarantinePolicy: {
-            status: 'disabled'
-          }
-          retentionPolicy: {
-            days: 7
-            status: 'enabled'
-          }
-        }
-      }
-    }
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2024-01-01
     description: Private endpoint for Container Registry — required when publicNetworkAccess is Disabled (requires Premium
@@ -241,14 +192,63 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-  prohibitions:
-  - NEVER set adminUserEnabled to true — use managed identity with AcrPull/AcrPush roles
-  - NEVER set publicNetworkAccess to Enabled
-  - NEVER use Basic or Standard SKU when private endpoints are required — Premium is required for private endpoints
-  - NEVER use admin credentials in container runtime configuration — use identity-based registry authentication
   targets:
-    services: &id001
+    services:
     - Microsoft.ContainerRegistry/registries
+    terraform_pattern: |
+      resource "azapi_resource" "container_registry" {
+        type      = "Microsoft.ContainerRegistry/registries@2023-11-01-preview"
+        name      = var.acr_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "Premium"
+          }
+          properties = {
+            adminUserEnabled    = false
+            publicNetworkAccess = "Disabled"
+            networkRuleBypassOptions = "AzureServices"
+            policies = {
+              quarantinePolicy = {
+                status = "disabled"
+              }
+              retentionPolicy = {
+                days   = 7
+                status = "enabled"
+              }
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' = {
+        name: acrName
+        location: location
+        sku: {
+          name: 'Premium'
+        }
+        properties: {
+          adminUserEnabled: false
+          publicNetworkAccess: 'Disabled'
+          networkRuleBypassOptions: 'AzureServices'
+          policies: {
+            quarantinePolicy: {
+              status: 'disabled'
+            }
+            retentionPolicy: {
+              days: 7
+              status: 'enabled'
+            }
+          }
+        }
+      }
+    prohibitions:
+    - NEVER set adminUserEnabled to true — use managed identity with AcrPull/AcrPush roles
+    - NEVER set publicNetworkAccess to Enabled
+    - NEVER use Basic or Standard SKU when private endpoints are required — Premium is required for private endpoints
+    - NEVER use admin credentials in container runtime configuration — use identity-based registry authentication
 - id: AZ-ACR-002
   severity: required
   description: Use Premium SKU when private endpoints are required
@@ -258,7 +258,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - Microsoft.ContainerRegistry/registries
 - id: AZ-ACR-003
   severity: recommended
   description: Enable retention policy for untagged manifests
@@ -269,7 +270,8 @@ rules:
   - cloud-architect
   - cost-analyst
   targets:
-    services: *id001
+    services:
+    - Microsoft.ContainerRegistry/registries
 - id: AZ-ACR-004
   severity: recommended
   description: Enable diagnostic settings to Log Analytics workspace
@@ -327,7 +329,8 @@ rules:
         }
       }
   targets:
-    services: *id001
+    services:
+    - Microsoft.ContainerRegistry/registries
 patterns:
 - name: Container Registry with private endpoint and RBAC
   description: Complete Container Registry deployment with admin disabled, Premium SKU, private endpoint, DNS, and AcrPull/AcrPush

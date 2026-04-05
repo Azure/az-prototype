@@ -4,68 +4,74 @@ description: Authentication method and RBAC assignment detection
 last_updated: '2026-04-04'
 patterns:
 - id: ANTI-AUTH-001
-  search_patterns:
-  - sql authentication
-  - username/password
-  - sql_login
-  - administrator_login_password
-  safe_patterns:
-  - do not use sql authentication
-  - avoid sql authentication
-  - entra authentication
-  - sql authentication is fully disabled
-  - sql authentication is disabled
-  - sql authentication must be disabled
-  - azureadonlyauthentication = true
-  - azureadonlyauthentications
-  correct_patterns:
-  - azureADOnlyAuthentication = true
-  - azuread_authentication_only = true
-  - '# Use Microsoft Entra authentication with managed identity'
   warning_message: SQL authentication with username/password detected — use Microsoft Entra (Azure AD) authentication with
     managed identity.
   description: Detects SQL authentication (username/password) instead of Microsoft Entra (AAD) authentication
   rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  targets:
+    search_patterns:
+    - sql authentication
+    - username/password
+    - sql_login
+    - administrator_login_password
+    safe_patterns:
+    - do not use sql authentication
+    - avoid sql authentication
+    - entra authentication
+    - sql authentication is fully disabled
+    - sql authentication is disabled
+    - sql authentication must be disabled
+    - azureadonlyauthentication = true
+    - azureadonlyauthentications
+    correct_patterns:
+    - azureADOnlyAuthentication = true
+    - azuread_authentication_only = true
+    - '# Use Microsoft Entra authentication with managed identity'
+  applies_to: []
 - id: ANTI-AUTH-002
-  search_patterns:
-  - access_policy {
-  - access_policy =
-  - access policies
-  safe_patterns:
-  - do not use access policies
-  - avoid access policies
-  - rbac_authorization
-  correct_patterns:
-  - enable_rbac_authorization = true
-  - enableRbacAuthorization = true
-  - azurerm_role_assignment
   warning_message: Key Vault access policies detected — use enable_rbac_authorization = true with role assignments instead.
   description: Detects shared access signature (SAS) tokens where managed identity with RBAC should be used
   rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  targets:
+    search_patterns:
+    - access_policy {
+    - access_policy =
+    - access policies
+    safe_patterns:
+    - do not use access policies
+    - avoid access policies
+    - rbac_authorization
+    correct_patterns:
+    - enable_rbac_authorization = true
+    - enableRbacAuthorization = true
+    - azurerm_role_assignment
+  applies_to: []
 - id: ANTI-AUTH-003
-  search_patterns:
-  - '"owner"'
-  - '"contributor"'
-  safe_patterns:
-  - storage blob data
-  - key vault secrets
-  - key vault crypto
-  - cosmos db account
-  - cosmos db data
-  - signalr service owner
-  - service bus data
-  - redis cache contributor
-  - acrpull
-  - acrpush
-  - monitoring reader
-  - log analytics reader
-  correct_patterns:
-  - '"Reader"'
-  - '"Storage Blob Data Contributor"'
-  - '"Key Vault Secrets User"'
-  - '"Cosmos DB Account Reader Role"'
-  - '# Use the most specific built-in role at the narrowest scope'
   warning_message: Broad role assignment detected (Owner/Contributor at subscription/RG scope) -- use the most specific built-in
     role at the narrowest scope.
   description: Detects access policy authorization on Key Vault instead of RBAC authorization model
   rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  targets:
+    search_patterns:
+    - '"owner"'
+    - '"contributor"'
+    safe_patterns:
+    - storage blob data
+    - key vault secrets
+    - key vault crypto
+    - cosmos db account
+    - cosmos db data
+    - signalr service owner
+    - service bus data
+    - redis cache contributor
+    - acrpull
+    - acrpush
+    - monitoring reader
+    - log analytics reader
+    correct_patterns:
+    - '"Reader"'
+    - '"Storage Blob Data Contributor"'
+    - '"Key Vault Secrets User"'
+    - '"Cosmos DB Account Reader Role"'
+    - '# Use the most specific built-in role at the narrowest scope'
+  applies_to: []

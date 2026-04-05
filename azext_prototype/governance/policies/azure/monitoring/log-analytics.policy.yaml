@@ -12,54 +12,6 @@ rules:
   - bicep-agent
   - cloud-architect
   - monitoring-agent
-  terraform_pattern: |
-    resource "azapi_resource" "log_analytics_workspace" {
-      type      = "Microsoft.OperationalInsights/workspaces@2023-09-01"
-      name      = var.log_analytics_name
-      location  = var.location
-      parent_id = azapi_resource.resource_group.id
-
-      body = {
-        properties = {
-          sku = {
-            name = "PerGB2018"
-          }
-          retentionInDays                      = 30
-          publicNetworkAccessForIngestion       = "Disabled"
-          publicNetworkAccessForQuery           = "Disabled"
-          features = {
-            enableLogAccessUsingOnlyResourcePermissions = true
-          }
-        }
-      }
-    }
-
-    output "log_analytics_workspace_id" {
-      value = azapi_resource.log_analytics_workspace.id
-    }
-
-    output "log_analytics_customer_id" {
-      value = azapi_resource.log_analytics_workspace.output.properties.customerId
-    }
-  bicep_pattern: |
-    resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
-      name: logAnalyticsName
-      location: location
-      properties: {
-        sku: {
-          name: 'PerGB2018'
-        }
-        retentionInDays: 30
-        publicNetworkAccessForIngestion: 'Disabled'
-        publicNetworkAccessForQuery: 'Disabled'
-        features: {
-          enableLogAccessUsingOnlyResourcePermissions: true
-        }
-      }
-    }
-
-    output logAnalyticsWorkspaceId string = logAnalyticsWorkspace.id
-    output logAnalyticsCustomerId string = logAnalyticsWorkspace.properties.customerId
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2024-01-01
     description: Private endpoint for Log Analytics ingestion — required when publicNetworkAccessForIngestion is Disabled
@@ -200,14 +152,62 @@ rules:
           }]
         }
       }
-  prohibitions:
-  - NEVER use Free SKU for production or shared workspaces — use PerGB2018
-  - NEVER set retentionInDays below 30 for compliance-sensitive workloads
-  - NEVER set publicNetworkAccessForIngestion to Enabled when private endpoints are available
-  - NEVER set publicNetworkAccessForQuery to Enabled when private endpoints are available
   targets:
-    services: &id001
+    services:
     - Microsoft.OperationalInsights/workspaces
+    terraform_pattern: |
+      resource "azapi_resource" "log_analytics_workspace" {
+        type      = "Microsoft.OperationalInsights/workspaces@2023-09-01"
+        name      = var.log_analytics_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            sku = {
+              name = "PerGB2018"
+            }
+            retentionInDays                      = 30
+            publicNetworkAccessForIngestion       = "Disabled"
+            publicNetworkAccessForQuery           = "Disabled"
+            features = {
+              enableLogAccessUsingOnlyResourcePermissions = true
+            }
+          }
+        }
+      }
+
+      output "log_analytics_workspace_id" {
+        value = azapi_resource.log_analytics_workspace.id
+      }
+
+      output "log_analytics_customer_id" {
+        value = azapi_resource.log_analytics_workspace.output.properties.customerId
+      }
+    bicep_pattern: |
+      resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+        name: logAnalyticsName
+        location: location
+        properties: {
+          sku: {
+            name: 'PerGB2018'
+          }
+          retentionInDays: 30
+          publicNetworkAccessForIngestion: 'Disabled'
+          publicNetworkAccessForQuery: 'Disabled'
+          features: {
+            enableLogAccessUsingOnlyResourcePermissions: true
+          }
+        }
+      }
+
+      output logAnalyticsWorkspaceId string = logAnalyticsWorkspace.id
+      output logAnalyticsCustomerId string = logAnalyticsWorkspace.properties.customerId
+    prohibitions:
+    - NEVER use Free SKU for production or shared workspaces — use PerGB2018
+    - NEVER set retentionInDays below 30 for compliance-sensitive workloads
+    - NEVER set publicNetworkAccessForIngestion to Enabled when private endpoints are available
+    - NEVER set publicNetworkAccessForQuery to Enabled when private endpoints are available
 - id: AZ-LA-002
   severity: required
   description: Output workspace ID and customer ID for downstream diagnostic settings
@@ -217,7 +217,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - Microsoft.OperationalInsights/workspaces
 - id: AZ-LA-003
   severity: recommended
   description: Set retention to 30 days for POC, 90 days for production
@@ -226,7 +227,8 @@ rules:
   - cloud-architect
   - cost-analyst
   targets:
-    services: *id001
+    services:
+    - Microsoft.OperationalInsights/workspaces
 patterns:
 - name: Log Analytics Workspace with private endpoint
   description: Complete Log Analytics deployment with PerGB2018 SKU, private access, and DNS configuration

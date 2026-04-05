@@ -110,13 +110,18 @@ class TestAntiPatternLoader:
 
     def test_load_from_custom_directory(self, tmp_path):
         yaml_content = (
-            "domain: test\n"
+            "kind: anti-pattern\n"
+            "category: test\n"
+            "description: Test anti-patterns\n"
+            "last_updated: '2026-04-04'\n"
             "patterns:\n"
             "  - id: ANTI-TEST-001\n"
-            "    search_patterns:\n"
-            '      - "test_pattern"\n'
-            "    safe_patterns: []\n"
+            "    description: Test detection\n"
             '    warning_message: "Test warning"\n'
+            "    targets:\n"
+            "      search_patterns:\n"
+            '        - "test_pattern"\n'
+            "      safe_patterns: []\n"
         )
         (tmp_path / "test.yaml").write_text(yaml_content)
         reset_cache()
@@ -128,12 +133,16 @@ class TestAntiPatternLoader:
 
     def test_load_generates_fallback_id_when_missing(self, tmp_path):
         yaml_content = (
-            "domain: test\n"
+            "kind: anti-pattern\n"
+            "category: test\n"
+            "description: Test\n"
+            "last_updated: '2026-04-04'\n"
             "patterns:\n"
-            "  - search_patterns:\n"
-            '      - "test_pattern"\n'
-            "    safe_patterns: []\n"
+            "  - description: Test detection\n"
             '    warning_message: "Test warning"\n'
+            "    targets:\n"
+            "      search_patterns:\n"
+            '        - "test_pattern"\n'
         )
         (tmp_path / "test.yaml").write_text(yaml_content)
         reset_cache()

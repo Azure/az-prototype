@@ -11,88 +11,88 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "waf_policy" {
-      type      = "Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies@2024-01-01"
-      name      = var.waf_policy_name
-      location  = var.location
-      parent_id = var.resource_group_id
-
-      body = {
-        properties = {
-          policySettings = {
-            state                  = "Enabled"
-            mode                   = "Prevention"
-            requestBodyCheck       = true
-            maxRequestBodySizeInKb = 128
-            fileUploadLimitInMb    = 100
-            requestBodyEnforcement = true
-            requestBodyInspectLimitInKB = 128
-          }
-          managedRules = {
-            managedRuleSets = [
-              {
-                ruleSetType    = "OWASP"
-                ruleSetVersion = "3.2"
-                ruleGroupOverrides = []
-              },
-              {
-                ruleSetType    = "Microsoft_BotManagerRuleSet"
-                ruleSetVersion = "1.0"
-                ruleGroupOverrides = []
-              }
-            ]
-            exclusions = []
-          }
-          customRules = []
-        }
-      }
-    }
-  bicep_pattern: |
-    resource wafPolicy 'Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies@2024-01-01' = {
-      name: wafPolicyName
-      location: location
-      properties: {
-        policySettings: {
-          state: 'Enabled'
-          mode: 'Prevention'
-          requestBodyCheck: true
-          maxRequestBodySizeInKb: 128
-          fileUploadLimitInMb: 100
-          requestBodyEnforcement: true
-          requestBodyInspectLimitInKB: 128
-        }
-        managedRules: {
-          managedRuleSets: [
-            {
-              ruleSetType: 'OWASP'
-              ruleSetVersion: '3.2'
-              ruleGroupOverrides: []
-            }
-            {
-              ruleSetType: 'Microsoft_BotManagerRuleSet'
-              ruleSetVersion: '1.0'
-              ruleGroupOverrides: []
-            }
-          ]
-          exclusions: []
-        }
-        customRules: []
-      }
-    }
   companion_resources:
   - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
     name: diag-waf
     description: Diagnostic settings for WAF logs to monitor blocked requests and rule matches
-  prohibitions:
-  - Never set WAF mode to Detection in production — always use Prevention
-  - Never disable requestBodyCheck — it is required for SQL injection and XSS detection
-  - Never remove OWASP managed rule set — only add exclusions for verified false positives
-  - Never add broad exclusions (e.g., entire rule groups) without documenting justification
-  - Never deploy Application Gateway without WAF policy association
   targets:
-    services: &id001
+    services:
     - Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies
+    terraform_pattern: |
+      resource "azapi_resource" "waf_policy" {
+        type      = "Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies@2024-01-01"
+        name      = var.waf_policy_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        body = {
+          properties = {
+            policySettings = {
+              state                  = "Enabled"
+              mode                   = "Prevention"
+              requestBodyCheck       = true
+              maxRequestBodySizeInKb = 128
+              fileUploadLimitInMb    = 100
+              requestBodyEnforcement = true
+              requestBodyInspectLimitInKB = 128
+            }
+            managedRules = {
+              managedRuleSets = [
+                {
+                  ruleSetType    = "OWASP"
+                  ruleSetVersion = "3.2"
+                  ruleGroupOverrides = []
+                },
+                {
+                  ruleSetType    = "Microsoft_BotManagerRuleSet"
+                  ruleSetVersion = "1.0"
+                  ruleGroupOverrides = []
+                }
+              ]
+              exclusions = []
+            }
+            customRules = []
+          }
+        }
+      }
+    bicep_pattern: |
+      resource wafPolicy 'Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies@2024-01-01' = {
+        name: wafPolicyName
+        location: location
+        properties: {
+          policySettings: {
+            state: 'Enabled'
+            mode: 'Prevention'
+            requestBodyCheck: true
+            maxRequestBodySizeInKb: 128
+            fileUploadLimitInMb: 100
+            requestBodyEnforcement: true
+            requestBodyInspectLimitInKB: 128
+          }
+          managedRules: {
+            managedRuleSets: [
+              {
+                ruleSetType: 'OWASP'
+                ruleSetVersion: '3.2'
+                ruleGroupOverrides: []
+              }
+              {
+                ruleSetType: 'Microsoft_BotManagerRuleSet'
+                ruleSetVersion: '1.0'
+                ruleGroupOverrides: []
+              }
+            ]
+            exclusions: []
+          }
+          customRules: []
+        }
+      }
+    prohibitions:
+    - Never set WAF mode to Detection in production — always use Prevention
+    - Never disable requestBodyCheck — it is required for SQL injection and XSS detection
+    - Never remove OWASP managed rule set — only add exclusions for verified false positives
+    - Never add broad exclusions (e.g., entire rule groups) without documenting justification
+    - Never deploy Application Gateway without WAF policy association
 - id: AZ-WAF-002
   severity: required
   description: Enable request body inspection and set appropriate size limits
@@ -102,7 +102,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies
 - id: AZ-WAF-003
   severity: recommended
   description: Add custom rules for geo-filtering and rate limiting before managed rules
@@ -112,56 +113,57 @@ rules:
   - bicep-agent
   - cloud-architect
   - security-reviewer
-  terraform_pattern: |
-    # Add to customRules array in WAF policy
-    # Rate limiting custom rule example:
-    {
-      name     = "RateLimitRule"
-      priority = 100
-      ruleType = "RateLimitRule"
-      action   = "Block"
-      rateLimitDuration     = "OneMin"
-      rateLimitThreshold    = 100
-      groupByUserSession    = []
-      matchConditions = [
-        {
-          matchVariables = [
-            {
-              variableName = "RemoteAddr"
-              selector     = null
-            }
-          ]
-          operator         = "IPMatch"
-          negationConditon = true
-          matchValues      = []
-          transforms       = []
-        }
-      ]
-    }
-  bicep_pattern: |
-    // Add to customRules array in WAF policy
-    {
-      name: 'RateLimitRule'
-      priority: 100
-      ruleType: 'RateLimitRule'
-      action: 'Block'
-      rateLimitDuration: 'OneMin'
-      rateLimitThreshold: 100
-      matchConditions: [
-        {
-          matchVariables: [
-            {
-              variableName: 'RemoteAddr'
-            }
-          ]
-          operator: 'IPMatch'
-          negationConditon: true
-          matchValues: []
-        }
-      ]
-    }
   targets:
-    services: *id001
+    services:
+    - Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies
+    terraform_pattern: |
+      # Add to customRules array in WAF policy
+      # Rate limiting custom rule example:
+      {
+        name     = "RateLimitRule"
+        priority = 100
+        ruleType = "RateLimitRule"
+        action   = "Block"
+        rateLimitDuration     = "OneMin"
+        rateLimitThreshold    = 100
+        groupByUserSession    = []
+        matchConditions = [
+          {
+            matchVariables = [
+              {
+                variableName = "RemoteAddr"
+                selector     = null
+              }
+            ]
+            operator         = "IPMatch"
+            negationConditon = true
+            matchValues      = []
+            transforms       = []
+          }
+        ]
+      }
+    bicep_pattern: |
+      // Add to customRules array in WAF policy
+      {
+        name: 'RateLimitRule'
+        priority: 100
+        ruleType: 'RateLimitRule'
+        action: 'Block'
+        rateLimitDuration: 'OneMin'
+        rateLimitThreshold: 100
+        matchConditions: [
+          {
+            matchVariables: [
+              {
+                variableName: 'RemoteAddr'
+              }
+            ]
+            operator: 'IPMatch'
+            negationConditon: true
+            matchValues: []
+          }
+        ]
+      }
 - id: AZ-WAF-004
   severity: recommended
   description: Configure WAF exclusions only for verified false positives with documented justification
@@ -172,7 +174,8 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services: *id001
+    services:
+    - Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies
 patterns:
 - name: WAF policy with OWASP 3.2 and bot protection
   description: Prevention mode WAF with managed rules, bot protection, and rate limiting

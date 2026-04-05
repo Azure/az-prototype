@@ -11,75 +11,75 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "bastion" {
-      type      = "Microsoft.Network/bastionHosts@2024-01-01"
-      name      = var.bastion_name
-      location  = var.location
-      parent_id = var.resource_group_id
-      body = {
-        sku = {
-          name = "Standard"
-        }
-        properties = {
-          ipConfigurations = [
-            {
-              name = "bastion-ip-config"
-              properties = {
-                subnet = {
-                  id = var.bastion_subnet_id
-                }
-                publicIPAddress = {
-                  id = azapi_resource.bastion_public_ip.id
-                }
-              }
-            }
-          ]
-          enableTunneling    = true
-          enableFileCopy     = true
-          enableShareableLink = false
-        }
-      }
-    }
-  bicep_pattern: |
-    resource bastion 'Microsoft.Network/bastionHosts@2024-01-01' = {
-      name: bastionName
-      location: location
-      sku: {
-        name: 'Standard'
-      }
-      properties: {
-        ipConfigurations: [
-          {
-            name: 'bastion-ip-config'
-            properties: {
-              subnet: {
-                id: bastionSubnetId
-              }
-              publicIPAddress: {
-                id: bastionPublicIp.id
-              }
-            }
-          }
-        ]
-        enableTunneling: true
-        enableFileCopy: true
-        enableShareableLink: false
-      }
-    }
   companion_resources:
   - Microsoft.Network/publicIPAddresses (Standard SKU, static, for Bastion frontend)
   - Microsoft.Network/virtualNetworks/subnets (dedicated AzureBastionSubnet with /26 or larger)
   - Microsoft.Network/networkSecurityGroups (NSG on AzureBastionSubnet with required rules)
   - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
-  prohibitions:
-  - Do not use Basic SKU for production — it lacks tunneling, file copy, and native client support
-  - Do not enable shareable links unless explicitly required — they bypass Azure AD conditional access
-  - Do not deploy Bastion in a subnet other than AzureBastionSubnet
-  - Do not use a subnet smaller than /26 for AzureBastionSubnet
   targets:
-    services: &id001
+    services:
     - Microsoft.Network/bastionHosts
+    terraform_pattern: |
+      resource "azapi_resource" "bastion" {
+        type      = "Microsoft.Network/bastionHosts@2024-01-01"
+        name      = var.bastion_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          sku = {
+            name = "Standard"
+          }
+          properties = {
+            ipConfigurations = [
+              {
+                name = "bastion-ip-config"
+                properties = {
+                  subnet = {
+                    id = var.bastion_subnet_id
+                  }
+                  publicIPAddress = {
+                    id = azapi_resource.bastion_public_ip.id
+                  }
+                }
+              }
+            ]
+            enableTunneling    = true
+            enableFileCopy     = true
+            enableShareableLink = false
+          }
+        }
+      }
+    bicep_pattern: |
+      resource bastion 'Microsoft.Network/bastionHosts@2024-01-01' = {
+        name: bastionName
+        location: location
+        sku: {
+          name: 'Standard'
+        }
+        properties: {
+          ipConfigurations: [
+            {
+              name: 'bastion-ip-config'
+              properties: {
+                subnet: {
+                  id: bastionSubnetId
+                }
+                publicIPAddress: {
+                  id: bastionPublicIp.id
+                }
+              }
+            }
+          ]
+          enableTunneling: true
+          enableFileCopy: true
+          enableShareableLink: false
+        }
+      }
+    prohibitions:
+    - Do not use Basic SKU for production — it lacks tunneling, file copy, and native client support
+    - Do not enable shareable links unless explicitly required — they bypass Azure AD conditional access
+    - Do not deploy Bastion in a subnet other than AzureBastionSubnet
+    - Do not use a subnet smaller than /26 for AzureBastionSubnet
 - id: AZ-BAS-002
   severity: required
   description: Create a dedicated AzureBastionSubnet with minimum /26 prefix and required NSG
@@ -88,38 +88,39 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "bastion_subnet" {
-      type      = "Microsoft.Network/virtualNetworks/subnets@2024-01-01"
-      name      = "AzureBastionSubnet"
-      parent_id = azapi_resource.vnet.id
-      body = {
-        properties = {
-          addressPrefix = var.bastion_subnet_prefix
-          networkSecurityGroup = {
-            id = azapi_resource.bastion_nsg.id
+  companion_resources:
+  - Microsoft.Network/networkSecurityGroups (with required inbound/outbound rules for Bastion)
+  targets:
+    services:
+    - Microsoft.Network/bastionHosts
+    terraform_pattern: |
+      resource "azapi_resource" "bastion_subnet" {
+        type      = "Microsoft.Network/virtualNetworks/subnets@2024-01-01"
+        name      = "AzureBastionSubnet"
+        parent_id = azapi_resource.vnet.id
+        body = {
+          properties = {
+            addressPrefix = var.bastion_subnet_prefix
+            networkSecurityGroup = {
+              id = azapi_resource.bastion_nsg.id
+            }
           }
         }
       }
-    }
-  bicep_pattern: |
-    resource bastionSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-01-01' = {
-      parent: vnet
-      name: 'AzureBastionSubnet'
-      properties: {
-        addressPrefix: bastionSubnetPrefix
-        networkSecurityGroup: {
-          id: bastionNsg.id
+    bicep_pattern: |
+      resource bastionSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-01-01' = {
+        parent: vnet
+        name: 'AzureBastionSubnet'
+        properties: {
+          addressPrefix: bastionSubnetPrefix
+          networkSecurityGroup: {
+            id: bastionNsg.id
+          }
         }
       }
-    }
-  companion_resources:
-  - Microsoft.Network/networkSecurityGroups (with required inbound/outbound rules for Bastion)
-  prohibitions:
-  - Do not name the subnet anything other than AzureBastionSubnet
-  - Do not omit NSG from AzureBastionSubnet
-  targets:
-    services: *id001
+    prohibitions:
+    - Do not name the subnet anything other than AzureBastionSubnet
+    - Do not omit NSG from AzureBastionSubnet
 - id: AZ-BAS-003
   severity: required
   description: Configure NSG on AzureBastionSubnet with mandatory inbound and outbound rules
@@ -128,190 +129,191 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "bastion_nsg" {
-      type      = "Microsoft.Network/networkSecurityGroups@2024-01-01"
-      name      = var.bastion_nsg_name
-      location  = var.location
-      parent_id = var.resource_group_id
-      body = {
-        properties = {
-          securityRules = [
-            {
-              name = "AllowHttpsInbound"
-              properties = {
-                priority                 = 120
-                direction                = "Inbound"
-                access                   = "Allow"
-                protocol                 = "Tcp"
-                sourcePortRange          = "*"
-                destinationPortRange     = "443"
-                sourceAddressPrefix      = "Internet"
-                destinationAddressPrefix = "*"
+  companion_resources: []
+  targets:
+    services:
+    - Microsoft.Network/bastionHosts
+    terraform_pattern: |
+      resource "azapi_resource" "bastion_nsg" {
+        type      = "Microsoft.Network/networkSecurityGroups@2024-01-01"
+        name      = var.bastion_nsg_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            securityRules = [
+              {
+                name = "AllowHttpsInbound"
+                properties = {
+                  priority                 = 120
+                  direction                = "Inbound"
+                  access                   = "Allow"
+                  protocol                 = "Tcp"
+                  sourcePortRange          = "*"
+                  destinationPortRange     = "443"
+                  sourceAddressPrefix      = "Internet"
+                  destinationAddressPrefix = "*"
+                }
+              },
+              {
+                name = "AllowGatewayManagerInbound"
+                properties = {
+                  priority                 = 130
+                  direction                = "Inbound"
+                  access                   = "Allow"
+                  protocol                 = "Tcp"
+                  sourcePortRange          = "*"
+                  destinationPortRange     = "443"
+                  sourceAddressPrefix      = "GatewayManager"
+                  destinationAddressPrefix = "*"
+                }
+              },
+              {
+                name = "AllowBastionHostCommunication"
+                properties = {
+                  priority                 = 150
+                  direction                = "Inbound"
+                  access                   = "Allow"
+                  protocol                 = "*"
+                  sourcePortRange          = "*"
+                  destinationPortRanges    = ["8080", "5701"]
+                  sourceAddressPrefix      = "VirtualNetwork"
+                  destinationAddressPrefix = "VirtualNetwork"
+                }
+              },
+              {
+                name = "AllowSshRdpOutbound"
+                properties = {
+                  priority                 = 100
+                  direction                = "Outbound"
+                  access                   = "Allow"
+                  protocol                 = "Tcp"
+                  sourcePortRange          = "*"
+                  destinationPortRanges    = ["22", "3389"]
+                  sourceAddressPrefix      = "*"
+                  destinationAddressPrefix = "VirtualNetwork"
+                }
+              },
+              {
+                name = "AllowAzureCloudOutbound"
+                properties = {
+                  priority                 = 110
+                  direction                = "Outbound"
+                  access                   = "Allow"
+                  protocol                 = "Tcp"
+                  sourcePortRange          = "*"
+                  destinationPortRange     = "443"
+                  sourceAddressPrefix      = "*"
+                  destinationAddressPrefix = "AzureCloud"
+                }
+              },
+              {
+                name = "AllowBastionCommunicationOutbound"
+                properties = {
+                  priority                 = 120
+                  direction                = "Outbound"
+                  access                   = "Allow"
+                  protocol                 = "*"
+                  sourcePortRange          = "*"
+                  destinationPortRanges    = ["8080", "5701"]
+                  sourceAddressPrefix      = "VirtualNetwork"
+                  destinationAddressPrefix = "VirtualNetwork"
+                }
               }
-            },
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource bastionNsg 'Microsoft.Network/networkSecurityGroups@2024-01-01' = {
+        name: bastionNsgName
+        location: location
+        properties: {
+          securityRules: [
             {
-              name = "AllowGatewayManagerInbound"
-              properties = {
-                priority                 = 130
-                direction                = "Inbound"
-                access                   = "Allow"
-                protocol                 = "Tcp"
-                sourcePortRange          = "*"
-                destinationPortRange     = "443"
-                sourceAddressPrefix      = "GatewayManager"
-                destinationAddressPrefix = "*"
+              name: 'AllowHttpsInbound'
+              properties: {
+                priority: 120
+                direction: 'Inbound'
+                access: 'Allow'
+                protocol: 'Tcp'
+                sourcePortRange: '*'
+                destinationPortRange: '443'
+                sourceAddressPrefix: 'Internet'
+                destinationAddressPrefix: '*'
               }
-            },
+            }
             {
-              name = "AllowBastionHostCommunication"
-              properties = {
-                priority                 = 150
-                direction                = "Inbound"
-                access                   = "Allow"
-                protocol                 = "*"
-                sourcePortRange          = "*"
-                destinationPortRanges    = ["8080", "5701"]
-                sourceAddressPrefix      = "VirtualNetwork"
-                destinationAddressPrefix = "VirtualNetwork"
+              name: 'AllowGatewayManagerInbound'
+              properties: {
+                priority: 130
+                direction: 'Inbound'
+                access: 'Allow'
+                protocol: 'Tcp'
+                sourcePortRange: '*'
+                destinationPortRange: '443'
+                sourceAddressPrefix: 'GatewayManager'
+                destinationAddressPrefix: '*'
               }
-            },
+            }
             {
-              name = "AllowSshRdpOutbound"
-              properties = {
-                priority                 = 100
-                direction                = "Outbound"
-                access                   = "Allow"
-                protocol                 = "Tcp"
-                sourcePortRange          = "*"
-                destinationPortRanges    = ["22", "3389"]
-                sourceAddressPrefix      = "*"
-                destinationAddressPrefix = "VirtualNetwork"
+              name: 'AllowBastionHostCommunication'
+              properties: {
+                priority: 150
+                direction: 'Inbound'
+                access: 'Allow'
+                protocol: '*'
+                sourcePortRange: '*'
+                destinationPortRanges: ['8080', '5701']
+                sourceAddressPrefix: 'VirtualNetwork'
+                destinationAddressPrefix: 'VirtualNetwork'
               }
-            },
+            }
             {
-              name = "AllowAzureCloudOutbound"
-              properties = {
-                priority                 = 110
-                direction                = "Outbound"
-                access                   = "Allow"
-                protocol                 = "Tcp"
-                sourcePortRange          = "*"
-                destinationPortRange     = "443"
-                sourceAddressPrefix      = "*"
-                destinationAddressPrefix = "AzureCloud"
+              name: 'AllowSshRdpOutbound'
+              properties: {
+                priority: 100
+                direction: 'Outbound'
+                access: 'Allow'
+                protocol: 'Tcp'
+                sourcePortRange: '*'
+                destinationPortRanges: ['22', '3389']
+                sourceAddressPrefix: '*'
+                destinationAddressPrefix: 'VirtualNetwork'
               }
-            },
+            }
             {
-              name = "AllowBastionCommunicationOutbound"
-              properties = {
-                priority                 = 120
-                direction                = "Outbound"
-                access                   = "Allow"
-                protocol                 = "*"
-                sourcePortRange          = "*"
-                destinationPortRanges    = ["8080", "5701"]
-                sourceAddressPrefix      = "VirtualNetwork"
-                destinationAddressPrefix = "VirtualNetwork"
+              name: 'AllowAzureCloudOutbound'
+              properties: {
+                priority: 110
+                direction: 'Outbound'
+                access: 'Allow'
+                protocol: 'Tcp'
+                sourcePortRange: '*'
+                destinationPortRange: '443'
+                sourceAddressPrefix: '*'
+                destinationAddressPrefix: 'AzureCloud'
+              }
+            }
+            {
+              name: 'AllowBastionCommunicationOutbound'
+              properties: {
+                priority: 120
+                direction: 'Outbound'
+                access: 'Allow'
+                protocol: '*'
+                sourcePortRange: '*'
+                destinationPortRanges: ['8080', '5701']
+                sourceAddressPrefix: 'VirtualNetwork'
+                destinationAddressPrefix: 'VirtualNetwork'
               }
             }
           ]
         }
       }
-    }
-  bicep_pattern: |
-    resource bastionNsg 'Microsoft.Network/networkSecurityGroups@2024-01-01' = {
-      name: bastionNsgName
-      location: location
-      properties: {
-        securityRules: [
-          {
-            name: 'AllowHttpsInbound'
-            properties: {
-              priority: 120
-              direction: 'Inbound'
-              access: 'Allow'
-              protocol: 'Tcp'
-              sourcePortRange: '*'
-              destinationPortRange: '443'
-              sourceAddressPrefix: 'Internet'
-              destinationAddressPrefix: '*'
-            }
-          }
-          {
-            name: 'AllowGatewayManagerInbound'
-            properties: {
-              priority: 130
-              direction: 'Inbound'
-              access: 'Allow'
-              protocol: 'Tcp'
-              sourcePortRange: '*'
-              destinationPortRange: '443'
-              sourceAddressPrefix: 'GatewayManager'
-              destinationAddressPrefix: '*'
-            }
-          }
-          {
-            name: 'AllowBastionHostCommunication'
-            properties: {
-              priority: 150
-              direction: 'Inbound'
-              access: 'Allow'
-              protocol: '*'
-              sourcePortRange: '*'
-              destinationPortRanges: ['8080', '5701']
-              sourceAddressPrefix: 'VirtualNetwork'
-              destinationAddressPrefix: 'VirtualNetwork'
-            }
-          }
-          {
-            name: 'AllowSshRdpOutbound'
-            properties: {
-              priority: 100
-              direction: 'Outbound'
-              access: 'Allow'
-              protocol: 'Tcp'
-              sourcePortRange: '*'
-              destinationPortRanges: ['22', '3389']
-              sourceAddressPrefix: '*'
-              destinationAddressPrefix: 'VirtualNetwork'
-            }
-          }
-          {
-            name: 'AllowAzureCloudOutbound'
-            properties: {
-              priority: 110
-              direction: 'Outbound'
-              access: 'Allow'
-              protocol: 'Tcp'
-              sourcePortRange: '*'
-              destinationPortRange: '443'
-              sourceAddressPrefix: '*'
-              destinationAddressPrefix: 'AzureCloud'
-            }
-          }
-          {
-            name: 'AllowBastionCommunicationOutbound'
-            properties: {
-              priority: 120
-              direction: 'Outbound'
-              access: 'Allow'
-              protocol: '*'
-              sourcePortRange: '*'
-              destinationPortRanges: ['8080', '5701']
-              sourceAddressPrefix: 'VirtualNetwork'
-              destinationAddressPrefix: 'VirtualNetwork'
-            }
-          }
-        ]
-      }
-    }
-  companion_resources: []
-  prohibitions:
-  - Do not omit mandatory GatewayManager inbound rule — Bastion will fail health checks
-  - Do not allow RDP/SSH inbound from Internet — only Bastion should broker these connections
-  targets:
-    services: *id001
+    prohibitions:
+    - Do not omit mandatory GatewayManager inbound rule — Bastion will fail health checks
+    - Do not allow RDP/SSH inbound from Internet — only Bastion should broker these connections
 - id: AZ-BAS-004
   severity: recommended
   description: Enable diagnostic settings for Bastion audit and session logs
@@ -321,55 +323,56 @@ rules:
   - bicep-agent
   - cloud-architect
   - monitoring-agent
-  terraform_pattern: |
-    resource "azapi_resource" "bastion_diagnostics" {
-      type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
-      name      = "diag-bastion"
-      parent_id = azapi_resource.bastion.id
-      body = {
-        properties = {
-          workspaceId = var.log_analytics_workspace_id
-          logs = [
+  companion_resources:
+  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  targets:
+    services:
+    - Microsoft.Network/bastionHosts
+    terraform_pattern: |
+      resource "azapi_resource" "bastion_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-bastion"
+        parent_id = azapi_resource.bastion.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "BastionAuditLogs"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource bastionDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-bastion'
+        scope: bastion
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
             {
-              category = "BastionAuditLogs"
-              enabled  = true
+              category: 'BastionAuditLogs'
+              enabled: true
             }
           ]
-          metrics = [
+          metrics: [
             {
-              category = "AllMetrics"
-              enabled  = true
+              category: 'AllMetrics'
+              enabled: true
             }
           ]
         }
       }
-    }
-  bicep_pattern: |
-    resource bastionDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
-      name: 'diag-bastion'
-      scope: bastion
-      properties: {
-        workspaceId: logAnalyticsWorkspaceId
-        logs: [
-          {
-            category: 'BastionAuditLogs'
-            enabled: true
-          }
-        ]
-        metrics: [
-          {
-            category: 'AllMetrics'
-            enabled: true
-          }
-        ]
-      }
-    }
-  companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
-  prohibitions:
-  - Do not skip BastionAuditLogs — they are essential for session tracking and compliance
-  targets:
-    services: *id001
+    prohibitions:
+    - Do not skip BastionAuditLogs — they are essential for session tracking and compliance
 patterns:
 - name: Azure Bastion Standard with full security
   description: Standard SKU Bastion with dedicated subnet, NSG, and diagnostics

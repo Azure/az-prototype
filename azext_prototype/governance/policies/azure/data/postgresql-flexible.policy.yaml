@@ -11,102 +11,102 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "pg_flexible" {
-      type      = "Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01"
-      name      = var.pg_name
-      location  = var.location
-      parent_id = var.resource_group_id
-      identity {
-        type = "SystemAssigned"
-      }
-      body = {
-        sku = {
-          name = var.sku_name
-          tier = "GeneralPurpose"
-        }
-        properties = {
-          version = "16"
-          administratorLogin         = var.admin_login
-          administratorLoginPassword = var.admin_password
-          authConfig = {
-            activeDirectoryAuth = "Enabled"
-            passwordAuth        = "Disabled"
-            tenantId            = var.tenant_id
-          }
-          storage = {
-            storageSizeGB = var.storage_size_gb
-            autoGrow      = "Enabled"
-            tier          = "P30"
-          }
-          backup = {
-            backupRetentionDays  = 35
-            geoRedundantBackup   = "Enabled"
-          }
-          highAvailability = {
-            mode = "ZoneRedundant"
-          }
-          network = {
-            delegatedSubnetResourceId = var.delegated_subnet_id
-            privateDnsZoneArmResourceId = var.private_dns_zone_id
-            publicNetworkAccess       = "Disabled"
-          }
-        }
-      }
-    }
-  bicep_pattern: |
-    resource pgFlexible 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
-      name: pgName
-      location: location
-      identity: {
-        type: 'SystemAssigned'
-      }
-      sku: {
-        name: skuName
-        tier: 'GeneralPurpose'
-      }
-      properties: {
-        version: '16'
-        administratorLogin: adminLogin
-        administratorLoginPassword: adminPassword
-        authConfig: {
-          activeDirectoryAuth: 'Enabled'
-          passwordAuth: 'Disabled'
-          tenantId: tenantId
-        }
-        storage: {
-          storageSizeGB: storageSizeGb
-          autoGrow: 'Enabled'
-          tier: 'P30'
-        }
-        backup: {
-          backupRetentionDays: 35
-          geoRedundantBackup: 'Enabled'
-        }
-        highAvailability: {
-          mode: 'ZoneRedundant'
-        }
-        network: {
-          delegatedSubnetResourceId: delegatedSubnetId
-          privateDnsZoneArmResourceId: privateDnsZoneId
-          publicNetworkAccess: 'Disabled'
-        }
-      }
-    }
   companion_resources:
   - Microsoft.Network/virtualNetworks/subnets (delegated subnet with Microsoft.DBforPostgreSQL/flexibleServers delegation)
   - Microsoft.Network/privateDnsZones (privatelink.postgres.database.azure.com)
   - Microsoft.Network/privateDnsZones/virtualNetworkLinks (link DNS zone to VNet)
   - Microsoft.DBforPostgreSQL/flexibleServers/administrators (Entra admin assignment)
   - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
-  prohibitions:
-  - Do not enable publicNetworkAccess — use VNet integration or private endpoints
-  - Do not hardcode administratorLoginPassword in templates — use Key Vault references
-  - Do not use passwordAuth Enabled when Entra auth is available
-  - Do not use Burstable tier for production workloads requiring HA
   targets:
-    services: &id001
+    services:
     - Microsoft.DBforPostgreSQL/flexibleServers
+    terraform_pattern: |
+      resource "azapi_resource" "pg_flexible" {
+        type      = "Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01"
+        name      = var.pg_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        identity {
+          type = "SystemAssigned"
+        }
+        body = {
+          sku = {
+            name = var.sku_name
+            tier = "GeneralPurpose"
+          }
+          properties = {
+            version = "16"
+            administratorLogin         = var.admin_login
+            administratorLoginPassword = var.admin_password
+            authConfig = {
+              activeDirectoryAuth = "Enabled"
+              passwordAuth        = "Disabled"
+              tenantId            = var.tenant_id
+            }
+            storage = {
+              storageSizeGB = var.storage_size_gb
+              autoGrow      = "Enabled"
+              tier          = "P30"
+            }
+            backup = {
+              backupRetentionDays  = 35
+              geoRedundantBackup   = "Enabled"
+            }
+            highAvailability = {
+              mode = "ZoneRedundant"
+            }
+            network = {
+              delegatedSubnetResourceId = var.delegated_subnet_id
+              privateDnsZoneArmResourceId = var.private_dns_zone_id
+              publicNetworkAccess       = "Disabled"
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource pgFlexible 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
+        name: pgName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: skuName
+          tier: 'GeneralPurpose'
+        }
+        properties: {
+          version: '16'
+          administratorLogin: adminLogin
+          administratorLoginPassword: adminPassword
+          authConfig: {
+            activeDirectoryAuth: 'Enabled'
+            passwordAuth: 'Disabled'
+            tenantId: tenantId
+          }
+          storage: {
+            storageSizeGB: storageSizeGb
+            autoGrow: 'Enabled'
+            tier: 'P30'
+          }
+          backup: {
+            backupRetentionDays: 35
+            geoRedundantBackup: 'Enabled'
+          }
+          highAvailability: {
+            mode: 'ZoneRedundant'
+          }
+          network: {
+            delegatedSubnetResourceId: delegatedSubnetId
+            privateDnsZoneArmResourceId: privateDnsZoneId
+            publicNetworkAccess: 'Disabled'
+          }
+        }
+      }
+    prohibitions:
+    - Do not enable publicNetworkAccess — use VNet integration or private endpoints
+    - Do not hardcode administratorLoginPassword in templates — use Key Vault references
+    - Do not use passwordAuth Enabled when Entra auth is available
+    - Do not use Burstable tier for production workloads requiring HA
 - id: AZ-PG-002
   severity: required
   description: Configure Entra admin for PostgreSQL Flexible Server
@@ -115,35 +115,36 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "pg_entra_admin" {
-      type      = "Microsoft.DBforPostgreSQL/flexibleServers/administrators@2024-08-01"
-      name      = var.entra_admin_object_id
-      parent_id = azapi_resource.pg_flexible.id
-      body = {
-        properties = {
-          principalName = var.entra_admin_name
-          principalType = "Group"
-          tenantId      = var.tenant_id
-        }
-      }
-    }
-  bicep_pattern: |
-    resource pgEntraAdmin 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2024-08-01' = {
-      parent: pgFlexible
-      name: entraAdminObjectId
-      properties: {
-        principalName: entraAdminName
-        principalType: 'Group'
-        tenantId: tenantId
-      }
-    }
   companion_resources:
   - Microsoft.DBforPostgreSQL/flexibleServers (parent server with authConfig.activeDirectoryAuth Enabled)
-  prohibitions:
-  - Do not use individual user accounts as Entra admin — use a security group
   targets:
-    services: *id001
+    services:
+    - Microsoft.DBforPostgreSQL/flexibleServers
+    terraform_pattern: |
+      resource "azapi_resource" "pg_entra_admin" {
+        type      = "Microsoft.DBforPostgreSQL/flexibleServers/administrators@2024-08-01"
+        name      = var.entra_admin_object_id
+        parent_id = azapi_resource.pg_flexible.id
+        body = {
+          properties = {
+            principalName = var.entra_admin_name
+            principalType = "Group"
+            tenantId      = var.tenant_id
+          }
+        }
+      }
+    bicep_pattern: |
+      resource pgEntraAdmin 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2024-08-01' = {
+        parent: pgFlexible
+        name: entraAdminObjectId
+        properties: {
+          principalName: entraAdminName
+          principalType: 'Group'
+          tenantId: tenantId
+        }
+      }
+    prohibitions:
+    - Do not use individual user accounts as Entra admin — use a security group
 - id: AZ-PG-003
   severity: required
   description: Enable diagnostic settings for PostgreSQL audit and slow query logs
@@ -153,63 +154,64 @@ rules:
   - bicep-agent
   - cloud-architect
   - monitoring-agent
-  terraform_pattern: |
-    resource "azapi_resource" "pg_diagnostics" {
-      type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
-      name      = "diag-postgresql"
-      parent_id = azapi_resource.pg_flexible.id
-      body = {
-        properties = {
-          workspaceId = var.log_analytics_workspace_id
-          logs = [
+  companion_resources:
+  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  targets:
+    services:
+    - Microsoft.DBforPostgreSQL/flexibleServers
+    terraform_pattern: |
+      resource "azapi_resource" "pg_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-postgresql"
+        parent_id = azapi_resource.pg_flexible.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "PostgreSQLLogs"
+                enabled  = true
+              },
+              {
+                category = "PostgreSQLFlexSessions"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource pgDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-postgresql'
+        scope: pgFlexible
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
             {
-              category = "PostgreSQLLogs"
-              enabled  = true
-            },
+              category: 'PostgreSQLLogs'
+              enabled: true
+            }
             {
-              category = "PostgreSQLFlexSessions"
-              enabled  = true
+              category: 'PostgreSQLFlexSessions'
+              enabled: true
             }
           ]
-          metrics = [
+          metrics: [
             {
-              category = "AllMetrics"
-              enabled  = true
+              category: 'AllMetrics'
+              enabled: true
             }
           ]
         }
       }
-    }
-  bicep_pattern: |
-    resource pgDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
-      name: 'diag-postgresql'
-      scope: pgFlexible
-      properties: {
-        workspaceId: logAnalyticsWorkspaceId
-        logs: [
-          {
-            category: 'PostgreSQLLogs'
-            enabled: true
-          }
-          {
-            category: 'PostgreSQLFlexSessions'
-            enabled: true
-          }
-        ]
-        metrics: [
-          {
-            category: 'AllMetrics'
-            enabled: true
-          }
-        ]
-      }
-    }
-  companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
-  prohibitions:
-  - Do not disable PostgreSQLLogs in production
-  targets:
-    services: *id001
+    prohibitions:
+    - Do not disable PostgreSQLLogs in production
 - id: AZ-PG-004
   severity: recommended
   description: Enable zone-redundant high availability for production databases
@@ -218,17 +220,18 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    # Set highAvailability.mode = "ZoneRedundant" in server properties
-    # See PG-001 terraform_pattern for full example
-  bicep_pattern: |
-    // Set highAvailability.mode: 'ZoneRedundant' in server properties
-    // See PG-001 bicep_pattern for full example
   companion_resources: []
-  prohibitions:
-  - Do not use SameZone HA for production — it does not protect against zone failures
   targets:
-    services: *id001
+    services:
+    - Microsoft.DBforPostgreSQL/flexibleServers
+    terraform_pattern: |
+      # Set highAvailability.mode = "ZoneRedundant" in server properties
+      # See PG-001 terraform_pattern for full example
+    bicep_pattern: |
+      // Set highAvailability.mode: 'ZoneRedundant' in server properties
+      // See PG-001 bicep_pattern for full example
+    prohibitions:
+    - Do not use SameZone HA for production — it does not protect against zone failures
 patterns:
 - name: PostgreSQL Flexible Server with Entra auth and VNet integration
   description: Production PostgreSQL with Entra-only auth, VNet integration, HA, and diagnostics

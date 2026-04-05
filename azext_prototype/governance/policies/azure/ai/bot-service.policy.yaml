@@ -11,53 +11,6 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "bot" {
-      type      = "Microsoft.BotService/botServices@2022-09-15"
-      name      = var.bot_name
-      location  = "global"
-      parent_id = var.resource_group_id
-
-      body = {
-        kind = "azurebot"
-        sku = {
-          name = var.sku_name  # "F0" or "S1"
-        }
-        properties = {
-          displayName                    = var.bot_display_name
-          endpoint                       = var.bot_endpoint
-          msaAppId                       = var.msa_app_id
-          msaAppType                     = "UserAssignedMSI"
-          msaAppMSIResourceId            = var.user_assigned_identity_id
-          msaAppTenantId                 = var.tenant_id
-          disableLocalAuth               = true
-          isStreamingSupported           = true
-          publicNetworkAccess            = "Disabled"
-          tenantId                       = var.tenant_id
-        }
-      }
-    }
-  bicep_pattern: |
-    resource bot 'Microsoft.BotService/botServices@2022-09-15' = {
-      name: botName
-      location: 'global'
-      kind: 'azurebot'
-      sku: {
-        name: skuName
-      }
-      properties: {
-        displayName: botDisplayName
-        endpoint: botEndpoint
-        msaAppId: msaAppId
-        msaAppType: 'UserAssignedMSI'
-        msaAppMSIResourceId: userAssignedIdentityId
-        msaAppTenantId: tenantId
-        disableLocalAuth: true
-        isStreamingSupported: true
-        publicNetworkAccess: 'Disabled'
-        tenantId: tenantId
-      }
-    }
   companion_resources:
   - type: Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31
     name: id-bot
@@ -127,15 +80,62 @@ rules:
   - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
     name: diag-bot
     description: Diagnostic settings to route bot activity logs to Log Analytics
-  prohibitions:
-  - Never hardcode MSA app passwords or client secrets in IaC
-  - Never use msaAppType 'SingleTenant' with hardcoded credentials — use UserAssignedMSI
-  - Never set disableLocalAuth to false
-  - Never enable V1 Direct Line protocol — it lacks enhanced authentication
-  - Never leave trustedOrigins empty on Direct Line channels with isSecureSiteEnabled
   targets:
-    services: &id001
+    services:
     - Microsoft.BotService/botServices
+    terraform_pattern: |
+      resource "azapi_resource" "bot" {
+        type      = "Microsoft.BotService/botServices@2022-09-15"
+        name      = var.bot_name
+        location  = "global"
+        parent_id = var.resource_group_id
+
+        body = {
+          kind = "azurebot"
+          sku = {
+            name = var.sku_name  # "F0" or "S1"
+          }
+          properties = {
+            displayName                    = var.bot_display_name
+            endpoint                       = var.bot_endpoint
+            msaAppId                       = var.msa_app_id
+            msaAppType                     = "UserAssignedMSI"
+            msaAppMSIResourceId            = var.user_assigned_identity_id
+            msaAppTenantId                 = var.tenant_id
+            disableLocalAuth               = true
+            isStreamingSupported           = true
+            publicNetworkAccess            = "Disabled"
+            tenantId                       = var.tenant_id
+          }
+        }
+      }
+    bicep_pattern: |
+      resource bot 'Microsoft.BotService/botServices@2022-09-15' = {
+        name: botName
+        location: 'global'
+        kind: 'azurebot'
+        sku: {
+          name: skuName
+        }
+        properties: {
+          displayName: botDisplayName
+          endpoint: botEndpoint
+          msaAppId: msaAppId
+          msaAppType: 'UserAssignedMSI'
+          msaAppMSIResourceId: userAssignedIdentityId
+          msaAppTenantId: tenantId
+          disableLocalAuth: true
+          isStreamingSupported: true
+          publicNetworkAccess: 'Disabled'
+          tenantId: tenantId
+        }
+      }
+    prohibitions:
+    - Never hardcode MSA app passwords or client secrets in IaC
+    - Never use msaAppType 'SingleTenant' with hardcoded credentials — use UserAssignedMSI
+    - Never set disableLocalAuth to false
+    - Never enable V1 Direct Line protocol — it lacks enhanced authentication
+    - Never leave trustedOrigins empty on Direct Line channels with isSecureSiteEnabled
 - id: AZ-BOT-002
   severity: required
   description: Configure Direct Line channels with enhanced authentication and trusted origins
@@ -146,7 +146,8 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services: *id001
+    services:
+    - Microsoft.BotService/botServices
 - id: AZ-BOT-003
   severity: recommended
   description: Enable Application Insights for bot telemetry and conversation analytics
@@ -157,7 +158,8 @@ rules:
   - cloud-architect
   - monitoring-agent
   targets:
-    services: *id001
+    services:
+    - Microsoft.BotService/botServices
 patterns:
 - name: Bot Service with managed identity and secure Direct Line
   description: Azure Bot with user-assigned identity, enhanced auth, and trusted origins

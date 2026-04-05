@@ -11,40 +11,40 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "app_service_plan" {
-      type      = "Microsoft.Web/serverfarms@2023-12-01"
-      name      = var.app_service_plan_name
-      location  = var.location
-      parent_id = azapi_resource.resource_group.id
-
-      body = {
-        sku = {
-          name = "B1"
-          tier = "Basic"
-        }
-        kind = "linux"
-        properties = {
-          reserved = true
-        }
-      }
-    }
-  bicep_pattern: |
-    resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
-      name: appServicePlanName
-      location: location
-      kind: 'linux'
-      sku: {
-        name: 'B1'
-        tier: 'Basic'
-      }
-      properties: {
-        reserved: true
-      }
-    }
   targets:
-    services: &id001
+    services:
     - Microsoft.Web/sites
+    terraform_pattern: |
+      resource "azapi_resource" "app_service_plan" {
+        type      = "Microsoft.Web/serverfarms@2023-12-01"
+        name      = var.app_service_plan_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "B1"
+            tier = "Basic"
+          }
+          kind = "linux"
+          properties = {
+            reserved = true
+          }
+        }
+      }
+    bicep_pattern: |
+      resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
+        name: appServicePlanName
+        location: location
+        kind: 'linux'
+        sku: {
+          name: 'B1'
+          tier: 'Basic'
+        }
+        properties: {
+          reserved: true
+        }
+      }
 - id: AZ-AS-002
   severity: required
   description: Create App Service with HTTPS-only, TLS 1.2, managed identity, VNet integration, and public access disabled
@@ -54,60 +54,6 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "app_service" {
-      type      = "Microsoft.Web/sites@2023-12-01"
-      name      = var.app_service_name
-      location  = var.location
-      parent_id = azapi_resource.resource_group.id
-
-      identity {
-        type         = "UserAssigned"
-        identity_ids = [azapi_resource.user_assigned_identity.id]
-      }
-
-      body = {
-        kind = "app,linux"
-        properties = {
-          serverFarmId        = azapi_resource.app_service_plan.id
-          httpsOnly           = true
-          publicNetworkAccess = "Disabled"
-          virtualNetworkSubnetId = var.app_service_subnet_id
-          siteConfig = {
-            minTlsVersion          = "1.2"
-            ftpsState              = "Disabled"
-            vnetRouteAllEnabled    = true
-            http20Enabled          = true
-            linuxFxVersion         = var.linux_fx_version
-          }
-        }
-      }
-    }
-  bicep_pattern: |
-    resource appService 'Microsoft.Web/sites@2023-12-01' = {
-      name: appServiceName
-      location: location
-      kind: 'app,linux'
-      identity: {
-        type: 'UserAssigned'
-        userAssignedIdentities: {
-          '${userAssignedIdentity.id}': {}
-        }
-      }
-      properties: {
-        serverFarmId: appServicePlan.id
-        httpsOnly: true
-        publicNetworkAccess: 'Disabled'
-        virtualNetworkSubnetId: appServiceSubnetId
-        siteConfig: {
-          minTlsVersion: '1.2'
-          ftpsState: 'Disabled'
-          vnetRouteAllEnabled: true
-          http20Enabled: true
-          linuxFxVersion: linuxFxVersion
-        }
-      }
-    }
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2024-01-01
     description: Private endpoint for App Service — required when publicNetworkAccess is Disabled
@@ -278,12 +224,6 @@ rules:
           ]
         }
       }
-  prohibitions:
-  - NEVER set httpsOnly to false
-  - NEVER set minTlsVersion below 1.2
-  - NEVER set ftpsState to AllAllowed — use Disabled
-  - NEVER set publicNetworkAccess to Enabled
-  - NEVER store secrets in App Settings as plaintext — use Key Vault references (@Microsoft.KeyVault(SecretUri=...))
   template_check:
     scope:
     - app-service
@@ -292,7 +232,68 @@ rules:
     - identity
     error_message: 'Service ''{service_name}'' ({service_type}) missing {config_key}: true'
   targets:
-    services: *id001
+    services:
+    - Microsoft.Web/sites
+    terraform_pattern: |
+      resource "azapi_resource" "app_service" {
+        type      = "Microsoft.Web/sites@2023-12-01"
+        name      = var.app_service_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        identity {
+          type         = "UserAssigned"
+          identity_ids = [azapi_resource.user_assigned_identity.id]
+        }
+
+        body = {
+          kind = "app,linux"
+          properties = {
+            serverFarmId        = azapi_resource.app_service_plan.id
+            httpsOnly           = true
+            publicNetworkAccess = "Disabled"
+            virtualNetworkSubnetId = var.app_service_subnet_id
+            siteConfig = {
+              minTlsVersion          = "1.2"
+              ftpsState              = "Disabled"
+              vnetRouteAllEnabled    = true
+              http20Enabled          = true
+              linuxFxVersion         = var.linux_fx_version
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource appService 'Microsoft.Web/sites@2023-12-01' = {
+        name: appServiceName
+        location: location
+        kind: 'app,linux'
+        identity: {
+          type: 'UserAssigned'
+          userAssignedIdentities: {
+            '${userAssignedIdentity.id}': {}
+          }
+        }
+        properties: {
+          serverFarmId: appServicePlan.id
+          httpsOnly: true
+          publicNetworkAccess: 'Disabled'
+          virtualNetworkSubnetId: appServiceSubnetId
+          siteConfig: {
+            minTlsVersion: '1.2'
+            ftpsState: 'Disabled'
+            vnetRouteAllEnabled: true
+            http20Enabled: true
+            linuxFxVersion: linuxFxVersion
+          }
+        }
+      }
+    prohibitions:
+    - NEVER set httpsOnly to false
+    - NEVER set minTlsVersion below 1.2
+    - NEVER set ftpsState to AllAllowed — use Disabled
+    - NEVER set publicNetworkAccess to Enabled
+    - NEVER store secrets in App Settings as plaintext — use Key Vault references (@Microsoft.KeyVault(SecretUri=...))
 - id: AZ-AS-003
   severity: required
   description: Deploy into a VNet-integrated subnet for backend connectivity
@@ -308,7 +309,8 @@ rules:
     - virtual-network
     error_message: Template with app-service must include a virtual-network service for VNet integration
   targets:
-    services: *id001
+    services:
+    - Microsoft.Web/sites
 - id: AZ-AS-004
   severity: recommended
   description: Use deployment slots for zero-downtime deployments in production
@@ -318,7 +320,8 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services: *id001
+    services:
+    - Microsoft.Web/sites
 - id: AZ-AS-005
   severity: recommended
   description: Use App Service Authentication (EasyAuth) or custom middleware for user-facing apps
@@ -327,7 +330,8 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services: *id001
+    services:
+    - Microsoft.Web/sites
 - id: AZ-AS-006
   severity: recommended
   description: Enable health check feature on the App Service
@@ -338,14 +342,15 @@ rules:
   - terraform-agent
   - bicep-agent
   - monitoring-agent
-  terraform_pattern: |
-    # Add to the siteConfig properties in AS-002:
-    #   healthCheckPath = "/health"
-  bicep_pattern: |
-    // Add to the siteConfig properties in AS-002:
-    //   healthCheckPath: '/health'
   targets:
-    services: *id001
+    services:
+    - Microsoft.Web/sites
+    terraform_pattern: |
+      # Add to the siteConfig properties in AS-002:
+      #   healthCheckPath = "/health"
+    bicep_pattern: |
+      // Add to the siteConfig properties in AS-002:
+      //   healthCheckPath: '/health'
 - id: AZ-AS-007
   severity: recommended
   description: Disable ARR affinity for stateless applications
@@ -355,14 +360,15 @@ rules:
   - cloud-architect
   - terraform-agent
   - bicep-agent
-  terraform_pattern: |
-    # Add to the properties block in AS-002:
-    #   clientAffinityEnabled = false
-  bicep_pattern: |
-    // Add to the properties block in AS-002:
-    //   clientAffinityEnabled: false
   targets:
-    services: *id001
+    services:
+    - Microsoft.Web/sites
+    terraform_pattern: |
+      # Add to the properties block in AS-002:
+      #   clientAffinityEnabled = false
+    bicep_pattern: |
+      // Add to the properties block in AS-002:
+      //   clientAffinityEnabled: false
 - id: AZ-AS-008
   severity: recommended
   description: Enable zone redundancy on the App Service Plan for production workloads
@@ -372,20 +378,21 @@ rules:
   - cloud-architect
   - terraform-agent
   - bicep-agent
-  terraform_pattern: |
-    # Add to the App Service Plan properties in AS-001:
-    #   properties = {
-    #     zoneRedundant = true
-    #   }
-  bicep_pattern: |
-    // Add to the App Service Plan properties in AS-001:
-    //   properties: {
-    //     zoneRedundant: true
-    //   }
-  prohibitions:
-  - NEVER deploy production workloads on non-zone-redundant plans when the region supports availability zones
   targets:
-    services: *id001
+    services:
+    - Microsoft.Web/sites
+    terraform_pattern: |
+      # Add to the App Service Plan properties in AS-001:
+      #   properties = {
+      #     zoneRedundant = true
+      #   }
+    bicep_pattern: |
+      // Add to the App Service Plan properties in AS-001:
+      //   properties: {
+      //     zoneRedundant: true
+      //   }
+    prohibitions:
+    - NEVER deploy production workloads on non-zone-redundant plans when the region supports availability zones
 - id: AZ-AS-009
   severity: recommended
   description: Disable remote debugging and basic authentication
@@ -396,57 +403,58 @@ rules:
   - terraform-agent
   - bicep-agent
   - security-reviewer
-  terraform_pattern: |
-    # Add to the siteConfig properties in AS-002:
-    #   remoteDebuggingEnabled = false
-
-    resource "azapi_resource" "app_basic_auth_ftp" {
-      type      = "Microsoft.Web/sites/basicPublishingCredentialsPolicies@2023-12-01"
-      name      = "ftp"
-      parent_id = azapi_resource.app_service.id
-
-      body = {
-        properties = {
-          allow = false
-        }
-      }
-    }
-
-    resource "azapi_resource" "app_basic_auth_scm" {
-      type      = "Microsoft.Web/sites/basicPublishingCredentialsPolicies@2023-12-01"
-      name      = "scm"
-      parent_id = azapi_resource.app_service.id
-
-      body = {
-        properties = {
-          allow = false
-        }
-      }
-    }
-  bicep_pattern: |
-    // Add to the siteConfig properties in AS-002:
-    //   remoteDebuggingEnabled: false
-
-    resource appBasicAuthFtp 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2023-12-01' = {
-      parent: appService
-      name: 'ftp'
-      properties: {
-        allow: false
-      }
-    }
-
-    resource appBasicAuthScm 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2023-12-01' = {
-      parent: appService
-      name: 'scm'
-      properties: {
-        allow: false
-      }
-    }
-  prohibitions:
-  - NEVER enable remote debugging in production
-  - NEVER enable basic authentication (FTP or SCM) in production
   targets:
-    services: *id001
+    services:
+    - Microsoft.Web/sites
+    terraform_pattern: |
+      # Add to the siteConfig properties in AS-002:
+      #   remoteDebuggingEnabled = false
+
+      resource "azapi_resource" "app_basic_auth_ftp" {
+        type      = "Microsoft.Web/sites/basicPublishingCredentialsPolicies@2023-12-01"
+        name      = "ftp"
+        parent_id = azapi_resource.app_service.id
+
+        body = {
+          properties = {
+            allow = false
+          }
+        }
+      }
+
+      resource "azapi_resource" "app_basic_auth_scm" {
+        type      = "Microsoft.Web/sites/basicPublishingCredentialsPolicies@2023-12-01"
+        name      = "scm"
+        parent_id = azapi_resource.app_service.id
+
+        body = {
+          properties = {
+            allow = false
+          }
+        }
+      }
+    bicep_pattern: |
+      // Add to the siteConfig properties in AS-002:
+      //   remoteDebuggingEnabled: false
+
+      resource appBasicAuthFtp 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2023-12-01' = {
+        parent: appService
+        name: 'ftp'
+        properties: {
+          allow: false
+        }
+      }
+
+      resource appBasicAuthScm 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2023-12-01' = {
+        parent: appService
+        name: 'scm'
+        properties: {
+          allow: false
+        }
+      }
+    prohibitions:
+    - NEVER enable remote debugging in production
+    - NEVER enable basic authentication (FTP or SCM) in production
 - id: AZ-AS-010
   severity: recommended
   description: Enable auto-heal rules for automatic recovery from unexpected issues
@@ -457,7 +465,8 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services: *id001
+    services:
+    - Microsoft.Web/sites
 patterns:
 - name: App Service with managed identity and VNet
   description: Complete App Service deployment with HTTPS, TLS 1.2, managed identity, VNet integration, private endpoint,

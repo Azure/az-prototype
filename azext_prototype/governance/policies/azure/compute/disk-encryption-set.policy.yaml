@@ -11,57 +11,57 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "disk_encryption_set" {
-      type      = "Microsoft.Compute/diskEncryptionSets@2024-03-01"
-      name      = var.des_name
-      location  = var.location
-      parent_id = var.resource_group_id
-      identity {
-        type = "SystemAssigned"
-      }
-      body = {
-        properties = {
-          activeKey = {
-            sourceVault = {
-              id = var.key_vault_id
-            }
-            keyUrl = var.key_url
-          }
-          encryptionType                    = "EncryptionAtRestWithCustomerKey"
-          rotationToLatestKeyVersionEnabled = true
-        }
-      }
-    }
-  bicep_pattern: |
-    resource diskEncryptionSet 'Microsoft.Compute/diskEncryptionSets@2024-03-01' = {
-      name: desName
-      location: location
-      identity: {
-        type: 'SystemAssigned'
-      }
-      properties: {
-        activeKey: {
-          sourceVault: {
-            id: keyVaultId
-          }
-          keyUrl: keyUrl
-        }
-        encryptionType: 'EncryptionAtRestWithCustomerKey'
-        rotationToLatestKeyVersionEnabled: true
-      }
-    }
   companion_resources:
   - Microsoft.KeyVault/vaults (Key Vault with purge protection enabled)
   - Microsoft.KeyVault/vaults/keys (RSA 2048-bit or higher encryption key)
   - Microsoft.Authorization/roleAssignments (Key Vault Crypto Service Encryption User role for DES identity)
-  prohibitions:
-  - Do not use EncryptionAtRestWithPlatformKey when CMK is required by policy
-  - Do not disable rotationToLatestKeyVersionEnabled — manual rotation causes outages on key expiry
-  - Do not use a Key Vault without purge protection — key deletion would make disks inaccessible
   targets:
-    services: &id001
+    services:
     - Microsoft.Compute/diskEncryptionSets
+    terraform_pattern: |
+      resource "azapi_resource" "disk_encryption_set" {
+        type      = "Microsoft.Compute/diskEncryptionSets@2024-03-01"
+        name      = var.des_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        identity {
+          type = "SystemAssigned"
+        }
+        body = {
+          properties = {
+            activeKey = {
+              sourceVault = {
+                id = var.key_vault_id
+              }
+              keyUrl = var.key_url
+            }
+            encryptionType                    = "EncryptionAtRestWithCustomerKey"
+            rotationToLatestKeyVersionEnabled = true
+          }
+        }
+      }
+    bicep_pattern: |
+      resource diskEncryptionSet 'Microsoft.Compute/diskEncryptionSets@2024-03-01' = {
+        name: desName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          activeKey: {
+            sourceVault: {
+              id: keyVaultId
+            }
+            keyUrl: keyUrl
+          }
+          encryptionType: 'EncryptionAtRestWithCustomerKey'
+          rotationToLatestKeyVersionEnabled: true
+        }
+      }
+    prohibitions:
+    - Do not use EncryptionAtRestWithPlatformKey when CMK is required by policy
+    - Do not disable rotationToLatestKeyVersionEnabled — manual rotation causes outages on key expiry
+    - Do not use a Key Vault without purge protection — key deletion would make disks inaccessible
 - id: AZ-DES-002
   severity: required
   description: Grant the Disk Encryption Set identity access to the Key Vault
@@ -70,37 +70,38 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "des_role_assignment" {
-      type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
-      name      = var.role_assignment_name
-      parent_id = var.key_vault_id
-      body = {
-        properties = {
-          roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/e147488a-f6f5-4113-8e2d-b22465e65bf6"
-          principalId      = azapi_resource.disk_encryption_set.identity[0].principal_id
-          principalType    = "ServicePrincipal"
-        }
-      }
-    }
-  bicep_pattern: |
-    resource desRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-      name: guid(keyVault.id, diskEncryptionSet.id, 'e147488a-f6f5-4113-8e2d-b22465e65bf6')
-      scope: keyVault
-      properties: {
-        roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'e147488a-f6f5-4113-8e2d-b22465e65bf6')
-        principalId: diskEncryptionSet.identity.principalId
-        principalType: 'ServicePrincipal'
-      }
-    }
   companion_resources:
   - Microsoft.Compute/diskEncryptionSets (DES with system-assigned identity)
   - Microsoft.KeyVault/vaults (Key Vault with RBAC authorization)
-  prohibitions:
-  - Do not use access policies for Key Vault when using RBAC authorization model
-  - Do not grant Key Vault Administrator to the DES — use least-privilege Crypto Service Encryption User
   targets:
-    services: *id001
+    services:
+    - Microsoft.Compute/diskEncryptionSets
+    terraform_pattern: |
+      resource "azapi_resource" "des_role_assignment" {
+        type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name      = var.role_assignment_name
+        parent_id = var.key_vault_id
+        body = {
+          properties = {
+            roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/e147488a-f6f5-4113-8e2d-b22465e65bf6"
+            principalId      = azapi_resource.disk_encryption_set.identity[0].principal_id
+            principalType    = "ServicePrincipal"
+          }
+        }
+      }
+    bicep_pattern: |
+      resource desRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+        name: guid(keyVault.id, diskEncryptionSet.id, 'e147488a-f6f5-4113-8e2d-b22465e65bf6')
+        scope: keyVault
+        properties: {
+          roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'e147488a-f6f5-4113-8e2d-b22465e65bf6')
+          principalId: diskEncryptionSet.identity.principalId
+          principalType: 'ServicePrincipal'
+        }
+      }
+    prohibitions:
+    - Do not use access policies for Key Vault when using RBAC authorization model
+    - Do not grant Key Vault Administrator to the DES — use least-privilege Crypto Service Encryption User
 - id: AZ-DES-003
   severity: required
   description: Enable automatic key rotation to latest key version
@@ -109,20 +110,21 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    # Set rotationToLatestKeyVersionEnabled = true in DES properties
-    # See DES-001 terraform_pattern for full example
-    # Use keyUrl WITHOUT version suffix for auto-rotation
-  bicep_pattern: |
-    // Set rotationToLatestKeyVersionEnabled: true in DES properties
-    // See DES-001 bicep_pattern for full example
-    // Use keyUrl WITHOUT version suffix for auto-rotation
   companion_resources: []
-  prohibitions:
-  - Do not pin keyUrl to a specific key version when auto-rotation is enabled
-  - Do not disable auto-rotation without an explicit key rotation procedure
   targets:
-    services: *id001
+    services:
+    - Microsoft.Compute/diskEncryptionSets
+    terraform_pattern: |
+      # Set rotationToLatestKeyVersionEnabled = true in DES properties
+      # See DES-001 terraform_pattern for full example
+      # Use keyUrl WITHOUT version suffix for auto-rotation
+    bicep_pattern: |
+      // Set rotationToLatestKeyVersionEnabled: true in DES properties
+      // See DES-001 bicep_pattern for full example
+      // Use keyUrl WITHOUT version suffix for auto-rotation
+    prohibitions:
+    - Do not pin keyUrl to a specific key version when auto-rotation is enabled
+    - Do not disable auto-rotation without an explicit key rotation procedure
 - id: AZ-DES-004
   severity: recommended
   description: Use EncryptionAtRestWithPlatformAndCustomerKeys for double encryption
@@ -132,53 +134,54 @@ rules:
   - bicep-agent
   - cloud-architect
   - security-reviewer
-  terraform_pattern: |
-    resource "azapi_resource" "des_double_encryption" {
-      type      = "Microsoft.Compute/diskEncryptionSets@2024-03-01"
-      name      = var.des_name
-      location  = var.location
-      parent_id = var.resource_group_id
-      identity {
-        type = "SystemAssigned"
-      }
-      body = {
-        properties = {
-          activeKey = {
-            sourceVault = {
-              id = var.key_vault_id
-            }
-            keyUrl = var.key_url
-          }
-          encryptionType                    = "EncryptionAtRestWithPlatformAndCustomerKeys"
-          rotationToLatestKeyVersionEnabled = true
-        }
-      }
-    }
-  bicep_pattern: |
-    resource desDoubleEncryption 'Microsoft.Compute/diskEncryptionSets@2024-03-01' = {
-      name: desName
-      location: location
-      identity: {
-        type: 'SystemAssigned'
-      }
-      properties: {
-        activeKey: {
-          sourceVault: {
-            id: keyVaultId
-          }
-          keyUrl: keyUrl
-        }
-        encryptionType: 'EncryptionAtRestWithPlatformAndCustomerKeys'
-        rotationToLatestKeyVersionEnabled: true
-      }
-    }
   companion_resources:
   - Microsoft.KeyVault/vaults (Key Vault with purge protection)
   - Microsoft.KeyVault/vaults/keys (RSA encryption key)
-  prohibitions:
-  - Do not use double encryption on ultra-performance workloads without measuring impact
   targets:
-    services: *id001
+    services:
+    - Microsoft.Compute/diskEncryptionSets
+    terraform_pattern: |
+      resource "azapi_resource" "des_double_encryption" {
+        type      = "Microsoft.Compute/diskEncryptionSets@2024-03-01"
+        name      = var.des_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        identity {
+          type = "SystemAssigned"
+        }
+        body = {
+          properties = {
+            activeKey = {
+              sourceVault = {
+                id = var.key_vault_id
+              }
+              keyUrl = var.key_url
+            }
+            encryptionType                    = "EncryptionAtRestWithPlatformAndCustomerKeys"
+            rotationToLatestKeyVersionEnabled = true
+          }
+        }
+      }
+    bicep_pattern: |
+      resource desDoubleEncryption 'Microsoft.Compute/diskEncryptionSets@2024-03-01' = {
+        name: desName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          activeKey: {
+            sourceVault: {
+              id: keyVaultId
+            }
+            keyUrl: keyUrl
+          }
+          encryptionType: 'EncryptionAtRestWithPlatformAndCustomerKeys'
+          rotationToLatestKeyVersionEnabled: true
+        }
+      }
+    prohibitions:
+    - Do not use double encryption on ultra-performance workloads without measuring impact
 patterns:
 - name: Disk Encryption Set with CMK and auto-rotation
   description: Customer-managed key encryption with automatic key rotation

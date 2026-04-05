@@ -11,23 +11,6 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "ddos_plan" {
-      type      = "Microsoft.Network/ddosProtectionPlans@2024-01-01"
-      name      = var.ddos_plan_name
-      location  = var.location
-      parent_id = var.resource_group_id
-
-      body = {
-        properties = {}
-      }
-    }
-  bicep_pattern: |
-    resource ddosPlan 'Microsoft.Network/ddosProtectionPlans@2024-01-01' = {
-      name: ddosPlanName
-      location: location
-      properties: {}
-    }
   companion_resources:
   - type: Microsoft.Network/virtualNetworks@2024-01-01
     name: VNet DDoS association
@@ -140,13 +123,30 @@ rules:
           ]
         }
       }
-  prohibitions:
-  - Never deploy public-facing VNets without DDoS Protection Plan association
-  - Never set enableDdosProtection to false on VNets with public IP addresses
-  - Never skip DDoS attack metric alerts — immediate notification is critical
   targets:
-    services: &id001
+    services:
     - Microsoft.Network/ddosProtectionPlans
+    terraform_pattern: |
+      resource "azapi_resource" "ddos_plan" {
+        type      = "Microsoft.Network/ddosProtectionPlans@2024-01-01"
+        name      = var.ddos_plan_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        body = {
+          properties = {}
+        }
+      }
+    bicep_pattern: |
+      resource ddosPlan 'Microsoft.Network/ddosProtectionPlans@2024-01-01' = {
+        name: ddosPlanName
+        location: location
+        properties: {}
+      }
+    prohibitions:
+    - Never deploy public-facing VNets without DDoS Protection Plan association
+    - Never set enableDdosProtection to false on VNets with public IP addresses
+    - Never skip DDoS attack metric alerts — immediate notification is critical
 - id: AZ-DDOS-002
   severity: required
   description: Configure DDoS attack metric alerts on all public IP addresses
@@ -157,7 +157,8 @@ rules:
   - cloud-architect
   - monitoring-agent
   targets:
-    services: *id001
+    services:
+    - Microsoft.Network/ddosProtectionPlans
 - id: AZ-DDOS-003
   severity: recommended
   description: Enable DDoS diagnostic logging for attack analytics and post-incident review
@@ -168,7 +169,8 @@ rules:
   - cloud-architect
   - monitoring-agent
   targets:
-    services: *id001
+    services:
+    - Microsoft.Network/ddosProtectionPlans
 patterns:
 - name: DDoS Protection with VNet association and alerts
   description: DDoS plan associated with VNets, metric alerts on public IPs, and diagnostic logging

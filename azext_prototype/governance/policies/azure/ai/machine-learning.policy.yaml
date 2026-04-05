@@ -11,76 +11,6 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "ml_workspace" {
-      type      = "Microsoft.MachineLearningServices/workspaces@2024-04-01"
-      name      = var.ml_workspace_name
-      location  = var.location
-      parent_id = var.resource_group_id
-
-      identity {
-        type = "SystemAssigned"
-      }
-
-      body = {
-        sku = {
-          name = "Basic"
-          tier = "Basic"
-        }
-        properties = {
-          friendlyName           = var.ml_workspace_name
-          storageAccount         = var.storage_account_id
-          keyVault               = var.key_vault_id
-          applicationInsights    = var.app_insights_id
-          containerRegistry      = var.container_registry_id
-          publicNetworkAccess    = "Disabled"
-          hbiWorkspace           = true
-          managedNetwork = {
-            isolationMode = "AllowOnlyApprovedOutbound"
-          }
-          encryption = {
-            status    = "Enabled"
-            keyVaultProperties = {
-              keyVaultArmId = var.key_vault_id
-              keyIdentifier = var.cmk_key_id
-            }
-          }
-          v1LegacyMode = false
-        }
-      }
-    }
-  bicep_pattern: |
-    resource mlWorkspace 'Microsoft.MachineLearningServices/workspaces@2024-04-01' = {
-      name: mlWorkspaceName
-      location: location
-      identity: {
-        type: 'SystemAssigned'
-      }
-      sku: {
-        name: 'Basic'
-        tier: 'Basic'
-      }
-      properties: {
-        friendlyName: mlWorkspaceName
-        storageAccount: storageAccountId
-        keyVault: keyVaultId
-        applicationInsights: appInsightsId
-        containerRegistry: containerRegistryId
-        publicNetworkAccess: 'Disabled'
-        hbiWorkspace: true
-        managedNetwork: {
-          isolationMode: 'AllowOnlyApprovedOutbound'
-        }
-        encryption: {
-          status: 'Enabled'
-          keyVaultProperties: {
-            keyVaultArmId: keyVaultId
-            keyIdentifier: cmkKeyId
-          }
-        }
-        v1LegacyMode: false
-      }
-    }
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2024-01-01
     name: pe-ml-workspace
@@ -184,16 +114,86 @@ rules:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: AzureML Data Scientist / Compute Operator
     description: RBAC role assignments for data scientists and compute operators
-  prohibitions:
-  - Never hardcode storage account keys or workspace secrets in IaC
-  - Never set publicNetworkAccess to Enabled without managed network isolation
-  - Never disable hbiWorkspace when processing sensitive/regulated data
-  - Never use v1LegacyMode — always use v2 APIs
-  - Never create compute instances without managed identity
-  - Never skip associated Key Vault, Storage Account, or Application Insights dependencies
   targets:
-    services: &id001
+    services:
     - Microsoft.MachineLearningServices/workspaces
+    terraform_pattern: |
+      resource "azapi_resource" "ml_workspace" {
+        type      = "Microsoft.MachineLearningServices/workspaces@2024-04-01"
+        name      = var.ml_workspace_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          sku = {
+            name = "Basic"
+            tier = "Basic"
+          }
+          properties = {
+            friendlyName           = var.ml_workspace_name
+            storageAccount         = var.storage_account_id
+            keyVault               = var.key_vault_id
+            applicationInsights    = var.app_insights_id
+            containerRegistry      = var.container_registry_id
+            publicNetworkAccess    = "Disabled"
+            hbiWorkspace           = true
+            managedNetwork = {
+              isolationMode = "AllowOnlyApprovedOutbound"
+            }
+            encryption = {
+              status    = "Enabled"
+              keyVaultProperties = {
+                keyVaultArmId = var.key_vault_id
+                keyIdentifier = var.cmk_key_id
+              }
+            }
+            v1LegacyMode = false
+          }
+        }
+      }
+    bicep_pattern: |
+      resource mlWorkspace 'Microsoft.MachineLearningServices/workspaces@2024-04-01' = {
+        name: mlWorkspaceName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: 'Basic'
+          tier: 'Basic'
+        }
+        properties: {
+          friendlyName: mlWorkspaceName
+          storageAccount: storageAccountId
+          keyVault: keyVaultId
+          applicationInsights: appInsightsId
+          containerRegistry: containerRegistryId
+          publicNetworkAccess: 'Disabled'
+          hbiWorkspace: true
+          managedNetwork: {
+            isolationMode: 'AllowOnlyApprovedOutbound'
+          }
+          encryption: {
+            status: 'Enabled'
+            keyVaultProperties: {
+              keyVaultArmId: keyVaultId
+              keyIdentifier: cmkKeyId
+            }
+          }
+          v1LegacyMode: false
+        }
+      }
+    prohibitions:
+    - Never hardcode storage account keys or workspace secrets in IaC
+    - Never set publicNetworkAccess to Enabled without managed network isolation
+    - Never disable hbiWorkspace when processing sensitive/regulated data
+    - Never use v1LegacyMode — always use v2 APIs
+    - Never create compute instances without managed identity
+    - Never skip associated Key Vault, Storage Account, or Application Insights dependencies
 - id: AZ-ML-002
   severity: required
   description: Deploy compute instances and clusters with managed identity and no public IP
@@ -202,52 +202,53 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "ml_compute" {
-      type      = "Microsoft.MachineLearningServices/workspaces/computes@2024-04-01"
-      name      = var.compute_name
-      parent_id = azapi_resource.ml_workspace.id
-      location  = var.location
+  targets:
+    services:
+    - Microsoft.MachineLearningServices/workspaces
+    terraform_pattern: |
+      resource "azapi_resource" "ml_compute" {
+        type      = "Microsoft.MachineLearningServices/workspaces/computes@2024-04-01"
+        name      = var.compute_name
+        parent_id = azapi_resource.ml_workspace.id
+        location  = var.location
 
-      body = {
-        properties = {
-          computeType = "ComputeInstance"
+        body = {
           properties = {
-            vmSize                        = var.vm_size
-            enableNodePublicIp            = false
-            idleTimeBeforeShutdown        = "PT30M"
-            setupScripts                  = null
-            personalComputeInstanceSettings = null
+            computeType = "ComputeInstance"
+            properties = {
+              vmSize                        = var.vm_size
+              enableNodePublicIp            = false
+              idleTimeBeforeShutdown        = "PT30M"
+              setupScripts                  = null
+              personalComputeInstanceSettings = null
+            }
+          }
+          identity = {
+            type = "SystemAssigned"
           }
         }
-        identity = {
-          type = "SystemAssigned"
-        }
       }
-    }
-  bicep_pattern: |
-    resource mlCompute 'Microsoft.MachineLearningServices/workspaces/computes@2024-04-01' = {
-      name: computeName
-      parent: mlWorkspace
-      location: location
-      properties: {
-        computeType: 'ComputeInstance'
+    bicep_pattern: |
+      resource mlCompute 'Microsoft.MachineLearningServices/workspaces/computes@2024-04-01' = {
+        name: computeName
+        parent: mlWorkspace
+        location: location
         properties: {
-          vmSize: vmSize
-          enableNodePublicIp: false
-          idleTimeBeforeShutdown: 'PT30M'
+          computeType: 'ComputeInstance'
+          properties: {
+            vmSize: vmSize
+            enableNodePublicIp: false
+            idleTimeBeforeShutdown: 'PT30M'
+          }
+        }
+        identity: {
+          type: 'SystemAssigned'
         }
       }
-      identity: {
-        type: 'SystemAssigned'
-      }
-    }
-  prohibitions:
-  - Never set enableNodePublicIp to true
-  - Never create compute without managed identity
-  - Never skip idle shutdown configuration — set idleTimeBeforeShutdown to avoid cost waste
-  targets:
-    services: *id001
+    prohibitions:
+    - Never set enableNodePublicIp to true
+    - Never create compute without managed identity
+    - Never skip idle shutdown configuration — set idleTimeBeforeShutdown to avoid cost waste
 - id: AZ-ML-003
   severity: recommended
   description: Use managed online endpoints with managed identity for model serving
@@ -258,7 +259,8 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services: *id001
+    services:
+    - Microsoft.MachineLearningServices/workspaces
 patterns:
 - name: ML workspace with managed network and CMK
   description: Secure ML workspace with network isolation, CMK encryption, and associated resources

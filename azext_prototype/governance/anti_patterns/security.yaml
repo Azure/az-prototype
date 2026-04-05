@@ -4,120 +4,132 @@ description: Credentials, secrets, and insecure configuration detection
 last_updated: '2026-04-04'
 patterns:
 - id: ANTI-SEC-001
-  search_patterns:
-  - connection_string
-  - connectionstring
-  - access_key
-  - accesskey
-  - account_key
-  - accountkey
-  - shared_access_key
-  - client_secret
-  - password =
-  - password="
-  - password='
-  safe_patterns:
-  - applicationinsights_connection_string
-  - appinsights_connection_string
-  - application_insights_connection_string
-  - appinsights_connectionstring
-  - .properties.connectionstring
-  - instrumentationkey
-  - never output
-  - never reference
-  - not available
-  - are disabled
-  - is disabled
-  - must not
-  - do not output
-  - do not use
-  - prohibited
-  - defaultazurecredential
-  correct_patterns:
-  - '# Use managed identity via DefaultAzureCredential'
-  - azurerm_user_assigned_identity
-  - Microsoft.ManagedIdentity/userAssignedIdentities
   warning_message: Possible credential/secret in output — use managed identity instead of connection strings or keys.
   description: Detects connection strings, access keys, or shared secrets in generated code that should use managed identity
     instead
   rationale: Hardcoded credentials or access keys create security vulnerabilities and prevent key rotation.
+  targets:
+    search_patterns:
+    - connection_string
+    - connectionstring
+    - access_key
+    - accesskey
+    - account_key
+    - accountkey
+    - shared_access_key
+    - client_secret
+    - password =
+    - password="
+    - password='
+    safe_patterns:
+    - applicationinsights_connection_string
+    - appinsights_connection_string
+    - application_insights_connection_string
+    - appinsights_connectionstring
+    - .properties.connectionstring
+    - instrumentationkey
+    - never output
+    - never reference
+    - not available
+    - are disabled
+    - is disabled
+    - must not
+    - do not output
+    - do not use
+    - prohibited
+    - defaultazurecredential
+    correct_patterns:
+    - '# Use managed identity via DefaultAzureCredential'
+    - azurerm_user_assigned_identity
+    - Microsoft.ManagedIdentity/userAssignedIdentities
+  applies_to: []
 - id: ANTI-SEC-002
-  search_patterns:
-  - admin_enabled = true
-  - admin_username
-  - admin_password
-  safe_patterns: []
-  correct_patterns:
-  - admin_enabled = false
-  - adminUserEnabled = false
-  - '# Use managed identity with RBAC role assignment'
   warning_message: Admin credentials detected — use managed identity or RBAC-based authentication instead.
   description: Detects admin credential usage (admin_enabled, admin_username) which bypasses RBAC and managed identity
   rationale: Hardcoded credentials or access keys create security vulnerabilities and prevent key rotation.
+  targets:
+    search_patterns:
+    - admin_enabled = true
+    - admin_username
+    - admin_password
+    safe_patterns: []
+    correct_patterns:
+    - admin_enabled = false
+    - adminUserEnabled = false
+    - '# Use managed identity with RBAC role assignment'
+  applies_to: []
 - id: ANTI-SEC-003
-  search_patterns:
-  - hardcoded
-  - hard-coded
-  - hard coded
-  safe_patterns:
-  - do not hardcode
-  - avoid hardcod
-  - never hardcode
-  - don't hardcode
-  - possible hard-coded value detected
-  - rather than hardcoded
-  - instead of hardcod
-  correct_patterns:
-  - '# Externalize secrets to Key Vault or use managed identity'
-  - azurerm_key_vault_secret
-  - Microsoft.KeyVault/vaults/secrets
   warning_message: Possible hard-coded value detected — externalize secrets to Key Vault or use managed identity.
   description: Detects potential hardcoded values that should be parameterized or sourced from Key Vault
   rationale: Hardcoded credentials or access keys create security vulnerabilities and prevent key rotation.
+  targets:
+    search_patterns:
+    - hardcoded
+    - hard-coded
+    - hard coded
+    safe_patterns:
+    - do not hardcode
+    - avoid hardcod
+    - never hardcode
+    - don't hardcode
+    - possible hard-coded value detected
+    - rather than hardcoded
+    - instead of hardcod
+    correct_patterns:
+    - '# Externalize secrets to Key Vault or use managed identity'
+    - azurerm_key_vault_secret
+    - Microsoft.KeyVault/vaults/secrets
+  applies_to: []
 - id: ANTI-SEC-004
-  search_patterns:
-  - disable_tde
-  - transparent_data_encryption = false
-  - encryption_at_rest = false
-  safe_patterns: []
-  correct_patterns:
-  - transparent_data_encryption = true
-  - encryption_at_rest = true
-  - transparentDataEncryption = "Enabled"
   warning_message: Encryption at rest appears disabled — leave default encryption enabled on all data services.
   description: Detects disabled encryption at rest on storage or database services
   rationale: Weak or missing encryption exposes data in transit to interception.
+  targets:
+    search_patterns:
+    - disable_tde
+    - transparent_data_encryption = false
+    - encryption_at_rest = false
+    safe_patterns: []
+    correct_patterns:
+    - transparent_data_encryption = true
+    - encryption_at_rest = true
+    - transparentDataEncryption = "Enabled"
+  applies_to: []
 - id: ANTI-SEC-005
-  search_patterns:
-  - output "cosmos_account_primary_key"
-  - output "cosmos_primary_key"
-  - output "cosmos_connection_strings"
-  - output "primary_key"
-  - output "primary_connection_string"
-  - output "secondary_key"
-  - output "storage_account_key"
-  - output "storage_primary_key"
-  - output "sql_admin_password"
-  safe_patterns:
-  - deprecated
-  - do not use
-  correct_patterns:
-  - '# Remove sensitive outputs — use managed identity for service-to-service auth'
-  - output "resource_id"
-  - output "resource_name"
-  - output "principal_id"
   warning_message: Sensitive value exposed as Terraform output — remove this output entirely. Use managed identity instead
     of keys.
   description: Detects sensitive values exposed as Terraform outputs without the sensitive flag
   rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  targets:
+    search_patterns:
+    - output "cosmos_account_primary_key"
+    - output "cosmos_primary_key"
+    - output "cosmos_connection_strings"
+    - output "primary_key"
+    - output "primary_connection_string"
+    - output "secondary_key"
+    - output "storage_account_key"
+    - output "storage_primary_key"
+    - output "sql_admin_password"
+    safe_patterns:
+    - deprecated
+    - do not use
+    correct_patterns:
+    - '# Remove sensitive outputs — use managed identity for service-to-service auth'
+    - output "resource_id"
+    - output "resource_name"
+    - output "principal_id"
+  applies_to: []
 - id: ANTI-SEC-006
-  search_patterns:
-  - DO NOT USE - use managed identity
-  - 'DEPRECATED: Use managed identity'
-  - 'WARNING: Do not use'
-  safe_patterns: []
-  correct_patterns:
-  - '# Remove this output entirely — do not emit sensitive values'
   warning_message: Output marked as 'do not use' should be removed entirely, not left with a warning. Omit sensitive outputs.
   description: Detects public network access enabled on services that should be private-only
   rationale: Missing outputs or incomplete configurations cause downstream failures in dependent stages.
+  targets:
+    search_patterns:
+    - DO NOT USE - use managed identity
+    - 'DEPRECATED: Use managed identity'
+    - 'WARNING: Do not use'
+    safe_patterns: []
+    correct_patterns:
+    - '# Remove this output entirely — do not emit sensitive values'
+  applies_to: []

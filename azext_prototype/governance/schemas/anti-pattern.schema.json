@@ -52,34 +52,35 @@
           },
           "targets": {
             "type": "object",
-            "description": "What this pattern targets.",
+            "description": "Detection targets — services, search patterns, safe patterns, and correct alternatives.",
             "properties": {
               "services": {
                 "type": "array",
                 "items": { "type": "string" },
-                "description": "ARM resource type namespaces (e.g. ['Microsoft.Storage/storageAccounts']). Empty or absent means all services."
+                "description": "ARM resource type namespaces. Empty or absent means all services."
+              },
+              "search_patterns": {
+                "type": "array",
+                "items": { "type": "string" },
+                "minItems": 1,
+                "description": "Substrings to search for (case-insensitive)."
+              },
+              "safe_patterns": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Substrings that exempt a match (case-insensitive)."
+              },
+              "correct_patterns": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Examples of correct code to show when pattern is detected."
               }
             },
+            "required": ["search_patterns"],
             "additionalProperties": false
-          },
-          "search_patterns": {
-            "type": "array",
-            "items": { "type": "string" },
-            "minItems": 1,
-            "description": "Substrings to search for (case-insensitive)."
-          },
-          "safe_patterns": {
-            "type": "array",
-            "items": { "type": "string" },
-            "description": "Substrings that exempt a match (case-insensitive)."
-          },
-          "correct_patterns": {
-            "type": "array",
-            "items": { "type": "string" },
-            "description": "Examples of correct code to show when pattern is detected."
           }
         },
-        "required": ["id", "description", "warning_message", "search_patterns"]
+        "required": ["id", "description", "warning_message", "targets"]
       }
     }
   },

@@ -12,74 +12,6 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "apim" {
-      type      = "Microsoft.ApiManagement/service@2023-09-01-preview"
-      name      = var.apim_name
-      location  = var.location
-      parent_id = var.resource_group_id
-
-      identity {
-        type = "SystemAssigned"
-      }
-
-      body = {
-        sku = {
-          name     = var.sku_name      # "Developer", "Basic", "Standard", "Premium"
-          capacity = var.sku_capacity   # 1+
-        }
-        properties = {
-          publisherEmail          = var.publisher_email
-          publisherName           = var.publisher_name
-          virtualNetworkType      = "Internal"
-          virtualNetworkConfiguration = {
-            subnetResourceId = var.apim_subnet_id
-          }
-          customProperties = {
-            "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls10" = "false"
-            "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls11" = "false"
-            "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Ssl30" = "false"
-            "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Tls10" = "false"
-            "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Tls11" = "false"
-            "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Ssl30" = "false"
-            "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Ciphers.TripleDes168"    = "false"
-          }
-          publicNetworkAccess = "Disabled"
-          disableGateway      = false
-        }
-      }
-    }
-  bicep_pattern: |
-    resource apim 'Microsoft.ApiManagement/service@2023-09-01-preview' = {
-      name: apimName
-      location: location
-      identity: {
-        type: 'SystemAssigned'
-      }
-      sku: {
-        name: skuName
-        capacity: skuCapacity
-      }
-      properties: {
-        publisherEmail: publisherEmail
-        publisherName: publisherName
-        virtualNetworkType: 'Internal'
-        virtualNetworkConfiguration: {
-          subnetResourceId: apimSubnetId
-        }
-        customProperties: {
-          'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls10': 'false'
-          'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls11': 'false'
-          'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Ssl30': 'false'
-          'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Tls10': 'false'
-          'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Tls11': 'false'
-          'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Ssl30': 'false'
-          'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Ciphers.TripleDes168': 'false'
-        }
-        publicNetworkAccess: 'Disabled'
-        disableGateway: false
-      }
-    }
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2024-01-01
     name: pe-apim
@@ -180,16 +112,84 @@ rules:
   - type: Microsoft.ApiManagement/service/namedValues@2023-09-01-preview
     name: Key Vault named values
     description: Named values backed by Key Vault secrets — never store secrets as plain text named values
-  prohibitions:
-  - Never hardcode API keys, certificates, or secrets in APIM policies or named values
-  - Never enable TLS 1.0, TLS 1.1, or SSL 3.0 on gateway or backend
-  - Never use Triple DES 168 cipher
-  - Never set virtualNetworkType to None for production — use Internal or External
-  - Never store plain-text secrets in named values — use Key Vault references
-  - Never expose management API endpoint publicly without IP restrictions
   targets:
-    services: &id001
+    services:
     - Microsoft.ApiManagement/service
+    terraform_pattern: |
+      resource "azapi_resource" "apim" {
+        type      = "Microsoft.ApiManagement/service@2023-09-01-preview"
+        name      = var.apim_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          sku = {
+            name     = var.sku_name      # "Developer", "Basic", "Standard", "Premium"
+            capacity = var.sku_capacity   # 1+
+          }
+          properties = {
+            publisherEmail          = var.publisher_email
+            publisherName           = var.publisher_name
+            virtualNetworkType      = "Internal"
+            virtualNetworkConfiguration = {
+              subnetResourceId = var.apim_subnet_id
+            }
+            customProperties = {
+              "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls10" = "false"
+              "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls11" = "false"
+              "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Ssl30" = "false"
+              "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Tls10" = "false"
+              "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Tls11" = "false"
+              "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Ssl30" = "false"
+              "Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Ciphers.TripleDes168"    = "false"
+            }
+            publicNetworkAccess = "Disabled"
+            disableGateway      = false
+          }
+        }
+      }
+    bicep_pattern: |
+      resource apim 'Microsoft.ApiManagement/service@2023-09-01-preview' = {
+        name: apimName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: skuName
+          capacity: skuCapacity
+        }
+        properties: {
+          publisherEmail: publisherEmail
+          publisherName: publisherName
+          virtualNetworkType: 'Internal'
+          virtualNetworkConfiguration: {
+            subnetResourceId: apimSubnetId
+          }
+          customProperties: {
+            'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls10': 'false'
+            'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Tls11': 'false'
+            'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Protocols.Ssl30': 'false'
+            'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Tls10': 'false'
+            'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Tls11': 'false'
+            'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Backend.Protocols.Ssl30': 'false'
+            'Microsoft.WindowsAzure.ApiManagement.Gateway.Security.Ciphers.TripleDes168': 'false'
+          }
+          publicNetworkAccess: 'Disabled'
+          disableGateway: false
+        }
+      }
+    prohibitions:
+    - Never hardcode API keys, certificates, or secrets in APIM policies or named values
+    - Never enable TLS 1.0, TLS 1.1, or SSL 3.0 on gateway or backend
+    - Never use Triple DES 168 cipher
+    - Never set virtualNetworkType to None for production — use Internal or External
+    - Never store plain-text secrets in named values — use Key Vault references
+    - Never expose management API endpoint publicly without IP restrictions
 - id: AZ-APIM-002
   severity: required
   description: Use subscription keys or OAuth 2.0 for API authentication — never expose APIs without auth
@@ -200,7 +200,8 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services: *id001
+    services:
+    - Microsoft.ApiManagement/service
 - id: AZ-APIM-003
   severity: recommended
   description: Implement rate limiting and quota policies on all API products
@@ -210,7 +211,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - Microsoft.ApiManagement/service
 - id: AZ-APIM-004
   severity: recommended
   description: Use managed identity for backend service authentication
@@ -221,7 +223,8 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services: *id001
+    services:
+    - Microsoft.ApiManagement/service
 - id: AZ-APIM-005
   severity: recommended
   description: Enable zone redundancy for Premium tier APIM instances
@@ -231,16 +234,17 @@ rules:
   - cloud-architect
   - terraform-agent
   - bicep-agent
-  terraform_pattern: |
-    # Add zones to the APIM resource in APIM-001:
-    #   body = {
-    #     zones = ["1", "2", "3"]
-    #   }
-  bicep_pattern: |
-    // Add zones to the APIM resource in APIM-001:
-    //   zones: ['1', '2', '3']
   targets:
-    services: *id001
+    services:
+    - Microsoft.ApiManagement/service
+    terraform_pattern: |
+      # Add zones to the APIM resource in APIM-001:
+      #   body = {
+      #     zones = ["1", "2", "3"]
+      #   }
+    bicep_pattern: |
+      // Add zones to the APIM resource in APIM-001:
+      //   zones: ['1', '2', '3']
 - id: AZ-APIM-006
   severity: recommended
   description: Enable autoscaling or deploy multiple units to handle traffic spikes
@@ -251,7 +255,8 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services: *id001
+    services:
+    - Microsoft.ApiManagement/service
 - id: AZ-APIM-007
   severity: recommended
   description: Use Defender for APIs for threat detection and API security insights
@@ -261,7 +266,8 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services: *id001
+    services:
+    - Microsoft.ApiManagement/service
 - id: AZ-APIM-008
   severity: recommended
   description: Implement validate-jwt, validate-content, and validate-headers policies for API security
@@ -273,7 +279,8 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services: *id001
+    services:
+    - Microsoft.ApiManagement/service
 - id: AZ-APIM-009
   severity: recommended
   description: Use built-in cache or external Redis-compatible cache for frequently accessed API responses
@@ -283,7 +290,8 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services: *id001
+    services:
+    - Microsoft.ApiManagement/service
 - id: AZ-APIM-010
   severity: recommended
   description: Disable the direct management REST API
@@ -292,7 +300,8 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services: *id001
+    services:
+    - Microsoft.ApiManagement/service
 patterns:
 - name: APIM with VNet integration and Key Vault
   description: Internal APIM deployment with VNet injection, TLS enforcement, and Key Vault-backed secrets

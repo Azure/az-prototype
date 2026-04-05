@@ -11,69 +11,6 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "firewall" {
-      type      = "Microsoft.Network/azureFirewalls@2024-01-01"
-      name      = var.firewall_name
-      location  = var.location
-      parent_id = var.resource_group_id
-
-      body = {
-        properties = {
-          sku = {
-            name = "AZFW_VNet"
-            tier = "Premium"
-          }
-          ipConfigurations = [
-            {
-              name = "fw-ipconfig"
-              properties = {
-                subnet = {
-                  id = var.firewall_subnet_id  # Must be named "AzureFirewallSubnet"
-                }
-                publicIPAddress = {
-                  id = var.firewall_pip_id
-                }
-              }
-            }
-          ]
-          firewallPolicy = {
-            id = azapi_resource.firewall_policy.id
-          }
-          threatIntelMode = "Deny"
-        }
-        zones = ["1", "2", "3"]
-      }
-    }
-  bicep_pattern: |
-    resource firewall 'Microsoft.Network/azureFirewalls@2024-01-01' = {
-      name: firewallName
-      location: location
-      zones: ['1', '2', '3']
-      properties: {
-        sku: {
-          name: 'AZFW_VNet'
-          tier: 'Premium'
-        }
-        ipConfigurations: [
-          {
-            name: 'fw-ipconfig'
-            properties: {
-              subnet: {
-                id: firewallSubnetId
-              }
-              publicIPAddress: {
-                id: firewallPipId
-              }
-            }
-          }
-        ]
-        firewallPolicy: {
-          id: firewallPolicy.id
-        }
-        threatIntelMode: 'Deny'
-      }
-    }
   companion_resources:
   - type: Microsoft.Network/firewallPolicies@2024-01-01
     name: fw-policy
@@ -226,16 +163,79 @@ rules:
           ]
         }
       }
-  prohibitions:
-  - Never deploy Azure Firewall without a firewall policy — always use policy-based management
-  - Never set threatIntelMode to Off — use Alert or Deny
-  - Never deploy without zone redundancy (zones 1, 2, 3)
-  - Never use Basic SKU public IP — use Standard SKU
-  - Never use the AzureFirewallSubnet for any resources other than Azure Firewall
-  - Never hardcode Key Vault secret IDs for TLS certificates
   targets:
-    services: &id001
+    services:
     - TODO:azure-firewall
+    terraform_pattern: |
+      resource "azapi_resource" "firewall" {
+        type      = "Microsoft.Network/azureFirewalls@2024-01-01"
+        name      = var.firewall_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        body = {
+          properties = {
+            sku = {
+              name = "AZFW_VNet"
+              tier = "Premium"
+            }
+            ipConfigurations = [
+              {
+                name = "fw-ipconfig"
+                properties = {
+                  subnet = {
+                    id = var.firewall_subnet_id  # Must be named "AzureFirewallSubnet"
+                  }
+                  publicIPAddress = {
+                    id = var.firewall_pip_id
+                  }
+                }
+              }
+            ]
+            firewallPolicy = {
+              id = azapi_resource.firewall_policy.id
+            }
+            threatIntelMode = "Deny"
+          }
+          zones = ["1", "2", "3"]
+        }
+      }
+    bicep_pattern: |
+      resource firewall 'Microsoft.Network/azureFirewalls@2024-01-01' = {
+        name: firewallName
+        location: location
+        zones: ['1', '2', '3']
+        properties: {
+          sku: {
+            name: 'AZFW_VNet'
+            tier: 'Premium'
+          }
+          ipConfigurations: [
+            {
+              name: 'fw-ipconfig'
+              properties: {
+                subnet: {
+                  id: firewallSubnetId
+                }
+                publicIPAddress: {
+                  id: firewallPipId
+                }
+              }
+            }
+          ]
+          firewallPolicy: {
+            id: firewallPolicy.id
+          }
+          threatIntelMode: 'Deny'
+        }
+      }
+    prohibitions:
+    - Never deploy Azure Firewall without a firewall policy — always use policy-based management
+    - Never set threatIntelMode to Off — use Alert or Deny
+    - Never deploy without zone redundancy (zones 1, 2, 3)
+    - Never use Basic SKU public IP — use Standard SKU
+    - Never use the AzureFirewallSubnet for any resources other than Azure Firewall
+    - Never hardcode Key Vault secret IDs for TLS certificates
 - id: AZ-FW-002
   severity: required
   description: Deploy in zone-redundant configuration across all three availability zones
@@ -245,7 +245,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - TODO:azure-firewall
 - id: AZ-FW-003
   severity: required
   description: Enable DNS proxy on the firewall policy for FQDN-based network rules
@@ -255,7 +256,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - TODO:azure-firewall
 - id: AZ-FW-004
   severity: recommended
   description: Organize rules into rule collection groups by function (infra, app, network)
@@ -265,7 +267,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - TODO:azure-firewall
 - id: AZ-FW-005
   severity: recommended
   description: Use structured firewall log format and send to Log Analytics
@@ -276,10 +279,11 @@ rules:
   - bicep-agent
   - cloud-architect
   - monitoring-agent
-  prohibitions:
-  - Do not enable both structured and legacy diagnostic log formats simultaneously
   targets:
-    services: *id001
+    services:
+    - TODO:azure-firewall
+    prohibitions:
+    - Do not enable both structured and legacy diagnostic log formats simultaneously
 - id: AZ-FW-006
   severity: recommended
   description: Monitor SNAT port utilization, firewall health state, throughput, and latency probe metrics
@@ -288,7 +292,8 @@ rules:
   - cloud-architect
   - monitoring-agent
   targets:
-    services: *id001
+    services:
+    - TODO:azure-firewall
 - id: AZ-FW-007
   severity: recommended
   description: Configure at least 5 public IP addresses for deployments susceptible to SNAT port exhaustion
@@ -299,7 +304,8 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services: *id001
+    services:
+    - TODO:azure-firewall
 - id: AZ-FW-008
   severity: recommended
   description: Use policy analytics dashboard to identify and optimize firewall policies
@@ -309,7 +315,8 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services: *id001
+    services:
+    - TODO:azure-firewall
 - id: AZ-FW-009
   severity: recommended
   description: Place frequently used rules early in rule collection groups to optimize latency
@@ -320,7 +327,8 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services: *id001
+    services:
+    - TODO:azure-firewall
 patterns:
 - name: Azure Firewall Premium with IDPS and TLS inspection
   description: Hub firewall with Premium policy, threat intelligence in Deny mode, and zone-redundant deployment

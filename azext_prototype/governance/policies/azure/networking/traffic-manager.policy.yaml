@@ -11,75 +11,75 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "traffic_manager" {
-      type      = "Microsoft.Network/trafficManagerProfiles@2022-04-01"
-      name      = var.tm_profile_name
-      location  = "global"
-      parent_id = var.resource_group_id
-      body = {
-        properties = {
-          profileStatus        = "Enabled"
-          trafficRoutingMethod = "Performance"
-          dnsConfig = {
-            relativeName = var.tm_dns_name
-            ttl          = 60
+  companion_resources:
+  - Microsoft.Network/trafficManagerProfiles/azureEndpoints (Azure endpoint definitions)
+  - Microsoft.Network/trafficManagerProfiles/externalEndpoints (external endpoint definitions)
+  - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
+  targets:
+    services:
+    - Microsoft.Network/trafficManagerProfiles
+    terraform_pattern: |
+      resource "azapi_resource" "traffic_manager" {
+        type      = "Microsoft.Network/trafficManagerProfiles@2022-04-01"
+        name      = var.tm_profile_name
+        location  = "global"
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            profileStatus        = "Enabled"
+            trafficRoutingMethod = "Performance"
+            dnsConfig = {
+              relativeName = var.tm_dns_name
+              ttl          = 60
+            }
+            monitorConfig = {
+              protocol                    = "HTTPS"
+              port                        = 443
+              path                        = "/health"
+              intervalInSeconds           = 30
+              toleratedNumberOfFailures   = 3
+              timeoutInSeconds            = 10
+              expectedStatusCodeRanges = [
+                {
+                  min = 200
+                  max = 299
+                }
+              ]
+            }
           }
-          monitorConfig = {
-            protocol                    = "HTTPS"
-            port                        = 443
-            path                        = "/health"
-            intervalInSeconds           = 30
-            toleratedNumberOfFailures   = 3
-            timeoutInSeconds            = 10
-            expectedStatusCodeRanges = [
+        }
+      }
+    bicep_pattern: |
+      resource trafficManager 'Microsoft.Network/trafficManagerProfiles@2022-04-01' = {
+        name: tmProfileName
+        location: 'global'
+        properties: {
+          profileStatus: 'Enabled'
+          trafficRoutingMethod: 'Performance'
+          dnsConfig: {
+            relativeName: tmDnsName
+            ttl: 60
+          }
+          monitorConfig: {
+            protocol: 'HTTPS'
+            port: 443
+            path: '/health'
+            intervalInSeconds: 30
+            toleratedNumberOfFailures: 3
+            timeoutInSeconds: 10
+            expectedStatusCodeRanges: [
               {
-                min = 200
-                max = 299
+                min: 200
+                max: 299
               }
             ]
           }
         }
       }
-    }
-  bicep_pattern: |
-    resource trafficManager 'Microsoft.Network/trafficManagerProfiles@2022-04-01' = {
-      name: tmProfileName
-      location: 'global'
-      properties: {
-        profileStatus: 'Enabled'
-        trafficRoutingMethod: 'Performance'
-        dnsConfig: {
-          relativeName: tmDnsName
-          ttl: 60
-        }
-        monitorConfig: {
-          protocol: 'HTTPS'
-          port: 443
-          path: '/health'
-          intervalInSeconds: 30
-          toleratedNumberOfFailures: 3
-          timeoutInSeconds: 10
-          expectedStatusCodeRanges: [
-            {
-              min: 200
-              max: 299
-            }
-          ]
-        }
-      }
-    }
-  companion_resources:
-  - Microsoft.Network/trafficManagerProfiles/azureEndpoints (Azure endpoint definitions)
-  - Microsoft.Network/trafficManagerProfiles/externalEndpoints (external endpoint definitions)
-  - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
-  prohibitions:
-  - Do not use HTTP monitoring — always use HTTPS for health probes
-  - Do not set TTL higher than 60 seconds for failover scenarios — increases failover time
-  - Do not use Traffic Manager without health monitoring enabled
-  targets:
-    services: &id001
-    - Microsoft.Network/trafficManagerProfiles
+    prohibitions:
+    - Do not use HTTP monitoring — always use HTTPS for health probes
+    - Do not set TTL higher than 60 seconds for failover scenarios — increases failover time
+    - Do not use Traffic Manager without health monitoring enabled
 - id: AZ-TM-002
   severity: required
   description: Configure endpoints with proper priority and geographic constraints
@@ -88,41 +88,42 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "tm_endpoint" {
-      type      = "Microsoft.Network/trafficManagerProfiles/azureEndpoints@2022-04-01"
-      name      = var.endpoint_name
-      parent_id = azapi_resource.traffic_manager.id
-      body = {
-        properties = {
-          targetResourceId = var.target_resource_id
-          endpointStatus   = "Enabled"
-          weight           = 100
-          priority         = 1
-          endpointLocation = var.endpoint_location
-        }
-      }
-    }
-  bicep_pattern: |
-    resource tmEndpoint 'Microsoft.Network/trafficManagerProfiles/azureEndpoints@2022-04-01' = {
-      parent: trafficManager
-      name: endpointName
-      properties: {
-        targetResourceId: targetResourceId
-        endpointStatus: 'Enabled'
-        weight: 100
-        priority: 1
-        endpointLocation: endpointLocation
-      }
-    }
   companion_resources:
   - Microsoft.Network/trafficManagerProfiles (parent profile)
   - Microsoft.Web/sites or Microsoft.Network/publicIPAddresses (target resources)
-  prohibitions:
-  - Do not configure all endpoints with the same priority in Priority routing — creates ambiguous failover
-  - Do not leave endpoints in Disabled state without documentation
   targets:
-    services: *id001
+    services:
+    - Microsoft.Network/trafficManagerProfiles
+    terraform_pattern: |
+      resource "azapi_resource" "tm_endpoint" {
+        type      = "Microsoft.Network/trafficManagerProfiles/azureEndpoints@2022-04-01"
+        name      = var.endpoint_name
+        parent_id = azapi_resource.traffic_manager.id
+        body = {
+          properties = {
+            targetResourceId = var.target_resource_id
+            endpointStatus   = "Enabled"
+            weight           = 100
+            priority         = 1
+            endpointLocation = var.endpoint_location
+          }
+        }
+      }
+    bicep_pattern: |
+      resource tmEndpoint 'Microsoft.Network/trafficManagerProfiles/azureEndpoints@2022-04-01' = {
+        parent: trafficManager
+        name: endpointName
+        properties: {
+          targetResourceId: targetResourceId
+          endpointStatus: 'Enabled'
+          weight: 100
+          priority: 1
+          endpointLocation: endpointLocation
+        }
+      }
+    prohibitions:
+    - Do not configure all endpoints with the same priority in Priority routing — creates ambiguous failover
+    - Do not leave endpoints in Disabled state without documentation
 - id: AZ-TM-003
   severity: recommended
   description: Enable diagnostic settings for Traffic Manager profile
@@ -132,55 +133,56 @@ rules:
   - bicep-agent
   - cloud-architect
   - monitoring-agent
-  terraform_pattern: |
-    resource "azapi_resource" "tm_diagnostics" {
-      type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
-      name      = "diag-traffic-manager"
-      parent_id = azapi_resource.traffic_manager.id
-      body = {
-        properties = {
-          workspaceId = var.log_analytics_workspace_id
-          logs = [
+  companion_resources:
+  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  targets:
+    services:
+    - Microsoft.Network/trafficManagerProfiles
+    terraform_pattern: |
+      resource "azapi_resource" "tm_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-traffic-manager"
+        parent_id = azapi_resource.traffic_manager.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "ProbeHealthStatusEvents"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource tmDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-traffic-manager'
+        scope: trafficManager
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
             {
-              category = "ProbeHealthStatusEvents"
-              enabled  = true
+              category: 'ProbeHealthStatusEvents'
+              enabled: true
             }
           ]
-          metrics = [
+          metrics: [
             {
-              category = "AllMetrics"
-              enabled  = true
+              category: 'AllMetrics'
+              enabled: true
             }
           ]
         }
       }
-    }
-  bicep_pattern: |
-    resource tmDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
-      name: 'diag-traffic-manager'
-      scope: trafficManager
-      properties: {
-        workspaceId: logAnalyticsWorkspaceId
-        logs: [
-          {
-            category: 'ProbeHealthStatusEvents'
-            enabled: true
-          }
-        ]
-        metrics: [
-          {
-            category: 'AllMetrics'
-            enabled: true
-          }
-        ]
-      }
-    }
-  companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
-  prohibitions:
-  - Do not omit ProbeHealthStatusEvents — they are critical for failover diagnostics
-  targets:
-    services: *id001
+    prohibitions:
+    - Do not omit ProbeHealthStatusEvents — they are critical for failover diagnostics
 - id: AZ-TM-004
   severity: recommended
   description: Use nested profiles for complex routing topologies
@@ -189,39 +191,40 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "tm_nested_endpoint" {
-      type      = "Microsoft.Network/trafficManagerProfiles/nestedEndpoints@2022-04-01"
-      name      = var.nested_endpoint_name
-      parent_id = azapi_resource.traffic_manager.id
-      body = {
-        properties = {
-          targetResourceId     = azapi_resource.child_profile.id
-          endpointStatus       = "Enabled"
-          minChildEndpoints    = 1
-          minChildEndpointsIPv4 = 1
-          priority             = 1
-        }
-      }
-    }
-  bicep_pattern: |
-    resource tmNestedEndpoint 'Microsoft.Network/trafficManagerProfiles/nestedEndpoints@2022-04-01' = {
-      parent: trafficManager
-      name: nestedEndpointName
-      properties: {
-        targetResourceId: childProfile.id
-        endpointStatus: 'Enabled'
-        minChildEndpoints: 1
-        minChildEndpointsIPv4: 1
-        priority: 1
-      }
-    }
   companion_resources:
   - Microsoft.Network/trafficManagerProfiles (child profile)
-  prohibitions:
-  - Do not set minChildEndpoints to 0 — profile will never fail over
   targets:
-    services: *id001
+    services:
+    - Microsoft.Network/trafficManagerProfiles
+    terraform_pattern: |
+      resource "azapi_resource" "tm_nested_endpoint" {
+        type      = "Microsoft.Network/trafficManagerProfiles/nestedEndpoints@2022-04-01"
+        name      = var.nested_endpoint_name
+        parent_id = azapi_resource.traffic_manager.id
+        body = {
+          properties = {
+            targetResourceId     = azapi_resource.child_profile.id
+            endpointStatus       = "Enabled"
+            minChildEndpoints    = 1
+            minChildEndpointsIPv4 = 1
+            priority             = 1
+          }
+        }
+      }
+    bicep_pattern: |
+      resource tmNestedEndpoint 'Microsoft.Network/trafficManagerProfiles/nestedEndpoints@2022-04-01' = {
+        parent: trafficManager
+        name: nestedEndpointName
+        properties: {
+          targetResourceId: childProfile.id
+          endpointStatus: 'Enabled'
+          minChildEndpoints: 1
+          minChildEndpointsIPv4: 1
+          priority: 1
+        }
+      }
+    prohibitions:
+    - Do not set minChildEndpoints to 0 — profile will never fail over
 patterns:
 - name: Traffic Manager with Performance routing and HTTPS monitoring
   description: Multi-region failover with Performance routing and health probes

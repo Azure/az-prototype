@@ -12,41 +12,41 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "resource_group" {
-      type     = "Microsoft.Resources/resourceGroups@2024-03-01"
-      name     = var.resource_group_name
-      location = var.location
-
-      tags = {
-        project     = var.project_name
-        environment = var.environment
-        owner       = var.owner
-        created_by  = "azext-prototype"
-      }
-
-      body = {}
-    }
-  bicep_pattern: |
-    targetScope = 'subscription'
-
-    resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
-      name: resourceGroupName
-      location: location
-      tags: {
-        project: projectName
-        environment: environment
-        owner: owner
-        created_by: 'azext-prototype'
-      }
-    }
-  prohibitions:
-  - NEVER hardcode the location — always use a variable (var.location in Terraform, location parameter in Bicep)
-  - NEVER create a resource group without tags
-  - NEVER hardcode the resource group name — always use a variable
   targets:
-    services: &id001
+    services:
     - TODO:resource-group
+    terraform_pattern: |
+      resource "azapi_resource" "resource_group" {
+        type     = "Microsoft.Resources/resourceGroups@2024-03-01"
+        name     = var.resource_group_name
+        location = var.location
+
+        tags = {
+          project     = var.project_name
+          environment = var.environment
+          owner       = var.owner
+          created_by  = "azext-prototype"
+        }
+
+        body = {}
+      }
+    bicep_pattern: |
+      targetScope = 'subscription'
+
+      resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
+        name: resourceGroupName
+        location: location
+        tags: {
+          project: projectName
+          environment: environment
+          owner: owner
+          created_by: 'azext-prototype'
+        }
+      }
+    prohibitions:
+    - NEVER hardcode the location — always use a variable (var.location in Terraform, location parameter in Bicep)
+    - NEVER create a resource group without tags
+    - NEVER hardcode the resource group name — always use a variable
 - id: AZ-RG-002
   severity: required
   description: 'Include mandatory tags: project, environment, owner, created_by'
@@ -55,12 +55,13 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  prohibitions:
-  - NEVER omit the project tag — it identifies which POC this resource group belongs to
-  - NEVER omit the environment tag — it distinguishes dev/staging/prod resources
-  - NEVER omit the owner tag — it identifies who is responsible for the resource group
   targets:
-    services: *id001
+    services:
+    - TODO:resource-group
+    prohibitions:
+    - NEVER omit the project tag — it identifies which POC this resource group belongs to
+    - NEVER omit the environment tag — it distinguishes dev/staging/prod resources
+    - NEVER omit the owner tag — it identifies who is responsible for the resource group
 - id: AZ-RG-003
   severity: required
   description: Set Bicep targetScope to subscription when creating resource groups
@@ -68,10 +69,11 @@ rules:
     groups
   applies_to:
   - bicep-agent
-  prohibitions:
-  - NEVER omit targetScope = 'subscription' in the Bicep file that creates resource groups
   targets:
-    services: *id001
+    services:
+    - TODO:resource-group
+    prohibitions:
+    - NEVER omit targetScope = 'subscription' in the Bicep file that creates resource groups
 - id: AZ-RG-004
   severity: recommended
   description: 'Use naming convention: rg-{project}-{environment}-{location}'
@@ -81,7 +83,8 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services: *id001
+    services:
+    - TODO:resource-group
 - id: AZ-RG-005
   severity: recommended
   description: Create separate resource groups for different lifecycle boundaries
@@ -90,7 +93,8 @@ rules:
   applies_to:
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - TODO:resource-group
 patterns:
 - name: Resource Group with tags
   description: Standard resource group with required tags and parameterized location

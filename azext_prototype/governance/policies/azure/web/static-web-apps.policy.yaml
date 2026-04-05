@@ -12,46 +12,6 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "static_web_app" {
-      type      = "Microsoft.Web/staticSites@2023-12-01"
-      name      = var.swa_name
-      location  = var.location
-      parent_id = var.resource_group_id
-
-      identity {
-        type = "SystemAssigned"
-      }
-
-      body = {
-        sku = {
-          name = "Standard"
-          tier = "Standard"
-        }
-        properties = {
-          stagingEnvironmentPolicy  = "Enabled"
-          allowConfigFileUpdates    = true
-          enterpriseGradeCdnStatus  = "Enabled"
-        }
-      }
-    }
-  bicep_pattern: |
-    resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
-      name: swaName
-      location: location
-      identity: {
-        type: 'SystemAssigned'
-      }
-      sku: {
-        name: 'Standard'
-        tier: 'Standard'
-      }
-      properties: {
-        stagingEnvironmentPolicy: 'Enabled'
-        allowConfigFileUpdates: true
-        enterpriseGradeCdnStatus: 'Enabled'
-      }
-    }
   companion_resources:
   - type: Microsoft.Web/staticSites/config@2023-12-01
     name: appsettings
@@ -108,14 +68,54 @@ rules:
   - type: Microsoft.Web/staticSites/linkedBackends@2023-12-01
     name: linked-backend
     description: Linked backend API (e.g., Container Apps, Functions) for managed API routing
-  prohibitions:
-  - Never hardcode API keys or connection strings in staticwebapp.config.json
-  - Never use Free SKU in production — it lacks private endpoints, custom auth, and SLA
-  - Never embed secrets in application settings without Key Vault references
-  - Never disable stagingEnvironmentPolicy — staging environments enable safe preview deployments
   targets:
-    services: &id001
+    services:
     - Microsoft.Web/staticSites
+    terraform_pattern: |
+      resource "azapi_resource" "static_web_app" {
+        type      = "Microsoft.Web/staticSites@2023-12-01"
+        name      = var.swa_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          sku = {
+            name = "Standard"
+            tier = "Standard"
+          }
+          properties = {
+            stagingEnvironmentPolicy  = "Enabled"
+            allowConfigFileUpdates    = true
+            enterpriseGradeCdnStatus  = "Enabled"
+          }
+        }
+      }
+    bicep_pattern: |
+      resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
+        name: swaName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: 'Standard'
+          tier: 'Standard'
+        }
+        properties: {
+          stagingEnvironmentPolicy: 'Enabled'
+          allowConfigFileUpdates: true
+          enterpriseGradeCdnStatus: 'Enabled'
+        }
+      }
+    prohibitions:
+    - Never hardcode API keys or connection strings in staticwebapp.config.json
+    - Never use Free SKU in production — it lacks private endpoints, custom auth, and SLA
+    - Never embed secrets in application settings without Key Vault references
+    - Never disable stagingEnvironmentPolicy — staging environments enable safe preview deployments
 - id: AZ-SWA-002
   severity: required
   description: Configure custom authentication with identity providers in staticwebapp.config.json
@@ -126,7 +126,8 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services: *id001
+    services:
+    - Microsoft.Web/staticSites
 - id: AZ-SWA-003
   severity: recommended
   description: Enable enterprise-grade CDN for global content distribution
@@ -136,7 +137,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - Microsoft.Web/staticSites
 - id: AZ-SWA-004
   severity: recommended
   description: Configure custom domain with managed SSL certificate
@@ -146,7 +148,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - Microsoft.Web/staticSites
 patterns:
 - name: Static Web App with linked backend and custom auth
   description: Standard SWA with managed identity, linked backend API, and Entra ID authentication

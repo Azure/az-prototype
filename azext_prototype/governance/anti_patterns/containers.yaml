@@ -4,50 +4,56 @@ description: Container Apps, ACR, and container runtime configuration detection
 last_updated: '2026-04-04'
 patterns:
 - id: ANTI-CONT-001
-  search_patterns:
-  - environment_variable
-  - env_var
-  safe_patterns:
-  - key vault
-  - keyvault
-  - managed identity
-  - secret_ref
-  - secretref
-  correct_patterns:
-  - secret_ref
-  - secretRef
-  - '# Use Key Vault references with managed identity'
-  - keyVaultUrl
   warning_message: Secrets in environment variables detected — use Key Vault references with managed identity instead.
   description: Detects container registry admin credentials instead of AcrPull role assignment with managed identity
   rationale: Hardcoded credentials or access keys create security vulnerabilities and prevent key rotation.
+  targets:
+    search_patterns:
+    - environment_variable
+    - env_var
+    safe_patterns:
+    - key vault
+    - keyvault
+    - managed identity
+    - secret_ref
+    - secretref
+    correct_patterns:
+    - secret_ref
+    - secretRef
+    - '# Use Key Vault references with managed identity'
+    - keyVaultUrl
+  applies_to: []
 - id: ANTI-CONT-002
-  search_patterns:
-  - admin_user_enabled = true
-  - acrpush
-  safe_patterns:
-  - managed identity
-  - acrpull
-  correct_patterns:
-  - admin_user_enabled = false
-  - adminUserEnabled = false
-  - '"AcrPull"'
-  - '# Use managed identity with AcrPull role assignment'
   warning_message: Container registry admin credentials detected — use managed identity with AcrPull role assignment.
   description: Detects latest tag on container images instead of immutable SHA or version tags
   rationale: Hardcoded credentials or access keys create security vulnerabilities and prevent key rotation.
+  targets:
+    search_patterns:
+    - admin_user_enabled = true
+    - acrpush
+    safe_patterns:
+    - managed identity
+    - acrpull
+    correct_patterns:
+    - admin_user_enabled = false
+    - adminUserEnabled = false
+    - '"AcrPull"'
+    - '# Use managed identity with AcrPull role assignment'
+  applies_to: []
 - id: ANTI-CONT-003
-  search_patterns:
-  - microsoft.app/containerapps
-  safe_patterns:
-  - userassignedidentities
-  - systemassigned, userassigned
-  correct_patterns:
-  - type = "SystemAssigned, UserAssigned"
-  - identity.userAssignedIdentities
   warning_message: Container App detected. Ensure the identity block uses UserAssigned (or SystemAssigned, UserAssigned) with
     the UAMI attached in userAssignedIdentities for ACR image pull. SystemAssigned alone causes image pull failures on first
     provision.
   description: Container App detected. Ensure the identity block uses UserAssigned (or SystemAssigned, UserAssigned) with
     the UAMI attached in userAssignedIdentities for ACR image pull. SystemAssigned alone causes i
   rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  targets:
+    search_patterns:
+    - microsoft.app/containerapps
+    safe_patterns:
+    - userassignedidentities
+    - systemassigned, userassigned
+    correct_patterns:
+    - type = "SystemAssigned, UserAssigned"
+    - identity.userAssignedIdentities
+  applies_to: []

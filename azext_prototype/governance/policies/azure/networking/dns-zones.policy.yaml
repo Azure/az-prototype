@@ -11,28 +11,28 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "private_dns_zone" {
-      type      = "Microsoft.Network/privateDnsZones@2024-06-01"
-      name      = var.private_dns_zone_name
-      location  = "global"
-      parent_id = var.resource_group_id
-      body = {}
-    }
-  bicep_pattern: |
-    resource privateDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
-      name: privateDnsZoneName
-      location: 'global'
-    }
   companion_resources:
   - Microsoft.Network/privateDnsZones/virtualNetworkLinks (link to VNets for resolution)
   - Microsoft.Network/privateEndpoints/privateDnsZoneGroups (auto-registration for private endpoints)
-  prohibitions:
-  - Do not use public DNS zones for internal service discovery
-  - Do not create private DNS zones without VNet links — they will not resolve
   targets:
-    services: &id001
+    services:
     - Microsoft.Network/dnsZones
+    terraform_pattern: |
+      resource "azapi_resource" "private_dns_zone" {
+        type      = "Microsoft.Network/privateDnsZones@2024-06-01"
+        name      = var.private_dns_zone_name
+        location  = "global"
+        parent_id = var.resource_group_id
+        body = {}
+      }
+    bicep_pattern: |
+      resource privateDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
+        name: privateDnsZoneName
+        location: 'global'
+      }
+    prohibitions:
+    - Do not use public DNS zones for internal service discovery
+    - Do not create private DNS zones without VNet links — they will not resolve
 - id: AZ-DNS-002
   severity: required
   description: Link Private DNS Zones to all VNets that need resolution
@@ -41,41 +41,42 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "dns_vnet_link" {
-      type      = "Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01"
-      name      = var.vnet_link_name
-      location  = "global"
-      parent_id = azapi_resource.private_dns_zone.id
-      body = {
-        properties = {
-          virtualNetwork = {
-            id = var.vnet_id
-          }
-          registrationEnabled = false
-        }
-      }
-    }
-  bicep_pattern: |
-    resource dnsVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
-      parent: privateDnsZone
-      name: vnetLinkName
-      location: 'global'
-      properties: {
-        virtualNetwork: {
-          id: vnetId
-        }
-        registrationEnabled: false
-      }
-    }
   companion_resources:
   - Microsoft.Network/privateDnsZones (parent zone)
   - Microsoft.Network/virtualNetworks (target VNet)
-  prohibitions:
-  - Do not enable registrationEnabled unless auto-registration of VM records is explicitly needed
-  - Do not create multiple VNet links to the same VNet for the same zone
   targets:
-    services: *id001
+    services:
+    - Microsoft.Network/dnsZones
+    terraform_pattern: |
+      resource "azapi_resource" "dns_vnet_link" {
+        type      = "Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01"
+        name      = var.vnet_link_name
+        location  = "global"
+        parent_id = azapi_resource.private_dns_zone.id
+        body = {
+          properties = {
+            virtualNetwork = {
+              id = var.vnet_id
+            }
+            registrationEnabled = false
+          }
+        }
+      }
+    bicep_pattern: |
+      resource dnsVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
+        parent: privateDnsZone
+        name: vnetLinkName
+        location: 'global'
+        properties: {
+          virtualNetwork: {
+            id: vnetId
+          }
+          registrationEnabled: false
+        }
+      }
+    prohibitions:
+    - Do not enable registrationEnabled unless auto-registration of VM records is explicitly needed
+    - Do not create multiple VNet links to the same VNet for the same zone
 - id: AZ-DNS-003
   severity: required
   description: Use standard private DNS zone names for Azure private endpoints
@@ -84,44 +85,45 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    # Standard private DNS zone names for common Azure services:
-    # Storage Blob:    privatelink.blob.core.windows.net
-    # Storage File:    privatelink.file.core.windows.net
-    # Storage Table:   privatelink.table.core.windows.net
-    # Storage Queue:   privatelink.queue.core.windows.net
-    # SQL Database:    privatelink.database.windows.net
-    # Cosmos DB:       privatelink.documents.azure.com
-    # Key Vault:       privatelink.vaultcore.azure.net
-    # ACR:             privatelink.azurecr.io
-    # Event Hubs:      privatelink.servicebus.windows.net
-    # Service Bus:     privatelink.servicebus.windows.net
-    # IoT Hub:         privatelink.azure-devices.net
-    # Redis:           privatelink.redis.cache.windows.net
-    # App Config:      privatelink.azconfig.io
-    # Synapse:         privatelink.sql.azuresynapse.net
-
-    resource "azapi_resource" "pe_dns_zone" {
-      type      = "Microsoft.Network/privateDnsZones@2024-06-01"
-      name      = "privatelink.blob.core.windows.net"
-      location  = "global"
-      parent_id = var.resource_group_id
-      body = {}
-    }
-  bicep_pattern: |
-    // Use the correct privatelink zone name for each Azure service
-    resource peDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
-      name: 'privatelink.blob.core.windows.net'
-      location: 'global'
-    }
   companion_resources:
   - Microsoft.Network/privateEndpoints (private endpoint for the service)
   - Microsoft.Network/privateDnsZones/virtualNetworkLinks (link zone to VNet)
-  prohibitions:
-  - Do not use custom zone names for private endpoints — Azure expects standard privatelink.* names
-  - Do not create duplicate private DNS zones for the same service in the same resource group
   targets:
-    services: *id001
+    services:
+    - Microsoft.Network/dnsZones
+    terraform_pattern: |
+      # Standard private DNS zone names for common Azure services:
+      # Storage Blob:    privatelink.blob.core.windows.net
+      # Storage File:    privatelink.file.core.windows.net
+      # Storage Table:   privatelink.table.core.windows.net
+      # Storage Queue:   privatelink.queue.core.windows.net
+      # SQL Database:    privatelink.database.windows.net
+      # Cosmos DB:       privatelink.documents.azure.com
+      # Key Vault:       privatelink.vaultcore.azure.net
+      # ACR:             privatelink.azurecr.io
+      # Event Hubs:      privatelink.servicebus.windows.net
+      # Service Bus:     privatelink.servicebus.windows.net
+      # IoT Hub:         privatelink.azure-devices.net
+      # Redis:           privatelink.redis.cache.windows.net
+      # App Config:      privatelink.azconfig.io
+      # Synapse:         privatelink.sql.azuresynapse.net
+
+      resource "azapi_resource" "pe_dns_zone" {
+        type      = "Microsoft.Network/privateDnsZones@2024-06-01"
+        name      = "privatelink.blob.core.windows.net"
+        location  = "global"
+        parent_id = var.resource_group_id
+        body = {}
+      }
+    bicep_pattern: |
+      // Use the correct privatelink zone name for each Azure service
+      resource peDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
+        name: 'privatelink.blob.core.windows.net'
+        location: 'global'
+      }
+    prohibitions:
+    - Do not use custom zone names for private endpoints — Azure expects standard privatelink.* names
+    - Do not create duplicate private DNS zones for the same service in the same resource group
 - id: AZ-DNS-004
   severity: recommended
   description: Configure public DNS zones with appropriate TTL values and DNSSEC when available
@@ -130,58 +132,59 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "public_dns_zone" {
-      type      = "Microsoft.Network/dnsZones@2023-07-01-preview"
-      name      = var.domain_name
-      location  = "global"
-      parent_id = var.resource_group_id
-      body = {
-        properties = {}
+  companion_resources:
+  - Microsoft.Insights/diagnosticSettings (route query logs to Log Analytics)
+  targets:
+    services:
+    - Microsoft.Network/dnsZones
+    terraform_pattern: |
+      resource "azapi_resource" "public_dns_zone" {
+        type      = "Microsoft.Network/dnsZones@2023-07-01-preview"
+        name      = var.domain_name
+        location  = "global"
+        parent_id = var.resource_group_id
+        body = {
+          properties = {}
+        }
       }
-    }
 
-    resource "azapi_resource" "dns_a_record" {
-      type      = "Microsoft.Network/dnsZones/A@2023-07-01-preview"
-      name      = var.record_name
-      parent_id = azapi_resource.public_dns_zone.id
-      body = {
-        properties = {
-          TTL = 300
-          ARecords = [
+      resource "azapi_resource" "dns_a_record" {
+        type      = "Microsoft.Network/dnsZones/A@2023-07-01-preview"
+        name      = var.record_name
+        parent_id = azapi_resource.public_dns_zone.id
+        body = {
+          properties = {
+            TTL = 300
+            ARecords = [
+              {
+                ipv4Address = var.target_ip
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource publicDnsZone 'Microsoft.Network/dnsZones@2023-07-01-preview' = {
+        name: domainName
+        location: 'global'
+        properties: {}
+      }
+
+      resource dnsARecord 'Microsoft.Network/dnsZones/A@2023-07-01-preview' = {
+        parent: publicDnsZone
+        name: recordName
+        properties: {
+          TTL: 300
+          ARecords: [
             {
-              ipv4Address = var.target_ip
+              ipv4Address: targetIp
             }
           ]
         }
       }
-    }
-  bicep_pattern: |
-    resource publicDnsZone 'Microsoft.Network/dnsZones@2023-07-01-preview' = {
-      name: domainName
-      location: 'global'
-      properties: {}
-    }
-
-    resource dnsARecord 'Microsoft.Network/dnsZones/A@2023-07-01-preview' = {
-      parent: publicDnsZone
-      name: recordName
-      properties: {
-        TTL: 300
-        ARecords: [
-          {
-            ipv4Address: targetIp
-          }
-        ]
-      }
-    }
-  companion_resources:
-  - Microsoft.Insights/diagnosticSettings (route query logs to Log Analytics)
-  prohibitions:
-  - Do not set TTL to 0 — it disables caching and increases query load
-  - Do not create wildcard records unless explicitly required
-  targets:
-    services: *id001
+    prohibitions:
+    - Do not set TTL to 0 — it disables caching and increases query load
+    - Do not create wildcard records unless explicitly required
 - id: AZ-DNS-005
   severity: recommended
   description: Enable diagnostic settings for DNS zone query logging
@@ -191,43 +194,44 @@ rules:
   - bicep-agent
   - cloud-architect
   - monitoring-agent
-  terraform_pattern: |
-    resource "azapi_resource" "dns_diagnostics" {
-      type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
-      name      = "diag-dns-zone"
-      parent_id = azapi_resource.public_dns_zone.id
-      body = {
-        properties = {
-          workspaceId = var.log_analytics_workspace_id
-          metrics = [
+  companion_resources:
+  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  targets:
+    services:
+    - Microsoft.Network/dnsZones
+    terraform_pattern: |
+      resource "azapi_resource" "dns_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-dns-zone"
+        parent_id = azapi_resource.public_dns_zone.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource dnsDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-dns-zone'
+        scope: publicDnsZone
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          metrics: [
             {
-              category = "AllMetrics"
-              enabled  = true
+              category: 'AllMetrics'
+              enabled: true
             }
           ]
         }
       }
-    }
-  bicep_pattern: |
-    resource dnsDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
-      name: 'diag-dns-zone'
-      scope: publicDnsZone
-      properties: {
-        workspaceId: logAnalyticsWorkspaceId
-        metrics: [
-          {
-            category: 'AllMetrics'
-            enabled: true
-          }
-        ]
-      }
-    }
-  companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
-  prohibitions:
-  - Do not skip DNS diagnostics in production — resolution failures are hard to debug without logs
-  targets:
-    services: *id001
+    prohibitions:
+    - Do not skip DNS diagnostics in production — resolution failures are hard to debug without logs
 patterns:
 - name: Private DNS Zone with VNet link and private endpoint
   description: Private DNS zone for Azure service private endpoints with VNet resolution

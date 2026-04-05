@@ -11,54 +11,54 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "public_ip" {
-      type      = "Microsoft.Network/publicIPAddresses@2024-01-01"
-      name      = var.pip_name
-      location  = var.location
-      parent_id = var.resource_group_id
-      body = {
-        sku = {
-          name = "Standard"
-          tier = "Regional"
-        }
-        properties = {
-          publicIPAllocationMethod = "Static"
-          publicIPAddressVersion   = "IPv4"
-          ddosSettings = {
-            protectionMode = "VirtualNetworkInherited"
-          }
-        }
-        zones = ["1", "2", "3"]
-      }
-    }
-  bicep_pattern: |
-    resource publicIp 'Microsoft.Network/publicIPAddresses@2024-01-01' = {
-      name: pipName
-      location: location
-      sku: {
-        name: 'Standard'
-        tier: 'Regional'
-      }
-      zones: ['1', '2', '3']
-      properties: {
-        publicIPAllocationMethod: 'Static'
-        publicIPAddressVersion: 'IPv4'
-        ddosSettings: {
-          protectionMode: 'VirtualNetworkInherited'
-        }
-      }
-    }
   companion_resources:
   - Microsoft.Network/ddosProtectionPlans (DDoS protection for production workloads)
   - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
-  prohibitions:
-  - Do not use Basic SKU — it is being retired September 2025
-  - Do not use Dynamic allocation with Standard SKU for load balancers or NAT gateways
-  - Do not deploy public IPs without DDoS protection in production
   targets:
-    services: &id001
+    services:
     - Microsoft.Network/publicIPAddresses
+    terraform_pattern: |
+      resource "azapi_resource" "public_ip" {
+        type      = "Microsoft.Network/publicIPAddresses@2024-01-01"
+        name      = var.pip_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          sku = {
+            name = "Standard"
+            tier = "Regional"
+          }
+          properties = {
+            publicIPAllocationMethod = "Static"
+            publicIPAddressVersion   = "IPv4"
+            ddosSettings = {
+              protectionMode = "VirtualNetworkInherited"
+            }
+          }
+          zones = ["1", "2", "3"]
+        }
+      }
+    bicep_pattern: |
+      resource publicIp 'Microsoft.Network/publicIPAddresses@2024-01-01' = {
+        name: pipName
+        location: location
+        sku: {
+          name: 'Standard'
+          tier: 'Regional'
+        }
+        zones: ['1', '2', '3']
+        properties: {
+          publicIPAllocationMethod: 'Static'
+          publicIPAddressVersion: 'IPv4'
+          ddosSettings: {
+            protectionMode: 'VirtualNetworkInherited'
+          }
+        }
+      }
+    prohibitions:
+    - Do not use Basic SKU — it is being retired September 2025
+    - Do not use Dynamic allocation with Standard SKU for load balancers or NAT gateways
+    - Do not deploy public IPs without DDoS protection in production
 - id: AZ-PIP-002
   severity: required
   description: Deploy zone-redundant public IPs for production workloads
@@ -67,18 +67,19 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    # Set zones = ["1", "2", "3"] for zone-redundant
-    # See PIP-001 terraform_pattern for full example
-  bicep_pattern: |
-    // Set zones: ['1', '2', '3'] for zone-redundant
-    // See PIP-001 bicep_pattern for full example
   companion_resources: []
-  prohibitions:
-  - Do not deploy production public IPs without zone redundancy
-  - Do not mix zone-redundant IPs with zonal resources — they must be in the same zone or zone-redundant
   targets:
-    services: *id001
+    services:
+    - Microsoft.Network/publicIPAddresses
+    terraform_pattern: |
+      # Set zones = ["1", "2", "3"] for zone-redundant
+      # See PIP-001 terraform_pattern for full example
+    bicep_pattern: |
+      // Set zones: ['1', '2', '3'] for zone-redundant
+      // See PIP-001 bicep_pattern for full example
+    prohibitions:
+    - Do not deploy production public IPs without zone redundancy
+    - Do not mix zone-redundant IPs with zonal resources — they must be in the same zone or zone-redundant
 - id: AZ-PIP-003
   severity: recommended
   description: Minimize the use of public IP addresses — prefer private endpoints and internal load balancers
@@ -88,28 +89,29 @@ rules:
   - bicep-agent
   - cloud-architect
   - security-reviewer
-  terraform_pattern: |
-    # Prefer internal load balancers and private endpoints
-    # Only use public IPs for:
-    # - Application Gateway / Front Door ingress
-    # - VPN/ExpressRoute gateways
-    # - Azure Bastion
-    # - NAT Gateway for outbound
-  bicep_pattern: |
-    // Prefer internal load balancers and private endpoints
-    // Only use public IPs for:
-    // - Application Gateway / Front Door ingress
-    // - VPN/ExpressRoute gateways
-    // - Azure Bastion
-    // - NAT Gateway for outbound
   companion_resources:
   - Microsoft.Network/privateEndpoints (replace public endpoints)
   - Microsoft.Network/loadBalancers (internal LB instead of public)
-  prohibitions:
-  - Do not assign public IPs directly to VMs — use Bastion or internal LB
-  - Do not assign public IPs to databases, caches, or storage accounts — use private endpoints
   targets:
-    services: *id001
+    services:
+    - Microsoft.Network/publicIPAddresses
+    terraform_pattern: |
+      # Prefer internal load balancers and private endpoints
+      # Only use public IPs for:
+      # - Application Gateway / Front Door ingress
+      # - VPN/ExpressRoute gateways
+      # - Azure Bastion
+      # - NAT Gateway for outbound
+    bicep_pattern: |
+      // Prefer internal load balancers and private endpoints
+      // Only use public IPs for:
+      // - Application Gateway / Front Door ingress
+      // - VPN/ExpressRoute gateways
+      // - Azure Bastion
+      // - NAT Gateway for outbound
+    prohibitions:
+    - Do not assign public IPs directly to VMs — use Bastion or internal LB
+    - Do not assign public IPs to databases, caches, or storage accounts — use private endpoints
 - id: AZ-PIP-004
   severity: recommended
   description: Enable diagnostic settings for public IP address DDoS and flow logs
@@ -119,71 +121,72 @@ rules:
   - bicep-agent
   - cloud-architect
   - monitoring-agent
-  terraform_pattern: |
-    resource "azapi_resource" "pip_diagnostics" {
-      type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
-      name      = "diag-public-ip"
-      parent_id = azapi_resource.public_ip.id
-      body = {
-        properties = {
-          workspaceId = var.log_analytics_workspace_id
-          logs = [
+  companion_resources:
+  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  targets:
+    services:
+    - Microsoft.Network/publicIPAddresses
+    terraform_pattern: |
+      resource "azapi_resource" "pip_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-public-ip"
+        parent_id = azapi_resource.public_ip.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "DDoSProtectionNotifications"
+                enabled  = true
+              },
+              {
+                category = "DDoSMitigationFlowLogs"
+                enabled  = true
+              },
+              {
+                category = "DDoSMitigationReports"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource pipDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-public-ip'
+        scope: publicIp
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
             {
-              category = "DDoSProtectionNotifications"
-              enabled  = true
-            },
+              category: 'DDoSProtectionNotifications'
+              enabled: true
+            }
             {
-              category = "DDoSMitigationFlowLogs"
-              enabled  = true
-            },
+              category: 'DDoSMitigationFlowLogs'
+              enabled: true
+            }
             {
-              category = "DDoSMitigationReports"
-              enabled  = true
+              category: 'DDoSMitigationReports'
+              enabled: true
             }
           ]
-          metrics = [
+          metrics: [
             {
-              category = "AllMetrics"
-              enabled  = true
+              category: 'AllMetrics'
+              enabled: true
             }
           ]
         }
       }
-    }
-  bicep_pattern: |
-    resource pipDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
-      name: 'diag-public-ip'
-      scope: publicIp
-      properties: {
-        workspaceId: logAnalyticsWorkspaceId
-        logs: [
-          {
-            category: 'DDoSProtectionNotifications'
-            enabled: true
-          }
-          {
-            category: 'DDoSMitigationFlowLogs'
-            enabled: true
-          }
-          {
-            category: 'DDoSMitigationReports'
-            enabled: true
-          }
-        ]
-        metrics: [
-          {
-            category: 'AllMetrics'
-            enabled: true
-          }
-        ]
-      }
-    }
-  companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
-  prohibitions:
-  - Do not omit DDoS logs on internet-facing public IPs
-  targets:
-    services: *id001
+    prohibitions:
+    - Do not omit DDoS logs on internet-facing public IPs
 patterns:
 - name: Standard zone-redundant public IP with DDoS diagnostics
   description: Production-ready public IP with zone redundancy and DDoS monitoring

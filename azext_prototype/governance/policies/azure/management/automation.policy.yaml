@@ -11,48 +11,6 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "automation" {
-      type      = "Microsoft.Automation/automationAccounts@2023-11-01"
-      name      = var.automation_name
-      location  = var.location
-      parent_id = var.resource_group_id
-
-      identity {
-        type = "SystemAssigned"
-      }
-
-      body = {
-        properties = {
-          sku = {
-            name = "Basic"
-          }
-          publicNetworkAccess  = false
-          disableLocalAuth     = true
-          encryption = {
-            keySource = "Microsoft.Automation"
-          }
-        }
-      }
-    }
-  bicep_pattern: |
-    resource automation 'Microsoft.Automation/automationAccounts@2023-11-01' = {
-      name: automationName
-      location: location
-      identity: {
-        type: 'SystemAssigned'
-      }
-      properties: {
-        sku: {
-          name: 'Basic'
-        }
-        publicNetworkAccess: false
-        disableLocalAuth: true
-        encryption: {
-          keySource: 'Microsoft.Automation'
-        }
-      }
-    }
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2024-01-01
     name: pe-automation
@@ -153,15 +111,57 @@ rules:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: Automation Contributor
     description: RBAC role assignment for automation account management
-  prohibitions:
-  - Never use Run As accounts — they are deprecated; use managed identity
-  - Never hardcode credentials in runbook scripts or variables
-  - Never set disableLocalAuth to false — use Microsoft Entra authentication
-  - Never store secrets as plain-text Automation variables — use encrypted variables or Key Vault
-  - Never enable public network access without compensating network controls
   targets:
-    services: &id001
+    services:
     - Microsoft.Automation/automationAccounts
+    terraform_pattern: |
+      resource "azapi_resource" "automation" {
+        type      = "Microsoft.Automation/automationAccounts@2023-11-01"
+        name      = var.automation_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          properties = {
+            sku = {
+              name = "Basic"
+            }
+            publicNetworkAccess  = false
+            disableLocalAuth     = true
+            encryption = {
+              keySource = "Microsoft.Automation"
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource automation 'Microsoft.Automation/automationAccounts@2023-11-01' = {
+        name: automationName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          sku: {
+            name: 'Basic'
+          }
+          publicNetworkAccess: false
+          disableLocalAuth: true
+          encryption: {
+            keySource: 'Microsoft.Automation'
+          }
+        }
+      }
+    prohibitions:
+    - Never use Run As accounts — they are deprecated; use managed identity
+    - Never hardcode credentials in runbook scripts or variables
+    - Never set disableLocalAuth to false — use Microsoft Entra authentication
+    - Never store secrets as plain-text Automation variables — use encrypted variables or Key Vault
+    - Never enable public network access without compensating network controls
 - id: AZ-AUTO-002
   severity: required
   description: Use managed identity for all runbook authentication instead of Run As accounts
@@ -172,7 +172,8 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services: *id001
+    services:
+    - Microsoft.Automation/automationAccounts
 - id: AZ-AUTO-003
   severity: recommended
   description: Link Automation account to Log Analytics workspace for job log aggregation
@@ -183,7 +184,8 @@ rules:
   - cloud-architect
   - monitoring-agent
   targets:
-    services: *id001
+    services:
+    - Microsoft.Automation/automationAccounts
 - id: AZ-AUTO-004
   severity: recommended
   description: Use encrypted Automation variables or Key Vault references for sensitive configuration
@@ -194,7 +196,8 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services: *id001
+    services:
+    - Microsoft.Automation/automationAccounts
 patterns:
 - name: Automation account with managed identity and private endpoint
   description: Secure Automation account with no public access, managed identity, and Log Analytics integration

@@ -11,39 +11,6 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "fabric_capacity" {
-      type      = "Microsoft.Fabric/capacities@2023-11-01"
-      name      = var.fabric_capacity_name
-      location  = var.location
-      parent_id = var.resource_group_id
-
-      body = {
-        sku = {
-          name = var.sku_name  # "F2", "F4", "F8", "F16", "F32", "F64", "F128", "F256", "F512", "F1024", "F2048"
-          tier = "Fabric"
-        }
-        properties = {
-          administration = {
-            members = var.capacity_admin_upns
-          }
-        }
-      }
-    }
-  bicep_pattern: |
-    resource fabricCapacity 'Microsoft.Fabric/capacities@2023-11-01' = {
-      name: fabricCapacityName
-      location: location
-      sku: {
-        name: skuName
-        tier: 'Fabric'
-      }
-      properties: {
-        administration: {
-          members: capacityAdminUpns
-        }
-      }
-    }
   companion_resources:
   - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
     name: diag-fabric
@@ -51,14 +18,47 @@ rules:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: Fabric Capacity Contributor
     description: RBAC role assignment for Fabric capacity management — separate from workspace permissions
-  prohibitions:
-  - Never over-provision Fabric capacity SKU — start with smallest SKU and scale up based on CU consumption
-  - Never grant capacity admin to broad groups — limit to dedicated administrators
-  - Never skip Fabric tenant settings configuration — data exfiltration and sharing controls are tenant-level
-  - Never hardcode admin UPNs — use variables for environment-specific configuration
   targets:
-    services: &id001
+    services:
     - Microsoft.Fabric/capacities
+    terraform_pattern: |
+      resource "azapi_resource" "fabric_capacity" {
+        type      = "Microsoft.Fabric/capacities@2023-11-01"
+        name      = var.fabric_capacity_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        body = {
+          sku = {
+            name = var.sku_name  # "F2", "F4", "F8", "F16", "F32", "F64", "F128", "F256", "F512", "F1024", "F2048"
+            tier = "Fabric"
+          }
+          properties = {
+            administration = {
+              members = var.capacity_admin_upns
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource fabricCapacity 'Microsoft.Fabric/capacities@2023-11-01' = {
+        name: fabricCapacityName
+        location: location
+        sku: {
+          name: skuName
+          tier: 'Fabric'
+        }
+        properties: {
+          administration: {
+            members: capacityAdminUpns
+          }
+        }
+      }
+    prohibitions:
+    - Never over-provision Fabric capacity SKU — start with smallest SKU and scale up based on CU consumption
+    - Never grant capacity admin to broad groups — limit to dedicated administrators
+    - Never skip Fabric tenant settings configuration — data exfiltration and sharing controls are tenant-level
+    - Never hardcode admin UPNs — use variables for environment-specific configuration
 - id: AZ-FAB-002
   severity: required
   description: Configure Fabric tenant settings for data exfiltration prevention and guest access control
@@ -67,7 +67,8 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services: *id001
+    services:
+    - Microsoft.Fabric/capacities
 - id: AZ-FAB-003
   severity: required
   description: Enable Fabric audit logging and route to Log Analytics
@@ -77,7 +78,8 @@ rules:
   - security-reviewer
   - monitoring-agent
   targets:
-    services: *id001
+    services:
+    - Microsoft.Fabric/capacities
 - id: AZ-FAB-004
   severity: recommended
   description: Configure auto-pause and auto-resume for cost optimization
@@ -88,7 +90,8 @@ rules:
   - cloud-architect
   - cost-analyst
   targets:
-    services: *id001
+    services:
+    - Microsoft.Fabric/capacities
 - id: AZ-FAB-005
   severity: recommended
   description: Use managed private endpoints for secure data source connectivity
@@ -98,7 +101,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - Microsoft.Fabric/capacities
 patterns:
 - name: Fabric capacity with admin governance
   description: Fabric capacity with limited administrators, audit logging, and cost controls

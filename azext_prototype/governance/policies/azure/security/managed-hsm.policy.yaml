@@ -13,57 +13,6 @@ rules:
   - bicep-agent
   - cloud-architect
   - security-reviewer
-  terraform_pattern: |
-    resource "azapi_resource" "managed_hsm" {
-      type      = "Microsoft.KeyVault/managedHSMs@2023-07-01"
-      name      = var.hsm_name
-      location  = var.location
-      parent_id = var.resource_group_id
-
-      body = {
-        sku = {
-          name   = "Standard_B1"
-          family = "B"
-        }
-        properties = {
-          tenantId                      = var.tenant_id
-          initialAdminObjectIds         = var.admin_object_ids  # Minimum 3 for quorum
-          enableSoftDelete              = true
-          softDeleteRetentionInDays     = 90
-          enablePurgeProtection         = true
-          publicNetworkAccess           = "Disabled"
-          networkAcls = {
-            bypass        = "None"
-            defaultAction = "Deny"
-            ipRules       = []
-            virtualNetworkRules = []
-          }
-        }
-      }
-    }
-  bicep_pattern: |
-    resource managedHsm 'Microsoft.KeyVault/managedHSMs@2023-07-01' = {
-      name: hsmName
-      location: location
-      sku: {
-        name: 'Standard_B1'
-        family: 'B'
-      }
-      properties: {
-        tenantId: tenantId
-        initialAdminObjectIds: adminObjectIds
-        enableSoftDelete: true
-        softDeleteRetentionInDays: 90
-        enablePurgeProtection: true
-        publicNetworkAccess: 'Disabled'
-        networkAcls: {
-          bypass: 'None'
-          defaultAction: 'Deny'
-          ipRules: []
-          virtualNetworkRules: []
-        }
-      }
-    }
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2024-01-01
     name: pe-hsm
@@ -164,17 +113,68 @@ rules:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: Managed HSM Crypto User / Officer
     description: RBAC local role assignments for key operations — separate Crypto User from Crypto Officer
-  prohibitions:
-  - Never deploy with fewer than 3 initial admin object IDs — prevents lockout
-  - Never disable soft delete or purge protection
-  - Never set softDeleteRetentionInDays below 90
-  - Never set networkAcls bypass to AzureServices unless explicitly required
-  - Never set publicNetworkAccess to Enabled
-  - Never combine Crypto Officer and Crypto User roles on the same identity
-  - Never skip security domain download after initial activation
   targets:
-    services: &id001
+    services:
     - Microsoft.KeyVault/managedHSMs
+    terraform_pattern: |
+      resource "azapi_resource" "managed_hsm" {
+        type      = "Microsoft.KeyVault/managedHSMs@2023-07-01"
+        name      = var.hsm_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        body = {
+          sku = {
+            name   = "Standard_B1"
+            family = "B"
+          }
+          properties = {
+            tenantId                      = var.tenant_id
+            initialAdminObjectIds         = var.admin_object_ids  # Minimum 3 for quorum
+            enableSoftDelete              = true
+            softDeleteRetentionInDays     = 90
+            enablePurgeProtection         = true
+            publicNetworkAccess           = "Disabled"
+            networkAcls = {
+              bypass        = "None"
+              defaultAction = "Deny"
+              ipRules       = []
+              virtualNetworkRules = []
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource managedHsm 'Microsoft.KeyVault/managedHSMs@2023-07-01' = {
+        name: hsmName
+        location: location
+        sku: {
+          name: 'Standard_B1'
+          family: 'B'
+        }
+        properties: {
+          tenantId: tenantId
+          initialAdminObjectIds: adminObjectIds
+          enableSoftDelete: true
+          softDeleteRetentionInDays: 90
+          enablePurgeProtection: true
+          publicNetworkAccess: 'Disabled'
+          networkAcls: {
+            bypass: 'None'
+            defaultAction: 'Deny'
+            ipRules: []
+            virtualNetworkRules: []
+          }
+        }
+      }
+    prohibitions:
+    - Never deploy with fewer than 3 initial admin object IDs — prevents lockout
+    - Never disable soft delete or purge protection
+    - Never set softDeleteRetentionInDays below 90
+    - Never set networkAcls bypass to AzureServices unless explicitly required
+    - Never set publicNetworkAccess to Enabled
+    - Never combine Crypto Officer and Crypto User roles on the same identity
+    - Never skip security domain download after initial activation
 - id: AZ-HSM-002
   severity: required
   description: Enable soft delete with 90-day retention and purge protection
@@ -186,7 +186,8 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services: *id001
+    services:
+    - Microsoft.KeyVault/managedHSMs
 - id: AZ-HSM-003
   severity: required
   description: Download and securely store the security domain immediately after HSM activation
@@ -195,7 +196,8 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services: *id001
+    services:
+    - Microsoft.KeyVault/managedHSMs
 - id: AZ-HSM-004
   severity: required
   description: Separate Crypto Officer and Crypto User roles — enforce dual control
@@ -204,7 +206,8 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services: *id001
+    services:
+    - Microsoft.KeyVault/managedHSMs
 - id: AZ-HSM-005
   severity: recommended
   description: Enable diagnostic logging for all key operations to Log Analytics
@@ -216,7 +219,8 @@ rules:
   - security-reviewer
   - monitoring-agent
   targets:
-    services: *id001
+    services:
+    - Microsoft.KeyVault/managedHSMs
 patterns:
 - name: Managed HSM with private endpoint and dual control
   description: FIPS 140-2 Level 3 HSM with private access, soft delete, purge protection, and role separation

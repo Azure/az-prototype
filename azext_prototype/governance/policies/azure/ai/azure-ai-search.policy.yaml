@@ -11,64 +11,6 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "search" {
-      type      = "Microsoft.Search/searchServices@2024-03-01-preview"
-      name      = var.search_name
-      location  = var.location
-      parent_id = var.resource_group_id
-
-      identity {
-        type = "SystemAssigned"
-      }
-
-      body = {
-        sku = {
-          name = var.sku_name  # "basic", "standard", "standard2", "standard3"
-        }
-        properties = {
-          hostingMode          = "default"
-          publicNetworkAccess  = "disabled"
-          disableLocalAuth     = true
-          authOptions = {
-            aadOrApiKey = {
-              aadAuthFailureMode = "http401WithBearerChallenge"
-            }
-          }
-          encryptionWithCmk = {
-            enforcement = "Enabled"
-          }
-          replicaCount   = var.replica_count
-          partitionCount = var.partition_count
-        }
-      }
-    }
-  bicep_pattern: |
-    resource search 'Microsoft.Search/searchServices@2024-03-01-preview' = {
-      name: searchName
-      location: location
-      identity: {
-        type: 'SystemAssigned'
-      }
-      sku: {
-        name: skuName
-      }
-      properties: {
-        hostingMode: 'default'
-        publicNetworkAccess: 'disabled'
-        disableLocalAuth: true
-        authOptions: {
-          aadOrApiKey: {
-            aadAuthFailureMode: 'http401WithBearerChallenge'
-          }
-        }
-        encryptionWithCmk: {
-          enforcement: 'Enabled'
-        }
-        replicaCount: replicaCount
-        partitionCount: partitionCount
-      }
-    }
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2024-01-01
     name: pe-search
@@ -169,14 +111,72 @@ rules:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: Search Index Data Reader / Contributor
     description: RBAC role assignment granting consuming identity the appropriate Search data-plane role
-  prohibitions:
-  - Never hardcode search admin keys or query keys in source code or IaC
-  - Never set disableLocalAuth to false — always use Microsoft Entra authentication
-  - Never set publicNetworkAccess to enabled without compensating network controls
-  - Never use admin keys for query operations — use query keys or RBAC
   targets:
-    services: &id001
+    services:
     - Microsoft.Search/searchServices
+    terraform_pattern: |
+      resource "azapi_resource" "search" {
+        type      = "Microsoft.Search/searchServices@2024-03-01-preview"
+        name      = var.search_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          sku = {
+            name = var.sku_name  # "basic", "standard", "standard2", "standard3"
+          }
+          properties = {
+            hostingMode          = "default"
+            publicNetworkAccess  = "disabled"
+            disableLocalAuth     = true
+            authOptions = {
+              aadOrApiKey = {
+                aadAuthFailureMode = "http401WithBearerChallenge"
+              }
+            }
+            encryptionWithCmk = {
+              enforcement = "Enabled"
+            }
+            replicaCount   = var.replica_count
+            partitionCount = var.partition_count
+          }
+        }
+      }
+    bicep_pattern: |
+      resource search 'Microsoft.Search/searchServices@2024-03-01-preview' = {
+        name: searchName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: skuName
+        }
+        properties: {
+          hostingMode: 'default'
+          publicNetworkAccess: 'disabled'
+          disableLocalAuth: true
+          authOptions: {
+            aadOrApiKey: {
+              aadAuthFailureMode: 'http401WithBearerChallenge'
+            }
+          }
+          encryptionWithCmk: {
+            enforcement: 'Enabled'
+          }
+          replicaCount: replicaCount
+          partitionCount: partitionCount
+        }
+      }
+    prohibitions:
+    - Never hardcode search admin keys or query keys in source code or IaC
+    - Never set disableLocalAuth to false — always use Microsoft Entra authentication
+    - Never set publicNetworkAccess to enabled without compensating network controls
+    - Never use admin keys for query operations — use query keys or RBAC
 - id: AZ-AIS-002
   severity: recommended
   description: Configure semantic ranking and vector search with appropriate dimensions
@@ -187,7 +187,8 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services: *id001
+    services:
+    - Microsoft.Search/searchServices
 - id: AZ-AIS-003
   severity: recommended
   description: Enable customer-managed key encryption for indexes containing sensitive data
@@ -198,7 +199,8 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services: *id001
+    services:
+    - Microsoft.Search/searchServices
 patterns:
 - name: Azure AI Search with private endpoint and RBAC
   description: Secure search service with no public access, managed identity, and private connectivity

@@ -12,59 +12,6 @@ rules:
   - bicep-agent
   - cloud-architect
   - security-reviewer
-  terraform_pattern: |
-    resource "azapi_resource" "log_analytics" {
-      type      = "Microsoft.OperationalInsights/workspaces@2023-09-01"
-      name      = var.log_analytics_name
-      location  = var.location
-      parent_id = var.resource_group_id
-
-      body = {
-        properties = {
-          sku = {
-            name = "PerGB2018"
-          }
-          retentionInDays = var.retention_days  # Minimum 90 for Sentinel
-          features = {
-            enableDataExport = true
-          }
-        }
-      }
-    }
-
-    resource "azapi_resource" "sentinel" {
-      type      = "Microsoft.SecurityInsights/onboardingStates@2024-03-01"
-      name      = "default"
-      parent_id = azapi_resource.log_analytics.id
-
-      body = {
-        properties = {
-          customerManagedKey = false
-        }
-      }
-    }
-  bicep_pattern: |
-    resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
-      name: logAnalyticsName
-      location: location
-      properties: {
-        sku: {
-          name: 'PerGB2018'
-        }
-        retentionInDays: retentionDays
-        features: {
-          enableDataExport: true
-        }
-      }
-    }
-
-    resource sentinel 'Microsoft.SecurityInsights/onboardingStates@2024-03-01' = {
-      name: 'default'
-      scope: logAnalytics
-      properties: {
-        customerManagedKey: false
-      }
-    }
   companion_resources:
   - type: Microsoft.SecurityInsights/dataConnectors@2024-03-01
     name: Azure Activity data connector
@@ -131,15 +78,68 @@ rules:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: Microsoft Sentinel Responder / Reader
     description: RBAC role assignments for SOC analysts and security responders
-  prohibitions:
-  - Never deploy Sentinel on a shared operational Log Analytics workspace — use a dedicated security workspace
-  - Never set retention below 90 days for Sentinel workspaces
-  - Never disable the Fusion alert rule — it is the primary ML-based threat detection mechanism
-  - Never hardcode tenant IDs in data connector configurations
-  - Never grant Microsoft Sentinel Contributor to analysts — use Responder for incident management
   targets:
-    services: &id001
+    services:
     - Microsoft.SecurityInsights/settings
+    terraform_pattern: |
+      resource "azapi_resource" "log_analytics" {
+        type      = "Microsoft.OperationalInsights/workspaces@2023-09-01"
+        name      = var.log_analytics_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        body = {
+          properties = {
+            sku = {
+              name = "PerGB2018"
+            }
+            retentionInDays = var.retention_days  # Minimum 90 for Sentinel
+            features = {
+              enableDataExport = true
+            }
+          }
+        }
+      }
+
+      resource "azapi_resource" "sentinel" {
+        type      = "Microsoft.SecurityInsights/onboardingStates@2024-03-01"
+        name      = "default"
+        parent_id = azapi_resource.log_analytics.id
+
+        body = {
+          properties = {
+            customerManagedKey = false
+          }
+        }
+      }
+    bicep_pattern: |
+      resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+        name: logAnalyticsName
+        location: location
+        properties: {
+          sku: {
+            name: 'PerGB2018'
+          }
+          retentionInDays: retentionDays
+          features: {
+            enableDataExport: true
+          }
+        }
+      }
+
+      resource sentinel 'Microsoft.SecurityInsights/onboardingStates@2024-03-01' = {
+        name: 'default'
+        scope: logAnalytics
+        properties: {
+          customerManagedKey: false
+        }
+      }
+    prohibitions:
+    - Never deploy Sentinel on a shared operational Log Analytics workspace — use a dedicated security workspace
+    - Never set retention below 90 days for Sentinel workspaces
+    - Never disable the Fusion alert rule — it is the primary ML-based threat detection mechanism
+    - Never hardcode tenant IDs in data connector configurations
+    - Never grant Microsoft Sentinel Contributor to analysts — use Responder for incident management
 - id: AZ-SNTL-002
   severity: required
   description: Enable core data connectors for Azure Activity, Entra ID, and Defender for Cloud
@@ -150,7 +150,8 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services: *id001
+    services:
+    - Microsoft.SecurityInsights/settings
 - id: AZ-SNTL-003
   severity: required
   description: Enable the Fusion alert rule for ML-based multi-stage attack detection
@@ -161,7 +162,8 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services: *id001
+    services:
+    - Microsoft.SecurityInsights/settings
 - id: AZ-SNTL-004
   severity: recommended
   description: Configure automation rules for common incident response playbooks
@@ -172,7 +174,8 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services: *id001
+    services:
+    - Microsoft.SecurityInsights/settings
 - id: AZ-SNTL-005
   severity: recommended
   description: Set up workspace-level RBAC with Microsoft Sentinel-specific roles
@@ -181,7 +184,8 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services: *id001
+    services:
+    - Microsoft.SecurityInsights/settings
 patterns:
 - name: Sentinel with core data connectors and Fusion
   description: Dedicated Sentinel workspace with Azure Activity, Entra ID connectors, and Fusion detection

@@ -12,84 +12,6 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "batch_account" {
-      type      = "Microsoft.Batch/batchAccounts@2024-02-01"
-      name      = var.batch_account_name
-      location  = var.location
-      parent_id = var.resource_group_id
-
-      identity {
-        type = "SystemAssigned"
-      }
-
-      body = {
-        properties = {
-          poolAllocationMode   = "UserSubscription"
-          publicNetworkAccess  = "Disabled"
-          allowedAuthenticationModes = [
-            "AAD"
-          ]
-          autoStorage = {
-            storageAccountId        = var.storage_account_id
-            authenticationMode      = "BatchAccountManagedIdentity"
-          }
-          encryption = {
-            keySource = "Microsoft.Batch"
-          }
-          keyVaultReference = {
-            id  = var.key_vault_id
-            url = var.key_vault_url
-          }
-          networkProfile = {
-            accountAccess = {
-              defaultAction = "Deny"
-              ipRules       = []
-            }
-            nodeManagementAccess = {
-              defaultAction = "Deny"
-              ipRules       = []
-            }
-          }
-        }
-      }
-    }
-  bicep_pattern: |
-    resource batchAccount 'Microsoft.Batch/batchAccounts@2024-02-01' = {
-      name: batchAccountName
-      location: location
-      identity: {
-        type: 'SystemAssigned'
-      }
-      properties: {
-        poolAllocationMode: 'UserSubscription'
-        publicNetworkAccess: 'Disabled'
-        allowedAuthenticationModes: [
-          'AAD'
-        ]
-        autoStorage: {
-          storageAccountId: storageAccountId
-          authenticationMode: 'BatchAccountManagedIdentity'
-        }
-        encryption: {
-          keySource: 'Microsoft.Batch'
-        }
-        keyVaultReference: {
-          id: keyVaultId
-          url: keyVaultUrl
-        }
-        networkProfile: {
-          accountAccess: {
-            defaultAction: 'Deny'
-            ipRules: []
-          }
-          nodeManagementAccess: {
-            defaultAction: 'Deny'
-            ipRules: []
-          }
-        }
-      }
-    }
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2024-01-01
     name: pe-batch
@@ -190,15 +112,93 @@ rules:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: Batch Account Contributor
     description: RBAC role assignment for Batch account management and pool operations
-  prohibitions:
-  - Never use shared key authentication — set allowedAuthenticationModes to AAD only
-  - Never hardcode storage account keys in auto-storage config — use BatchAccountManagedIdentity
-  - Never set publicNetworkAccess to Enabled without network profile restrictions
-  - Never use BatchService pool allocation mode when VNet control is required
-  - Never embed secrets in task command lines — use Key Vault references
   targets:
-    services: &id001
+    services:
     - Microsoft.Batch/batchAccounts
+    terraform_pattern: |
+      resource "azapi_resource" "batch_account" {
+        type      = "Microsoft.Batch/batchAccounts@2024-02-01"
+        name      = var.batch_account_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          properties = {
+            poolAllocationMode   = "UserSubscription"
+            publicNetworkAccess  = "Disabled"
+            allowedAuthenticationModes = [
+              "AAD"
+            ]
+            autoStorage = {
+              storageAccountId        = var.storage_account_id
+              authenticationMode      = "BatchAccountManagedIdentity"
+            }
+            encryption = {
+              keySource = "Microsoft.Batch"
+            }
+            keyVaultReference = {
+              id  = var.key_vault_id
+              url = var.key_vault_url
+            }
+            networkProfile = {
+              accountAccess = {
+                defaultAction = "Deny"
+                ipRules       = []
+              }
+              nodeManagementAccess = {
+                defaultAction = "Deny"
+                ipRules       = []
+              }
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource batchAccount 'Microsoft.Batch/batchAccounts@2024-02-01' = {
+        name: batchAccountName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          poolAllocationMode: 'UserSubscription'
+          publicNetworkAccess: 'Disabled'
+          allowedAuthenticationModes: [
+            'AAD'
+          ]
+          autoStorage: {
+            storageAccountId: storageAccountId
+            authenticationMode: 'BatchAccountManagedIdentity'
+          }
+          encryption: {
+            keySource: 'Microsoft.Batch'
+          }
+          keyVaultReference: {
+            id: keyVaultId
+            url: keyVaultUrl
+          }
+          networkProfile: {
+            accountAccess: {
+              defaultAction: 'Deny'
+              ipRules: []
+            }
+            nodeManagementAccess: {
+              defaultAction: 'Deny'
+              ipRules: []
+            }
+          }
+        }
+      }
+    prohibitions:
+    - Never use shared key authentication — set allowedAuthenticationModes to AAD only
+    - Never hardcode storage account keys in auto-storage config — use BatchAccountManagedIdentity
+    - Never set publicNetworkAccess to Enabled without network profile restrictions
+    - Never use BatchService pool allocation mode when VNet control is required
+    - Never embed secrets in task command lines — use Key Vault references
 - id: AZ-BATCH-002
   severity: required
   description: Deploy Batch pools with VNet injection and no public IP for compute nodes
@@ -208,7 +208,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - Microsoft.Batch/batchAccounts
 - id: AZ-BATCH-003
   severity: recommended
   description: Configure auto-scale formulas for cost optimization
@@ -219,7 +220,8 @@ rules:
   - cloud-architect
   - cost-analyst
   targets:
-    services: *id001
+    services:
+    - Microsoft.Batch/batchAccounts
 - id: AZ-BATCH-004
   severity: recommended
   description: Use container task execution for reproducible and isolated job processing
@@ -230,7 +232,8 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services: *id001
+    services:
+    - Microsoft.Batch/batchAccounts
 patterns:
 - name: Batch account with user-subscription pools and private networking
   description: Batch account with AAD auth, private endpoints, VNet-injected pools, and auto-scale

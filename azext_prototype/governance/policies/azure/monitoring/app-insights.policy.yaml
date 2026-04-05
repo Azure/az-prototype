@@ -13,55 +13,55 @@ rules:
   - bicep-agent
   - cloud-architect
   - monitoring-agent
-  terraform_pattern: |
-    resource "azapi_resource" "app_insights" {
-      type      = "Microsoft.Insights/components@2020-02-02"
-      name      = var.app_insights_name
-      location  = var.location
-      parent_id = azapi_resource.resource_group.id
+  targets:
+    services:
+    - Microsoft.Insights/components
+    terraform_pattern: |
+      resource "azapi_resource" "app_insights" {
+        type      = "Microsoft.Insights/components@2020-02-02"
+        name      = var.app_insights_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
 
-      body = {
-        kind = "web"
-        properties = {
-          Application_Type    = "web"
-          WorkspaceResourceId = azapi_resource.log_analytics_workspace.id
-          SamplingPercentage  = 100
+        body = {
+          kind = "web"
+          properties = {
+            Application_Type    = "web"
+            WorkspaceResourceId = azapi_resource.log_analytics_workspace.id
+            SamplingPercentage  = 100
+          }
         }
       }
-    }
 
-    output "app_insights_connection_string" {
-      value     = azapi_resource.app_insights.output.properties.ConnectionString
-      sensitive = true
-    }
-
-    output "app_insights_instrumentation_key" {
-      value     = azapi_resource.app_insights.output.properties.InstrumentationKey
-      sensitive = true
-    }
-  bicep_pattern: |
-    resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
-      name: appInsightsName
-      location: location
-      kind: 'web'
-      properties: {
-        Application_Type: 'web'
-        WorkspaceResourceId: logAnalyticsWorkspace.id
-        SamplingPercentage: 100
+      output "app_insights_connection_string" {
+        value     = azapi_resource.app_insights.output.properties.ConnectionString
+        sensitive = true
       }
-    }
 
-    output appInsightsConnectionString string = appInsights.properties.ConnectionString
-    output appInsightsInstrumentationKey string = appInsights.properties.InstrumentationKey
-  prohibitions:
-  - NEVER use API version 2024-03-01 — it does not exist for Microsoft.Insights/components
-  - NEVER create classic (non-workspace-based) Application Insights — always set WorkspaceResourceId
-  - NEVER include publicNetworkAccessForIngestion or publicNetworkAccessForQuery on Microsoft.Insights/components@2020-02-02
-    — these properties are NOT supported on this API version
-  - NEVER use InstrumentationKey for new integrations — use ConnectionString instead
-  targets:
-    services: &id001
-    - Microsoft.Insights/components
+      output "app_insights_instrumentation_key" {
+        value     = azapi_resource.app_insights.output.properties.InstrumentationKey
+        sensitive = true
+      }
+    bicep_pattern: |
+      resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
+        name: appInsightsName
+        location: location
+        kind: 'web'
+        properties: {
+          Application_Type: 'web'
+          WorkspaceResourceId: logAnalyticsWorkspace.id
+          SamplingPercentage: 100
+        }
+      }
+
+      output appInsightsConnectionString string = appInsights.properties.ConnectionString
+      output appInsightsInstrumentationKey string = appInsights.properties.InstrumentationKey
+    prohibitions:
+    - NEVER use API version 2024-03-01 — it does not exist for Microsoft.Insights/components
+    - NEVER create classic (non-workspace-based) Application Insights — always set WorkspaceResourceId
+    - NEVER include publicNetworkAccessForIngestion or publicNetworkAccessForQuery on Microsoft.Insights/components@2020-02-02
+      — these properties are NOT supported on this API version
+    - NEVER use InstrumentationKey for new integrations — use ConnectionString instead
 - id: AZ-AI-002
   severity: required
   description: Link Application Insights to Log Analytics Workspace via WorkspaceResourceId
@@ -80,7 +80,8 @@ rules:
     - application-insights
     error_message: Template with compute services should include application-insights for observability
   targets:
-    services: *id001
+    services:
+    - Microsoft.Insights/components
 - id: AZ-AI-003
   severity: recommended
   description: Set SamplingPercentage to 100 for POC, reduce for high-traffic production
@@ -90,7 +91,8 @@ rules:
   - monitoring-agent
   - cost-analyst
   targets:
-    services: *id001
+    services:
+    - Microsoft.Insights/components
 - id: AZ-AI-004
   severity: recommended
   description: Output ConnectionString for downstream app configuration
@@ -100,7 +102,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - Microsoft.Insights/components
 patterns:
 - name: Application Insights linked to Log Analytics
   description: Workspace-based Application Insights with connection string output for app configuration

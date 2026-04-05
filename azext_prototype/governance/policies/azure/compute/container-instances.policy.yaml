@@ -12,138 +12,6 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "container_group" {
-      type      = "Microsoft.ContainerInstance/containerGroups@2023-05-01"
-      name      = var.container_group_name
-      location  = var.location
-      parent_id = var.resource_group_id
-
-      identity {
-        type = "SystemAssigned"
-      }
-
-      body = {
-        properties = {
-          osType = "Linux"
-          restartPolicy = "OnFailure"
-          ipAddress = {
-            type = "Private"
-            ports = [
-              {
-                port     = var.container_port
-                protocol = "TCP"
-              }
-            ]
-          }
-          subnetIds = [
-            {
-              id   = var.subnet_id
-              name = var.subnet_name
-            }
-          ]
-          containers = [
-            {
-              name = var.container_name
-              properties = {
-                image = var.container_image
-                ports = [
-                  {
-                    port     = var.container_port
-                    protocol = "TCP"
-                  }
-                ]
-                resources = {
-                  requests = {
-                    cpu        = var.cpu_cores
-                    memoryInGB = var.memory_gb
-                  }
-                  limits = {
-                    cpu        = var.cpu_cores
-                    memoryInGB = var.memory_gb
-                  }
-                }
-                environmentVariables = []
-              }
-            }
-          ]
-          imageRegistryCredentials = [
-            {
-              server   = var.acr_login_server
-              identity = var.acr_identity_id
-            }
-          ]
-          encryptionProperties = {
-            vaultBaseUrl   = var.key_vault_url
-            keyName        = var.encryption_key_name
-            keyVersion     = var.encryption_key_version
-          }
-        }
-      }
-    }
-  bicep_pattern: |
-    resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01' = {
-      name: containerGroupName
-      location: location
-      identity: {
-        type: 'SystemAssigned'
-      }
-      properties: {
-        osType: 'Linux'
-        restartPolicy: 'OnFailure'
-        ipAddress: {
-          type: 'Private'
-          ports: [
-            {
-              port: containerPort
-              protocol: 'TCP'
-            }
-          ]
-        }
-        subnetIds: [
-          {
-            id: subnetId
-            name: subnetName
-          }
-        ]
-        containers: [
-          {
-            name: containerName
-            properties: {
-              image: containerImage
-              ports: [
-                {
-                  port: containerPort
-                  protocol: 'TCP'
-                }
-              ]
-              resources: {
-                requests: {
-                  cpu: cpuCores
-                  memoryInGB: memoryGb
-                }
-                limits: {
-                  cpu: cpuCores
-                  memoryInGB: memoryGb
-                }
-              }
-              environmentVariables: []
-            }
-          }
-        ]
-        imageRegistryCredentials: [
-          {
-            server: acrLoginServer
-            identity: acrIdentityId
-          }
-        ]
-        encryptionProperties: {
-          vaultBaseUrl: keyVaultUrl
-          keyName: encryptionKeyName
-          keyVersion: encryptionKeyVersion
-        }
-      }
-    }
   companion_resources:
   - type: Microsoft.ContainerRegistry/registries@2023-07-01
     name: Container Registry
@@ -154,15 +22,147 @@ rules:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: AcrPull role
     description: RBAC role assignment granting ACI managed identity the AcrPull role on the container registry
-  prohibitions:
-  - Never hardcode registry passwords in imageRegistryCredentials — use managed identity
-  - Never set ipAddress.type to Public for production workloads
-  - Never pass secrets as plain-text environment variables — use secure environment variables or Key Vault
-  - Never omit resource limits — always set both requests and limits for cpu and memory
-  - Never use latest tag for container images — always pin to a specific version or digest
   targets:
-    services: &id001
+    services:
     - Microsoft.ContainerInstance/containerGroups
+    terraform_pattern: |
+      resource "azapi_resource" "container_group" {
+        type      = "Microsoft.ContainerInstance/containerGroups@2023-05-01"
+        name      = var.container_group_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          properties = {
+            osType = "Linux"
+            restartPolicy = "OnFailure"
+            ipAddress = {
+              type = "Private"
+              ports = [
+                {
+                  port     = var.container_port
+                  protocol = "TCP"
+                }
+              ]
+            }
+            subnetIds = [
+              {
+                id   = var.subnet_id
+                name = var.subnet_name
+              }
+            ]
+            containers = [
+              {
+                name = var.container_name
+                properties = {
+                  image = var.container_image
+                  ports = [
+                    {
+                      port     = var.container_port
+                      protocol = "TCP"
+                    }
+                  ]
+                  resources = {
+                    requests = {
+                      cpu        = var.cpu_cores
+                      memoryInGB = var.memory_gb
+                    }
+                    limits = {
+                      cpu        = var.cpu_cores
+                      memoryInGB = var.memory_gb
+                    }
+                  }
+                  environmentVariables = []
+                }
+              }
+            ]
+            imageRegistryCredentials = [
+              {
+                server   = var.acr_login_server
+                identity = var.acr_identity_id
+              }
+            ]
+            encryptionProperties = {
+              vaultBaseUrl   = var.key_vault_url
+              keyName        = var.encryption_key_name
+              keyVersion     = var.encryption_key_version
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01' = {
+        name: containerGroupName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          osType: 'Linux'
+          restartPolicy: 'OnFailure'
+          ipAddress: {
+            type: 'Private'
+            ports: [
+              {
+                port: containerPort
+                protocol: 'TCP'
+              }
+            ]
+          }
+          subnetIds: [
+            {
+              id: subnetId
+              name: subnetName
+            }
+          ]
+          containers: [
+            {
+              name: containerName
+              properties: {
+                image: containerImage
+                ports: [
+                  {
+                    port: containerPort
+                    protocol: 'TCP'
+                  }
+                ]
+                resources: {
+                  requests: {
+                    cpu: cpuCores
+                    memoryInGB: memoryGb
+                  }
+                  limits: {
+                    cpu: cpuCores
+                    memoryInGB: memoryGb
+                  }
+                }
+                environmentVariables: []
+              }
+            }
+          ]
+          imageRegistryCredentials: [
+            {
+              server: acrLoginServer
+              identity: acrIdentityId
+            }
+          ]
+          encryptionProperties: {
+            vaultBaseUrl: keyVaultUrl
+            keyName: encryptionKeyName
+            keyVersion: encryptionKeyVersion
+          }
+        }
+      }
+    prohibitions:
+    - Never hardcode registry passwords in imageRegistryCredentials — use managed identity
+    - Never set ipAddress.type to Public for production workloads
+    - Never pass secrets as plain-text environment variables — use secure environment variables or Key Vault
+    - Never omit resource limits — always set both requests and limits for cpu and memory
+    - Never use latest tag for container images — always pin to a specific version or digest
 - id: AZ-ACI-002
   severity: required
   description: Use secure environment variables or Key Vault references for secrets
@@ -174,7 +174,8 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services: *id001
+    services:
+    - Microsoft.ContainerInstance/containerGroups
 - id: AZ-ACI-003
   severity: recommended
   description: Set resource limits and requests on all containers
@@ -184,7 +185,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - Microsoft.ContainerInstance/containerGroups
 - id: AZ-ACI-004
   severity: recommended
   description: Pull images from a private registry using managed identity
@@ -195,7 +197,8 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services: *id001
+    services:
+    - Microsoft.ContainerInstance/containerGroups
 patterns:
 - name: ACI with VNet injection and managed identity
   description: Private container group with VNet integration, managed identity for ACR pull, and encrypted secrets

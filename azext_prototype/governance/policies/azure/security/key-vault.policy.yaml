@@ -12,53 +12,6 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "key_vault" {
-      type      = "Microsoft.KeyVault/vaults@2023-07-01"
-      name      = var.key_vault_name
-      location  = var.location
-      parent_id = azapi_resource.resource_group.id
-
-      body = {
-        properties = {
-          tenantId                  = var.tenant_id
-          sku = {
-            family = "A"
-            name   = "standard"
-          }
-          enableRbacAuthorization   = true
-          enableSoftDelete          = true
-          softDeleteRetentionInDays = 90
-          enablePurgeProtection     = true
-          publicNetworkAccess       = "Disabled"
-          networkAcls = {
-            defaultAction = "Deny"
-            bypass        = "AzureServices"
-          }
-        }
-      }
-    }
-  bicep_pattern: |
-    resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
-      name: keyVaultName
-      location: location
-      properties: {
-        tenantId: tenant().tenantId
-        sku: {
-          family: 'A'
-          name: 'standard'
-        }
-        enableRbacAuthorization: true
-        enableSoftDelete: true
-        softDeleteRetentionInDays: 90
-        enablePurgeProtection: true
-        publicNetworkAccess: 'Disabled'
-        networkAcls: {
-          defaultAction: 'Deny'
-          bypass: 'AzureServices'
-        }
-      }
-    }
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2024-01-01
     description: Private endpoint for Key Vault — required when publicNetworkAccess is Disabled
@@ -229,12 +182,6 @@ rules:
           ]
         }
       }
-  prohibitions:
-  - NEVER set enableRbacAuthorization to false — do not use access policies
-  - NEVER set enableSoftDelete to false
-  - NEVER set enablePurgeProtection to false
-  - NEVER set publicNetworkAccess to Enabled
-  - NEVER use service principal secrets to access Key Vault — use managed identity
   template_check:
     scope:
     - key-vault
@@ -244,8 +191,61 @@ rules:
     - purge_protection
     error_message: 'Service ''{service_name}'' ({service_type}) missing {config_key}: true'
   targets:
-    services: &id001
+    services:
     - Microsoft.KeyVault/vaults
+    terraform_pattern: |
+      resource "azapi_resource" "key_vault" {
+        type      = "Microsoft.KeyVault/vaults@2023-07-01"
+        name      = var.key_vault_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            tenantId                  = var.tenant_id
+            sku = {
+              family = "A"
+              name   = "standard"
+            }
+            enableRbacAuthorization   = true
+            enableSoftDelete          = true
+            softDeleteRetentionInDays = 90
+            enablePurgeProtection     = true
+            publicNetworkAccess       = "Disabled"
+            networkAcls = {
+              defaultAction = "Deny"
+              bypass        = "AzureServices"
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+        name: keyVaultName
+        location: location
+        properties: {
+          tenantId: tenant().tenantId
+          sku: {
+            family: 'A'
+            name: 'standard'
+          }
+          enableRbacAuthorization: true
+          enableSoftDelete: true
+          softDeleteRetentionInDays: 90
+          enablePurgeProtection: true
+          publicNetworkAccess: 'Disabled'
+          networkAcls: {
+            defaultAction: 'Deny'
+            bypass: 'AzureServices'
+          }
+        }
+      }
+    prohibitions:
+    - NEVER set enableRbacAuthorization to false — do not use access policies
+    - NEVER set enableSoftDelete to false
+    - NEVER set enablePurgeProtection to false
+    - NEVER set publicNetworkAccess to Enabled
+    - NEVER use service principal secrets to access Key Vault — use managed identity
 - id: AZ-KV-002
   severity: required
   description: Assign Key Vault RBAC roles to application identities
@@ -310,7 +310,8 @@ rules:
         }
       }
   targets:
-    services: *id001
+    services:
+    - Microsoft.KeyVault/vaults
 patterns:
 - name: Key Vault with RBAC and private endpoint
   description: Complete Key Vault deployment with RBAC authorization, soft-delete, purge protection, private endpoint, diagnostics,

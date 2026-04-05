@@ -93,12 +93,8 @@ def load(directory: Path | None = None) -> list[AntiPatternCheck]:
         for idx, entry in enumerate(patterns_list, 1):
             if not isinstance(entry, dict):
                 continue
-            search = entry.get("search_patterns", [])
-            safe = entry.get("safe_patterns", [])
+
             message = entry.get("warning_message", "")
-            if not search or not message:
-                continue
-            correct = entry.get("correct_patterns", [])
             check_id = entry.get("id", f"{domain.upper()}-{idx:03d}")
 
             check_applies_to = entry.get("applies_to", [])
@@ -108,6 +104,14 @@ def load(directory: Path | None = None) -> list[AntiPatternCheck]:
             targets = entry.get("targets", {})
             if not isinstance(targets, dict):
                 targets = {}
+
+            # search/safe/correct patterns live inside targets
+            search = targets.get("search_patterns", [])
+            safe = targets.get("safe_patterns", [])
+            correct = targets.get("correct_patterns", [])
+
+            if not search or not message:
+                continue
 
             checks.append(
                 AntiPatternCheck(

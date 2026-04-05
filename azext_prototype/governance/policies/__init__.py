@@ -56,14 +56,10 @@ class PolicyRule:
     rationale: str = ""
     warning_message: str = ""
     applies_to: list[str] = field(default_factory=list)
-    targets: dict = field(default_factory=dict)  # {"services": ["Microsoft.Sql/servers", ...]}
-    terraform_pattern: str = ""
-    bicep_pattern: str = ""
-    csharp_pattern: str = ""
-    python_pattern: str = ""
-    react_pattern: str = ""
+    targets: dict = field(
+        default_factory=dict
+    )  # {"services": [...], "terraform_pattern": "...", "prohibitions": [...]}
     companion_resources: list[CompanionResource] = field(default_factory=list)
-    prohibitions: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -150,7 +146,8 @@ def validate_policy_file(path: Path) -> list[ValidationError]:
         errors.append(ValidationError(filename, "'rules' must be a list"))
         rules = []
 
-    rule_ids: set[str] = set()
+    # Same ID is allowed with different targets (different services)
+    rule_id_targets: set[tuple[str, ...]] = set()
     for i, rule in enumerate(rules):
         prefix = f"rules[{i}]"
         if not isinstance(rule, dict):
@@ -162,10 +159,15 @@ def validate_policy_file(path: Path) -> list[ValidationError]:
                 errors.append(ValidationError(filename, f"{prefix} missing required key: '{key}'"))
 
         rid = rule.get("id", "")
+        targets = rule.get("targets", {})
+        target_svcs = tuple(sorted(targets.get("services", []))) if isinstance(targets, dict) else ()
+        key = (rid, target_svcs)
         if rid:
-            if rid in rule_ids:
-                errors.append(ValidationError(filename, f"{prefix}: duplicate rule id '{rid}'"))
-            rule_ids.add(rid)
+            if key in rule_id_targets:
+                errors.append(
+                    ValidationError(filename, f"{prefix}: duplicate rule id+targets '{rid}' for {target_svcs}")
+                )
+            rule_id_targets.add(key)
 
         severity = rule.get("severity", "")
         if severity and severity not in VALID_SEVERITIES:
@@ -428,8 +430,9 @@ class PolicyEngine:
                 if rule.rationale:
                     sections.append(f"Rationale: {rule.rationale}")
 
-                pattern = getattr(rule, pattern_key, "") or ""
-                if pattern.strip():
+                # Patterns are inside targets
+                pattern = rule.targets.get(pattern_key, "") or ""
+                if isinstance(pattern, str) and pattern.strip():
                     sections.append(f"```\n{pattern.strip()}\n```")
 
                 for cr in rule.companion_resources:
@@ -438,8 +441,9 @@ class PolicyEngine:
                     if cr_pattern.strip():
                         sections.append(f"```\n{cr_pattern.strip()}\n```")
 
-                if rule.prohibitions:
-                    for p in rule.prohibitions:
+                prohibitions = rule.targets.get("prohibitions", [])
+                if prohibitions:
+                    for p in prohibitions:
                         sections.append(f"- NEVER: {p}")
 
             sections.append("")
@@ -519,13 +523,7 @@ class PolicyEngine:
                     warning_message=str(r.get("warning_message", "")),
                     applies_to=r.get("applies_to", []),
                     targets=targets,
-                    terraform_pattern=str(r.get("terraform_pattern", "")),
-                    bicep_pattern=str(r.get("bicep_pattern", "")),
-                    csharp_pattern=str(r.get("csharp_pattern", "")),
-                    python_pattern=str(r.get("python_pattern", "")),
-                    react_pattern=str(r.get("react_pattern", "")),
                     companion_resources=companions,
-                    prohibitions=r.get("prohibitions", []),
                 )
             )
 

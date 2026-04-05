@@ -57,35 +57,35 @@
           },
           "targets": {
             "type": "object",
-            "description": "What this rule targets.",
+            "description": "Service targets and implementation patterns for this rule.",
             "properties": {
               "services": {
                 "type": "array",
                 "items": { "type": "string" },
                 "description": "ARM resource type namespaces (e.g. ['Microsoft.Sql/servers'])."
+              },
+              "terraform_pattern": {
+                "type": "string",
+                "description": "Terraform code pattern (optional — only for infrastructure agents)."
+              },
+              "bicep_pattern": {
+                "type": "string",
+                "description": "Bicep code pattern (optional — only for infrastructure agents)."
+              },
+              "csharp_pattern": {
+                "type": "string",
+                "description": "C# code pattern (optional — only for csharp-developer)."
+              },
+              "python_pattern": {
+                "type": "string",
+                "description": "Python code pattern (optional — only for python-developer)."
+              },
+              "react_pattern": {
+                "type": "string",
+                "description": "React/TypeScript code pattern (optional — only for react-developer)."
               }
             },
             "additionalProperties": false
-          },
-          "terraform_pattern": {
-            "type": "string",
-            "description": "Terraform code pattern (optional — only for infrastructure agents)."
-          },
-          "bicep_pattern": {
-            "type": "string",
-            "description": "Bicep code pattern (optional — only for infrastructure agents)."
-          },
-          "csharp_pattern": {
-            "type": "string",
-            "description": "C# code pattern (optional — only for csharp-developer)."
-          },
-          "python_pattern": {
-            "type": "string",
-            "description": "Python code pattern (optional — only for python-developer)."
-          },
-          "react_pattern": {
-            "type": "string",
-            "description": "React/TypeScript code pattern (optional — only for react-developer)."
           },
           "companion_resources": {
             "type": "array",

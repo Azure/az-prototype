@@ -11,61 +11,6 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "cognitive" {
-      type      = "Microsoft.CognitiveServices/accounts@2024-04-01-preview"
-      name      = var.cognitive_name
-      location  = var.location
-      parent_id = var.resource_group_id
-
-      identity {
-        type = "SystemAssigned"
-      }
-
-      body = {
-        kind = var.cognitive_kind  # "CognitiveServices", "TextAnalytics", "ComputerVision", etc.
-        sku = {
-          name = var.sku_name  # "S0", "S1", "F0"
-        }
-        properties = {
-          customSubDomainName  = var.cognitive_subdomain
-          disableLocalAuth     = true
-          publicNetworkAccess  = "Disabled"
-          networkAcls = {
-            defaultAction = "Deny"
-            ipRules       = []
-          }
-          encryption = {
-            keySource = "Microsoft.CognitiveServices"
-          }
-          apiProperties = {}
-        }
-      }
-    }
-  bicep_pattern: |
-    resource cognitive 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' = {
-      name: cognitiveName
-      location: location
-      kind: cognitiveKind
-      identity: {
-        type: 'SystemAssigned'
-      }
-      sku: {
-        name: skuName
-      }
-      properties: {
-        customSubDomainName: cognitiveSubdomain
-        disableLocalAuth: true
-        publicNetworkAccess: 'Disabled'
-        networkAcls: {
-          defaultAction: 'Deny'
-          ipRules: []
-        }
-        encryption: {
-          keySource: 'Microsoft.CognitiveServices'
-        }
-      }
-    }
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2024-01-01
     name: pe-cognitive
@@ -166,15 +111,70 @@ rules:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: Cognitive Services User
     description: RBAC role assignment granting consuming identity the Cognitive Services User role
-  prohibitions:
-  - Never hardcode API keys in source code or IaC templates
-  - Never set disableLocalAuth to false — always disable key-based authentication
-  - Never set publicNetworkAccess to Enabled without compensating network controls
-  - Never use Cognitive Services Contributor when Cognitive Services User suffices
-  - Never omit customSubDomainName — it is required for Microsoft Entra authentication
   targets:
-    services: &id001
+    services:
     - Microsoft.CognitiveServices/accounts
+    terraform_pattern: |
+      resource "azapi_resource" "cognitive" {
+        type      = "Microsoft.CognitiveServices/accounts@2024-04-01-preview"
+        name      = var.cognitive_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          kind = var.cognitive_kind  # "CognitiveServices", "TextAnalytics", "ComputerVision", etc.
+          sku = {
+            name = var.sku_name  # "S0", "S1", "F0"
+          }
+          properties = {
+            customSubDomainName  = var.cognitive_subdomain
+            disableLocalAuth     = true
+            publicNetworkAccess  = "Disabled"
+            networkAcls = {
+              defaultAction = "Deny"
+              ipRules       = []
+            }
+            encryption = {
+              keySource = "Microsoft.CognitiveServices"
+            }
+            apiProperties = {}
+          }
+        }
+      }
+    bicep_pattern: |
+      resource cognitive 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' = {
+        name: cognitiveName
+        location: location
+        kind: cognitiveKind
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: skuName
+        }
+        properties: {
+          customSubDomainName: cognitiveSubdomain
+          disableLocalAuth: true
+          publicNetworkAccess: 'Disabled'
+          networkAcls: {
+            defaultAction: 'Deny'
+            ipRules: []
+          }
+          encryption: {
+            keySource: 'Microsoft.CognitiveServices'
+          }
+        }
+      }
+    prohibitions:
+    - Never hardcode API keys in source code or IaC templates
+    - Never set disableLocalAuth to false — always disable key-based authentication
+    - Never set publicNetworkAccess to Enabled without compensating network controls
+    - Never use Cognitive Services Contributor when Cognitive Services User suffices
+    - Never omit customSubDomainName — it is required for Microsoft Entra authentication
 - id: AZ-CS-002
   severity: required
   description: Set customSubDomainName on all Cognitive Services accounts
@@ -184,7 +184,8 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services: *id001
+    services:
+    - Microsoft.CognitiveServices/accounts
 - id: AZ-CS-003
   severity: recommended
   description: Enable customer-managed key encryption for accounts processing sensitive data
@@ -195,7 +196,8 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services: *id001
+    services:
+    - Microsoft.CognitiveServices/accounts
 patterns:
 - name: Cognitive Services with private endpoint and RBAC
   description: Secure Cognitive Services deployment with no public access, managed identity, and diagnostics

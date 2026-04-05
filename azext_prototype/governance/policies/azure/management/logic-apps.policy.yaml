@@ -12,87 +12,6 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  terraform_pattern: |
-    resource "azapi_resource" "logic_app" {
-      type      = "Microsoft.Logic/workflows@2019-05-01"
-      name      = var.logic_app_name
-      location  = var.location
-      parent_id = var.resource_group_id
-
-      identity {
-        type = "SystemAssigned"
-      }
-
-      body = {
-        properties = {
-          state = "Enabled"
-          accessControl = {
-            triggers = {
-              allowedCallerIpAddresses = []
-            }
-            contents = {
-              allowedCallerIpAddresses = []
-            }
-            actions = {
-              allowedCallerIpAddresses = []
-            }
-            workflowManagement = {
-              allowedCallerIpAddresses = []
-            }
-          }
-          endpointsConfiguration = {
-            workflow = {
-              outgoingIpAddresses    = []
-              accessEndpointIpAddresses = []
-            }
-            connector = {
-              outgoingIpAddresses = []
-            }
-          }
-          definition = {
-            "$schema"      = "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#"
-            contentVersion = "1.0.0.0"
-            triggers       = {}
-            actions        = {}
-            outputs        = {}
-          }
-          parameters = {}
-        }
-      }
-    }
-  bicep_pattern: |
-    resource logicApp 'Microsoft.Logic/workflows@2019-05-01' = {
-      name: logicAppName
-      location: location
-      identity: {
-        type: 'SystemAssigned'
-      }
-      properties: {
-        state: 'Enabled'
-        accessControl: {
-          triggers: {
-            allowedCallerIpAddresses: []
-          }
-          contents: {
-            allowedCallerIpAddresses: []
-          }
-          actions: {
-            allowedCallerIpAddresses: []
-          }
-          workflowManagement: {
-            allowedCallerIpAddresses: []
-          }
-        }
-        definition: {
-          '$schema': 'https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#'
-          contentVersion: '1.0.0.0'
-          triggers: {}
-          actions: {}
-          outputs: {}
-        }
-        parameters: {}
-      }
-    }
   companion_resources:
   - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
     name: diag-logic-app
@@ -144,15 +63,96 @@ rules:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: Logic App Contributor
     description: RBAC role assignments for Logic App management
-  prohibitions:
-  - Never hardcode connection strings or credentials in workflow parameters
-  - Never leave accessControl IP restrictions empty in production — use VNet or specific IPs
-  - Never embed secrets directly in workflow definitions — use Key Vault references
-  - Never disable managed identity — it is required for secure API connections
-  - Never use shared access signature (SAS) trigger URLs without IP restrictions
   targets:
-    services: &id001
+    services:
     - Microsoft.Logic/workflows
+    terraform_pattern: |
+      resource "azapi_resource" "logic_app" {
+        type      = "Microsoft.Logic/workflows@2019-05-01"
+        name      = var.logic_app_name
+        location  = var.location
+        parent_id = var.resource_group_id
+
+        identity {
+          type = "SystemAssigned"
+        }
+
+        body = {
+          properties = {
+            state = "Enabled"
+            accessControl = {
+              triggers = {
+                allowedCallerIpAddresses = []
+              }
+              contents = {
+                allowedCallerIpAddresses = []
+              }
+              actions = {
+                allowedCallerIpAddresses = []
+              }
+              workflowManagement = {
+                allowedCallerIpAddresses = []
+              }
+            }
+            endpointsConfiguration = {
+              workflow = {
+                outgoingIpAddresses    = []
+                accessEndpointIpAddresses = []
+              }
+              connector = {
+                outgoingIpAddresses = []
+              }
+            }
+            definition = {
+              "$schema"      = "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#"
+              contentVersion = "1.0.0.0"
+              triggers       = {}
+              actions        = {}
+              outputs        = {}
+            }
+            parameters = {}
+          }
+        }
+      }
+    bicep_pattern: |
+      resource logicApp 'Microsoft.Logic/workflows@2019-05-01' = {
+        name: logicAppName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        properties: {
+          state: 'Enabled'
+          accessControl: {
+            triggers: {
+              allowedCallerIpAddresses: []
+            }
+            contents: {
+              allowedCallerIpAddresses: []
+            }
+            actions: {
+              allowedCallerIpAddresses: []
+            }
+            workflowManagement: {
+              allowedCallerIpAddresses: []
+            }
+          }
+          definition: {
+            '$schema': 'https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#'
+            contentVersion: '1.0.0.0'
+            triggers: {}
+            actions: {}
+            outputs: {}
+          }
+          parameters: {}
+        }
+      }
+    prohibitions:
+    - Never hardcode connection strings or credentials in workflow parameters
+    - Never leave accessControl IP restrictions empty in production — use VNet or specific IPs
+    - Never embed secrets directly in workflow definitions — use Key Vault references
+    - Never disable managed identity — it is required for secure API connections
+    - Never use shared access signature (SAS) trigger URLs without IP restrictions
 - id: AZ-LA-002
   severity: required
   description: Use managed identity for all API connections instead of connection strings
@@ -163,7 +163,8 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services: *id001
+    services:
+    - Microsoft.Logic/workflows
 - id: AZ-LA-003
   severity: recommended
   description: Configure IP-based access control for triggers, actions, and management endpoints
@@ -174,7 +175,8 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services: *id001
+    services:
+    - Microsoft.Logic/workflows
 - id: AZ-LA-004
   severity: recommended
   description: Enable diagnostic logging for workflow runs and trigger history
@@ -185,7 +187,8 @@ rules:
   - cloud-architect
   - monitoring-agent
   targets:
-    services: *id001
+    services:
+    - Microsoft.Logic/workflows
 patterns:
 - name: Logic App with managed identity and access control
   description: Secure Logic App with managed identity, IP restrictions, and Key Vault-backed parameters
