@@ -12,10 +12,18 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/privateEndpoints (private endpoint with groupId 'namespace')
-  - Microsoft.Network/privateDnsZones (privatelink.servicebus.windows.net)
-  - Microsoft.Authorization/roleAssignments (Azure Event Hubs Data Sender/Receiver roles)
-  - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
+  - type: Microsoft.Network/privateEndpoints@2023-04-01
+    name: pe-eventhubs
+    description: Private endpoint for Event Hubs namespace with groupId 'namespace'
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.servicebus.windows.net
+    description: Private DNS zone for Event Hubs private endpoint resolution
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: Azure Event Hubs Data Sender/Receiver
+    description: RBAC roles granting send and receive permissions on the Event Hubs namespace
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-eventhubs
+    description: Diagnostic settings routing operational and audit logs to Log Analytics
   targets:
   - services:
     - Microsoft.EventHub/namespaces
@@ -81,7 +89,9 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.EventHub/namespaces/eventhubs/consumergroups (consumer groups for each application)
+  - type: Microsoft.EventHub/namespaces/eventhubs/consumergroups@2024-01-01
+    name: cg-app
+    description: Dedicated consumer group for each consuming application
   targets:
   - services:
     - Microsoft.EventHub/namespaces
@@ -244,7 +254,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace as destination for Event Hubs diagnostic logs
   targets:
   - services:
     - Microsoft.EventHub/namespaces

@@ -13,6 +13,7 @@ rules:
   - cloud-architect
   companion_resources:
   - type: Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-05-15
+    name: Cosmos DB Built-in Data Contributor
     description: RBAC role assignment granting Cosmos DB Built-in Data Contributor to the application identity
     terraform_pattern: |
       resource "azapi_resource" "cosmos_role_assignment" {
@@ -39,6 +40,7 @@ rules:
         }
       }
   - type: Microsoft.Network/privateEndpoints@2024-01-01
+    name: pe-cosmos
     description: Private endpoint for Cosmos DB — required when publicNetworkAccess is Disabled
     terraform_pattern: |
       resource "azapi_resource" "cosmos_private_endpoint" {
@@ -86,6 +88,7 @@ rules:
         }
       }
   - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.documents.azure.com
     description: Private DNS zone for Cosmos DB private endpoint resolution
     terraform_pattern: |
       resource "azapi_resource" "cosmos_dns_zone" {
@@ -436,6 +439,7 @@ rules:
   - monitoring-agent
   companion_resources:
   - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-cosmos
     description: Diagnostic settings for Cosmos DB to Log Analytics
     terraform_pattern: |
       resource "azapi_resource" "cosmos_diagnostics" {

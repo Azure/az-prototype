@@ -237,6 +237,7 @@ rules:
   - cloud-architect
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2024-01-01
+    name: pe-sql
     description: Private endpoint for SQL Server — required when publicNetworkAccess is Disabled
     terraform_pattern: |
       resource "azapi_resource" "sql_private_endpoint" {
@@ -284,6 +285,7 @@ rules:
         }
       }
   - type: Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01
+    name: privatelink.database.windows.net
     description: Private DNS zone for SQL Server private endpoint resolution
     terraform_pattern: |
       resource "azapi_resource" "sql_dns_zone" {
@@ -377,6 +379,7 @@ rules:
   - monitoring-agent
   companion_resources:
   - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-sql
     description: Diagnostic settings for SQL Database to Log Analytics
     terraform_pattern: |
       resource "azapi_resource" "sql_db_diagnostics" {

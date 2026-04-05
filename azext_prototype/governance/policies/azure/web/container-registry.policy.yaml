@@ -15,6 +15,7 @@ rules:
   - cloud-architect
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2024-01-01
+    name: pe-acr
     description: Private endpoint for Container Registry — required when publicNetworkAccess is Disabled (requires Premium
       SKU)
     terraform_pattern: |
@@ -63,6 +64,7 @@ rules:
         }
       }
   - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.azurecr.io
     description: Private DNS zone for Container Registry private endpoint resolution
     terraform_pattern: |
       resource "azapi_resource" "acr_dns_zone" {
@@ -283,6 +285,7 @@ rules:
   - monitoring-agent
   companion_resources:
   - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-acr
     description: Diagnostic settings for Container Registry to Log Analytics
     terraform_pattern: |
       resource "azapi_resource" "acr_diagnostics" {

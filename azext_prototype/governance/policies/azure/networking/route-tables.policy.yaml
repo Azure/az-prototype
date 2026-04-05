@@ -12,8 +12,12 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/virtualNetworks/subnets (associate route table with target subnets)
-  - Microsoft.Network/azureFirewalls or NVA (next-hop target for forced tunneling)
+  - type: Microsoft.Network/virtualNetworks/subnets@2024-01-01
+    name: snet-workload
+    description: Associate route table with target subnets
+  - type: Microsoft.Network/azureFirewalls@2023-04-01
+    name: azurefirewalls
+    description: Next-hop target for forced tunneling
   targets:
   - services:
     - Microsoft.Network/routeTables
@@ -51,7 +55,9 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/routeTables (parent route table)
+  - type: Microsoft.Network/routeTables@2023-04-01
+    name: rt-default
+    description: Parent route table
   targets:
   - services:
     - Microsoft.Network/routeTables
@@ -90,7 +96,9 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/networkSecurityGroups (always pair UDR with NSG)
+  - type: Microsoft.Network/networkSecurityGroups@2023-04-01
+    name: nsg-resource
+    description: Always pair UDR with NSG
   targets:
   - services:
     - Microsoft.Network/routeTables

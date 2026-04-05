@@ -108,7 +108,7 @@
                 "terraform_pattern": { "type": "string" },
                 "bicep_pattern": { "type": "string" }
               },
-              "required": ["type", "description"],
+              "required": ["type", "name", "description"],
               "additionalProperties": false
             }
           },

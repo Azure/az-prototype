@@ -12,8 +12,12 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/networkSecurityGroups (NSG with least-privilege rules)
-  - Microsoft.Network/virtualNetworks/subnets (target subnet)
+  - type: Microsoft.Network/networkSecurityGroups@2023-04-01
+    name: nsg-resource
+    description: NSG with least-privilege rules
+  - type: Microsoft.Network/virtualNetworks/subnets@2024-01-01
+    name: snet-resource
+    description: Target subnet
   targets:
   - services:
     - Microsoft.Network/networkInterfaces
@@ -78,8 +82,12 @@ rules:
   - cloud-architect
   - security-reviewer
   companion_resources:
-  - Microsoft.Network/bastionHosts (for management access instead of public IPs)
-  - Microsoft.Network/loadBalancers (for application traffic instead of public IPs)
+  - type: Microsoft.Network/bastionHosts@2023-04-01
+    name: bas-mgmt
+    description: For management access instead of public IPs
+  - type: Microsoft.Network/loadBalancers@2023-04-01
+    name: lb
+    description: For application traffic instead of public IPs
   targets:
   - services:
     - Microsoft.Network/networkInterfaces

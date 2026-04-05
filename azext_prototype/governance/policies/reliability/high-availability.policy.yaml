@@ -371,34 +371,6 @@ rules:
     - NEVER set PostgreSQL Flexible highAvailability.mode to SameZone for production — use ZoneRedundant
     - NEVER omit zoneRedundant on Container Apps Environment for production workloads
     - NEVER deploy SQL Database without zoneRedundant = true for General Purpose or Business Critical tiers
-- id: WAF-REL-HA-001
-  severity: recommended
-  description: 'Enable zone redundancy for ALL production PaaS services.  Every service that supports availability zones MUST
-    be configured with zone-redundant deployment.  This is the single most impactful reliability control — it protects against
-    datacenter-level failures with zero application changes.  Configure the exact zone properties per service type: zoneRedundant
-    for Container Apps and Service Bus Premium; zones for AKS node pools, VMs, and Public IPs; ZRS replication for Storage;
-    zone-redundant HA for SQL and PostgreSQL Flexible; multi-AZ writes for Cosmos DB; zone redundancy for Redis Enterprise.'
-  rationale: Azure availability zones are physically separated datacenters within a region.  Zone-redundant deployments survive
-    a full datacenter failure (power, cooling, networking).  Without zone redundancy, a single datacenter outage takes down
-    the entire service.  Azure SLA improves from 99.9% to 99.95%-99.99% with zone redundancy.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  template_check:
-    scope:
-    - sql-database
-    - cosmos-db
-    - storage
-    - container-apps
-    - aks
-    - redis-cache
-    - service-bus
-    - postgresql-flexible
-    require_config:
-    - zone_redundant
-    error_message: Service '{service_name}' ({service_type}) must configure zone_redundant for production reliability
-  targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
@@ -739,36 +711,15 @@ rules:
     - NEVER set PostgreSQL Flexible highAvailability.mode to SameZone for production — use ZoneRedundant
     - NEVER omit zoneRedundant on Container Apps Environment for production workloads
     - NEVER deploy SQL Database without zoneRedundant = true for General Purpose or Business Critical tiers
-- id: WAF-REL-HA-001
-  severity: recommended
-  description: 'Enable zone redundancy for ALL production PaaS services.  Every service that supports availability zones MUST
-    be configured with zone-redundant deployment.  This is the single most impactful reliability control — it protects against
-    datacenter-level failures with zero application changes.  Configure the exact zone properties per service type: zoneRedundant
-    for Container Apps and Service Bus Premium; zones for AKS node pools, VMs, and Public IPs; ZRS replication for Storage;
-    zone-redundant HA for SQL and PostgreSQL Flexible; multi-AZ writes for Cosmos DB; zone redundancy for Redis Enterprise.'
-  rationale: Azure availability zones are physically separated datacenters within a region.  Zone-redundant deployments survive
-    a full datacenter failure (power, cooling, networking).  Without zone redundancy, a single datacenter outage takes down
-    the entire service.  Azure SLA improves from 99.9% to 99.95%-99.99% with zone redundancy.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  template_check:
-    scope:
-    - sql-database
-    - cosmos-db
-    - storage
-    - container-apps
-    - aks
-    - redis-cache
-    - service-bus
-    - postgresql-flexible
-    require_config:
-    - zone_redundant
-    error_message: Service '{service_name}' ({service_type}) must configure zone_redundant for production reliability
-  targets:
   - services:
-    - TODO:storage
+    - Microsoft.Sql/servers/databases
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Storage/storageAccounts
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.App/managedEnvironments
+    - Microsoft.Cache/redis
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
       # === Zone Redundancy per Service Type (azapi_resource) ===
       # EVERY production PaaS resource MUST include zone configuration.
@@ -1107,34 +1058,6 @@ rules:
     - NEVER set PostgreSQL Flexible highAvailability.mode to SameZone for production — use ZoneRedundant
     - NEVER omit zoneRedundant on Container Apps Environment for production workloads
     - NEVER deploy SQL Database without zoneRedundant = true for General Purpose or Business Critical tiers
-- id: WAF-REL-HA-001
-  severity: recommended
-  description: 'Enable zone redundancy for ALL production PaaS services.  Every service that supports availability zones MUST
-    be configured with zone-redundant deployment.  This is the single most impactful reliability control — it protects against
-    datacenter-level failures with zero application changes.  Configure the exact zone properties per service type: zoneRedundant
-    for Container Apps and Service Bus Premium; zones for AKS node pools, VMs, and Public IPs; ZRS replication for Storage;
-    zone-redundant HA for SQL and PostgreSQL Flexible; multi-AZ writes for Cosmos DB; zone redundancy for Redis Enterprise.'
-  rationale: Azure availability zones are physically separated datacenters within a region.  Zone-redundant deployments survive
-    a full datacenter failure (power, cooling, networking).  Without zone redundancy, a single datacenter outage takes down
-    the entire service.  Azure SLA improves from 99.9% to 99.95%-99.99% with zone redundancy.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  template_check:
-    scope:
-    - sql-database
-    - cosmos-db
-    - storage
-    - container-apps
-    - aks
-    - redis-cache
-    - service-bus
-    - postgresql-flexible
-    require_config:
-    - zone_redundant
-    error_message: Service '{service_name}' ({service_type}) must configure zone_redundant for production reliability
-  targets:
   - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
@@ -1475,34 +1398,6 @@ rules:
     - NEVER set PostgreSQL Flexible highAvailability.mode to SameZone for production — use ZoneRedundant
     - NEVER omit zoneRedundant on Container Apps Environment for production workloads
     - NEVER deploy SQL Database without zoneRedundant = true for General Purpose or Business Critical tiers
-- id: WAF-REL-HA-001
-  severity: recommended
-  description: 'Enable zone redundancy for ALL production PaaS services.  Every service that supports availability zones MUST
-    be configured with zone-redundant deployment.  This is the single most impactful reliability control — it protects against
-    datacenter-level failures with zero application changes.  Configure the exact zone properties per service type: zoneRedundant
-    for Container Apps and Service Bus Premium; zones for AKS node pools, VMs, and Public IPs; ZRS replication for Storage;
-    zone-redundant HA for SQL and PostgreSQL Flexible; multi-AZ writes for Cosmos DB; zone redundancy for Redis Enterprise.'
-  rationale: Azure availability zones are physically separated datacenters within a region.  Zone-redundant deployments survive
-    a full datacenter failure (power, cooling, networking).  Without zone redundancy, a single datacenter outage takes down
-    the entire service.  Azure SLA improves from 99.9% to 99.95%-99.99% with zone redundancy.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  template_check:
-    scope:
-    - sql-database
-    - cosmos-db
-    - storage
-    - container-apps
-    - aks
-    - redis-cache
-    - service-bus
-    - postgresql-flexible
-    require_config:
-    - zone_redundant
-    error_message: Service '{service_name}' ({service_type}) must configure zone_redundant for production reliability
-  targets:
   - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
@@ -1843,34 +1738,6 @@ rules:
     - NEVER set PostgreSQL Flexible highAvailability.mode to SameZone for production — use ZoneRedundant
     - NEVER omit zoneRedundant on Container Apps Environment for production workloads
     - NEVER deploy SQL Database without zoneRedundant = true for General Purpose or Business Critical tiers
-- id: WAF-REL-HA-001
-  severity: recommended
-  description: 'Enable zone redundancy for ALL production PaaS services.  Every service that supports availability zones MUST
-    be configured with zone-redundant deployment.  This is the single most impactful reliability control — it protects against
-    datacenter-level failures with zero application changes.  Configure the exact zone properties per service type: zoneRedundant
-    for Container Apps and Service Bus Premium; zones for AKS node pools, VMs, and Public IPs; ZRS replication for Storage;
-    zone-redundant HA for SQL and PostgreSQL Flexible; multi-AZ writes for Cosmos DB; zone redundancy for Redis Enterprise.'
-  rationale: Azure availability zones are physically separated datacenters within a region.  Zone-redundant deployments survive
-    a full datacenter failure (power, cooling, networking).  Without zone redundancy, a single datacenter outage takes down
-    the entire service.  Azure SLA improves from 99.9% to 99.95%-99.99% with zone redundancy.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  template_check:
-    scope:
-    - sql-database
-    - cosmos-db
-    - storage
-    - container-apps
-    - aks
-    - redis-cache
-    - service-bus
-    - postgresql-flexible
-    require_config:
-    - zone_redundant
-    error_message: Service '{service_name}' ({service_type}) must configure zone_redundant for production reliability
-  targets:
   - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
@@ -2211,34 +2078,6 @@ rules:
     - NEVER set PostgreSQL Flexible highAvailability.mode to SameZone for production — use ZoneRedundant
     - NEVER omit zoneRedundant on Container Apps Environment for production workloads
     - NEVER deploy SQL Database without zoneRedundant = true for General Purpose or Business Critical tiers
-- id: WAF-REL-HA-001
-  severity: recommended
-  description: 'Enable zone redundancy for ALL production PaaS services.  Every service that supports availability zones MUST
-    be configured with zone-redundant deployment.  This is the single most impactful reliability control — it protects against
-    datacenter-level failures with zero application changes.  Configure the exact zone properties per service type: zoneRedundant
-    for Container Apps and Service Bus Premium; zones for AKS node pools, VMs, and Public IPs; ZRS replication for Storage;
-    zone-redundant HA for SQL and PostgreSQL Flexible; multi-AZ writes for Cosmos DB; zone redundancy for Redis Enterprise.'
-  rationale: Azure availability zones are physically separated datacenters within a region.  Zone-redundant deployments survive
-    a full datacenter failure (power, cooling, networking).  Without zone redundancy, a single datacenter outage takes down
-    the entire service.  Azure SLA improves from 99.9% to 99.95%-99.99% with zone redundancy.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  template_check:
-    scope:
-    - sql-database
-    - cosmos-db
-    - storage
-    - container-apps
-    - aks
-    - redis-cache
-    - service-bus
-    - postgresql-flexible
-    require_config:
-    - zone_redundant
-    error_message: Service '{service_name}' ({service_type}) must configure zone_redundant for production reliability
-  targets:
   - services:
     - Microsoft.ServiceBus/namespaces
     terraform_pattern: |
@@ -2579,34 +2418,6 @@ rules:
     - NEVER set PostgreSQL Flexible highAvailability.mode to SameZone for production — use ZoneRedundant
     - NEVER omit zoneRedundant on Container Apps Environment for production workloads
     - NEVER deploy SQL Database without zoneRedundant = true for General Purpose or Business Critical tiers
-- id: WAF-REL-HA-001
-  severity: recommended
-  description: 'Enable zone redundancy for ALL production PaaS services.  Every service that supports availability zones MUST
-    be configured with zone-redundant deployment.  This is the single most impactful reliability control — it protects against
-    datacenter-level failures with zero application changes.  Configure the exact zone properties per service type: zoneRedundant
-    for Container Apps and Service Bus Premium; zones for AKS node pools, VMs, and Public IPs; ZRS replication for Storage;
-    zone-redundant HA for SQL and PostgreSQL Flexible; multi-AZ writes for Cosmos DB; zone redundancy for Redis Enterprise.'
-  rationale: Azure availability zones are physically separated datacenters within a region.  Zone-redundant deployments survive
-    a full datacenter failure (power, cooling, networking).  Without zone redundancy, a single datacenter outage takes down
-    the entire service.  Azure SLA improves from 99.9% to 99.95%-99.99% with zone redundancy.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  template_check:
-    scope:
-    - sql-database
-    - cosmos-db
-    - storage
-    - container-apps
-    - aks
-    - redis-cache
-    - service-bus
-    - postgresql-flexible
-    require_config:
-    - zone_redundant
-    error_message: Service '{service_name}' ({service_type}) must configure zone_redundant for production reliability
-  targets:
   - services:
     - Microsoft.Web/sites
     terraform_pattern: |
@@ -2947,34 +2758,6 @@ rules:
     - NEVER set PostgreSQL Flexible highAvailability.mode to SameZone for production — use ZoneRedundant
     - NEVER omit zoneRedundant on Container Apps Environment for production workloads
     - NEVER deploy SQL Database without zoneRedundant = true for General Purpose or Business Critical tiers
-- id: WAF-REL-HA-001
-  severity: recommended
-  description: 'Enable zone redundancy for ALL production PaaS services.  Every service that supports availability zones MUST
-    be configured with zone-redundant deployment.  This is the single most impactful reliability control — it protects against
-    datacenter-level failures with zero application changes.  Configure the exact zone properties per service type: zoneRedundant
-    for Container Apps and Service Bus Premium; zones for AKS node pools, VMs, and Public IPs; ZRS replication for Storage;
-    zone-redundant HA for SQL and PostgreSQL Flexible; multi-AZ writes for Cosmos DB; zone redundancy for Redis Enterprise.'
-  rationale: Azure availability zones are physically separated datacenters within a region.  Zone-redundant deployments survive
-    a full datacenter failure (power, cooling, networking).  Without zone redundancy, a single datacenter outage takes down
-    the entire service.  Azure SLA improves from 99.9% to 99.95%-99.99% with zone redundancy.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  template_check:
-    scope:
-    - sql-database
-    - cosmos-db
-    - storage
-    - container-apps
-    - aks
-    - redis-cache
-    - service-bus
-    - postgresql-flexible
-    require_config:
-    - zone_redundant
-    error_message: Service '{service_name}' ({service_type}) must configure zone_redundant for production reliability
-  targets:
   - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
@@ -3315,34 +3098,6 @@ rules:
     - NEVER set PostgreSQL Flexible highAvailability.mode to SameZone for production — use ZoneRedundant
     - NEVER omit zoneRedundant on Container Apps Environment for production workloads
     - NEVER deploy SQL Database without zoneRedundant = true for General Purpose or Business Critical tiers
-- id: WAF-REL-HA-001
-  severity: recommended
-  description: 'Enable zone redundancy for ALL production PaaS services.  Every service that supports availability zones MUST
-    be configured with zone-redundant deployment.  This is the single most impactful reliability control — it protects against
-    datacenter-level failures with zero application changes.  Configure the exact zone properties per service type: zoneRedundant
-    for Container Apps and Service Bus Premium; zones for AKS node pools, VMs, and Public IPs; ZRS replication for Storage;
-    zone-redundant HA for SQL and PostgreSQL Flexible; multi-AZ writes for Cosmos DB; zone redundancy for Redis Enterprise.'
-  rationale: Azure availability zones are physically separated datacenters within a region.  Zone-redundant deployments survive
-    a full datacenter failure (power, cooling, networking).  Without zone redundancy, a single datacenter outage takes down
-    the entire service.  Azure SLA improves from 99.9% to 99.95%-99.99% with zone redundancy.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  template_check:
-    scope:
-    - sql-database
-    - cosmos-db
-    - storage
-    - container-apps
-    - aks
-    - redis-cache
-    - service-bus
-    - postgresql-flexible
-    require_config:
-    - zone_redundant
-    error_message: Service '{service_name}' ({service_type}) must configure zone_redundant for production reliability
-  targets:
   - services:
     - Microsoft.Compute/virtualMachineScaleSets
     terraform_pattern: |
@@ -3683,34 +3438,6 @@ rules:
     - NEVER set PostgreSQL Flexible highAvailability.mode to SameZone for production — use ZoneRedundant
     - NEVER omit zoneRedundant on Container Apps Environment for production workloads
     - NEVER deploy SQL Database without zoneRedundant = true for General Purpose or Business Critical tiers
-- id: WAF-REL-HA-001
-  severity: recommended
-  description: 'Enable zone redundancy for ALL production PaaS services.  Every service that supports availability zones MUST
-    be configured with zone-redundant deployment.  This is the single most impactful reliability control — it protects against
-    datacenter-level failures with zero application changes.  Configure the exact zone properties per service type: zoneRedundant
-    for Container Apps and Service Bus Premium; zones for AKS node pools, VMs, and Public IPs; ZRS replication for Storage;
-    zone-redundant HA for SQL and PostgreSQL Flexible; multi-AZ writes for Cosmos DB; zone redundancy for Redis Enterprise.'
-  rationale: Azure availability zones are physically separated datacenters within a region.  Zone-redundant deployments survive
-    a full datacenter failure (power, cooling, networking).  Without zone redundancy, a single datacenter outage takes down
-    the entire service.  Azure SLA improves from 99.9% to 99.95%-99.99% with zone redundancy.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  template_check:
-    scope:
-    - sql-database
-    - cosmos-db
-    - storage
-    - container-apps
-    - aks
-    - redis-cache
-    - service-bus
-    - postgresql-flexible
-    require_config:
-    - zone_redundant
-    error_message: Service '{service_name}' ({service_type}) must configure zone_redundant for production reliability
-  targets:
   - services:
     - Microsoft.Network/loadBalancers
     terraform_pattern: |
@@ -4051,34 +3778,6 @@ rules:
     - NEVER set PostgreSQL Flexible highAvailability.mode to SameZone for production — use ZoneRedundant
     - NEVER omit zoneRedundant on Container Apps Environment for production workloads
     - NEVER deploy SQL Database without zoneRedundant = true for General Purpose or Business Critical tiers
-- id: WAF-REL-HA-001
-  severity: recommended
-  description: 'Enable zone redundancy for ALL production PaaS services.  Every service that supports availability zones MUST
-    be configured with zone-redundant deployment.  This is the single most impactful reliability control — it protects against
-    datacenter-level failures with zero application changes.  Configure the exact zone properties per service type: zoneRedundant
-    for Container Apps and Service Bus Premium; zones for AKS node pools, VMs, and Public IPs; ZRS replication for Storage;
-    zone-redundant HA for SQL and PostgreSQL Flexible; multi-AZ writes for Cosmos DB; zone redundancy for Redis Enterprise.'
-  rationale: Azure availability zones are physically separated datacenters within a region.  Zone-redundant deployments survive
-    a full datacenter failure (power, cooling, networking).  Without zone redundancy, a single datacenter outage takes down
-    the entire service.  Azure SLA improves from 99.9% to 99.95%-99.99% with zone redundancy.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  template_check:
-    scope:
-    - sql-database
-    - cosmos-db
-    - storage
-    - container-apps
-    - aks
-    - redis-cache
-    - service-bus
-    - postgresql-flexible
-    require_config:
-    - zone_redundant
-    error_message: Service '{service_name}' ({service_type}) must configure zone_redundant for production reliability
-  targets:
   - services:
     - Microsoft.Network/applicationGateways
     terraform_pattern: |
@@ -4419,34 +4118,6 @@ rules:
     - NEVER set PostgreSQL Flexible highAvailability.mode to SameZone for production — use ZoneRedundant
     - NEVER omit zoneRedundant on Container Apps Environment for production workloads
     - NEVER deploy SQL Database without zoneRedundant = true for General Purpose or Business Critical tiers
-- id: WAF-REL-HA-001
-  severity: recommended
-  description: 'Enable zone redundancy for ALL production PaaS services.  Every service that supports availability zones MUST
-    be configured with zone-redundant deployment.  This is the single most impactful reliability control — it protects against
-    datacenter-level failures with zero application changes.  Configure the exact zone properties per service type: zoneRedundant
-    for Container Apps and Service Bus Premium; zones for AKS node pools, VMs, and Public IPs; ZRS replication for Storage;
-    zone-redundant HA for SQL and PostgreSQL Flexible; multi-AZ writes for Cosmos DB; zone redundancy for Redis Enterprise.'
-  rationale: Azure availability zones are physically separated datacenters within a region.  Zone-redundant deployments survive
-    a full datacenter failure (power, cooling, networking).  Without zone redundancy, a single datacenter outage takes down
-    the entire service.  Azure SLA improves from 99.9% to 99.95%-99.99% with zone redundancy.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  template_check:
-    scope:
-    - sql-database
-    - cosmos-db
-    - storage
-    - container-apps
-    - aks
-    - redis-cache
-    - service-bus
-    - postgresql-flexible
-    require_config:
-    - zone_redundant
-    error_message: Service '{service_name}' ({service_type}) must configure zone_redundant for production reliability
-  targets:
   - services:
     - Microsoft.Network/frontDoors
     terraform_pattern: |
@@ -4787,34 +4458,6 @@ rules:
     - NEVER set PostgreSQL Flexible highAvailability.mode to SameZone for production — use ZoneRedundant
     - NEVER omit zoneRedundant on Container Apps Environment for production workloads
     - NEVER deploy SQL Database without zoneRedundant = true for General Purpose or Business Critical tiers
-- id: WAF-REL-HA-001
-  severity: recommended
-  description: 'Enable zone redundancy for ALL production PaaS services.  Every service that supports availability zones MUST
-    be configured with zone-redundant deployment.  This is the single most impactful reliability control — it protects against
-    datacenter-level failures with zero application changes.  Configure the exact zone properties per service type: zoneRedundant
-    for Container Apps and Service Bus Premium; zones for AKS node pools, VMs, and Public IPs; ZRS replication for Storage;
-    zone-redundant HA for SQL and PostgreSQL Flexible; multi-AZ writes for Cosmos DB; zone redundancy for Redis Enterprise.'
-  rationale: Azure availability zones are physically separated datacenters within a region.  Zone-redundant deployments survive
-    a full datacenter failure (power, cooling, networking).  Without zone redundancy, a single datacenter outage takes down
-    the entire service.  Azure SLA improves from 99.9% to 99.95%-99.99% with zone redundancy.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  template_check:
-    scope:
-    - sql-database
-    - cosmos-db
-    - storage
-    - container-apps
-    - aks
-    - redis-cache
-    - service-bus
-    - postgresql-flexible
-    require_config:
-    - zone_redundant
-    error_message: Service '{service_name}' ({service_type}) must configure zone_redundant for production reliability
-  targets:
   - services:
     - Microsoft.Network/trafficManagerProfiles
     terraform_pattern: |
@@ -5155,34 +4798,6 @@ rules:
     - NEVER set PostgreSQL Flexible highAvailability.mode to SameZone for production — use ZoneRedundant
     - NEVER omit zoneRedundant on Container Apps Environment for production workloads
     - NEVER deploy SQL Database without zoneRedundant = true for General Purpose or Business Critical tiers
-- id: WAF-REL-HA-001
-  severity: recommended
-  description: 'Enable zone redundancy for ALL production PaaS services.  Every service that supports availability zones MUST
-    be configured with zone-redundant deployment.  This is the single most impactful reliability control — it protects against
-    datacenter-level failures with zero application changes.  Configure the exact zone properties per service type: zoneRedundant
-    for Container Apps and Service Bus Premium; zones for AKS node pools, VMs, and Public IPs; ZRS replication for Storage;
-    zone-redundant HA for SQL and PostgreSQL Flexible; multi-AZ writes for Cosmos DB; zone redundancy for Redis Enterprise.'
-  rationale: Azure availability zones are physically separated datacenters within a region.  Zone-redundant deployments survive
-    a full datacenter failure (power, cooling, networking).  Without zone redundancy, a single datacenter outage takes down
-    the entire service.  Azure SLA improves from 99.9% to 99.95%-99.99% with zone redundancy.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  template_check:
-    scope:
-    - sql-database
-    - cosmos-db
-    - storage
-    - container-apps
-    - aks
-    - redis-cache
-    - service-bus
-    - postgresql-flexible
-    require_config:
-    - zone_redundant
-    error_message: Service '{service_name}' ({service_type}) must configure zone_redundant for production reliability
-  targets:
   - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
@@ -5538,10 +5153,13 @@ rules:
   - cloud-architect
   companion_resources:
   - type: Microsoft.Cdn/profiles/securityPolicies@2024-02-01
+    name: waf-security-policy
     description: WAF policy attached to Front Door endpoint for DDoS and bot protection
   - type: Microsoft.Network/privateLinkServices@2023-11-01
+    name: pls-origin
     description: Private Link service for Front Door to origin connectivity (Private Link origin)
   - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-frontdoor
     description: Diagnostic settings for Front Door access logs and health probe logs
   targets:
   - services:
@@ -5846,27 +5464,6 @@ rules:
     - NEVER set both origin priorities to different values for active-active — use same priority with equal weights
     - NEVER omit health probe settings on Front Door origin groups — unhealthy origins must be detected automatically
     - NEVER use Front Door Standard tier for production — Premium tier is required for Private Link origins and WAF
-- id: WAF-REL-HA-002
-  severity: recommended
-  description: Deploy critical workloads across multiple Azure regions using Azure Front Door or Traffic Manager for active-active
-    or active-passive failover.  Front Door is preferred for HTTP workloads (global load balancing with WAF, SSL offload,
-    and sub-second failover).  Traffic Manager is for non-HTTP protocols (DNS-based routing, 30-60s failover).  Each region
-    must be independently deployable with its own data tier.
-  rationale: Multi-region deployment protects against region-wide outages (natural disasters, regional Azure incidents).  Azure
-    SLA for multi-region architectures can reach 99.99%+.  Without multi- region, a regional outage causes complete service
-    unavailability.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Cdn/profiles/securityPolicies@2024-02-01
-    description: WAF policy attached to Front Door endpoint for DDoS and bot protection
-  - type: Microsoft.Network/privateLinkServices@2023-11-01
-    description: Private Link service for Front Door to origin connectivity (Private Link origin)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for Front Door access logs and health probe logs
-  targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
@@ -6169,29 +5766,14 @@ rules:
     - NEVER set both origin priorities to different values for active-active — use same priority with equal weights
     - NEVER omit health probe settings on Front Door origin groups — unhealthy origins must be detected automatically
     - NEVER use Front Door Standard tier for production — Premium tier is required for Private Link origins and WAF
-- id: WAF-REL-HA-002
-  severity: recommended
-  description: Deploy critical workloads across multiple Azure regions using Azure Front Door or Traffic Manager for active-active
-    or active-passive failover.  Front Door is preferred for HTTP workloads (global load balancing with WAF, SSL offload,
-    and sub-second failover).  Traffic Manager is for non-HTTP protocols (DNS-based routing, 30-60s failover).  Each region
-    must be independently deployable with its own data tier.
-  rationale: Multi-region deployment protects against region-wide outages (natural disasters, regional Azure incidents).  Azure
-    SLA for multi-region architectures can reach 99.99%+.  Without multi- region, a regional outage causes complete service
-    unavailability.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Cdn/profiles/securityPolicies@2024-02-01
-    description: WAF policy attached to Front Door endpoint for DDoS and bot protection
-  - type: Microsoft.Network/privateLinkServices@2023-11-01
-    description: Private Link service for Front Door to origin connectivity (Private Link origin)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for Front Door access logs and health probe logs
-  targets:
   - services:
-    - TODO:storage
+    - Microsoft.Cdn/profiles
+    - Microsoft.Cdn/profiles/afdEndpoints
+    - Microsoft.Cdn/profiles/originGroups
+    - Microsoft.Cdn/profiles/originGroups/origins
+    - Microsoft.Cdn/profiles/afdEndpoints/routes
+    - Microsoft.Network/trafficmanagerprofiles
+    - Microsoft.Network/trafficmanagerprofiles/azureEndpoints
     terraform_pattern: |
       # === Multi-Region Active-Active with Azure Front Door ===
 
@@ -6492,27 +6074,6 @@ rules:
     - NEVER set both origin priorities to different values for active-active — use same priority with equal weights
     - NEVER omit health probe settings on Front Door origin groups — unhealthy origins must be detected automatically
     - NEVER use Front Door Standard tier for production — Premium tier is required for Private Link origins and WAF
-- id: WAF-REL-HA-002
-  severity: recommended
-  description: Deploy critical workloads across multiple Azure regions using Azure Front Door or Traffic Manager for active-active
-    or active-passive failover.  Front Door is preferred for HTTP workloads (global load balancing with WAF, SSL offload,
-    and sub-second failover).  Traffic Manager is for non-HTTP protocols (DNS-based routing, 30-60s failover).  Each region
-    must be independently deployable with its own data tier.
-  rationale: Multi-region deployment protects against region-wide outages (natural disasters, regional Azure incidents).  Azure
-    SLA for multi-region architectures can reach 99.99%+.  Without multi- region, a regional outage causes complete service
-    unavailability.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Cdn/profiles/securityPolicies@2024-02-01
-    description: WAF policy attached to Front Door endpoint for DDoS and bot protection
-  - type: Microsoft.Network/privateLinkServices@2023-11-01
-    description: Private Link service for Front Door to origin connectivity (Private Link origin)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for Front Door access logs and health probe logs
-  targets:
   - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
@@ -6815,27 +6376,6 @@ rules:
     - NEVER set both origin priorities to different values for active-active — use same priority with equal weights
     - NEVER omit health probe settings on Front Door origin groups — unhealthy origins must be detected automatically
     - NEVER use Front Door Standard tier for production — Premium tier is required for Private Link origins and WAF
-- id: WAF-REL-HA-002
-  severity: recommended
-  description: Deploy critical workloads across multiple Azure regions using Azure Front Door or Traffic Manager for active-active
-    or active-passive failover.  Front Door is preferred for HTTP workloads (global load balancing with WAF, SSL offload,
-    and sub-second failover).  Traffic Manager is for non-HTTP protocols (DNS-based routing, 30-60s failover).  Each region
-    must be independently deployable with its own data tier.
-  rationale: Multi-region deployment protects against region-wide outages (natural disasters, regional Azure incidents).  Azure
-    SLA for multi-region architectures can reach 99.99%+.  Without multi- region, a regional outage causes complete service
-    unavailability.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Cdn/profiles/securityPolicies@2024-02-01
-    description: WAF policy attached to Front Door endpoint for DDoS and bot protection
-  - type: Microsoft.Network/privateLinkServices@2023-11-01
-    description: Private Link service for Front Door to origin connectivity (Private Link origin)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for Front Door access logs and health probe logs
-  targets:
   - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
@@ -7138,27 +6678,6 @@ rules:
     - NEVER set both origin priorities to different values for active-active — use same priority with equal weights
     - NEVER omit health probe settings on Front Door origin groups — unhealthy origins must be detected automatically
     - NEVER use Front Door Standard tier for production — Premium tier is required for Private Link origins and WAF
-- id: WAF-REL-HA-002
-  severity: recommended
-  description: Deploy critical workloads across multiple Azure regions using Azure Front Door or Traffic Manager for active-active
-    or active-passive failover.  Front Door is preferred for HTTP workloads (global load balancing with WAF, SSL offload,
-    and sub-second failover).  Traffic Manager is for non-HTTP protocols (DNS-based routing, 30-60s failover).  Each region
-    must be independently deployable with its own data tier.
-  rationale: Multi-region deployment protects against region-wide outages (natural disasters, regional Azure incidents).  Azure
-    SLA for multi-region architectures can reach 99.99%+.  Without multi- region, a regional outage causes complete service
-    unavailability.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Cdn/profiles/securityPolicies@2024-02-01
-    description: WAF policy attached to Front Door endpoint for DDoS and bot protection
-  - type: Microsoft.Network/privateLinkServices@2023-11-01
-    description: Private Link service for Front Door to origin connectivity (Private Link origin)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for Front Door access logs and health probe logs
-  targets:
   - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
@@ -7461,27 +6980,6 @@ rules:
     - NEVER set both origin priorities to different values for active-active — use same priority with equal weights
     - NEVER omit health probe settings on Front Door origin groups — unhealthy origins must be detected automatically
     - NEVER use Front Door Standard tier for production — Premium tier is required for Private Link origins and WAF
-- id: WAF-REL-HA-002
-  severity: recommended
-  description: Deploy critical workloads across multiple Azure regions using Azure Front Door or Traffic Manager for active-active
-    or active-passive failover.  Front Door is preferred for HTTP workloads (global load balancing with WAF, SSL offload,
-    and sub-second failover).  Traffic Manager is for non-HTTP protocols (DNS-based routing, 30-60s failover).  Each region
-    must be independently deployable with its own data tier.
-  rationale: Multi-region deployment protects against region-wide outages (natural disasters, regional Azure incidents).  Azure
-    SLA for multi-region architectures can reach 99.99%+.  Without multi- region, a regional outage causes complete service
-    unavailability.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Cdn/profiles/securityPolicies@2024-02-01
-    description: WAF policy attached to Front Door endpoint for DDoS and bot protection
-  - type: Microsoft.Network/privateLinkServices@2023-11-01
-    description: Private Link service for Front Door to origin connectivity (Private Link origin)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for Front Door access logs and health probe logs
-  targets:
   - services:
     - Microsoft.ServiceBus/namespaces
     terraform_pattern: |
@@ -7784,27 +7282,6 @@ rules:
     - NEVER set both origin priorities to different values for active-active — use same priority with equal weights
     - NEVER omit health probe settings on Front Door origin groups — unhealthy origins must be detected automatically
     - NEVER use Front Door Standard tier for production — Premium tier is required for Private Link origins and WAF
-- id: WAF-REL-HA-002
-  severity: recommended
-  description: Deploy critical workloads across multiple Azure regions using Azure Front Door or Traffic Manager for active-active
-    or active-passive failover.  Front Door is preferred for HTTP workloads (global load balancing with WAF, SSL offload,
-    and sub-second failover).  Traffic Manager is for non-HTTP protocols (DNS-based routing, 30-60s failover).  Each region
-    must be independently deployable with its own data tier.
-  rationale: Multi-region deployment protects against region-wide outages (natural disasters, regional Azure incidents).  Azure
-    SLA for multi-region architectures can reach 99.99%+.  Without multi- region, a regional outage causes complete service
-    unavailability.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Cdn/profiles/securityPolicies@2024-02-01
-    description: WAF policy attached to Front Door endpoint for DDoS and bot protection
-  - type: Microsoft.Network/privateLinkServices@2023-11-01
-    description: Private Link service for Front Door to origin connectivity (Private Link origin)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for Front Door access logs and health probe logs
-  targets:
   - services:
     - Microsoft.Web/sites
     terraform_pattern: |
@@ -8107,27 +7584,6 @@ rules:
     - NEVER set both origin priorities to different values for active-active — use same priority with equal weights
     - NEVER omit health probe settings on Front Door origin groups — unhealthy origins must be detected automatically
     - NEVER use Front Door Standard tier for production — Premium tier is required for Private Link origins and WAF
-- id: WAF-REL-HA-002
-  severity: recommended
-  description: Deploy critical workloads across multiple Azure regions using Azure Front Door or Traffic Manager for active-active
-    or active-passive failover.  Front Door is preferred for HTTP workloads (global load balancing with WAF, SSL offload,
-    and sub-second failover).  Traffic Manager is for non-HTTP protocols (DNS-based routing, 30-60s failover).  Each region
-    must be independently deployable with its own data tier.
-  rationale: Multi-region deployment protects against region-wide outages (natural disasters, regional Azure incidents).  Azure
-    SLA for multi-region architectures can reach 99.99%+.  Without multi- region, a regional outage causes complete service
-    unavailability.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Cdn/profiles/securityPolicies@2024-02-01
-    description: WAF policy attached to Front Door endpoint for DDoS and bot protection
-  - type: Microsoft.Network/privateLinkServices@2023-11-01
-    description: Private Link service for Front Door to origin connectivity (Private Link origin)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for Front Door access logs and health probe logs
-  targets:
   - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
@@ -8430,27 +7886,6 @@ rules:
     - NEVER set both origin priorities to different values for active-active — use same priority with equal weights
     - NEVER omit health probe settings on Front Door origin groups — unhealthy origins must be detected automatically
     - NEVER use Front Door Standard tier for production — Premium tier is required for Private Link origins and WAF
-- id: WAF-REL-HA-002
-  severity: recommended
-  description: Deploy critical workloads across multiple Azure regions using Azure Front Door or Traffic Manager for active-active
-    or active-passive failover.  Front Door is preferred for HTTP workloads (global load balancing with WAF, SSL offload,
-    and sub-second failover).  Traffic Manager is for non-HTTP protocols (DNS-based routing, 30-60s failover).  Each region
-    must be independently deployable with its own data tier.
-  rationale: Multi-region deployment protects against region-wide outages (natural disasters, regional Azure incidents).  Azure
-    SLA for multi-region architectures can reach 99.99%+.  Without multi- region, a regional outage causes complete service
-    unavailability.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Cdn/profiles/securityPolicies@2024-02-01
-    description: WAF policy attached to Front Door endpoint for DDoS and bot protection
-  - type: Microsoft.Network/privateLinkServices@2023-11-01
-    description: Private Link service for Front Door to origin connectivity (Private Link origin)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for Front Door access logs and health probe logs
-  targets:
   - services:
     - Microsoft.Compute/virtualMachineScaleSets
     terraform_pattern: |
@@ -8753,27 +8188,6 @@ rules:
     - NEVER set both origin priorities to different values for active-active — use same priority with equal weights
     - NEVER omit health probe settings on Front Door origin groups — unhealthy origins must be detected automatically
     - NEVER use Front Door Standard tier for production — Premium tier is required for Private Link origins and WAF
-- id: WAF-REL-HA-002
-  severity: recommended
-  description: Deploy critical workloads across multiple Azure regions using Azure Front Door or Traffic Manager for active-active
-    or active-passive failover.  Front Door is preferred for HTTP workloads (global load balancing with WAF, SSL offload,
-    and sub-second failover).  Traffic Manager is for non-HTTP protocols (DNS-based routing, 30-60s failover).  Each region
-    must be independently deployable with its own data tier.
-  rationale: Multi-region deployment protects against region-wide outages (natural disasters, regional Azure incidents).  Azure
-    SLA for multi-region architectures can reach 99.99%+.  Without multi- region, a regional outage causes complete service
-    unavailability.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Cdn/profiles/securityPolicies@2024-02-01
-    description: WAF policy attached to Front Door endpoint for DDoS and bot protection
-  - type: Microsoft.Network/privateLinkServices@2023-11-01
-    description: Private Link service for Front Door to origin connectivity (Private Link origin)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for Front Door access logs and health probe logs
-  targets:
   - services:
     - Microsoft.Network/loadBalancers
     terraform_pattern: |
@@ -9076,27 +8490,6 @@ rules:
     - NEVER set both origin priorities to different values for active-active — use same priority with equal weights
     - NEVER omit health probe settings on Front Door origin groups — unhealthy origins must be detected automatically
     - NEVER use Front Door Standard tier for production — Premium tier is required for Private Link origins and WAF
-- id: WAF-REL-HA-002
-  severity: recommended
-  description: Deploy critical workloads across multiple Azure regions using Azure Front Door or Traffic Manager for active-active
-    or active-passive failover.  Front Door is preferred for HTTP workloads (global load balancing with WAF, SSL offload,
-    and sub-second failover).  Traffic Manager is for non-HTTP protocols (DNS-based routing, 30-60s failover).  Each region
-    must be independently deployable with its own data tier.
-  rationale: Multi-region deployment protects against region-wide outages (natural disasters, regional Azure incidents).  Azure
-    SLA for multi-region architectures can reach 99.99%+.  Without multi- region, a regional outage causes complete service
-    unavailability.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Cdn/profiles/securityPolicies@2024-02-01
-    description: WAF policy attached to Front Door endpoint for DDoS and bot protection
-  - type: Microsoft.Network/privateLinkServices@2023-11-01
-    description: Private Link service for Front Door to origin connectivity (Private Link origin)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for Front Door access logs and health probe logs
-  targets:
   - services:
     - Microsoft.Network/applicationGateways
     terraform_pattern: |
@@ -9399,27 +8792,6 @@ rules:
     - NEVER set both origin priorities to different values for active-active — use same priority with equal weights
     - NEVER omit health probe settings on Front Door origin groups — unhealthy origins must be detected automatically
     - NEVER use Front Door Standard tier for production — Premium tier is required for Private Link origins and WAF
-- id: WAF-REL-HA-002
-  severity: recommended
-  description: Deploy critical workloads across multiple Azure regions using Azure Front Door or Traffic Manager for active-active
-    or active-passive failover.  Front Door is preferred for HTTP workloads (global load balancing with WAF, SSL offload,
-    and sub-second failover).  Traffic Manager is for non-HTTP protocols (DNS-based routing, 30-60s failover).  Each region
-    must be independently deployable with its own data tier.
-  rationale: Multi-region deployment protects against region-wide outages (natural disasters, regional Azure incidents).  Azure
-    SLA for multi-region architectures can reach 99.99%+.  Without multi- region, a regional outage causes complete service
-    unavailability.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Cdn/profiles/securityPolicies@2024-02-01
-    description: WAF policy attached to Front Door endpoint for DDoS and bot protection
-  - type: Microsoft.Network/privateLinkServices@2023-11-01
-    description: Private Link service for Front Door to origin connectivity (Private Link origin)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for Front Door access logs and health probe logs
-  targets:
   - services:
     - Microsoft.Network/frontDoors
     terraform_pattern: |
@@ -9722,27 +9094,6 @@ rules:
     - NEVER set both origin priorities to different values for active-active — use same priority with equal weights
     - NEVER omit health probe settings on Front Door origin groups — unhealthy origins must be detected automatically
     - NEVER use Front Door Standard tier for production — Premium tier is required for Private Link origins and WAF
-- id: WAF-REL-HA-002
-  severity: recommended
-  description: Deploy critical workloads across multiple Azure regions using Azure Front Door or Traffic Manager for active-active
-    or active-passive failover.  Front Door is preferred for HTTP workloads (global load balancing with WAF, SSL offload,
-    and sub-second failover).  Traffic Manager is for non-HTTP protocols (DNS-based routing, 30-60s failover).  Each region
-    must be independently deployable with its own data tier.
-  rationale: Multi-region deployment protects against region-wide outages (natural disasters, regional Azure incidents).  Azure
-    SLA for multi-region architectures can reach 99.99%+.  Without multi- region, a regional outage causes complete service
-    unavailability.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Cdn/profiles/securityPolicies@2024-02-01
-    description: WAF policy attached to Front Door endpoint for DDoS and bot protection
-  - type: Microsoft.Network/privateLinkServices@2023-11-01
-    description: Private Link service for Front Door to origin connectivity (Private Link origin)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for Front Door access logs and health probe logs
-  targets:
   - services:
     - Microsoft.Network/trafficManagerProfiles
     terraform_pattern: |
@@ -10045,27 +9396,6 @@ rules:
     - NEVER set both origin priorities to different values for active-active — use same priority with equal weights
     - NEVER omit health probe settings on Front Door origin groups — unhealthy origins must be detected automatically
     - NEVER use Front Door Standard tier for production — Premium tier is required for Private Link origins and WAF
-- id: WAF-REL-HA-002
-  severity: recommended
-  description: Deploy critical workloads across multiple Azure regions using Azure Front Door or Traffic Manager for active-active
-    or active-passive failover.  Front Door is preferred for HTTP workloads (global load balancing with WAF, SSL offload,
-    and sub-second failover).  Traffic Manager is for non-HTTP protocols (DNS-based routing, 30-60s failover).  Each region
-    must be independently deployable with its own data tier.
-  rationale: Multi-region deployment protects against region-wide outages (natural disasters, regional Azure incidents).  Azure
-    SLA for multi-region architectures can reach 99.99%+.  Without multi- region, a regional outage causes complete service
-    unavailability.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Cdn/profiles/securityPolicies@2024-02-01
-    description: WAF policy attached to Front Door endpoint for DDoS and bot protection
-  - type: Microsoft.Network/privateLinkServices@2023-11-01
-    description: Private Link service for Front Door to origin connectivity (Private Link origin)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for Front Door access logs and health probe logs
-  targets:
   - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
@@ -10554,18 +9884,6 @@ rules:
     - NEVER use availability sets for new deployments — availability zones provide superior fault isolation
     - NEVER set platformFaultDomainCount > 1 for zone-spanning VMSS — use 1 for max spreading
     - NEVER disable automatic repairs on production VMSS — unhealthy instances must be replaced automatically
-- id: WAF-REL-HA-003
-  severity: required
-  description: Deploy production VMs and VM Scale Sets across availability zones. Single VMs MUST specify a zones property.  VM
-    Scale Sets MUST use zones = ["1", "2", "3"] with max spreading (platformFaultDomainCount = 1) for optimal zone distribution.  Availability
-    sets are legacy — use zones instead for new deployments.
-  rationale: VMs without zone placement risk co-location in a single datacenter. Availability zones provide 99.99% SLA vs
-    99.95% for availability sets. Zone-redundant VMSS automatically balances instances across zones.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
@@ -10740,20 +10058,9 @@ rules:
     - NEVER use availability sets for new deployments — availability zones provide superior fault isolation
     - NEVER set platformFaultDomainCount > 1 for zone-spanning VMSS — use 1 for max spreading
     - NEVER disable automatic repairs on production VMSS — unhealthy instances must be replaced automatically
-- id: WAF-REL-HA-003
-  severity: required
-  description: Deploy production VMs and VM Scale Sets across availability zones. Single VMs MUST specify a zones property.  VM
-    Scale Sets MUST use zones = ["1", "2", "3"] with max spreading (platformFaultDomainCount = 1) for optimal zone distribution.  Availability
-    sets are legacy — use zones instead for new deployments.
-  rationale: VMs without zone placement risk co-location in a single datacenter. Availability zones provide 99.99% SLA vs
-    99.95% for availability sets. Zone-redundant VMSS automatically balances instances across zones.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
-    - TODO:storage
+    - Microsoft.Compute/virtualMachines
+    - Microsoft.Compute/virtualMachineScaleSets
     terraform_pattern: |
       # === VM with Availability Zone Placement ===
       resource "azapi_resource" "virtual_machine" {
@@ -10926,18 +10233,6 @@ rules:
     - NEVER use availability sets for new deployments — availability zones provide superior fault isolation
     - NEVER set platformFaultDomainCount > 1 for zone-spanning VMSS — use 1 for max spreading
     - NEVER disable automatic repairs on production VMSS — unhealthy instances must be replaced automatically
-- id: WAF-REL-HA-003
-  severity: required
-  description: Deploy production VMs and VM Scale Sets across availability zones. Single VMs MUST specify a zones property.  VM
-    Scale Sets MUST use zones = ["1", "2", "3"] with max spreading (platformFaultDomainCount = 1) for optimal zone distribution.  Availability
-    sets are legacy — use zones instead for new deployments.
-  rationale: VMs without zone placement risk co-location in a single datacenter. Availability zones provide 99.99% SLA vs
-    99.95% for availability sets. Zone-redundant VMSS automatically balances instances across zones.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
@@ -11112,18 +10407,6 @@ rules:
     - NEVER use availability sets for new deployments — availability zones provide superior fault isolation
     - NEVER set platformFaultDomainCount > 1 for zone-spanning VMSS — use 1 for max spreading
     - NEVER disable automatic repairs on production VMSS — unhealthy instances must be replaced automatically
-- id: WAF-REL-HA-003
-  severity: required
-  description: Deploy production VMs and VM Scale Sets across availability zones. Single VMs MUST specify a zones property.  VM
-    Scale Sets MUST use zones = ["1", "2", "3"] with max spreading (platformFaultDomainCount = 1) for optimal zone distribution.  Availability
-    sets are legacy — use zones instead for new deployments.
-  rationale: VMs without zone placement risk co-location in a single datacenter. Availability zones provide 99.99% SLA vs
-    99.95% for availability sets. Zone-redundant VMSS automatically balances instances across zones.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
@@ -11298,18 +10581,6 @@ rules:
     - NEVER use availability sets for new deployments — availability zones provide superior fault isolation
     - NEVER set platformFaultDomainCount > 1 for zone-spanning VMSS — use 1 for max spreading
     - NEVER disable automatic repairs on production VMSS — unhealthy instances must be replaced automatically
-- id: WAF-REL-HA-003
-  severity: required
-  description: Deploy production VMs and VM Scale Sets across availability zones. Single VMs MUST specify a zones property.  VM
-    Scale Sets MUST use zones = ["1", "2", "3"] with max spreading (platformFaultDomainCount = 1) for optimal zone distribution.  Availability
-    sets are legacy — use zones instead for new deployments.
-  rationale: VMs without zone placement risk co-location in a single datacenter. Availability zones provide 99.99% SLA vs
-    99.95% for availability sets. Zone-redundant VMSS automatically balances instances across zones.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
@@ -11484,18 +10755,6 @@ rules:
     - NEVER use availability sets for new deployments — availability zones provide superior fault isolation
     - NEVER set platformFaultDomainCount > 1 for zone-spanning VMSS — use 1 for max spreading
     - NEVER disable automatic repairs on production VMSS — unhealthy instances must be replaced automatically
-- id: WAF-REL-HA-003
-  severity: required
-  description: Deploy production VMs and VM Scale Sets across availability zones. Single VMs MUST specify a zones property.  VM
-    Scale Sets MUST use zones = ["1", "2", "3"] with max spreading (platformFaultDomainCount = 1) for optimal zone distribution.  Availability
-    sets are legacy — use zones instead for new deployments.
-  rationale: VMs without zone placement risk co-location in a single datacenter. Availability zones provide 99.99% SLA vs
-    99.95% for availability sets. Zone-redundant VMSS automatically balances instances across zones.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.ServiceBus/namespaces
     terraform_pattern: |
@@ -11670,18 +10929,6 @@ rules:
     - NEVER use availability sets for new deployments — availability zones provide superior fault isolation
     - NEVER set platformFaultDomainCount > 1 for zone-spanning VMSS — use 1 for max spreading
     - NEVER disable automatic repairs on production VMSS — unhealthy instances must be replaced automatically
-- id: WAF-REL-HA-003
-  severity: required
-  description: Deploy production VMs and VM Scale Sets across availability zones. Single VMs MUST specify a zones property.  VM
-    Scale Sets MUST use zones = ["1", "2", "3"] with max spreading (platformFaultDomainCount = 1) for optimal zone distribution.  Availability
-    sets are legacy — use zones instead for new deployments.
-  rationale: VMs without zone placement risk co-location in a single datacenter. Availability zones provide 99.99% SLA vs
-    99.95% for availability sets. Zone-redundant VMSS automatically balances instances across zones.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.Web/sites
     terraform_pattern: |
@@ -11856,18 +11103,6 @@ rules:
     - NEVER use availability sets for new deployments — availability zones provide superior fault isolation
     - NEVER set platformFaultDomainCount > 1 for zone-spanning VMSS — use 1 for max spreading
     - NEVER disable automatic repairs on production VMSS — unhealthy instances must be replaced automatically
-- id: WAF-REL-HA-003
-  severity: required
-  description: Deploy production VMs and VM Scale Sets across availability zones. Single VMs MUST specify a zones property.  VM
-    Scale Sets MUST use zones = ["1", "2", "3"] with max spreading (platformFaultDomainCount = 1) for optimal zone distribution.  Availability
-    sets are legacy — use zones instead for new deployments.
-  rationale: VMs without zone placement risk co-location in a single datacenter. Availability zones provide 99.99% SLA vs
-    99.95% for availability sets. Zone-redundant VMSS automatically balances instances across zones.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
@@ -12042,18 +11277,6 @@ rules:
     - NEVER use availability sets for new deployments — availability zones provide superior fault isolation
     - NEVER set platformFaultDomainCount > 1 for zone-spanning VMSS — use 1 for max spreading
     - NEVER disable automatic repairs on production VMSS — unhealthy instances must be replaced automatically
-- id: WAF-REL-HA-003
-  severity: required
-  description: Deploy production VMs and VM Scale Sets across availability zones. Single VMs MUST specify a zones property.  VM
-    Scale Sets MUST use zones = ["1", "2", "3"] with max spreading (platformFaultDomainCount = 1) for optimal zone distribution.  Availability
-    sets are legacy — use zones instead for new deployments.
-  rationale: VMs without zone placement risk co-location in a single datacenter. Availability zones provide 99.99% SLA vs
-    99.95% for availability sets. Zone-redundant VMSS automatically balances instances across zones.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.Compute/virtualMachineScaleSets
     terraform_pattern: |
@@ -12228,18 +11451,6 @@ rules:
     - NEVER use availability sets for new deployments — availability zones provide superior fault isolation
     - NEVER set platformFaultDomainCount > 1 for zone-spanning VMSS — use 1 for max spreading
     - NEVER disable automatic repairs on production VMSS — unhealthy instances must be replaced automatically
-- id: WAF-REL-HA-003
-  severity: required
-  description: Deploy production VMs and VM Scale Sets across availability zones. Single VMs MUST specify a zones property.  VM
-    Scale Sets MUST use zones = ["1", "2", "3"] with max spreading (platformFaultDomainCount = 1) for optimal zone distribution.  Availability
-    sets are legacy — use zones instead for new deployments.
-  rationale: VMs without zone placement risk co-location in a single datacenter. Availability zones provide 99.99% SLA vs
-    99.95% for availability sets. Zone-redundant VMSS automatically balances instances across zones.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.Network/loadBalancers
     terraform_pattern: |
@@ -12414,18 +11625,6 @@ rules:
     - NEVER use availability sets for new deployments — availability zones provide superior fault isolation
     - NEVER set platformFaultDomainCount > 1 for zone-spanning VMSS — use 1 for max spreading
     - NEVER disable automatic repairs on production VMSS — unhealthy instances must be replaced automatically
-- id: WAF-REL-HA-003
-  severity: required
-  description: Deploy production VMs and VM Scale Sets across availability zones. Single VMs MUST specify a zones property.  VM
-    Scale Sets MUST use zones = ["1", "2", "3"] with max spreading (platformFaultDomainCount = 1) for optimal zone distribution.  Availability
-    sets are legacy — use zones instead for new deployments.
-  rationale: VMs without zone placement risk co-location in a single datacenter. Availability zones provide 99.99% SLA vs
-    99.95% for availability sets. Zone-redundant VMSS automatically balances instances across zones.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.Network/applicationGateways
     terraform_pattern: |
@@ -12600,18 +11799,6 @@ rules:
     - NEVER use availability sets for new deployments — availability zones provide superior fault isolation
     - NEVER set platformFaultDomainCount > 1 for zone-spanning VMSS — use 1 for max spreading
     - NEVER disable automatic repairs on production VMSS — unhealthy instances must be replaced automatically
-- id: WAF-REL-HA-003
-  severity: required
-  description: Deploy production VMs and VM Scale Sets across availability zones. Single VMs MUST specify a zones property.  VM
-    Scale Sets MUST use zones = ["1", "2", "3"] with max spreading (platformFaultDomainCount = 1) for optimal zone distribution.  Availability
-    sets are legacy — use zones instead for new deployments.
-  rationale: VMs without zone placement risk co-location in a single datacenter. Availability zones provide 99.99% SLA vs
-    99.95% for availability sets. Zone-redundant VMSS automatically balances instances across zones.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.Network/frontDoors
     terraform_pattern: |
@@ -12786,18 +11973,6 @@ rules:
     - NEVER use availability sets for new deployments — availability zones provide superior fault isolation
     - NEVER set platformFaultDomainCount > 1 for zone-spanning VMSS — use 1 for max spreading
     - NEVER disable automatic repairs on production VMSS — unhealthy instances must be replaced automatically
-- id: WAF-REL-HA-003
-  severity: required
-  description: Deploy production VMs and VM Scale Sets across availability zones. Single VMs MUST specify a zones property.  VM
-    Scale Sets MUST use zones = ["1", "2", "3"] with max spreading (platformFaultDomainCount = 1) for optimal zone distribution.  Availability
-    sets are legacy — use zones instead for new deployments.
-  rationale: VMs without zone placement risk co-location in a single datacenter. Availability zones provide 99.99% SLA vs
-    99.95% for availability sets. Zone-redundant VMSS automatically balances instances across zones.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.Network/trafficManagerProfiles
     terraform_pattern: |
@@ -12972,18 +12147,6 @@ rules:
     - NEVER use availability sets for new deployments — availability zones provide superior fault isolation
     - NEVER set platformFaultDomainCount > 1 for zone-spanning VMSS — use 1 for max spreading
     - NEVER disable automatic repairs on production VMSS — unhealthy instances must be replaced automatically
-- id: WAF-REL-HA-003
-  severity: required
-  description: Deploy production VMs and VM Scale Sets across availability zones. Single VMs MUST specify a zones property.  VM
-    Scale Sets MUST use zones = ["1", "2", "3"] with max spreading (platformFaultDomainCount = 1) for optimal zone distribution.  Availability
-    sets are legacy — use zones instead for new deployments.
-  rationale: VMs without zone placement risk co-location in a single datacenter. Availability zones provide 99.99% SLA vs
-    99.95% for availability sets. Zone-redundant VMSS automatically balances instances across zones.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
@@ -13311,22 +12474,6 @@ rules:
     - NEVER omit health probes on load-balanced services — traffic will continue flowing to failed backends indefinitely
     - NEVER use the root path (/) for health probes — use a dedicated /healthz endpoint that checks downstream dependencies
     - NEVER set unhealthyThreshold to 1 — a single failed probe causes premature removal; use 2-3 for stability
-- id: WAF-REL-HA-004
-  severity: required
-  description: Configure health probes for ALL load-balanced services.  Every Load Balancer, Application Gateway, and Front
-    Door MUST have health probes that check application-level health (not just TCP connectivity).  Use HTTP/HTTPS probes with
-    a dedicated /healthz endpoint that validates downstream dependencies.  Probes must have appropriate intervals and thresholds
-    to balance detection speed with false-positive avoidance.
-  rationale: Health probes are the foundation of automatic failover.  Without application-level health checks, traffic continues
-    flowing to unhealthy backends.  TCP-only probes miss application-level failures (database down, disk full, deadlock).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
@@ -13464,24 +12611,9 @@ rules:
     - NEVER omit health probes on load-balanced services — traffic will continue flowing to failed backends indefinitely
     - NEVER use the root path (/) for health probes — use a dedicated /healthz endpoint that checks downstream dependencies
     - NEVER set unhealthyThreshold to 1 — a single failed probe causes premature removal; use 2-3 for stability
-- id: WAF-REL-HA-004
-  severity: required
-  description: Configure health probes for ALL load-balanced services.  Every Load Balancer, Application Gateway, and Front
-    Door MUST have health probes that check application-level health (not just TCP connectivity).  Use HTTP/HTTPS probes with
-    a dedicated /healthz endpoint that validates downstream dependencies.  Probes must have appropriate intervals and thresholds
-    to balance detection speed with false-positive avoidance.
-  rationale: Health probes are the foundation of automatic failover.  Without application-level health checks, traffic continues
-    flowing to unhealthy backends.  TCP-only probes miss application-level failures (database down, disk full, deadlock).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
-    - TODO:storage
+    - Microsoft.Network/loadBalancers/probes
+    - Microsoft.Network/applicationGateways
     terraform_pattern: |
       # === Load Balancer Health Probe ===
       resource "azapi_resource" "lb_probe" {
@@ -13617,22 +12749,6 @@ rules:
     - NEVER omit health probes on load-balanced services — traffic will continue flowing to failed backends indefinitely
     - NEVER use the root path (/) for health probes — use a dedicated /healthz endpoint that checks downstream dependencies
     - NEVER set unhealthyThreshold to 1 — a single failed probe causes premature removal; use 2-3 for stability
-- id: WAF-REL-HA-004
-  severity: required
-  description: Configure health probes for ALL load-balanced services.  Every Load Balancer, Application Gateway, and Front
-    Door MUST have health probes that check application-level health (not just TCP connectivity).  Use HTTP/HTTPS probes with
-    a dedicated /healthz endpoint that validates downstream dependencies.  Probes must have appropriate intervals and thresholds
-    to balance detection speed with false-positive avoidance.
-  rationale: Health probes are the foundation of automatic failover.  Without application-level health checks, traffic continues
-    flowing to unhealthy backends.  TCP-only probes miss application-level failures (database down, disk full, deadlock).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
@@ -13770,22 +12886,6 @@ rules:
     - NEVER omit health probes on load-balanced services — traffic will continue flowing to failed backends indefinitely
     - NEVER use the root path (/) for health probes — use a dedicated /healthz endpoint that checks downstream dependencies
     - NEVER set unhealthyThreshold to 1 — a single failed probe causes premature removal; use 2-3 for stability
-- id: WAF-REL-HA-004
-  severity: required
-  description: Configure health probes for ALL load-balanced services.  Every Load Balancer, Application Gateway, and Front
-    Door MUST have health probes that check application-level health (not just TCP connectivity).  Use HTTP/HTTPS probes with
-    a dedicated /healthz endpoint that validates downstream dependencies.  Probes must have appropriate intervals and thresholds
-    to balance detection speed with false-positive avoidance.
-  rationale: Health probes are the foundation of automatic failover.  Without application-level health checks, traffic continues
-    flowing to unhealthy backends.  TCP-only probes miss application-level failures (database down, disk full, deadlock).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
@@ -13923,22 +13023,6 @@ rules:
     - NEVER omit health probes on load-balanced services — traffic will continue flowing to failed backends indefinitely
     - NEVER use the root path (/) for health probes — use a dedicated /healthz endpoint that checks downstream dependencies
     - NEVER set unhealthyThreshold to 1 — a single failed probe causes premature removal; use 2-3 for stability
-- id: WAF-REL-HA-004
-  severity: required
-  description: Configure health probes for ALL load-balanced services.  Every Load Balancer, Application Gateway, and Front
-    Door MUST have health probes that check application-level health (not just TCP connectivity).  Use HTTP/HTTPS probes with
-    a dedicated /healthz endpoint that validates downstream dependencies.  Probes must have appropriate intervals and thresholds
-    to balance detection speed with false-positive avoidance.
-  rationale: Health probes are the foundation of automatic failover.  Without application-level health checks, traffic continues
-    flowing to unhealthy backends.  TCP-only probes miss application-level failures (database down, disk full, deadlock).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
@@ -14076,22 +13160,6 @@ rules:
     - NEVER omit health probes on load-balanced services — traffic will continue flowing to failed backends indefinitely
     - NEVER use the root path (/) for health probes — use a dedicated /healthz endpoint that checks downstream dependencies
     - NEVER set unhealthyThreshold to 1 — a single failed probe causes premature removal; use 2-3 for stability
-- id: WAF-REL-HA-004
-  severity: required
-  description: Configure health probes for ALL load-balanced services.  Every Load Balancer, Application Gateway, and Front
-    Door MUST have health probes that check application-level health (not just TCP connectivity).  Use HTTP/HTTPS probes with
-    a dedicated /healthz endpoint that validates downstream dependencies.  Probes must have appropriate intervals and thresholds
-    to balance detection speed with false-positive avoidance.
-  rationale: Health probes are the foundation of automatic failover.  Without application-level health checks, traffic continues
-    flowing to unhealthy backends.  TCP-only probes miss application-level failures (database down, disk full, deadlock).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.ServiceBus/namespaces
     terraform_pattern: |
@@ -14229,22 +13297,6 @@ rules:
     - NEVER omit health probes on load-balanced services — traffic will continue flowing to failed backends indefinitely
     - NEVER use the root path (/) for health probes — use a dedicated /healthz endpoint that checks downstream dependencies
     - NEVER set unhealthyThreshold to 1 — a single failed probe causes premature removal; use 2-3 for stability
-- id: WAF-REL-HA-004
-  severity: required
-  description: Configure health probes for ALL load-balanced services.  Every Load Balancer, Application Gateway, and Front
-    Door MUST have health probes that check application-level health (not just TCP connectivity).  Use HTTP/HTTPS probes with
-    a dedicated /healthz endpoint that validates downstream dependencies.  Probes must have appropriate intervals and thresholds
-    to balance detection speed with false-positive avoidance.
-  rationale: Health probes are the foundation of automatic failover.  Without application-level health checks, traffic continues
-    flowing to unhealthy backends.  TCP-only probes miss application-level failures (database down, disk full, deadlock).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.Web/sites
     terraform_pattern: |
@@ -14382,22 +13434,6 @@ rules:
     - NEVER omit health probes on load-balanced services — traffic will continue flowing to failed backends indefinitely
     - NEVER use the root path (/) for health probes — use a dedicated /healthz endpoint that checks downstream dependencies
     - NEVER set unhealthyThreshold to 1 — a single failed probe causes premature removal; use 2-3 for stability
-- id: WAF-REL-HA-004
-  severity: required
-  description: Configure health probes for ALL load-balanced services.  Every Load Balancer, Application Gateway, and Front
-    Door MUST have health probes that check application-level health (not just TCP connectivity).  Use HTTP/HTTPS probes with
-    a dedicated /healthz endpoint that validates downstream dependencies.  Probes must have appropriate intervals and thresholds
-    to balance detection speed with false-positive avoidance.
-  rationale: Health probes are the foundation of automatic failover.  Without application-level health checks, traffic continues
-    flowing to unhealthy backends.  TCP-only probes miss application-level failures (database down, disk full, deadlock).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
@@ -14535,22 +13571,6 @@ rules:
     - NEVER omit health probes on load-balanced services — traffic will continue flowing to failed backends indefinitely
     - NEVER use the root path (/) for health probes — use a dedicated /healthz endpoint that checks downstream dependencies
     - NEVER set unhealthyThreshold to 1 — a single failed probe causes premature removal; use 2-3 for stability
-- id: WAF-REL-HA-004
-  severity: required
-  description: Configure health probes for ALL load-balanced services.  Every Load Balancer, Application Gateway, and Front
-    Door MUST have health probes that check application-level health (not just TCP connectivity).  Use HTTP/HTTPS probes with
-    a dedicated /healthz endpoint that validates downstream dependencies.  Probes must have appropriate intervals and thresholds
-    to balance detection speed with false-positive avoidance.
-  rationale: Health probes are the foundation of automatic failover.  Without application-level health checks, traffic continues
-    flowing to unhealthy backends.  TCP-only probes miss application-level failures (database down, disk full, deadlock).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.Compute/virtualMachineScaleSets
     terraform_pattern: |
@@ -14688,22 +13708,6 @@ rules:
     - NEVER omit health probes on load-balanced services — traffic will continue flowing to failed backends indefinitely
     - NEVER use the root path (/) for health probes — use a dedicated /healthz endpoint that checks downstream dependencies
     - NEVER set unhealthyThreshold to 1 — a single failed probe causes premature removal; use 2-3 for stability
-- id: WAF-REL-HA-004
-  severity: required
-  description: Configure health probes for ALL load-balanced services.  Every Load Balancer, Application Gateway, and Front
-    Door MUST have health probes that check application-level health (not just TCP connectivity).  Use HTTP/HTTPS probes with
-    a dedicated /healthz endpoint that validates downstream dependencies.  Probes must have appropriate intervals and thresholds
-    to balance detection speed with false-positive avoidance.
-  rationale: Health probes are the foundation of automatic failover.  Without application-level health checks, traffic continues
-    flowing to unhealthy backends.  TCP-only probes miss application-level failures (database down, disk full, deadlock).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.Network/loadBalancers
     terraform_pattern: |
@@ -14841,22 +13845,6 @@ rules:
     - NEVER omit health probes on load-balanced services — traffic will continue flowing to failed backends indefinitely
     - NEVER use the root path (/) for health probes — use a dedicated /healthz endpoint that checks downstream dependencies
     - NEVER set unhealthyThreshold to 1 — a single failed probe causes premature removal; use 2-3 for stability
-- id: WAF-REL-HA-004
-  severity: required
-  description: Configure health probes for ALL load-balanced services.  Every Load Balancer, Application Gateway, and Front
-    Door MUST have health probes that check application-level health (not just TCP connectivity).  Use HTTP/HTTPS probes with
-    a dedicated /healthz endpoint that validates downstream dependencies.  Probes must have appropriate intervals and thresholds
-    to balance detection speed with false-positive avoidance.
-  rationale: Health probes are the foundation of automatic failover.  Without application-level health checks, traffic continues
-    flowing to unhealthy backends.  TCP-only probes miss application-level failures (database down, disk full, deadlock).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.Network/applicationGateways
     terraform_pattern: |
@@ -14994,22 +13982,6 @@ rules:
     - NEVER omit health probes on load-balanced services — traffic will continue flowing to failed backends indefinitely
     - NEVER use the root path (/) for health probes — use a dedicated /healthz endpoint that checks downstream dependencies
     - NEVER set unhealthyThreshold to 1 — a single failed probe causes premature removal; use 2-3 for stability
-- id: WAF-REL-HA-004
-  severity: required
-  description: Configure health probes for ALL load-balanced services.  Every Load Balancer, Application Gateway, and Front
-    Door MUST have health probes that check application-level health (not just TCP connectivity).  Use HTTP/HTTPS probes with
-    a dedicated /healthz endpoint that validates downstream dependencies.  Probes must have appropriate intervals and thresholds
-    to balance detection speed with false-positive avoidance.
-  rationale: Health probes are the foundation of automatic failover.  Without application-level health checks, traffic continues
-    flowing to unhealthy backends.  TCP-only probes miss application-level failures (database down, disk full, deadlock).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.Network/frontDoors
     terraform_pattern: |
@@ -15147,22 +14119,6 @@ rules:
     - NEVER omit health probes on load-balanced services — traffic will continue flowing to failed backends indefinitely
     - NEVER use the root path (/) for health probes — use a dedicated /healthz endpoint that checks downstream dependencies
     - NEVER set unhealthyThreshold to 1 — a single failed probe causes premature removal; use 2-3 for stability
-- id: WAF-REL-HA-004
-  severity: required
-  description: Configure health probes for ALL load-balanced services.  Every Load Balancer, Application Gateway, and Front
-    Door MUST have health probes that check application-level health (not just TCP connectivity).  Use HTTP/HTTPS probes with
-    a dedicated /healthz endpoint that validates downstream dependencies.  Probes must have appropriate intervals and thresholds
-    to balance detection speed with false-positive avoidance.
-  rationale: Health probes are the foundation of automatic failover.  Without application-level health checks, traffic continues
-    flowing to unhealthy backends.  TCP-only probes miss application-level failures (database down, disk full, deadlock).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.Network/trafficManagerProfiles
     terraform_pattern: |
@@ -15300,22 +14256,6 @@ rules:
     - NEVER omit health probes on load-balanced services — traffic will continue flowing to failed backends indefinitely
     - NEVER use the root path (/) for health probes — use a dedicated /healthz endpoint that checks downstream dependencies
     - NEVER set unhealthyThreshold to 1 — a single failed probe causes premature removal; use 2-3 for stability
-- id: WAF-REL-HA-004
-  severity: required
-  description: Configure health probes for ALL load-balanced services.  Every Load Balancer, Application Gateway, and Front
-    Door MUST have health probes that check application-level health (not just TCP connectivity).  Use HTTP/HTTPS probes with
-    a dedicated /healthz endpoint that validates downstream dependencies.  Probes must have appropriate intervals and thresholds
-    to balance detection speed with false-positive avoidance.
-  rationale: Health probes are the foundation of automatic failover.  Without application-level health checks, traffic continues
-    flowing to unhealthy backends.  TCP-only probes miss application-level failures (database down, disk full, deadlock).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
@@ -15467,10 +14407,13 @@ rules:
   - cloud-architect
   companion_resources:
   - type: Microsoft.Sql/servers@2023-08-01-preview
+    name: sql-server
     description: Secondary SQL Server in paired region for failover group partner
   - type: Microsoft.Network/privateEndpoints@2023-11-01
+    name: pe-resource
     description: Private endpoints for secondary region database servers
   - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-resource
     description: Diagnostic settings for replication lag monitoring and failover events
   targets:
   - services:
@@ -15621,26 +14564,6 @@ rules:
       outages
     - NEVER use Strong consistency for multi-region Cosmos DB writes — it requires synchronous cross-region replication and
       dramatically increases latency
-- id: WAF-REL-HA-005
-  severity: recommended
-  description: Configure geo-replication for all production databases.  SQL Database must have active geo-replication or auto-failover
-    groups to a paired region.  Cosmos DB must have multi-region writes enabled with automatic failover.  PostgreSQL Flexible
-    must have read replicas in a secondary region.  Geo-replication provides both read scaling and disaster recovery.
-  rationale: Geo-replication protects against region-wide outages and reduces read latency for geographically distributed
-    users.  Without geo- replication, a regional outage causes complete data unavailability with potential data loss up to
-    the last backup (RPO of hours).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Sql/servers@2023-08-01-preview
-    description: Secondary SQL Server in paired region for failover group partner
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: Private endpoints for secondary region database servers
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for replication lag monitoring and failover events
-  targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
@@ -15789,28 +14712,10 @@ rules:
       outages
     - NEVER use Strong consistency for multi-region Cosmos DB writes — it requires synchronous cross-region replication and
       dramatically increases latency
-- id: WAF-REL-HA-005
-  severity: recommended
-  description: Configure geo-replication for all production databases.  SQL Database must have active geo-replication or auto-failover
-    groups to a paired region.  Cosmos DB must have multi-region writes enabled with automatic failover.  PostgreSQL Flexible
-    must have read replicas in a secondary region.  Geo-replication provides both read scaling and disaster recovery.
-  rationale: Geo-replication protects against region-wide outages and reduces read latency for geographically distributed
-    users.  Without geo- replication, a regional outage causes complete data unavailability with potential data loss up to
-    the last backup (RPO of hours).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Sql/servers@2023-08-01-preview
-    description: Secondary SQL Server in paired region for failover group partner
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: Private endpoints for secondary region database servers
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for replication lag monitoring and failover events
-  targets:
   - services:
-    - TODO:storage
+    - Microsoft.Sql/servers/failoverGroups
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
       # === SQL Database Auto-Failover Group ===
       resource "azapi_resource" "sql_failover_group" {
@@ -15957,26 +14862,6 @@ rules:
       outages
     - NEVER use Strong consistency for multi-region Cosmos DB writes — it requires synchronous cross-region replication and
       dramatically increases latency
-- id: WAF-REL-HA-005
-  severity: recommended
-  description: Configure geo-replication for all production databases.  SQL Database must have active geo-replication or auto-failover
-    groups to a paired region.  Cosmos DB must have multi-region writes enabled with automatic failover.  PostgreSQL Flexible
-    must have read replicas in a secondary region.  Geo-replication provides both read scaling and disaster recovery.
-  rationale: Geo-replication protects against region-wide outages and reduces read latency for geographically distributed
-    users.  Without geo- replication, a regional outage causes complete data unavailability with potential data loss up to
-    the last backup (RPO of hours).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Sql/servers@2023-08-01-preview
-    description: Secondary SQL Server in paired region for failover group partner
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: Private endpoints for secondary region database servers
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for replication lag monitoring and failover events
-  targets:
   - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
@@ -16125,26 +15010,6 @@ rules:
       outages
     - NEVER use Strong consistency for multi-region Cosmos DB writes — it requires synchronous cross-region replication and
       dramatically increases latency
-- id: WAF-REL-HA-005
-  severity: recommended
-  description: Configure geo-replication for all production databases.  SQL Database must have active geo-replication or auto-failover
-    groups to a paired region.  Cosmos DB must have multi-region writes enabled with automatic failover.  PostgreSQL Flexible
-    must have read replicas in a secondary region.  Geo-replication provides both read scaling and disaster recovery.
-  rationale: Geo-replication protects against region-wide outages and reduces read latency for geographically distributed
-    users.  Without geo- replication, a regional outage causes complete data unavailability with potential data loss up to
-    the last backup (RPO of hours).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Sql/servers@2023-08-01-preview
-    description: Secondary SQL Server in paired region for failover group partner
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: Private endpoints for secondary region database servers
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for replication lag monitoring and failover events
-  targets:
   - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
@@ -16293,26 +15158,6 @@ rules:
       outages
     - NEVER use Strong consistency for multi-region Cosmos DB writes — it requires synchronous cross-region replication and
       dramatically increases latency
-- id: WAF-REL-HA-005
-  severity: recommended
-  description: Configure geo-replication for all production databases.  SQL Database must have active geo-replication or auto-failover
-    groups to a paired region.  Cosmos DB must have multi-region writes enabled with automatic failover.  PostgreSQL Flexible
-    must have read replicas in a secondary region.  Geo-replication provides both read scaling and disaster recovery.
-  rationale: Geo-replication protects against region-wide outages and reduces read latency for geographically distributed
-    users.  Without geo- replication, a regional outage causes complete data unavailability with potential data loss up to
-    the last backup (RPO of hours).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Sql/servers@2023-08-01-preview
-    description: Secondary SQL Server in paired region for failover group partner
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: Private endpoints for secondary region database servers
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for replication lag monitoring and failover events
-  targets:
   - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
@@ -16461,26 +15306,6 @@ rules:
       outages
     - NEVER use Strong consistency for multi-region Cosmos DB writes — it requires synchronous cross-region replication and
       dramatically increases latency
-- id: WAF-REL-HA-005
-  severity: recommended
-  description: Configure geo-replication for all production databases.  SQL Database must have active geo-replication or auto-failover
-    groups to a paired region.  Cosmos DB must have multi-region writes enabled with automatic failover.  PostgreSQL Flexible
-    must have read replicas in a secondary region.  Geo-replication provides both read scaling and disaster recovery.
-  rationale: Geo-replication protects against region-wide outages and reduces read latency for geographically distributed
-    users.  Without geo- replication, a regional outage causes complete data unavailability with potential data loss up to
-    the last backup (RPO of hours).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Sql/servers@2023-08-01-preview
-    description: Secondary SQL Server in paired region for failover group partner
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: Private endpoints for secondary region database servers
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for replication lag monitoring and failover events
-  targets:
   - services:
     - Microsoft.ServiceBus/namespaces
     terraform_pattern: |
@@ -16629,26 +15454,6 @@ rules:
       outages
     - NEVER use Strong consistency for multi-region Cosmos DB writes — it requires synchronous cross-region replication and
       dramatically increases latency
-- id: WAF-REL-HA-005
-  severity: recommended
-  description: Configure geo-replication for all production databases.  SQL Database must have active geo-replication or auto-failover
-    groups to a paired region.  Cosmos DB must have multi-region writes enabled with automatic failover.  PostgreSQL Flexible
-    must have read replicas in a secondary region.  Geo-replication provides both read scaling and disaster recovery.
-  rationale: Geo-replication protects against region-wide outages and reduces read latency for geographically distributed
-    users.  Without geo- replication, a regional outage causes complete data unavailability with potential data loss up to
-    the last backup (RPO of hours).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Sql/servers@2023-08-01-preview
-    description: Secondary SQL Server in paired region for failover group partner
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: Private endpoints for secondary region database servers
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for replication lag monitoring and failover events
-  targets:
   - services:
     - Microsoft.Web/sites
     terraform_pattern: |
@@ -16797,26 +15602,6 @@ rules:
       outages
     - NEVER use Strong consistency for multi-region Cosmos DB writes — it requires synchronous cross-region replication and
       dramatically increases latency
-- id: WAF-REL-HA-005
-  severity: recommended
-  description: Configure geo-replication for all production databases.  SQL Database must have active geo-replication or auto-failover
-    groups to a paired region.  Cosmos DB must have multi-region writes enabled with automatic failover.  PostgreSQL Flexible
-    must have read replicas in a secondary region.  Geo-replication provides both read scaling and disaster recovery.
-  rationale: Geo-replication protects against region-wide outages and reduces read latency for geographically distributed
-    users.  Without geo- replication, a regional outage causes complete data unavailability with potential data loss up to
-    the last backup (RPO of hours).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Sql/servers@2023-08-01-preview
-    description: Secondary SQL Server in paired region for failover group partner
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: Private endpoints for secondary region database servers
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for replication lag monitoring and failover events
-  targets:
   - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
@@ -16965,26 +15750,6 @@ rules:
       outages
     - NEVER use Strong consistency for multi-region Cosmos DB writes — it requires synchronous cross-region replication and
       dramatically increases latency
-- id: WAF-REL-HA-005
-  severity: recommended
-  description: Configure geo-replication for all production databases.  SQL Database must have active geo-replication or auto-failover
-    groups to a paired region.  Cosmos DB must have multi-region writes enabled with automatic failover.  PostgreSQL Flexible
-    must have read replicas in a secondary region.  Geo-replication provides both read scaling and disaster recovery.
-  rationale: Geo-replication protects against region-wide outages and reduces read latency for geographically distributed
-    users.  Without geo- replication, a regional outage causes complete data unavailability with potential data loss up to
-    the last backup (RPO of hours).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Sql/servers@2023-08-01-preview
-    description: Secondary SQL Server in paired region for failover group partner
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: Private endpoints for secondary region database servers
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for replication lag monitoring and failover events
-  targets:
   - services:
     - Microsoft.Compute/virtualMachineScaleSets
     terraform_pattern: |
@@ -17133,26 +15898,6 @@ rules:
       outages
     - NEVER use Strong consistency for multi-region Cosmos DB writes — it requires synchronous cross-region replication and
       dramatically increases latency
-- id: WAF-REL-HA-005
-  severity: recommended
-  description: Configure geo-replication for all production databases.  SQL Database must have active geo-replication or auto-failover
-    groups to a paired region.  Cosmos DB must have multi-region writes enabled with automatic failover.  PostgreSQL Flexible
-    must have read replicas in a secondary region.  Geo-replication provides both read scaling and disaster recovery.
-  rationale: Geo-replication protects against region-wide outages and reduces read latency for geographically distributed
-    users.  Without geo- replication, a regional outage causes complete data unavailability with potential data loss up to
-    the last backup (RPO of hours).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Sql/servers@2023-08-01-preview
-    description: Secondary SQL Server in paired region for failover group partner
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: Private endpoints for secondary region database servers
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for replication lag monitoring and failover events
-  targets:
   - services:
     - Microsoft.Network/loadBalancers
     terraform_pattern: |
@@ -17301,26 +16046,6 @@ rules:
       outages
     - NEVER use Strong consistency for multi-region Cosmos DB writes — it requires synchronous cross-region replication and
       dramatically increases latency
-- id: WAF-REL-HA-005
-  severity: recommended
-  description: Configure geo-replication for all production databases.  SQL Database must have active geo-replication or auto-failover
-    groups to a paired region.  Cosmos DB must have multi-region writes enabled with automatic failover.  PostgreSQL Flexible
-    must have read replicas in a secondary region.  Geo-replication provides both read scaling and disaster recovery.
-  rationale: Geo-replication protects against region-wide outages and reduces read latency for geographically distributed
-    users.  Without geo- replication, a regional outage causes complete data unavailability with potential data loss up to
-    the last backup (RPO of hours).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Sql/servers@2023-08-01-preview
-    description: Secondary SQL Server in paired region for failover group partner
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: Private endpoints for secondary region database servers
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for replication lag monitoring and failover events
-  targets:
   - services:
     - Microsoft.Network/applicationGateways
     terraform_pattern: |
@@ -17469,26 +16194,6 @@ rules:
       outages
     - NEVER use Strong consistency for multi-region Cosmos DB writes — it requires synchronous cross-region replication and
       dramatically increases latency
-- id: WAF-REL-HA-005
-  severity: recommended
-  description: Configure geo-replication for all production databases.  SQL Database must have active geo-replication or auto-failover
-    groups to a paired region.  Cosmos DB must have multi-region writes enabled with automatic failover.  PostgreSQL Flexible
-    must have read replicas in a secondary region.  Geo-replication provides both read scaling and disaster recovery.
-  rationale: Geo-replication protects against region-wide outages and reduces read latency for geographically distributed
-    users.  Without geo- replication, a regional outage causes complete data unavailability with potential data loss up to
-    the last backup (RPO of hours).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Sql/servers@2023-08-01-preview
-    description: Secondary SQL Server in paired region for failover group partner
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: Private endpoints for secondary region database servers
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for replication lag monitoring and failover events
-  targets:
   - services:
     - Microsoft.Network/frontDoors
     terraform_pattern: |
@@ -17637,26 +16342,6 @@ rules:
       outages
     - NEVER use Strong consistency for multi-region Cosmos DB writes — it requires synchronous cross-region replication and
       dramatically increases latency
-- id: WAF-REL-HA-005
-  severity: recommended
-  description: Configure geo-replication for all production databases.  SQL Database must have active geo-replication or auto-failover
-    groups to a paired region.  Cosmos DB must have multi-region writes enabled with automatic failover.  PostgreSQL Flexible
-    must have read replicas in a secondary region.  Geo-replication provides both read scaling and disaster recovery.
-  rationale: Geo-replication protects against region-wide outages and reduces read latency for geographically distributed
-    users.  Without geo- replication, a regional outage causes complete data unavailability with potential data loss up to
-    the last backup (RPO of hours).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Sql/servers@2023-08-01-preview
-    description: Secondary SQL Server in paired region for failover group partner
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: Private endpoints for secondary region database servers
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for replication lag monitoring and failover events
-  targets:
   - services:
     - Microsoft.Network/trafficManagerProfiles
     terraform_pattern: |
@@ -17805,26 +16490,6 @@ rules:
       outages
     - NEVER use Strong consistency for multi-region Cosmos DB writes — it requires synchronous cross-region replication and
       dramatically increases latency
-- id: WAF-REL-HA-005
-  severity: recommended
-  description: Configure geo-replication for all production databases.  SQL Database must have active geo-replication or auto-failover
-    groups to a paired region.  Cosmos DB must have multi-region writes enabled with automatic failover.  PostgreSQL Flexible
-    must have read replicas in a secondary region.  Geo-replication provides both read scaling and disaster recovery.
-  rationale: Geo-replication protects against region-wide outages and reduces read latency for geographically distributed
-    users.  Without geo- replication, a regional outage causes complete data unavailability with potential data loss up to
-    the last backup (RPO of hours).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Sql/servers@2023-08-01-preview
-    description: Secondary SQL Server in paired region for failover group partner
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: Private endpoints for secondary region database servers
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for replication lag monitoring and failover events
-  targets:
   - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |

@@ -66,18 +66,8 @@ rules:
     - NEVER deploy dev/POC VMs without an auto-shutdown schedule
     - NEVER set auto-shutdown status to Disabled — if a VM needs 24/7 uptime, it should be in a production resource group
     - NEVER set auto-shutdown notification to Disabled — users must have the option to extend
-- id: WAF-COST-LIFE-001
-  severity: required
-  description: Configure auto-shutdown schedules for dev/POC VMs — shut down at 7 PM, no auto-start
-  rationale: Dev VMs running 24/7 cost 3x more than VMs with 10-hour daily usage; auto-shutdown eliminates forgotten instances
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  targets:
   - services:
-    - TODO:storage
+    - Microsoft.DevTestLab/schedules
     terraform_pattern: |
       # === VM Auto-Shutdown Schedule ===
       resource "azapi_resource" "vm_auto_shutdown" {
@@ -129,16 +119,6 @@ rules:
     - NEVER deploy dev/POC VMs without an auto-shutdown schedule
     - NEVER set auto-shutdown status to Disabled — if a VM needs 24/7 uptime, it should be in a production resource group
     - NEVER set auto-shutdown notification to Disabled — users must have the option to extend
-- id: WAF-COST-LIFE-001
-  severity: required
-  description: Configure auto-shutdown schedules for dev/POC VMs — shut down at 7 PM, no auto-start
-  rationale: Dev VMs running 24/7 cost 3x more than VMs with 10-hour daily usage; auto-shutdown eliminates forgotten instances
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  targets:
   - services:
     - Microsoft.OperationalInsights/workspaces
     terraform_pattern: |
@@ -192,16 +172,6 @@ rules:
     - NEVER deploy dev/POC VMs without an auto-shutdown schedule
     - NEVER set auto-shutdown status to Disabled — if a VM needs 24/7 uptime, it should be in a production resource group
     - NEVER set auto-shutdown notification to Disabled — users must have the option to extend
-- id: WAF-COST-LIFE-001
-  severity: required
-  description: Configure auto-shutdown schedules for dev/POC VMs — shut down at 7 PM, no auto-start
-  rationale: Dev VMs running 24/7 cost 3x more than VMs with 10-hour daily usage; auto-shutdown eliminates forgotten instances
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  targets:
   - services:
     - Microsoft.KeyVault/vaults
     terraform_pattern: |
@@ -255,16 +225,6 @@ rules:
     - NEVER deploy dev/POC VMs without an auto-shutdown schedule
     - NEVER set auto-shutdown status to Disabled — if a VM needs 24/7 uptime, it should be in a production resource group
     - NEVER set auto-shutdown notification to Disabled — users must have the option to extend
-- id: WAF-COST-LIFE-001
-  severity: required
-  description: Configure auto-shutdown schedules for dev/POC VMs — shut down at 7 PM, no auto-start
-  rationale: Dev VMs running 24/7 cost 3x more than VMs with 10-hour daily usage; auto-shutdown eliminates forgotten instances
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  targets:
   - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
@@ -318,16 +278,6 @@ rules:
     - NEVER deploy dev/POC VMs without an auto-shutdown schedule
     - NEVER set auto-shutdown status to Disabled — if a VM needs 24/7 uptime, it should be in a production resource group
     - NEVER set auto-shutdown notification to Disabled — users must have the option to extend
-- id: WAF-COST-LIFE-001
-  severity: required
-  description: Configure auto-shutdown schedules for dev/POC VMs — shut down at 7 PM, no auto-start
-  rationale: Dev VMs running 24/7 cost 3x more than VMs with 10-hour daily usage; auto-shutdown eliminates forgotten instances
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  targets:
   - services:
     - Microsoft.Resources/resourceGroups
     terraform_pattern: |
@@ -532,20 +482,8 @@ rules:
     - NEVER set lifecycle delete retention > 365 days for dev/POC
     - NEVER use Archive tier for data that needs frequent access — rehydration takes up to 15 hours
     - NEVER skip temp/staging cleanup rules — temporary data accumulates indefinitely without lifecycle policies
-- id: WAF-COST-LIFE-002
-  severity: required
-  description: Configure storage lifecycle management policies — move to Cool after 30 days, Archive after 90 days, delete
-    after 365 days
-  rationale: Storage lifecycle policies automatically tier data by age; Cool tier is 50% cheaper than Hot, Archive is 90%
-    cheaper
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  targets:
   - services:
-    - TODO:storage
+    - Microsoft.Storage/storageAccounts
     terraform_pattern: |
       # === Storage Lifecycle Management Policy ===
       resource "azapi_resource" "storage_lifecycle" {
@@ -683,18 +621,6 @@ rules:
     - NEVER set lifecycle delete retention > 365 days for dev/POC
     - NEVER use Archive tier for data that needs frequent access — rehydration takes up to 15 hours
     - NEVER skip temp/staging cleanup rules — temporary data accumulates indefinitely without lifecycle policies
-- id: WAF-COST-LIFE-002
-  severity: required
-  description: Configure storage lifecycle management policies — move to Cool after 30 days, Archive after 90 days, delete
-    after 365 days
-  rationale: Storage lifecycle policies automatically tier data by age; Cool tier is 50% cheaper than Hot, Archive is 90%
-    cheaper
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  targets:
   - services:
     - Microsoft.OperationalInsights/workspaces
     terraform_pattern: |
@@ -834,18 +760,6 @@ rules:
     - NEVER set lifecycle delete retention > 365 days for dev/POC
     - NEVER use Archive tier for data that needs frequent access — rehydration takes up to 15 hours
     - NEVER skip temp/staging cleanup rules — temporary data accumulates indefinitely without lifecycle policies
-- id: WAF-COST-LIFE-002
-  severity: required
-  description: Configure storage lifecycle management policies — move to Cool after 30 days, Archive after 90 days, delete
-    after 365 days
-  rationale: Storage lifecycle policies automatically tier data by age; Cool tier is 50% cheaper than Hot, Archive is 90%
-    cheaper
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  targets:
   - services:
     - Microsoft.KeyVault/vaults
     terraform_pattern: |
@@ -985,18 +899,6 @@ rules:
     - NEVER set lifecycle delete retention > 365 days for dev/POC
     - NEVER use Archive tier for data that needs frequent access — rehydration takes up to 15 hours
     - NEVER skip temp/staging cleanup rules — temporary data accumulates indefinitely without lifecycle policies
-- id: WAF-COST-LIFE-002
-  severity: required
-  description: Configure storage lifecycle management policies — move to Cool after 30 days, Archive after 90 days, delete
-    after 365 days
-  rationale: Storage lifecycle policies automatically tier data by age; Cool tier is 50% cheaper than Hot, Archive is 90%
-    cheaper
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  targets:
   - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
@@ -1136,18 +1038,6 @@ rules:
     - NEVER set lifecycle delete retention > 365 days for dev/POC
     - NEVER use Archive tier for data that needs frequent access — rehydration takes up to 15 hours
     - NEVER skip temp/staging cleanup rules — temporary data accumulates indefinitely without lifecycle policies
-- id: WAF-COST-LIFE-002
-  severity: required
-  description: Configure storage lifecycle management policies — move to Cool after 30 days, Archive after 90 days, delete
-    after 365 days
-  rationale: Storage lifecycle policies automatically tier data by age; Cool tier is 50% cheaper than Hot, Archive is 90%
-    cheaper
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  targets:
   - services:
     - Microsoft.Resources/resourceGroups
     terraform_pattern: |
@@ -1389,121 +1279,6 @@ rules:
     - NEVER remove daily ingestion cap for dev/POC workspaces — runaway logging can generate huge costs
     - NEVER set retention below 30 days — it is the minimum and provides free retention
     - NEVER use Free or Standalone SKU — PerGB2018 is the current pricing tier
-- id: WAF-COST-LIFE-003
-  severity: required
-  description: Set appropriate Log Analytics retention — 30 days for dev/POC, 90 days for production, with archive tier for
-    compliance
-  rationale: Log Analytics charges per GB ingested and per day retained beyond 31 days; reducing retention from 90 to 30 days
-    saves ~65%
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  - monitoring-agent
-  targets:
-  - services:
-    - TODO:storage
-    terraform_pattern: |
-      # === Log Analytics Workspace: Dev/POC (30 days) ===
-      resource "azapi_resource" "log_analytics_dev" {
-        type      = "Microsoft.OperationalInsights/workspaces@2023-09-01"
-        name      = var.log_analytics_name
-        location  = var.location
-        parent_id = azapi_resource.resource_group.id
-
-        body = {
-          properties = {
-            sku = {
-              name = "PerGB2018"
-            }
-            retentionInDays          = 30        # Dev/POC: 30 days (free retention tier)
-            features = {
-              enableDataExport = false
-            }
-            workspaceCapping = {
-              dailyQuotaGb = 1                   # Dev/POC: cap ingestion at 1 GB/day
-            }
-          }
-        }
-      }
-
-      # === Log Analytics Workspace: Production (90 days + archive) ===
-      resource "azapi_resource" "log_analytics_prod" {
-        type      = "Microsoft.OperationalInsights/workspaces@2023-09-01"
-        name      = var.log_analytics_name
-        location  = var.location
-        parent_id = azapi_resource.resource_group.id
-
-        body = {
-          properties = {
-            sku = {
-              name = "PerGB2018"
-            }
-            retentionInDays          = 90        # Production: 90 days interactive
-            features = {
-              enableDataExport = true
-            }
-            workspaceCapping = {
-              dailyQuotaGb = -1                  # Production: no daily cap
-            }
-          }
-        }
-      }
-    bicep_pattern: |
-      // === Log Analytics Workspace: Dev/POC (30 days) ===
-      resource logAnalyticsDev 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
-        name: logAnalyticsName
-        location: location
-        properties: {
-          sku: {
-            name: 'PerGB2018'
-          }
-          retentionInDays: 30                   // Dev/POC: 30 days (free retention)
-          features: {
-            enableDataExport: false
-          }
-          workspaceCapping: {
-            dailyQuotaGb: 1                     // Dev/POC: cap at 1 GB/day
-          }
-        }
-      }
-
-      // === Log Analytics Workspace: Production (90 days) ===
-      resource logAnalyticsProd 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
-        name: logAnalyticsName
-        location: location
-        properties: {
-          sku: {
-            name: 'PerGB2018'
-          }
-          retentionInDays: 90                   // Production: 90 days interactive
-          features: {
-            enableDataExport: true
-          }
-          workspaceCapping: {
-            dailyQuotaGb: json('-1')            // Production: no cap
-          }
-        }
-      }
-    prohibitions:
-    - NEVER set Log Analytics retention > 90 days for dev/POC — excessive retention wastes budget
-    - NEVER remove daily ingestion cap for dev/POC workspaces — runaway logging can generate huge costs
-    - NEVER set retention below 30 days — it is the minimum and provides free retention
-    - NEVER use Free or Standalone SKU — PerGB2018 is the current pricing tier
-- id: WAF-COST-LIFE-003
-  severity: required
-  description: Set appropriate Log Analytics retention — 30 days for dev/POC, 90 days for production, with archive tier for
-    compliance
-  rationale: Log Analytics charges per GB ingested and per day retained beyond 31 days; reducing retention from 90 to 30 days
-    saves ~65%
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.OperationalInsights/workspaces
     terraform_pattern: |
@@ -1593,19 +1368,6 @@ rules:
     - NEVER remove daily ingestion cap for dev/POC workspaces — runaway logging can generate huge costs
     - NEVER set retention below 30 days — it is the minimum and provides free retention
     - NEVER use Free or Standalone SKU — PerGB2018 is the current pricing tier
-- id: WAF-COST-LIFE-003
-  severity: required
-  description: Set appropriate Log Analytics retention — 30 days for dev/POC, 90 days for production, with archive tier for
-    compliance
-  rationale: Log Analytics charges per GB ingested and per day retained beyond 31 days; reducing retention from 90 to 30 days
-    saves ~65%
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.KeyVault/vaults
     terraform_pattern: |
@@ -1695,19 +1457,6 @@ rules:
     - NEVER remove daily ingestion cap for dev/POC workspaces — runaway logging can generate huge costs
     - NEVER set retention below 30 days — it is the minimum and provides free retention
     - NEVER use Free or Standalone SKU — PerGB2018 is the current pricing tier
-- id: WAF-COST-LIFE-003
-  severity: required
-  description: Set appropriate Log Analytics retention — 30 days for dev/POC, 90 days for production, with archive tier for
-    compliance
-  rationale: Log Analytics charges per GB ingested and per day retained beyond 31 days; reducing retention from 90 to 30 days
-    saves ~65%
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
@@ -1797,19 +1546,6 @@ rules:
     - NEVER remove daily ingestion cap for dev/POC workspaces — runaway logging can generate huge costs
     - NEVER set retention below 30 days — it is the minimum and provides free retention
     - NEVER use Free or Standalone SKU — PerGB2018 is the current pricing tier
-- id: WAF-COST-LIFE-003
-  severity: required
-  description: Set appropriate Log Analytics retention — 30 days for dev/POC, 90 days for production, with archive tier for
-    compliance
-  rationale: Log Analytics charges per GB ingested and per day retained beyond 31 days; reducing retention from 90 to 30 days
-    saves ~65%
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.Resources/resourceGroups
     terraform_pattern: |
@@ -2019,256 +1755,6 @@ rules:
     - NEVER enable purge protection on dev/POC Key Vaults — it prevents resource group cleanup
     - NEVER set blob soft-delete retention > 14 days for dev/POC
     - NEVER deploy Recovery Services Vault for dev/POC unless backup is an explicit requirement
-- id: WAF-COST-LIFE-004
-  severity: required
-  description: Configure appropriate soft-delete retention periods — shorter for dev/POC, longer for production
-  rationale: Soft-delete protects against accidental deletion but costs storage; longer retention in dev wastes budget
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  targets:
-  - services:
-    - TODO:storage
-    terraform_pattern: |
-      # === Key Vault Soft-Delete ===
-      resource "azapi_resource" "key_vault" {
-        type      = "Microsoft.KeyVault/vaults@2023-07-01"
-        name      = var.key_vault_name
-        location  = var.location
-        parent_id = azapi_resource.resource_group.id
-
-        body = {
-          properties = {
-            tenantId                 = var.tenant_id
-            sku = {
-              family = "A"
-              name   = "standard"
-            }
-            enableSoftDelete         = true
-            softDeleteRetentionInDays = 7       # Dev/POC: 7 days (minimum)
-            enablePurgeProtection    = false     # Dev/POC: allow purge for cleanup
-          }
-        }
-      }
-
-      # === Storage Account Soft-Delete ===
-      resource "azapi_resource" "storage_blob_service" {
-        type      = "Microsoft.Storage/storageAccounts/blobServices@2023-05-01"
-        name      = "default"
-        parent_id = azapi_resource.storage_account.id
-
-        body = {
-          properties = {
-            deleteRetentionPolicy = {
-              enabled = true
-              days    = 7              # Dev/POC: 7 days
-            }
-            containerDeleteRetentionPolicy = {
-              enabled = true
-              days    = 7              # Dev/POC: 7 days
-            }
-          }
-        }
-      }
-
-      # === Recovery Services Vault ===
-      resource "azapi_resource" "recovery_vault" {
-        type      = "Microsoft.RecoveryServices/vaults@2024-04-01"
-        name      = var.recovery_vault_name
-        location  = var.location
-        parent_id = azapi_resource.resource_group.id
-
-        body = {
-          sku = {
-            name = "Standard"
-          }
-          properties = {
-            publicNetworkAccess = "Disabled"
-          }
-        }
-      }
-    bicep_pattern: |
-      // === Key Vault Soft-Delete ===
-      resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
-        name: keyVaultName
-        location: location
-        properties: {
-          tenantId: tenantId
-          sku: {
-            family: 'A'
-            name: 'standard'
-          }
-          enableSoftDelete: true
-          softDeleteRetentionInDays: 7         // Dev/POC: 7 days (minimum)
-          enablePurgeProtection: false          // Dev/POC: allow purge for cleanup
-        }
-      }
-
-      // === Storage Account Soft-Delete ===
-      resource storageBlobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
-        parent: storageAccount
-        name: 'default'
-        properties: {
-          deleteRetentionPolicy: {
-            enabled: true
-            days: 7                            // Dev/POC: 7 days
-          }
-          containerDeleteRetentionPolicy: {
-            enabled: true
-            days: 7                            // Dev/POC: 7 days
-          }
-        }
-      }
-
-      // === Recovery Services Vault ===
-      resource recoveryVault 'Microsoft.RecoveryServices/vaults@2024-04-01' = {
-        name: recoveryVaultName
-        location: location
-        sku: {
-          name: 'Standard'
-        }
-        properties: {
-          publicNetworkAccess: 'Disabled'
-        }
-      }
-    prohibitions:
-    - NEVER disable soft-delete on Key Vault — it is now mandatory and cannot be disabled after creation
-    - NEVER set softDeleteRetentionInDays > 30 for dev/POC Key Vaults
-    - NEVER enable purge protection on dev/POC Key Vaults — it prevents resource group cleanup
-    - NEVER set blob soft-delete retention > 14 days for dev/POC
-    - NEVER deploy Recovery Services Vault for dev/POC unless backup is an explicit requirement
-- id: WAF-COST-LIFE-004
-  severity: required
-  description: Configure appropriate soft-delete retention periods — shorter for dev/POC, longer for production
-  rationale: Soft-delete protects against accidental deletion but costs storage; longer retention in dev wastes budget
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  targets:
-  - services:
-    - Microsoft.OperationalInsights/workspaces
-    terraform_pattern: |
-      # === Key Vault Soft-Delete ===
-      resource "azapi_resource" "key_vault" {
-        type      = "Microsoft.KeyVault/vaults@2023-07-01"
-        name      = var.key_vault_name
-        location  = var.location
-        parent_id = azapi_resource.resource_group.id
-
-        body = {
-          properties = {
-            tenantId                 = var.tenant_id
-            sku = {
-              family = "A"
-              name   = "standard"
-            }
-            enableSoftDelete         = true
-            softDeleteRetentionInDays = 7       # Dev/POC: 7 days (minimum)
-            enablePurgeProtection    = false     # Dev/POC: allow purge for cleanup
-          }
-        }
-      }
-
-      # === Storage Account Soft-Delete ===
-      resource "azapi_resource" "storage_blob_service" {
-        type      = "Microsoft.Storage/storageAccounts/blobServices@2023-05-01"
-        name      = "default"
-        parent_id = azapi_resource.storage_account.id
-
-        body = {
-          properties = {
-            deleteRetentionPolicy = {
-              enabled = true
-              days    = 7              # Dev/POC: 7 days
-            }
-            containerDeleteRetentionPolicy = {
-              enabled = true
-              days    = 7              # Dev/POC: 7 days
-            }
-          }
-        }
-      }
-
-      # === Recovery Services Vault ===
-      resource "azapi_resource" "recovery_vault" {
-        type      = "Microsoft.RecoveryServices/vaults@2024-04-01"
-        name      = var.recovery_vault_name
-        location  = var.location
-        parent_id = azapi_resource.resource_group.id
-
-        body = {
-          sku = {
-            name = "Standard"
-          }
-          properties = {
-            publicNetworkAccess = "Disabled"
-          }
-        }
-      }
-    bicep_pattern: |
-      // === Key Vault Soft-Delete ===
-      resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
-        name: keyVaultName
-        location: location
-        properties: {
-          tenantId: tenantId
-          sku: {
-            family: 'A'
-            name: 'standard'
-          }
-          enableSoftDelete: true
-          softDeleteRetentionInDays: 7         // Dev/POC: 7 days (minimum)
-          enablePurgeProtection: false          // Dev/POC: allow purge for cleanup
-        }
-      }
-
-      // === Storage Account Soft-Delete ===
-      resource storageBlobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
-        parent: storageAccount
-        name: 'default'
-        properties: {
-          deleteRetentionPolicy: {
-            enabled: true
-            days: 7                            // Dev/POC: 7 days
-          }
-          containerDeleteRetentionPolicy: {
-            enabled: true
-            days: 7                            // Dev/POC: 7 days
-          }
-        }
-      }
-
-      // === Recovery Services Vault ===
-      resource recoveryVault 'Microsoft.RecoveryServices/vaults@2024-04-01' = {
-        name: recoveryVaultName
-        location: location
-        sku: {
-          name: 'Standard'
-        }
-        properties: {
-          publicNetworkAccess: 'Disabled'
-        }
-      }
-    prohibitions:
-    - NEVER disable soft-delete on Key Vault — it is now mandatory and cannot be disabled after creation
-    - NEVER set softDeleteRetentionInDays > 30 for dev/POC Key Vaults
-    - NEVER enable purge protection on dev/POC Key Vaults — it prevents resource group cleanup
-    - NEVER set blob soft-delete retention > 14 days for dev/POC
-    - NEVER deploy Recovery Services Vault for dev/POC unless backup is an explicit requirement
-- id: WAF-COST-LIFE-004
-  severity: required
-  description: Configure appropriate soft-delete retention periods — shorter for dev/POC, longer for production
-  rationale: Soft-delete protects against accidental deletion but costs storage; longer retention in dev wastes budget
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  targets:
   - services:
     - Microsoft.KeyVault/vaults
     terraform_pattern: |
@@ -2379,16 +1865,116 @@ rules:
     - NEVER enable purge protection on dev/POC Key Vaults — it prevents resource group cleanup
     - NEVER set blob soft-delete retention > 14 days for dev/POC
     - NEVER deploy Recovery Services Vault for dev/POC unless backup is an explicit requirement
-- id: WAF-COST-LIFE-004
-  severity: required
-  description: Configure appropriate soft-delete retention periods — shorter for dev/POC, longer for production
-  rationale: Soft-delete protects against accidental deletion but costs storage; longer retention in dev wastes budget
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  targets:
+  - services:
+    - Microsoft.OperationalInsights/workspaces
+    terraform_pattern: |
+      # === Key Vault Soft-Delete ===
+      resource "azapi_resource" "key_vault" {
+        type      = "Microsoft.KeyVault/vaults@2023-07-01"
+        name      = var.key_vault_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          properties = {
+            tenantId                 = var.tenant_id
+            sku = {
+              family = "A"
+              name   = "standard"
+            }
+            enableSoftDelete         = true
+            softDeleteRetentionInDays = 7       # Dev/POC: 7 days (minimum)
+            enablePurgeProtection    = false     # Dev/POC: allow purge for cleanup
+          }
+        }
+      }
+
+      # === Storage Account Soft-Delete ===
+      resource "azapi_resource" "storage_blob_service" {
+        type      = "Microsoft.Storage/storageAccounts/blobServices@2023-05-01"
+        name      = "default"
+        parent_id = azapi_resource.storage_account.id
+
+        body = {
+          properties = {
+            deleteRetentionPolicy = {
+              enabled = true
+              days    = 7              # Dev/POC: 7 days
+            }
+            containerDeleteRetentionPolicy = {
+              enabled = true
+              days    = 7              # Dev/POC: 7 days
+            }
+          }
+        }
+      }
+
+      # === Recovery Services Vault ===
+      resource "azapi_resource" "recovery_vault" {
+        type      = "Microsoft.RecoveryServices/vaults@2024-04-01"
+        name      = var.recovery_vault_name
+        location  = var.location
+        parent_id = azapi_resource.resource_group.id
+
+        body = {
+          sku = {
+            name = "Standard"
+          }
+          properties = {
+            publicNetworkAccess = "Disabled"
+          }
+        }
+      }
+    bicep_pattern: |
+      // === Key Vault Soft-Delete ===
+      resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+        name: keyVaultName
+        location: location
+        properties: {
+          tenantId: tenantId
+          sku: {
+            family: 'A'
+            name: 'standard'
+          }
+          enableSoftDelete: true
+          softDeleteRetentionInDays: 7         // Dev/POC: 7 days (minimum)
+          enablePurgeProtection: false          // Dev/POC: allow purge for cleanup
+        }
+      }
+
+      // === Storage Account Soft-Delete ===
+      resource storageBlobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+        parent: storageAccount
+        name: 'default'
+        properties: {
+          deleteRetentionPolicy: {
+            enabled: true
+            days: 7                            // Dev/POC: 7 days
+          }
+          containerDeleteRetentionPolicy: {
+            enabled: true
+            days: 7                            // Dev/POC: 7 days
+          }
+        }
+      }
+
+      // === Recovery Services Vault ===
+      resource recoveryVault 'Microsoft.RecoveryServices/vaults@2024-04-01' = {
+        name: recoveryVaultName
+        location: location
+        sku: {
+          name: 'Standard'
+        }
+        properties: {
+          publicNetworkAccess: 'Disabled'
+        }
+      }
+    prohibitions:
+    - NEVER disable soft-delete on Key Vault — it is now mandatory and cannot be disabled after creation
+    - NEVER set softDeleteRetentionInDays > 30 for dev/POC Key Vaults
+    - NEVER enable purge protection on dev/POC Key Vaults — it prevents resource group cleanup
+    - NEVER set blob soft-delete retention > 14 days for dev/POC
+    - NEVER deploy Recovery Services Vault for dev/POC unless backup is an explicit requirement
   - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
@@ -2499,16 +2085,6 @@ rules:
     - NEVER enable purge protection on dev/POC Key Vaults — it prevents resource group cleanup
     - NEVER set blob soft-delete retention > 14 days for dev/POC
     - NEVER deploy Recovery Services Vault for dev/POC unless backup is an explicit requirement
-- id: WAF-COST-LIFE-004
-  severity: required
-  description: Configure appropriate soft-delete retention periods — shorter for dev/POC, longer for production
-  rationale: Soft-delete protects against accidental deletion but costs storage; longer retention in dev wastes budget
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  targets:
   - services:
     - Microsoft.Resources/resourceGroups
     terraform_pattern: |
@@ -2704,19 +2280,9 @@ rules:
     - NEVER use free-form tag values for Environment — restrict to 'dev', 'staging', 'prod'
     - NEVER omit the ManagedBy tag — it distinguishes IaC-managed from manually-created resources
     - NEVER hardcode tag values — always use variables/parameters for reusability
-- id: WAF-COST-LIFE-005
-  severity: required
-  description: Apply mandatory cost tracking tags to all resources — Environment, CostCenter, Owner, Project
-  rationale: Tags enable cost allocation, showback/chargeback, and automated cleanup of orphaned resources
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  - project-manager
-  targets:
   - services:
-    - TODO:storage
+    - Microsoft.Resources/resourceGroups
+    - Microsoft.Web/serverfarms
     terraform_pattern: |
       # === Mandatory Tags (apply to all resources) ===
       locals {
@@ -2789,17 +2355,6 @@ rules:
     - NEVER use free-form tag values for Environment — restrict to 'dev', 'staging', 'prod'
     - NEVER omit the ManagedBy tag — it distinguishes IaC-managed from manually-created resources
     - NEVER hardcode tag values — always use variables/parameters for reusability
-- id: WAF-COST-LIFE-005
-  severity: required
-  description: Apply mandatory cost tracking tags to all resources — Environment, CostCenter, Owner, Project
-  rationale: Tags enable cost allocation, showback/chargeback, and automated cleanup of orphaned resources
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  - project-manager
-  targets:
   - services:
     - Microsoft.OperationalInsights/workspaces
     terraform_pattern: |
@@ -2874,17 +2429,6 @@ rules:
     - NEVER use free-form tag values for Environment — restrict to 'dev', 'staging', 'prod'
     - NEVER omit the ManagedBy tag — it distinguishes IaC-managed from manually-created resources
     - NEVER hardcode tag values — always use variables/parameters for reusability
-- id: WAF-COST-LIFE-005
-  severity: required
-  description: Apply mandatory cost tracking tags to all resources — Environment, CostCenter, Owner, Project
-  rationale: Tags enable cost allocation, showback/chargeback, and automated cleanup of orphaned resources
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  - project-manager
-  targets:
   - services:
     - Microsoft.KeyVault/vaults
     terraform_pattern: |
@@ -2959,17 +2503,6 @@ rules:
     - NEVER use free-form tag values for Environment — restrict to 'dev', 'staging', 'prod'
     - NEVER omit the ManagedBy tag — it distinguishes IaC-managed from manually-created resources
     - NEVER hardcode tag values — always use variables/parameters for reusability
-- id: WAF-COST-LIFE-005
-  severity: required
-  description: Apply mandatory cost tracking tags to all resources — Environment, CostCenter, Owner, Project
-  rationale: Tags enable cost allocation, showback/chargeback, and automated cleanup of orphaned resources
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  - project-manager
-  targets:
   - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
@@ -3044,17 +2577,6 @@ rules:
     - NEVER use free-form tag values for Environment — restrict to 'dev', 'staging', 'prod'
     - NEVER omit the ManagedBy tag — it distinguishes IaC-managed from manually-created resources
     - NEVER hardcode tag values — always use variables/parameters for reusability
-- id: WAF-COST-LIFE-005
-  severity: required
-  description: Apply mandatory cost tracking tags to all resources — Environment, CostCenter, Owner, Project
-  rationale: Tags enable cost allocation, showback/chargeback, and automated cleanup of orphaned resources
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  - project-manager
-  targets:
   - services:
     - Microsoft.Resources/resourceGroups
     terraform_pattern: |
@@ -3141,6 +2663,7 @@ rules:
   - cost-analyst
   companion_resources:
   - type: Microsoft.Insights/actionGroups@2023-01-01
+    name: ag-ops
     description: Action group for budget alert notifications — required for budget alerts to trigger email/webhook notifications
   targets:
   - services:
@@ -3301,22 +2824,9 @@ rules:
     - NEVER skip the forecasted threshold — it provides advance warning before actual spend occurs
     - NEVER set budget amount without consulting cost-analyst for estimation
     - NEVER use only contactEmails without an action group — action groups support webhooks, Logic Apps, and runbook automation
-- id: WAF-COST-LIFE-006
-  severity: required
-  description: Configure Azure budget alerts with action groups — monthly budget with 50%, 80%, 100%, and 120% thresholds
-  rationale: Budget alerts provide early warning before costs exceed expectations; without them, overspend is only discovered
-    on invoices
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  companion_resources:
-  - type: Microsoft.Insights/actionGroups@2023-01-01
-    description: Action group for budget alert notifications — required for budget alerts to trigger email/webhook notifications
-  targets:
   - services:
-    - TODO:storage
+    - Microsoft.Consumption/budgets
+    - Microsoft.Insights/actionGroups
     terraform_pattern: |
       # === Budget with Alert Thresholds ===
       resource "azapi_resource" "budget" {
@@ -3473,20 +2983,6 @@ rules:
     - NEVER skip the forecasted threshold — it provides advance warning before actual spend occurs
     - NEVER set budget amount without consulting cost-analyst for estimation
     - NEVER use only contactEmails without an action group — action groups support webhooks, Logic Apps, and runbook automation
-- id: WAF-COST-LIFE-006
-  severity: required
-  description: Configure Azure budget alerts with action groups — monthly budget with 50%, 80%, 100%, and 120% thresholds
-  rationale: Budget alerts provide early warning before costs exceed expectations; without them, overspend is only discovered
-    on invoices
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  companion_resources:
-  - type: Microsoft.Insights/actionGroups@2023-01-01
-    description: Action group for budget alert notifications — required for budget alerts to trigger email/webhook notifications
-  targets:
   - services:
     - Microsoft.OperationalInsights/workspaces
     terraform_pattern: |
@@ -3645,20 +3141,6 @@ rules:
     - NEVER skip the forecasted threshold — it provides advance warning before actual spend occurs
     - NEVER set budget amount without consulting cost-analyst for estimation
     - NEVER use only contactEmails without an action group — action groups support webhooks, Logic Apps, and runbook automation
-- id: WAF-COST-LIFE-006
-  severity: required
-  description: Configure Azure budget alerts with action groups — monthly budget with 50%, 80%, 100%, and 120% thresholds
-  rationale: Budget alerts provide early warning before costs exceed expectations; without them, overspend is only discovered
-    on invoices
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  companion_resources:
-  - type: Microsoft.Insights/actionGroups@2023-01-01
-    description: Action group for budget alert notifications — required for budget alerts to trigger email/webhook notifications
-  targets:
   - services:
     - Microsoft.KeyVault/vaults
     terraform_pattern: |
@@ -3817,20 +3299,6 @@ rules:
     - NEVER skip the forecasted threshold — it provides advance warning before actual spend occurs
     - NEVER set budget amount without consulting cost-analyst for estimation
     - NEVER use only contactEmails without an action group — action groups support webhooks, Logic Apps, and runbook automation
-- id: WAF-COST-LIFE-006
-  severity: required
-  description: Configure Azure budget alerts with action groups — monthly budget with 50%, 80%, 100%, and 120% thresholds
-  rationale: Budget alerts provide early warning before costs exceed expectations; without them, overspend is only discovered
-    on invoices
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  companion_resources:
-  - type: Microsoft.Insights/actionGroups@2023-01-01
-    description: Action group for budget alert notifications — required for budget alerts to trigger email/webhook notifications
-  targets:
   - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
@@ -3989,20 +3457,6 @@ rules:
     - NEVER skip the forecasted threshold — it provides advance warning before actual spend occurs
     - NEVER set budget amount without consulting cost-analyst for estimation
     - NEVER use only contactEmails without an action group — action groups support webhooks, Logic Apps, and runbook automation
-- id: WAF-COST-LIFE-006
-  severity: required
-  description: Configure Azure budget alerts with action groups — monthly budget with 50%, 80%, 100%, and 120% thresholds
-  rationale: Budget alerts provide early warning before costs exceed expectations; without them, overspend is only discovered
-    on invoices
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - cost-analyst
-  companion_resources:
-  - type: Microsoft.Insights/actionGroups@2023-01-01
-    description: Action group for budget alert notifications — required for budget alerts to trigger email/webhook notifications
-  targets:
   - services:
     - Microsoft.Resources/resourceGroups
     terraform_pattern: |

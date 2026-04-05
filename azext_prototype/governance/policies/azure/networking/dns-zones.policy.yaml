@@ -12,8 +12,12 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/privateDnsZones/virtualNetworkLinks (link to VNets for resolution)
-  - Microsoft.Network/privateEndpoints/privateDnsZoneGroups (auto-registration for private endpoints)
+  - type: Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01
+    name: link-vnet
+    description: VNet link enabling DNS resolution from the virtual network
+  - type: Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-04-01
+    name: default
+    description: DNS zone group auto-registering private endpoint A records
   targets:
   - services:
     - Microsoft.Network/dnsZones
@@ -42,8 +46,12 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/privateDnsZones (parent zone)
-  - Microsoft.Network/virtualNetworks (target VNet)
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: parent-zone
+    description: Parent private DNS zone that the VNet link attaches to
+  - type: Microsoft.Network/virtualNetworks@2024-01-01
+    name: vnet
+    description: Target virtual network to link to the private DNS zone
   targets:
   - services:
     - Microsoft.Network/dnsZones
@@ -86,8 +94,12 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/privateEndpoints (private endpoint for the service)
-  - Microsoft.Network/privateDnsZones/virtualNetworkLinks (link zone to VNet)
+  - type: Microsoft.Network/privateEndpoints@2023-04-01
+    name: pe-service
+    description: Private endpoint for the Azure service requiring DNS resolution
+  - type: Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01
+    name: link-vnet
+    description: VNet link enabling private DNS zone resolution from the virtual network
   targets:
   - services:
     - Microsoft.Network/dnsZones
@@ -133,7 +145,9 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Insights/diagnosticSettings (route query logs to Log Analytics)
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-dns
+    description: Diagnostic settings routing DNS query logs to Log Analytics
   targets:
   - services:
     - Microsoft.Network/dnsZones
@@ -195,7 +209,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace as destination for DNS zone query logs
   targets:
   - services:
     - Microsoft.Network/dnsZones

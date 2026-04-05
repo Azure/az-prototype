@@ -12,9 +12,15 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/publicIPAddresses (Standard SKU, static allocation, zone-redundant)
-  - Microsoft.Network/virtualNetworks/subnets (associate NAT gateway with subnet)
-  - Microsoft.Insights/diagnosticSettings (route metrics to Log Analytics)
+  - type: Microsoft.Network/publicIPAddresses@2023-04-01
+    name: pip-resource
+    description: Standard SKU, static allocation, zone-redundant
+  - type: Microsoft.Network/virtualNetworks/subnets@2024-01-01
+    name: snet-nat
+    description: Associate NAT gateway with subnet
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-metrics
+    description: Route metrics to Log Analytics
   targets:
   - services:
     - Microsoft.Network/natGateways
@@ -62,7 +68,9 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/natGateways (parent NAT gateway resource)
+  - type: Microsoft.Network/natGateways@2023-04-01
+    name: nat-gw
+    description: Parent NAT gateway resource
   targets:
   - services:
     - Microsoft.Network/natGateways
@@ -110,7 +118,9 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/networkSecurityGroups (NSG on subnet for inbound filtering)
+  - type: Microsoft.Network/networkSecurityGroups@2023-04-01
+    name: nsg-resource
+    description: NSG on subnet for inbound filtering
   targets:
   - services:
     - Microsoft.Network/natGateways
@@ -151,7 +161,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace
   targets:
   - services:
     - Microsoft.Network/natGateways

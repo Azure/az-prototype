@@ -12,11 +12,21 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Storage/storageAccounts (ADLS Gen2 for default data lake)
-  - Microsoft.Network/privateEndpoints (private endpoints for SQL, Dev, and SqlOnDemand)
-  - Microsoft.Network/privateDnsZones (privatelink.sql.azuresynapse.net, privatelink.dev.azuresynapse.net, privatelink.azuresynapse.net)
-  - Microsoft.KeyVault/vaults (Key Vault for CMK encryption)
-  - Microsoft.Insights/diagnosticSettings (route audit logs to Log Analytics)
+  - type: Microsoft.Storage/storageAccounts@2023-01-01
+    name: st-synapse-datalake
+    description: ADLS Gen2 storage account serving as the default data lake for Synapse
+  - type: Microsoft.Network/privateEndpoints@2023-04-01
+    name: pe-synapse-sql, pe-synapse-sqlod, pe-synapse-dev
+    description: Private endpoints for Synapse SQL, SqlOnDemand, and Dev endpoints
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.sql.azuresynapse.net
+    description: Private DNS zones for Synapse SQL, Dev, and workspace endpoint resolution
+  - type: Microsoft.KeyVault/vaults@2023-07-01
+    name: kv-cmk
+    description: Key Vault storing customer-managed encryption keys for Synapse workspace
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-synapse
+    description: Diagnostic settings routing RBAC, gateway, and pipeline logs to Log Analytics
   targets:
   - services:
     - Microsoft.Synapse/workspaces
@@ -104,7 +114,9 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Synapse/workspaces/administrators (Entra admin assignment)
+  - type: Microsoft.Synapse/workspaces/administrators@2021-06-01
+    name: activeDirectory
+    description: Entra ID admin assignment for Synapse workspace SQL pools
   targets:
   - services:
     - Microsoft.Synapse/workspaces
@@ -138,10 +150,18 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/privateDnsZones (privatelink.sql.azuresynapse.net)
-  - Microsoft.Network/privateDnsZones (privatelink.dev.azuresynapse.net)
-  - Microsoft.Network/privateDnsZones (privatelink.azuresynapse.net)
-  - Microsoft.Network/privateEndpoints/privateDnsZoneGroups (DNS registration)
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.sql.azuresynapse.net
+    description: Private DNS zone for Synapse SQL endpoint resolution
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.dev.azuresynapse.net
+    description: Private DNS zone for Synapse Dev (Studio) endpoint resolution
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.azuresynapse.net
+    description: Private DNS zone for Synapse workspace management endpoint resolution
+  - type: Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-04-01
+    name: default
+    description: DNS zone group registering Synapse private endpoint DNS records
   targets:
   - services:
     - Microsoft.Synapse/workspaces
@@ -283,7 +303,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace as destination for Synapse workspace diagnostic logs
   targets:
   - services:
     - Microsoft.Synapse/workspaces

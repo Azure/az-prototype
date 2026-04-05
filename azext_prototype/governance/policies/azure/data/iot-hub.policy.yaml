@@ -12,10 +12,18 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/privateEndpoints (private endpoint with groupId 'iotHub')
-  - Microsoft.Network/privateDnsZones (privatelink.azure-devices.net)
-  - Microsoft.Devices/provisioningServices (DPS for device provisioning)
-  - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
+  - type: Microsoft.Network/privateEndpoints@2023-04-01
+    name: pe-iothub
+    description: Private endpoint for IoT Hub with groupId 'iotHub'
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.azure-devices.net
+    description: Private DNS zone for IoT Hub private endpoint resolution
+  - type: Microsoft.Devices/provisioningServices@2022-12-12
+    name: dps
+    description: Device Provisioning Service for automated X.509 device enrollment
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-iothub
+    description: Diagnostic settings routing connection, telemetry, and routing logs to Log Analytics
   targets:
   - services:
     - Microsoft.Devices/IotHubs
@@ -105,8 +113,12 @@ rules:
   - csharp-developer
   - python-developer
   companion_resources:
-  - Microsoft.Devices/IotHubs (parent IoT Hub)
-  - Microsoft.KeyVault/vaults (store X.509 CA certificates)
+  - type: Microsoft.Devices/IotHubs@2023-06-30
+    name: iot-hub
+    description: Parent IoT Hub that the DPS enrollment connects to
+  - type: Microsoft.KeyVault/vaults@2023-07-01
+    name: kv-certs
+    description: Key Vault storing X.509 CA certificates for device authentication
   targets:
   - services:
     - Microsoft.Devices/IotHubs
@@ -169,7 +181,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace as destination for IoT Hub diagnostic logs
   targets:
   - services:
     - Microsoft.Devices/IotHubs

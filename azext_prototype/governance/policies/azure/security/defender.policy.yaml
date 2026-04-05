@@ -14,7 +14,7 @@ rules:
   - security-reviewer
   targets:
   - services:
-    - TODO:defender-for-cloud
+    - Microsoft.Security/pricings
     terraform_pattern: |
       resource "azapi_resource" "defender_servers" {
         type      = "Microsoft.Security/pricings@2024-01-01"
@@ -170,7 +170,7 @@ rules:
   - security-reviewer
   targets:
   - services:
-    - TODO:defender-for-cloud
+    - Microsoft.Security/autoProvisioningSettings
     terraform_pattern: |
       resource "azapi_resource" "defender_auto_provision" {
         type      = "Microsoft.Security/autoProvisioningSettings@2017-08-01-preview"
@@ -203,7 +203,7 @@ rules:
   - security-reviewer
   targets:
   - services:
-    - TODO:defender-for-cloud
+    - Microsoft.Security/securityContacts
     terraform_pattern: |
       resource "azapi_resource" "security_contact" {
         type      = "Microsoft.Security/securityContacts@2020-01-01-preview"

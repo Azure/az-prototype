@@ -12,9 +12,15 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.KeyVault/vaults (Key Vault with purge protection enabled)
-  - Microsoft.KeyVault/vaults/keys (RSA 2048-bit or higher encryption key)
-  - Microsoft.Authorization/roleAssignments (Key Vault Crypto Service Encryption User role for DES identity)
+  - type: Microsoft.KeyVault/vaults@2023-07-01
+    name: kv-cmk
+    description: Key Vault with purge protection enabled for storing CMK encryption keys
+  - type: Microsoft.KeyVault/vaults/keys@2023-07-01
+    name: des-cmk-key
+    description: RSA 2048-bit or higher encryption key for Disk Encryption Set
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: Key Vault Crypto Service Encryption User
+    description: Grants DES identity permission to use Key Vault encryption keys
   targets:
   - services:
     - Microsoft.Compute/diskEncryptionSets
@@ -71,8 +77,12 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Compute/diskEncryptionSets (DES with system-assigned identity)
-  - Microsoft.KeyVault/vaults (Key Vault with RBAC authorization)
+  - type: Microsoft.Compute/diskEncryptionSets@2024-03-01
+    name: des-cmk
+    description: Disk Encryption Set with system-assigned identity for Key Vault access
+  - type: Microsoft.KeyVault/vaults@2023-07-01
+    name: kv-cmk
+    description: Key Vault with RBAC authorization for DES key access
   targets:
   - services:
     - Microsoft.Compute/diskEncryptionSets
@@ -135,8 +145,12 @@ rules:
   - cloud-architect
   - security-reviewer
   companion_resources:
-  - Microsoft.KeyVault/vaults (Key Vault with purge protection)
-  - Microsoft.KeyVault/vaults/keys (RSA encryption key)
+  - type: Microsoft.KeyVault/vaults@2023-07-01
+    name: kv-cmk
+    description: Key Vault with purge protection for double-encryption keys
+  - type: Microsoft.KeyVault/vaults/keys@2023-07-01
+    name: des-double-enc-key
+    description: RSA encryption key for platform-and-customer double encryption
   targets:
   - services:
     - Microsoft.Compute/diskEncryptionSets

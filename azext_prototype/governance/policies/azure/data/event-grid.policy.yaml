@@ -12,10 +12,18 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/privateEndpoints (private endpoint with groupId 'topic')
-  - Microsoft.Network/privateDnsZones (privatelink.eventgrid.azure.net)
-  - Microsoft.EventGrid/topics/eventSubscriptions (event subscriptions)
-  - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
+  - type: Microsoft.Network/privateEndpoints@2023-04-01
+    name: pe-eventgrid
+    description: Private endpoint for Event Grid topic with groupId 'topic'
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.eventgrid.azure.net
+    description: Private DNS zone for Event Grid private endpoint resolution
+  - type: Microsoft.EventGrid/topics/eventSubscriptions@2024-06-01-preview
+    name: eg-subscription
+    description: Event subscription defining delivery destination and filtering rules
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-eventgrid
+    description: Diagnostic settings routing delivery and publish failure logs to Log Analytics
   targets:
   - services:
     - Microsoft.EventGrid/topics
@@ -69,7 +77,9 @@ rules:
   - csharp-developer
   - python-developer
   companion_resources:
-  - Microsoft.Storage/storageAccounts (storage account for dead-letter container)
+  - type: Microsoft.Storage/storageAccounts@2023-01-01
+    name: st-deadletter
+    description: Storage account hosting the dead-letter blob container for undeliverable events
   targets:
   - services:
     - Microsoft.EventGrid/topics
@@ -147,7 +157,9 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Authorization/roleAssignments (Data Sender role on destination resource)
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: Event Grid Data Sender
+    description: Grants Event Grid identity permission to send events to the destination resource
   targets:
   - services:
     - Microsoft.EventGrid/topics
@@ -236,7 +248,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace as destination for Event Grid diagnostic logs
   targets:
   - services:
     - Microsoft.EventGrid/topics

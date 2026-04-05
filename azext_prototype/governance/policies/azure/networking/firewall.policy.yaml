@@ -165,7 +165,7 @@ rules:
       }
   targets:
   - services:
-    - TODO:azure-firewall
+    - Microsoft.Network/azureFirewalls
     terraform_pattern: |
       resource "azapi_resource" "firewall" {
         type      = "Microsoft.Network/azureFirewalls@2024-01-01"

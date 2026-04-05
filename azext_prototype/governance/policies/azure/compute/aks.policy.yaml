@@ -1,6 +1,6 @@
 kind: policy
 domain: azure-compute
-description: Governance policies for Aks
+description: Governance policies for AKS
 last_updated: '2026-03-27'
 rules:
 - id: AZ-AKS-001
@@ -14,6 +14,7 @@ rules:
   - cloud-architect
   companion_resources:
   - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.{location}.azmk8s.io
     description: Private DNS zone for AKS private cluster API server resolution
     terraform_pattern: |
       resource "azapi_resource" "aks_dns_zone" {
@@ -56,6 +57,7 @@ rules:
         }
       }
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: Network Contributor
     description: Network Contributor role for AKS identity on the VNet subnet
     terraform_pattern: |
       resource "azapi_resource" "aks_network_contributor" {

@@ -118,19 +118,6 @@ rules:
     - NEVER use clustered indexes on frequently updated columns — use nonclustered instead
     - NEVER skip INCLUDE columns in nonclustered indexes — covering indexes eliminate key lookups
     - NEVER create indexes without IF NOT EXISTS guards — re-running deploy.sh must be idempotent
-- id: WAF-PERF-DB-001
-  severity: required
-  description: Define SQL indexing strategy — create indexes in deploy.sh post-deployment script for primary query patterns
-  rationale: Missing indexes cause full table scans; proper indexing can improve query performance by 100-1000x. Indexes are
-    created post-deployment via T-SQL
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
@@ -233,19 +220,6 @@ rules:
     - NEVER use clustered indexes on frequently updated columns — use nonclustered instead
     - NEVER skip INCLUDE columns in nonclustered indexes — covering indexes eliminate key lookups
     - NEVER create indexes without IF NOT EXISTS guards — re-running deploy.sh must be idempotent
-- id: WAF-PERF-DB-001
-  severity: required
-  description: Define SQL indexing strategy — create indexes in deploy.sh post-deployment script for primary query patterns
-  rationale: Missing indexes cause full table scans; proper indexing can improve query performance by 100-1000x. Indexes are
-    created post-deployment via T-SQL
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
@@ -348,19 +322,6 @@ rules:
     - NEVER use clustered indexes on frequently updated columns — use nonclustered instead
     - NEVER skip INCLUDE columns in nonclustered indexes — covering indexes eliminate key lookups
     - NEVER create indexes without IF NOT EXISTS guards — re-running deploy.sh must be idempotent
-- id: WAF-PERF-DB-001
-  severity: required
-  description: Define SQL indexing strategy — create indexes in deploy.sh post-deployment script for primary query patterns
-  rationale: Missing indexes cause full table scans; proper indexing can improve query performance by 100-1000x. Indexes are
-    created post-deployment via T-SQL
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
@@ -597,20 +558,6 @@ rules:
     - NEVER set partitionKey.version to 1 — always use version 2 for larger key support
     - NEVER index large text or binary fields — exclude them from indexing policy
     - NEVER omit composite indexes for ORDER BY queries on multiple fields
-- id: WAF-PERF-DB-002
-  severity: required
-  description: Design Cosmos DB partition keys based on query patterns — use high-cardinality fields that align with read
-    and write access patterns
-  rationale: Partition key choice is the single most important Cosmos DB design decision; bad keys cause hot partitions, throttling,
-    and cross-partition queries
-  applies_to:
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  - terraform-agent
-  - bicep-agent
-  targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
@@ -731,20 +678,6 @@ rules:
     - NEVER set partitionKey.version to 1 — always use version 2 for larger key support
     - NEVER index large text or binary fields — exclude them from indexing policy
     - NEVER omit composite indexes for ORDER BY queries on multiple fields
-- id: WAF-PERF-DB-002
-  severity: required
-  description: Design Cosmos DB partition keys based on query patterns — use high-cardinality fields that align with read
-    and write access patterns
-  rationale: Partition key choice is the single most important Cosmos DB design decision; bad keys cause hot partitions, throttling,
-    and cross-partition queries
-  applies_to:
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  - terraform-agent
-  - bicep-agent
-  targets:
   - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
@@ -865,20 +798,6 @@ rules:
     - NEVER set partitionKey.version to 1 — always use version 2 for larger key support
     - NEVER index large text or binary fields — exclude them from indexing policy
     - NEVER omit composite indexes for ORDER BY queries on multiple fields
-- id: WAF-PERF-DB-002
-  severity: required
-  description: Design Cosmos DB partition keys based on query patterns — use high-cardinality fields that align with read
-    and write access patterns
-  rationale: Partition key choice is the single most important Cosmos DB design decision; bad keys cause hot partitions, throttling,
-    and cross-partition queries
-  applies_to:
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  - terraform-agent
-  - bicep-agent
-  targets:
   - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
@@ -1130,20 +1049,6 @@ rules:
     - NEVER omit Connection Timeout — default timeouts (15-30s) can cause thread starvation
     - NEVER use connection strings with passwords — use managed identity (Authentication=Active Directory Default)
     - NEVER use Cosmos DB Gateway mode in production for latency-sensitive workloads — use Direct mode
-- id: WAF-PERF-DB-003
-  severity: required
-  description: Configure connection pooling for all database connections — exact connection string patterns for SQL, Cosmos,
-    and PostgreSQL
-  rationale: Connection creation takes 20-100ms; pooling reuses connections, reducing latency and preventing connection exhaustion
-    under load
-  applies_to:
-  - app-developer
-  - csharp-developer
-  - python-developer
-  - cloud-architect
-  - terraform-agent
-  - bicep-agent
-  targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
@@ -1261,20 +1166,6 @@ rules:
     - NEVER omit Connection Timeout — default timeouts (15-30s) can cause thread starvation
     - NEVER use connection strings with passwords — use managed identity (Authentication=Active Directory Default)
     - NEVER use Cosmos DB Gateway mode in production for latency-sensitive workloads — use Direct mode
-- id: WAF-PERF-DB-003
-  severity: required
-  description: Configure connection pooling for all database connections — exact connection string patterns for SQL, Cosmos,
-    and PostgreSQL
-  rationale: Connection creation takes 20-100ms; pooling reuses connections, reducing latency and preventing connection exhaustion
-    under load
-  applies_to:
-  - app-developer
-  - csharp-developer
-  - python-developer
-  - cloud-architect
-  - terraform-agent
-  - bicep-agent
-  targets:
   - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
@@ -1392,20 +1283,6 @@ rules:
     - NEVER omit Connection Timeout — default timeouts (15-30s) can cause thread starvation
     - NEVER use connection strings with passwords — use managed identity (Authentication=Active Directory Default)
     - NEVER use Cosmos DB Gateway mode in production for latency-sensitive workloads — use Direct mode
-- id: WAF-PERF-DB-003
-  severity: required
-  description: Configure connection pooling for all database connections — exact connection string patterns for SQL, Cosmos,
-    and PostgreSQL
-  rationale: Connection creation takes 20-100ms; pooling reuses connections, reducing latency and preventing connection exhaustion
-    under load
-  applies_to:
-  - app-developer
-  - csharp-developer
-  - python-developer
-  - cloud-architect
-  - terraform-agent
-  - bicep-agent
-  targets:
   - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
@@ -1620,16 +1497,6 @@ rules:
     - NEVER use read replicas for dev/POC — they double database cost
     - NEVER deploy read replicas in the same availability zone as the primary — use cross-zone for HA
     - NEVER use ApplicationIntent=ReadOnly for operations requiring strong consistency
-- id: WAF-PERF-DB-004
-  severity: recommended
-  description: Configure read replicas for SQL and PostgreSQL to offload read traffic from the primary
-  rationale: Read replicas handle 50-80% of typical application traffic (reads); offloading reduces primary load and improves
-    read latency
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
@@ -1717,16 +1584,6 @@ rules:
     - NEVER use read replicas for dev/POC — they double database cost
     - NEVER deploy read replicas in the same availability zone as the primary — use cross-zone for HA
     - NEVER use ApplicationIntent=ReadOnly for operations requiring strong consistency
-- id: WAF-PERF-DB-004
-  severity: recommended
-  description: Configure read replicas for SQL and PostgreSQL to offload read traffic from the primary
-  rationale: Read replicas handle 50-80% of typical application traffic (reads); offloading reduces primary load and improves
-    read latency
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
@@ -1814,16 +1671,6 @@ rules:
     - NEVER use read replicas for dev/POC — they double database cost
     - NEVER deploy read replicas in the same availability zone as the primary — use cross-zone for HA
     - NEVER use ApplicationIntent=ReadOnly for operations requiring strong consistency
-- id: WAF-PERF-DB-004
-  severity: recommended
-  description: Configure read replicas for SQL and PostgreSQL to offload read traffic from the primary
-  rationale: Read replicas handle 50-80% of typical application traffic (reads); offloading reduces primary load and improves
-    read latency
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
@@ -2058,16 +1905,6 @@ rules:
     - NEVER disable Query Store — it is essential for identifying slow queries
     - NEVER skip Deadlocks and Timeouts log categories — they indicate critical performance issues
     - NEVER disable Automatic Tuning for Azure SQL — it provides automated index and plan recommendations
-- id: WAF-PERF-DB-005
-  severity: required
-  description: Enable Query Performance Insight and diagnostic settings for database performance monitoring
-  rationale: Without query monitoring, slow queries go undetected until they cause user-visible performance degradation
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
@@ -2205,16 +2042,6 @@ rules:
     - NEVER disable Query Store — it is essential for identifying slow queries
     - NEVER skip Deadlocks and Timeouts log categories — they indicate critical performance issues
     - NEVER disable Automatic Tuning for Azure SQL — it provides automated index and plan recommendations
-- id: WAF-PERF-DB-005
-  severity: required
-  description: Enable Query Performance Insight and diagnostic settings for database performance monitoring
-  rationale: Without query monitoring, slow queries go undetected until they cause user-visible performance degradation
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
@@ -2352,16 +2179,6 @@ rules:
     - NEVER disable Query Store — it is essential for identifying slow queries
     - NEVER skip Deadlocks and Timeouts log categories — they indicate critical performance issues
     - NEVER disable Automatic Tuning for Azure SQL — it provides automated index and plan recommendations
-- id: WAF-PERF-DB-005
-  severity: required
-  description: Enable Query Performance Insight and diagnostic settings for database performance monitoring
-  rationale: Without query monitoring, slow queries go undetected until they cause user-visible performance degradation
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.Cache/redis
     terraform_pattern: |

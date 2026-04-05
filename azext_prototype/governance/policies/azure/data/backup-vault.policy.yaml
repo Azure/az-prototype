@@ -12,10 +12,18 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.DataProtection/backupVaults/backupPolicies (retention and schedule policies)
-  - Microsoft.DataProtection/backupVaults/backupInstances (backup instances for protected resources)
-  - Microsoft.Authorization/roleAssignments (Backup Contributor role for vault identity on source resources)
-  - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
+  - type: Microsoft.DataProtection/backupVaults/backupPolicies@2024-04-01
+    name: daily-retention-policy
+    description: Backup policy defining retention schedule and RPO for protected resources
+  - type: Microsoft.DataProtection/backupVaults/backupInstances@2024-04-01
+    name: backup-instance
+    description: Backup instance linking a protected resource to the vault and policy
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: Backup Contributor
+    description: Grants Backup Vault identity permission to access source resources for backup
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-backup-vault
+    description: Diagnostic settings routing backup job and policy logs to Log Analytics
   targets:
   - services:
     - Microsoft.DataProtection/backupVaults
@@ -86,7 +94,9 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.DataProtection/backupVaults (parent backup vault)
+  - type: Microsoft.DataProtection/backupVaults@2024-04-01
+    name: backup-vault
+    description: Parent Backup Vault that owns this backup policy
   targets:
   - services:
     - Microsoft.DataProtection/backupVaults
@@ -216,7 +226,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace as destination for Backup Vault diagnostic logs
   targets:
   - services:
     - Microsoft.DataProtection/backupVaults

@@ -228,6 +228,92 @@ def validate_workloads() -> list[ValidationError]:
 
 
 # ------------------------------------------------------------------ #
+# Taxonomy validation
+# ------------------------------------------------------------------ #
+
+
+def validate_taxonomy() -> list[ValidationError]:
+    """Validate taxonomy.yaml structure and consistency with governance files."""
+    knowledge_dir = Path(__file__).resolve().parent.parent / "knowledge"
+    taxonomy_path = knowledge_dir / "taxonomy.yaml"
+
+    if not taxonomy_path.exists():
+        return [ValidationError("taxonomy.yaml", "File not found")]
+
+    errors: list[ValidationError] = []
+
+    try:
+        data = yaml.safe_load(taxonomy_path.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError) as exc:
+        return [ValidationError("taxonomy.yaml", f"Could not load: {exc}")]
+
+    layers = data.get("layers")
+    if not isinstance(layers, dict):
+        return [ValidationError("taxonomy.yaml", "'layers' must be a mapping")]
+
+    # Collect all valid capabilities and components
+    all_capabilities: dict[str, str] = {}  # capability → layer
+    all_components: dict[str, str] = {}  # component → capability
+
+    for layer_key, layer_data in layers.items():
+        if not isinstance(layer_data, dict):
+            errors.append(ValidationError("taxonomy.yaml", f"Layer '{layer_key}' must be a mapping"))
+            continue
+
+        if "display_name" not in layer_data:
+            errors.append(ValidationError("taxonomy.yaml", f"Layer '{layer_key}': missing 'display_name'"))
+
+        caps = layer_data.get("capabilities")
+        if not isinstance(caps, dict):
+            errors.append(ValidationError("taxonomy.yaml", f"Layer '{layer_key}': 'capabilities' must be a mapping"))
+            continue
+
+        for cap_key, cap_data in caps.items():
+            if cap_key in all_capabilities:
+                errors.append(
+                    ValidationError(
+                        "taxonomy.yaml",
+                        f"Duplicate capability '{cap_key}' in layers '{all_capabilities[cap_key]}' and '{layer_key}'",
+                    )
+                )
+            all_capabilities[cap_key] = layer_key
+
+            if not isinstance(cap_data, dict):
+                errors.append(
+                    ValidationError("taxonomy.yaml", f"Capability '{cap_key}' in '{layer_key}' must be a mapping")
+                )
+                continue
+
+            components = cap_data.get("components")
+            if not isinstance(components, list):
+                errors.append(ValidationError("taxonomy.yaml", f"Capability '{cap_key}': 'components' must be a list"))
+                continue
+
+            for comp in components:
+                if not isinstance(comp, str):
+                    errors.append(
+                        ValidationError("taxonomy.yaml", f"Capability '{cap_key}': component must be a string")
+                    )
+                elif comp in all_components:
+                    errors.append(
+                        ValidationError(
+                            "taxonomy.yaml",
+                            f"Duplicate component '{comp}' in capabilities "
+                            f"'{all_components[comp]}' and '{cap_key}'",
+                        )
+                    )
+                else:
+                    all_components[comp] = cap_key
+
+    if not errors:
+        # Validate that governance targets reference valid taxonomy services
+        # (check that targets.services entries map to known ARM namespaces — not taxonomy components)
+        pass  # Service validation deferred to namespace-level checks
+
+    return errors
+
+
+# ------------------------------------------------------------------ #
 # CLI entry point
 # ------------------------------------------------------------------ #
 
@@ -266,6 +352,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.all or args.workloads:
         areas.append("workloads")
         errors.extend(validate_workloads())
+
+    # Taxonomy is always validated (part of governance structure)
+    areas.append("taxonomy")
+    errors.extend(validate_taxonomy())
 
     sys.stdout.write(f"Validating: {', '.join(areas)}\n")
 

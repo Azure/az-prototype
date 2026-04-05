@@ -512,18 +512,17 @@ class PolicyEngine:
         for r in data.get("rules", []):
             if not isinstance(r, dict):
                 continue
-            companions = []
-            for cr in r.get("companion_resources", []):
-                if isinstance(cr, dict):
-                    companions.append(
-                        CompanionResource(
-                            type=str(cr.get("type", "")),
-                            description=str(cr.get("description", "")),
-                            name=str(cr.get("name", "")),
-                            terraform_pattern=str(cr.get("terraform_pattern", "")),
-                            bicep_pattern=str(cr.get("bicep_pattern", "")),
-                        )
-                    )
+            companions = [
+                CompanionResource(
+                    type=str(cr.get("type", "")),
+                    description=str(cr.get("description", "")),
+                    name=str(cr.get("name", "")),
+                    terraform_pattern=str(cr.get("terraform_pattern", "")),
+                    bicep_pattern=str(cr.get("bicep_pattern", "")),
+                )
+                for cr in r.get("companion_resources", [])
+                if isinstance(cr, dict)
+            ]
             # targets is a list of target blocks
             targets_raw = r.get("targets", [])
             if isinstance(targets_raw, dict):

@@ -12,11 +12,21 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/virtualNetworks/subnets (delegated subnet with Microsoft.DBforMySQL/flexibleServers delegation)
-  - Microsoft.Network/privateDnsZones (privatelink.mysql.database.azure.com)
-  - Microsoft.Network/privateDnsZones/virtualNetworkLinks (link DNS zone to VNet)
-  - Microsoft.DBforMySQL/flexibleServers/configurations (TLS and audit log settings)
-  - Microsoft.Insights/diagnosticSettings (route audit logs to Log Analytics)
+  - type: Microsoft.Network/virtualNetworks/subnets@2024-01-01
+    name: snet-mysql
+    description: Delegated subnet with Microsoft.DBforMySQL/flexibleServers service delegation
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.mysql.database.azure.com
+    description: Private DNS zone for MySQL Flexible Server VNet-integrated name resolution
+  - type: Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01
+    name: link-mysql-dns
+    description: VNet link connecting the MySQL private DNS zone to the virtual network
+  - type: Microsoft.DBforMySQL/flexibleServers/configurations@2023-12-30
+    name: tls_version
+    description: Server configuration enforcing TLS 1.2 and audit log settings
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-mysql
+    description: Diagnostic settings routing MySQL audit and slow query logs to Log Analytics
   targets:
   - services:
     - Microsoft.DBforMySQL/flexibleServers
@@ -163,7 +173,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace as destination for MySQL audit logs
   targets:
   - services:
     - Microsoft.DBforMySQL/flexibleServers

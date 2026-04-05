@@ -12,11 +12,21 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/networkSecurityGroups (NSG for VMSS NICs)
-  - Microsoft.Network/loadBalancers (Standard LB for traffic distribution)
-  - Microsoft.Compute/diskEncryptionSets (CMK for OS/data disk encryption)
-  - Microsoft.Insights/diagnosticSettings (VM diagnostics and metrics)
-  - Microsoft.Insights/autoscaleSettings (autoscale rules based on metrics)
+  - type: Microsoft.Network/networkSecurityGroups@2023-04-01
+    name: nsg-vmss
+    description: Network security group applied to VMSS network interface configurations
+  - type: Microsoft.Network/loadBalancers@2023-04-01
+    name: lb-vmss
+    description: Standard load balancer for distributing traffic across VMSS instances
+  - type: Microsoft.Compute/diskEncryptionSets@2024-03-01
+    name: des-cmk
+    description: Disk Encryption Set with customer-managed key for VMSS OS and data disks
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-vmss
+    description: Diagnostic settings for VMSS instance metrics and boot diagnostics
+  - type: Microsoft.Insights/autoscaleSettings@2022-10-01
+    name: autoscale-vmss
+    description: Autoscale rules for CPU-based scale-out and scale-in of VMSS instances
   targets:
   - services:
     - Microsoft.Compute/virtualMachineScaleSets
@@ -230,7 +240,9 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Compute/virtualMachineScaleSets (target VMSS)
+  - type: Microsoft.Compute/virtualMachineScaleSets@2024-03-01
+    name: vmss-target
+    description: Target VMSS that autoscale settings apply to
   targets:
   - services:
     - Microsoft.Compute/virtualMachineScaleSets
@@ -364,7 +376,9 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/loadBalancers/probes (health probe for automatic repairs)
+  - type: Microsoft.Network/loadBalancers/probes@2023-04-01
+    name: health-probe
+    description: Load balancer health probe providing health signal for automatic instance repairs
   targets:
   - services:
     - Microsoft.Compute/virtualMachineScaleSets

@@ -12,8 +12,12 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/ddosProtectionPlans (DDoS protection for production workloads)
-  - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
+  - type: Microsoft.Network/ddosProtectionPlans@2023-04-01
+    name: ddos-plan
+    description: DDoS protection for production workloads
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-udr
+    description: Route logs to Log Analytics
   targets:
   - services:
     - Microsoft.Network/publicIPAddresses
@@ -90,8 +94,12 @@ rules:
   - cloud-architect
   - security-reviewer
   companion_resources:
-  - Microsoft.Network/privateEndpoints (replace public endpoints)
-  - Microsoft.Network/loadBalancers (internal LB instead of public)
+  - type: Microsoft.Network/privateEndpoints@2023-04-01
+    name: pe-service
+    description: Replace public endpoints
+  - type: Microsoft.Network/loadBalancers@2023-04-01
+    name: lb-internal
+    description: Internal LB instead of public
   targets:
   - services:
     - Microsoft.Network/publicIPAddresses
@@ -122,7 +130,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace
   targets:
   - services:
     - Microsoft.Network/publicIPAddresses

@@ -12,11 +12,18 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/privateEndpoints (private endpoint with groupId 'namespace')
-  - Microsoft.Network/privateDnsZones (privatelink.servicebus.windows.net)
-  - 'Microsoft.Authorization/roleAssignments (Azure Service Bus Data Sender: 69a216fc-b224-4f12-b13e-bc0d1c5bc7d2, Azure Service
-    Bus Data Receiver: 4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0)'
-  - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
+  - type: Microsoft.Network/privateEndpoints@2023-04-01
+    name: pe-servicebus
+    description: Private endpoint for Service Bus namespace with groupId 'namespace'
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.servicebus.windows.net
+    description: Private DNS zone for Service Bus private endpoint resolution
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: Azure Service Bus Data Sender/Receiver
+    description: Data Sender (69a216fc) and Data Receiver (4f6d3b9b) RBAC roles for managed identity
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-servicebus
+    description: Diagnostic settings routing operational and audit logs to Log Analytics
   targets:
   - services:
     - Microsoft.ServiceBus/namespaces
@@ -208,7 +215,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace as destination for Service Bus diagnostic logs
   targets:
   - services:
     - Microsoft.ServiceBus/namespaces

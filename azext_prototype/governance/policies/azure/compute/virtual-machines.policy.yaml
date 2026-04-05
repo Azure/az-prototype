@@ -13,11 +13,21 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/networkInterfaces (NIC with NSG, no public IP)
-  - Microsoft.Compute/diskEncryptionSets (CMK for disk encryption)
-  - Microsoft.Network/bastionHosts (for secure remote access)
-  - Microsoft.Insights/diagnosticSettings (guest OS diagnostics)
-  - Microsoft.Compute/virtualMachines/extensions (Azure Monitor Agent)
+  - type: Microsoft.Network/networkInterfaces@2023-04-01
+    name: nic-vm
+    description: Network interface with NSG association and no public IP
+  - type: Microsoft.Compute/diskEncryptionSets@2024-03-01
+    name: des-cmk
+    description: Disk Encryption Set with customer-managed key for OS and data disks
+  - type: Microsoft.Network/bastionHosts@2023-04-01
+    name: bas-mgmt
+    description: Bastion host for secure remote VM access without public IPs
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-vm
+    description: Diagnostic settings for VM guest OS metrics and boot diagnostics
+  - type: Microsoft.Compute/virtualMachines/extensions@2024-03-01
+    name: AzureMonitorLinuxAgent
+    description: Azure Monitor Agent extension for centralized log and metric collection
   targets:
   - services:
     - Microsoft.Compute/virtualMachines
@@ -225,8 +235,12 @@ rules:
   - cloud-architect
   - security-reviewer
   companion_resources:
-  - Microsoft.Compute/diskEncryptionSets (CMK encryption set)
-  - Microsoft.KeyVault/vaults (Key Vault for encryption keys)
+  - type: Microsoft.Compute/diskEncryptionSets@2024-03-01
+    name: des-cmk
+    description: Disk Encryption Set with customer-managed key for VM disk encryption
+  - type: Microsoft.KeyVault/vaults@2023-07-01
+    name: kv-cmk
+    description: Key Vault storing encryption keys for Disk Encryption Set
   targets:
   - services:
     - Microsoft.Compute/virtualMachines
@@ -250,9 +264,15 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.Insights/dataCollectionRules (define what logs/metrics to collect)
-  - Microsoft.Insights/dataCollectionRuleAssociations (link DCR to VM)
-  - Microsoft.OperationalInsights/workspaces (Log Analytics destination)
+  - type: Microsoft.Insights/dataCollectionRules@2023-03-11
+    name: dcr-vm-logs
+    description: Data collection rule defining which logs and metrics to collect from VMs
+  - type: Microsoft.Insights/dataCollectionRuleAssociations@2023-03-11
+    name: dcra-vm
+    description: Association linking the data collection rule to the VM
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace as the destination for VM telemetry
   targets:
   - services:
     - Microsoft.Compute/virtualMachines

@@ -14,6 +14,7 @@ rules:
   - cloud-architect
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2024-01-01
+    name: pe-keyvault
     description: Private endpoint for Key Vault — required when publicNetworkAccess is Disabled
     terraform_pattern: |
       resource "azapi_resource" "kv_private_endpoint" {
@@ -61,6 +62,7 @@ rules:
         }
       }
   - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.vaultcore.azure.net
     description: Private DNS zone for Key Vault private endpoint resolution
     terraform_pattern: |
       resource "azapi_resource" "kv_dns_zone" {
@@ -137,6 +139,7 @@ rules:
         }
       }
   - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-keyvault
     description: Diagnostic settings for Key Vault to Log Analytics — audit trail for secret access and key operations
     terraform_pattern: |
       resource "azapi_resource" "kv_diagnostics" {
@@ -256,6 +259,7 @@ rules:
   - cloud-architect
   companion_resources:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: Key Vault Secrets User
     description: Key Vault Secrets User role (4633458b-17de-408a-b874-0445c86b69e6) for reading secrets
     terraform_pattern: |
       resource "azapi_resource" "kv_secrets_user_role" {

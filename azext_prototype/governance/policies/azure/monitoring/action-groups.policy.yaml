@@ -13,9 +13,15 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.Insights/metricAlerts (metric alert rules that reference this action group)
-  - Microsoft.Insights/scheduledQueryRules (log alert rules that reference this action group)
-  - Microsoft.Insights/activityLogAlerts (activity log alerts for subscription-level events)
+  - type: Microsoft.Insights/metricAlerts@2018-03-01
+    name: alert-critical-metrics
+    description: Metric alert rules that reference this action group for notification delivery
+  - type: Microsoft.Insights/scheduledQueryRules@2023-03-15-preview
+    name: alert-log-query
+    description: Log alert rules based on KQL queries that reference this action group
+  - type: Microsoft.Insights/activityLogAlerts@2020-10-01
+    name: alert-activity-log
+    description: Activity log alerts for subscription-level administrative events
   targets:
   - services:
     - Microsoft.Insights/actionGroups
@@ -125,7 +131,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.Insights/actionGroups (action group for notifications)
+  - type: Microsoft.Insights/actionGroups@2023-01-01
+    name: ag-ops
+    description: Action group defining notification receivers for metric alert delivery
   targets:
   - services:
     - Microsoft.Insights/actionGroups
@@ -210,7 +218,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.Insights/actionGroups (action group for notifications)
+  - type: Microsoft.Insights/actionGroups@2023-01-01
+    name: ag-ops
+    description: Action group defining notification receivers for activity log alert delivery
   targets:
   - services:
     - Microsoft.Insights/actionGroups

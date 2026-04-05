@@ -14,7 +14,7 @@ rules:
   - cloud-architect
   targets:
   - services:
-    - TODO:resource-group
+    - Microsoft.Resources/resourceGroups
     terraform_pattern: |
       resource "azapi_resource" "resource_group" {
         type     = "Microsoft.Resources/resourceGroups@2024-03-01"
@@ -57,7 +57,7 @@ rules:
   - cloud-architect
   targets:
   - services:
-    - TODO:resource-group
+    - Microsoft.Resources/resourceGroups
     prohibitions:
     - NEVER omit the project tag — it identifies which POC this resource group belongs to
     - NEVER omit the environment tag — it distinguishes dev/staging/prod resources
@@ -71,7 +71,7 @@ rules:
   - bicep-agent
   targets:
   - services:
-    - TODO:resource-group
+    - Microsoft.Resources/resourceGroups
     prohibitions:
     - NEVER omit targetScope = 'subscription' in the Bicep file that creates resource groups
 - id: AZ-RG-004
@@ -84,7 +84,7 @@ rules:
   - bicep-agent
   targets:
   - services:
-    - TODO:resource-group
+    - Microsoft.Resources/resourceGroups
 - id: AZ-RG-005
   severity: recommended
   description: Create separate resource groups for different lifecycle boundaries
@@ -94,7 +94,7 @@ rules:
   - cloud-architect
   targets:
   - services:
-    - TODO:resource-group
+    - Microsoft.Resources/resourceGroups
 patterns:
 - name: Resource Group with tags
   description: Standard resource group with required tags and parameterized location

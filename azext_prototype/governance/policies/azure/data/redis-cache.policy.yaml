@@ -13,9 +13,15 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/privateEndpoints (private endpoint with groupId 'redisCache')
-  - Microsoft.Network/privateDnsZones (privatelink.redis.cache.windows.net)
-  - Microsoft.Insights/diagnosticSettings (route metrics to Log Analytics)
+  - type: Microsoft.Network/privateEndpoints@2023-04-01
+    name: pe-redis
+    description: Private endpoint for Redis Cache with groupId 'redisCache'
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.redis.cache.windows.net
+    description: Private DNS zone for Redis Cache private endpoint resolution
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-redis
+    description: Diagnostic settings routing Redis metrics and connection logs to Log Analytics
   - type: Microsoft.Cache/redis/accessPolicyAssignments@2024-03-01
     name: worker-data-access
     description: Data-plane access policy assignment for managed identity (NOT standard RBAC)
@@ -138,7 +144,9 @@ rules:
   - csharp-developer
   - python-developer
   companion_resources:
-  - Microsoft.Cache/redis/accessPolicyAssignments@2024-03-01 (Data Owner or Data Contributor access policy — NOT Microsoft.Authorization/roleAssignments)
+  - type: Microsoft.Cache/redis/accessPolicyAssignments@2024-03-01
+    name: app-data-access
+    description: Data Owner or Data Contributor access policy for managed identity (NOT standard RBAC)
   targets:
   - services:
     - Microsoft.Cache/redis
@@ -207,7 +215,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace as destination for Redis Cache diagnostic data
   targets:
   - services:
     - Microsoft.Cache/redis

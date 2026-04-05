@@ -12,10 +12,18 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/publicIPAddresses (Standard SKU static for public LB, omit for internal LB)
-  - Microsoft.Network/networkSecurityGroups (required for Standard LB backends — no default allow)
-  - Microsoft.Network/loadBalancers/outboundRules (explicit outbound if disableOutboundSnat is true)
-  - Microsoft.Insights/diagnosticSettings (route metrics to Log Analytics)
+  - type: Microsoft.Network/publicIPAddresses@2023-04-01
+    name: pip-lb
+    description: Standard SKU static for public LB, omit for internal LB
+  - type: Microsoft.Network/networkSecurityGroups@2023-04-01
+    name: nsg-resource
+    description: Required for Standard LB backends — no default allow
+  - type: Microsoft.Network/loadBalancers/outboundRules@2023-04-01
+    name: outbound-rule
+    description: Explicit outbound if disableOutboundSnat is true
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-metrics
+    description: Route metrics to Log Analytics
   targets:
   - services:
     - Microsoft.Network/loadBalancers
@@ -181,8 +189,12 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/publicIPAddresses (dedicated outbound public IP)
-  - Microsoft.Network/natGateways (alternative — use NAT Gateway instead of outbound rules)
+  - type: Microsoft.Network/publicIPAddresses@2023-04-01
+    name: pip-outbound
+    description: Dedicated outbound public IP
+  - type: Microsoft.Network/natGateways@2023-04-01
+    name: nat-gw
+    description: Alternative — use NAT Gateway instead of outbound rules
   targets:
   - services:
     - Microsoft.Network/loadBalancers
@@ -249,7 +261,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace
   targets:
   - services:
     - Microsoft.Network/loadBalancers

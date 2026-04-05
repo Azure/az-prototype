@@ -12,11 +12,21 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/publicIPAddresses (two Standard SKU static IPs for active-active)
-  - Microsoft.Network/virtualNetworks/subnets (GatewaySubnet with /27 or larger)
-  - Microsoft.Network/localNetworkGateways (on-premises network definition)
-  - Microsoft.Network/connections (site-to-site connection resource)
-  - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
+  - type: Microsoft.Network/publicIPAddresses@2023-04-01
+    name: pip-resource
+    description: Two Standard SKU static IPs for active-active
+  - type: Microsoft.Network/virtualNetworks/subnets@2024-01-01
+    name: GatewaySubnet
+    description: GatewaySubnet with /27 or larger
+  - type: Microsoft.Network/localNetworkGateways@2023-04-01
+    name: lgw-onprem
+    description: On-premises network definition
+  - type: Microsoft.Network/connections@2023-04-01
+    name: s2s-connection
+    description: Site-to-site connection resource
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-udr
+    description: Route logs to Log Analytics
   targets:
   - services:
     - Microsoft.Network/virtualNetworkGateways
@@ -119,8 +129,12 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/virtualNetworkGateways (VPN gateway)
-  - Microsoft.Network/localNetworkGateways (on-premises gateway)
+  - type: Microsoft.Network/virtualNetworkGateways@2023-04-01
+    name: vpngw
+    description: VPN gateway
+  - type: Microsoft.Network/localNetworkGateways@2023-04-01
+    name: lgw-onprem
+    description: On-premises gateway
   targets:
   - services:
     - Microsoft.Network/virtualNetworkGateways
@@ -239,7 +253,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace
   targets:
   - services:
     - Microsoft.Network/virtualNetworkGateways

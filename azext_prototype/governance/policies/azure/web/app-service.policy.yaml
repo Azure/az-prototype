@@ -56,6 +56,7 @@ rules:
   - cloud-architect
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2024-01-01
+    name: pe-app-service
     description: Private endpoint for App Service — required when publicNetworkAccess is Disabled
     terraform_pattern: |
       resource "azapi_resource" "app_private_endpoint" {
@@ -103,6 +104,7 @@ rules:
         }
       }
   - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.azurewebsites.net
     description: Private DNS zone for App Service private endpoint resolution
     terraform_pattern: |
       resource "azapi_resource" "app_dns_zone" {
@@ -179,6 +181,7 @@ rules:
         }
       }
   - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-app-service
     description: Diagnostic settings for App Service to Log Analytics
     terraform_pattern: |
       resource "azapi_resource" "app_diagnostics" {

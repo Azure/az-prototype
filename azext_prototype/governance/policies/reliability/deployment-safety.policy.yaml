@@ -21,8 +21,10 @@ rules:
   - python-developer
   companion_resources:
   - type: Microsoft.Web/sites/slots@2023-12-01
+    name: app
     description: Staging deployment slot for App Service blue-green deployment
   - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-resource
     description: Diagnostic settings for deployment slot swap events and health check logs
   targets:
   - services:
@@ -266,28 +268,6 @@ rules:
       0'
     - NEVER deploy without readiness probes — new replicas receive traffic before they are ready, causing errors
     - NEVER use 'latest' image tag in production — use explicit version tags for reproducibility and rollback
-- id: WAF-REL-DEPLOY-001
-  severity: required
-  description: Implement blue-green or canary deployment for ALL production services.  App Service MUST use deployment slots
-    (staging slot with auto-swap or manual swap).  Container Apps MUST use revision- based traffic splitting (route percentage
-    of traffic to new revision).  AKS MUST use rolling update strategy with max surge and max unavailable.  Functions MUST
-    use deployment slots for premium/dedicated plans.  NEVER deploy directly to production without a staging phase.
-  rationale: 'Direct-to-production deployments are the #1 cause of production incidents.  Blue-green deployment enables zero-downtime
-    releases with instant rollback.  Canary deployment validates changes with a subset of traffic before full rollout.  Without
-    staging, a bad deploy takes down 100% of users immediately.'
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  companion_resources:
-  - type: Microsoft.Web/sites/slots@2023-12-01
-    description: Staging deployment slot for App Service blue-green deployment
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for deployment slot swap events and health check logs
-  targets:
   - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
@@ -529,28 +509,6 @@ rules:
       0'
     - NEVER deploy without readiness probes — new replicas receive traffic before they are ready, causing errors
     - NEVER use 'latest' image tag in production — use explicit version tags for reproducibility and rollback
-- id: WAF-REL-DEPLOY-001
-  severity: required
-  description: Implement blue-green or canary deployment for ALL production services.  App Service MUST use deployment slots
-    (staging slot with auto-swap or manual swap).  Container Apps MUST use revision- based traffic splitting (route percentage
-    of traffic to new revision).  AKS MUST use rolling update strategy with max surge and max unavailable.  Functions MUST
-    use deployment slots for premium/dedicated plans.  NEVER deploy directly to production without a staging phase.
-  rationale: 'Direct-to-production deployments are the #1 cause of production incidents.  Blue-green deployment enables zero-downtime
-    releases with instant rollback.  Canary deployment validates changes with a subset of traffic before full rollout.  Without
-    staging, a bad deploy takes down 100% of users immediately.'
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  companion_resources:
-  - type: Microsoft.Web/sites/slots@2023-12-01
-    description: Staging deployment slot for App Service blue-green deployment
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for deployment slot swap events and health check logs
-  targets:
   - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
@@ -792,28 +750,6 @@ rules:
       0'
     - NEVER deploy without readiness probes — new replicas receive traffic before they are ready, causing errors
     - NEVER use 'latest' image tag in production — use explicit version tags for reproducibility and rollback
-- id: WAF-REL-DEPLOY-001
-  severity: required
-  description: Implement blue-green or canary deployment for ALL production services.  App Service MUST use deployment slots
-    (staging slot with auto-swap or manual swap).  Container Apps MUST use revision- based traffic splitting (route percentage
-    of traffic to new revision).  AKS MUST use rolling update strategy with max surge and max unavailable.  Functions MUST
-    use deployment slots for premium/dedicated plans.  NEVER deploy directly to production without a staging phase.
-  rationale: 'Direct-to-production deployments are the #1 cause of production incidents.  Blue-green deployment enables zero-downtime
-    releases with instant rollback.  Canary deployment validates changes with a subset of traffic before full rollout.  Without
-    staging, a bad deploy takes down 100% of users immediately.'
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  companion_resources:
-  - type: Microsoft.Web/sites/slots@2023-12-01
-    description: Staging deployment slot for App Service blue-green deployment
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for deployment slot swap events and health check logs
-  targets:
   - services:
     - Microsoft.ContainerRegistry/registries
     terraform_pattern: |
@@ -1055,28 +991,6 @@ rules:
       0'
     - NEVER deploy without readiness probes — new replicas receive traffic before they are ready, causing errors
     - NEVER use 'latest' image tag in production — use explicit version tags for reproducibility and rollback
-- id: WAF-REL-DEPLOY-001
-  severity: required
-  description: Implement blue-green or canary deployment for ALL production services.  App Service MUST use deployment slots
-    (staging slot with auto-swap or manual swap).  Container Apps MUST use revision- based traffic splitting (route percentage
-    of traffic to new revision).  AKS MUST use rolling update strategy with max surge and max unavailable.  Functions MUST
-    use deployment slots for premium/dedicated plans.  NEVER deploy directly to production without a staging phase.
-  rationale: 'Direct-to-production deployments are the #1 cause of production incidents.  Blue-green deployment enables zero-downtime
-    releases with instant rollback.  Canary deployment validates changes with a subset of traffic before full rollout.  Without
-    staging, a bad deploy takes down 100% of users immediately.'
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  companion_resources:
-  - type: Microsoft.Web/sites/slots@2023-12-01
-    description: Staging deployment slot for App Service blue-green deployment
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for deployment slot swap events and health check logs
-  targets:
   - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
@@ -1318,28 +1232,6 @@ rules:
       0'
     - NEVER deploy without readiness probes — new replicas receive traffic before they are ready, causing errors
     - NEVER use 'latest' image tag in production — use explicit version tags for reproducibility and rollback
-- id: WAF-REL-DEPLOY-001
-  severity: required
-  description: Implement blue-green or canary deployment for ALL production services.  App Service MUST use deployment slots
-    (staging slot with auto-swap or manual swap).  Container Apps MUST use revision- based traffic splitting (route percentage
-    of traffic to new revision).  AKS MUST use rolling update strategy with max surge and max unavailable.  Functions MUST
-    use deployment slots for premium/dedicated plans.  NEVER deploy directly to production without a staging phase.
-  rationale: 'Direct-to-production deployments are the #1 cause of production incidents.  Blue-green deployment enables zero-downtime
-    releases with instant rollback.  Canary deployment validates changes with a subset of traffic before full rollout.  Without
-    staging, a bad deploy takes down 100% of users immediately.'
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  companion_resources:
-  - type: Microsoft.Web/sites/slots@2023-12-01
-    description: Staging deployment slot for App Service blue-green deployment
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings for deployment slot swap events and health check logs
-  targets:
   - services:
     - Microsoft.Compute/virtualMachineScaleSets
     terraform_pattern: |
@@ -1724,24 +1616,6 @@ rules:
     - NEVER use the root path (/) as the health check endpoint — it does not validate downstream dependencies
     - NEVER set failureThreshold to 1 for readiness probes — transient failures cause unnecessary traffic removal
     - NEVER skip startup probes for applications with slow initialization — readiness probes will fail and restart the container
-- id: WAF-REL-DEPLOY-002
-  severity: required
-  description: Validate application health BEFORE shifting production traffic to a new deployment.  App Service slots MUST
-    pass health check validation before swap.  Container Apps canary revisions MUST pass readiness probes before receiving
-    traffic.  AKS deployments MUST have readiness probes that validate application health including downstream dependencies.  Health
-    validation MUST check database connectivity, cache availability, and external API reachability — not just HTTP 200 from
-    the root endpoint.
-  rationale: Deploying code that passes build/test but fails at runtime (wrong connection strings, missing config, incompatible
-    schema) is a common failure mode.  Health gates catch these failures before they affect users.  Without gates, the first
-    sign of failure is user-facing errors.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
@@ -1867,24 +1741,6 @@ rules:
     - NEVER use the root path (/) as the health check endpoint — it does not validate downstream dependencies
     - NEVER set failureThreshold to 1 for readiness probes — transient failures cause unnecessary traffic removal
     - NEVER skip startup probes for applications with slow initialization — readiness probes will fail and restart the container
-- id: WAF-REL-DEPLOY-002
-  severity: required
-  description: Validate application health BEFORE shifting production traffic to a new deployment.  App Service slots MUST
-    pass health check validation before swap.  Container Apps canary revisions MUST pass readiness probes before receiving
-    traffic.  AKS deployments MUST have readiness probes that validate application health including downstream dependencies.  Health
-    validation MUST check database connectivity, cache availability, and external API reachability — not just HTTP 200 from
-    the root endpoint.
-  rationale: Deploying code that passes build/test but fails at runtime (wrong connection strings, missing config, incompatible
-    schema) is a common failure mode.  Health gates catch these failures before they affect users.  Without gates, the first
-    sign of failure is user-facing errors.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
@@ -2010,24 +1866,6 @@ rules:
     - NEVER use the root path (/) as the health check endpoint — it does not validate downstream dependencies
     - NEVER set failureThreshold to 1 for readiness probes — transient failures cause unnecessary traffic removal
     - NEVER skip startup probes for applications with slow initialization — readiness probes will fail and restart the container
-- id: WAF-REL-DEPLOY-002
-  severity: required
-  description: Validate application health BEFORE shifting production traffic to a new deployment.  App Service slots MUST
-    pass health check validation before swap.  Container Apps canary revisions MUST pass readiness probes before receiving
-    traffic.  AKS deployments MUST have readiness probes that validate application health including downstream dependencies.  Health
-    validation MUST check database connectivity, cache availability, and external API reachability — not just HTTP 200 from
-    the root endpoint.
-  rationale: Deploying code that passes build/test but fails at runtime (wrong connection strings, missing config, incompatible
-    schema) is a common failure mode.  Health gates catch these failures before they affect users.  Without gates, the first
-    sign of failure is user-facing errors.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.ContainerRegistry/registries
     terraform_pattern: |
@@ -2153,24 +1991,6 @@ rules:
     - NEVER use the root path (/) as the health check endpoint — it does not validate downstream dependencies
     - NEVER set failureThreshold to 1 for readiness probes — transient failures cause unnecessary traffic removal
     - NEVER skip startup probes for applications with slow initialization — readiness probes will fail and restart the container
-- id: WAF-REL-DEPLOY-002
-  severity: required
-  description: Validate application health BEFORE shifting production traffic to a new deployment.  App Service slots MUST
-    pass health check validation before swap.  Container Apps canary revisions MUST pass readiness probes before receiving
-    traffic.  AKS deployments MUST have readiness probes that validate application health including downstream dependencies.  Health
-    validation MUST check database connectivity, cache availability, and external API reachability — not just HTTP 200 from
-    the root endpoint.
-  rationale: Deploying code that passes build/test but fails at runtime (wrong connection strings, missing config, incompatible
-    schema) is a common failure mode.  Health gates catch these failures before they affect users.  Without gates, the first
-    sign of failure is user-facing errors.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
@@ -2296,24 +2116,6 @@ rules:
     - NEVER use the root path (/) as the health check endpoint — it does not validate downstream dependencies
     - NEVER set failureThreshold to 1 for readiness probes — transient failures cause unnecessary traffic removal
     - NEVER skip startup probes for applications with slow initialization — readiness probes will fail and restart the container
-- id: WAF-REL-DEPLOY-002
-  severity: required
-  description: Validate application health BEFORE shifting production traffic to a new deployment.  App Service slots MUST
-    pass health check validation before swap.  Container Apps canary revisions MUST pass readiness probes before receiving
-    traffic.  AKS deployments MUST have readiness probes that validate application health including downstream dependencies.  Health
-    validation MUST check database connectivity, cache availability, and external API reachability — not just HTTP 200 from
-    the root endpoint.
-  rationale: Deploying code that passes build/test but fails at runtime (wrong connection strings, missing config, incompatible
-    schema) is a common failure mode.  Health gates catch these failures before they affect users.  Without gates, the first
-    sign of failure is user-facing errors.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  targets:
   - services:
     - Microsoft.Compute/virtualMachineScaleSets
     terraform_pattern: |
@@ -2457,10 +2259,13 @@ rules:
   - python-developer
   companion_resources:
   - type: Microsoft.ContainerRegistry/registries@2023-07-01
+    name: acr
     description: Container Registry with retention policy for image version history
   - type: Microsoft.Storage/storageAccounts@2023-05-01
+    name: st-data
     description: Storage account with versioning for Terraform state rollback
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: Storage Blob Data Contributor
     description: RBAC for state storage — Storage Blob Data Contributor for deployment identity
   targets:
   - services:
@@ -2655,30 +2460,6 @@ rules:
     - NEVER store Terraform state locally — use remote backend with versioning for state protection and rollback
     - NEVER use Standard_LRS for Terraform state storage — state loss requires full infrastructure reimport
     - NEVER overwrite image tags (e.g., latest) in production — use unique version tags for each deployment
-- id: WAF-REL-DEPLOY-003
-  severity: required
-  description: Ensure every production deployment has a tested rollback path. App Service MUST be able to swap back to the
-    previous slot. Container Apps MUST be able to shift 100% traffic back to the previous revision.  AKS MUST have previous
-    deployment revision history preserved.  Container Registry MUST retain previous image versions.  Terraform state MUST
-    be stored remotely with versioning to enable state rollback.  Rollback MUST be executable within 5 minutes.
-  rationale: Rollback is the emergency brake for deployments.  If a deployment causes issues that health checks miss (performance
-    degradation, data corruption, business logic bugs), rollback is the only way to restore service quickly.  Without rollback,
-    the only option is a forward fix under pressure.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  companion_resources:
-  - type: Microsoft.ContainerRegistry/registries@2023-07-01
-    description: Container Registry with retention policy for image version history
-  - type: Microsoft.Storage/storageAccounts@2023-05-01
-    description: Storage account with versioning for Terraform state rollback
-  - type: Microsoft.Authorization/roleAssignments@2022-04-01
-    description: RBAC for state storage — Storage Blob Data Contributor for deployment identity
-  targets:
   - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
@@ -2871,30 +2652,6 @@ rules:
     - NEVER store Terraform state locally — use remote backend with versioning for state protection and rollback
     - NEVER use Standard_LRS for Terraform state storage — state loss requires full infrastructure reimport
     - NEVER overwrite image tags (e.g., latest) in production — use unique version tags for each deployment
-- id: WAF-REL-DEPLOY-003
-  severity: required
-  description: Ensure every production deployment has a tested rollback path. App Service MUST be able to swap back to the
-    previous slot. Container Apps MUST be able to shift 100% traffic back to the previous revision.  AKS MUST have previous
-    deployment revision history preserved.  Container Registry MUST retain previous image versions.  Terraform state MUST
-    be stored remotely with versioning to enable state rollback.  Rollback MUST be executable within 5 minutes.
-  rationale: Rollback is the emergency brake for deployments.  If a deployment causes issues that health checks miss (performance
-    degradation, data corruption, business logic bugs), rollback is the only way to restore service quickly.  Without rollback,
-    the only option is a forward fix under pressure.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  companion_resources:
-  - type: Microsoft.ContainerRegistry/registries@2023-07-01
-    description: Container Registry with retention policy for image version history
-  - type: Microsoft.Storage/storageAccounts@2023-05-01
-    description: Storage account with versioning for Terraform state rollback
-  - type: Microsoft.Authorization/roleAssignments@2022-04-01
-    description: RBAC for state storage — Storage Blob Data Contributor for deployment identity
-  targets:
   - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
@@ -3087,30 +2844,6 @@ rules:
     - NEVER store Terraform state locally — use remote backend with versioning for state protection and rollback
     - NEVER use Standard_LRS for Terraform state storage — state loss requires full infrastructure reimport
     - NEVER overwrite image tags (e.g., latest) in production — use unique version tags for each deployment
-- id: WAF-REL-DEPLOY-003
-  severity: required
-  description: Ensure every production deployment has a tested rollback path. App Service MUST be able to swap back to the
-    previous slot. Container Apps MUST be able to shift 100% traffic back to the previous revision.  AKS MUST have previous
-    deployment revision history preserved.  Container Registry MUST retain previous image versions.  Terraform state MUST
-    be stored remotely with versioning to enable state rollback.  Rollback MUST be executable within 5 minutes.
-  rationale: Rollback is the emergency brake for deployments.  If a deployment causes issues that health checks miss (performance
-    degradation, data corruption, business logic bugs), rollback is the only way to restore service quickly.  Without rollback,
-    the only option is a forward fix under pressure.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  companion_resources:
-  - type: Microsoft.ContainerRegistry/registries@2023-07-01
-    description: Container Registry with retention policy for image version history
-  - type: Microsoft.Storage/storageAccounts@2023-05-01
-    description: Storage account with versioning for Terraform state rollback
-  - type: Microsoft.Authorization/roleAssignments@2022-04-01
-    description: RBAC for state storage — Storage Blob Data Contributor for deployment identity
-  targets:
   - services:
     - Microsoft.ContainerRegistry/registries
     terraform_pattern: |
@@ -3303,30 +3036,6 @@ rules:
     - NEVER store Terraform state locally — use remote backend with versioning for state protection and rollback
     - NEVER use Standard_LRS for Terraform state storage — state loss requires full infrastructure reimport
     - NEVER overwrite image tags (e.g., latest) in production — use unique version tags for each deployment
-- id: WAF-REL-DEPLOY-003
-  severity: required
-  description: Ensure every production deployment has a tested rollback path. App Service MUST be able to swap back to the
-    previous slot. Container Apps MUST be able to shift 100% traffic back to the previous revision.  AKS MUST have previous
-    deployment revision history preserved.  Container Registry MUST retain previous image versions.  Terraform state MUST
-    be stored remotely with versioning to enable state rollback.  Rollback MUST be executable within 5 minutes.
-  rationale: Rollback is the emergency brake for deployments.  If a deployment causes issues that health checks miss (performance
-    degradation, data corruption, business logic bugs), rollback is the only way to restore service quickly.  Without rollback,
-    the only option is a forward fix under pressure.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  companion_resources:
-  - type: Microsoft.ContainerRegistry/registries@2023-07-01
-    description: Container Registry with retention policy for image version history
-  - type: Microsoft.Storage/storageAccounts@2023-05-01
-    description: Storage account with versioning for Terraform state rollback
-  - type: Microsoft.Authorization/roleAssignments@2022-04-01
-    description: RBAC for state storage — Storage Blob Data Contributor for deployment identity
-  targets:
   - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
@@ -3519,30 +3228,6 @@ rules:
     - NEVER store Terraform state locally — use remote backend with versioning for state protection and rollback
     - NEVER use Standard_LRS for Terraform state storage — state loss requires full infrastructure reimport
     - NEVER overwrite image tags (e.g., latest) in production — use unique version tags for each deployment
-- id: WAF-REL-DEPLOY-003
-  severity: required
-  description: Ensure every production deployment has a tested rollback path. App Service MUST be able to swap back to the
-    previous slot. Container Apps MUST be able to shift 100% traffic back to the previous revision.  AKS MUST have previous
-    deployment revision history preserved.  Container Registry MUST retain previous image versions.  Terraform state MUST
-    be stored remotely with versioning to enable state rollback.  Rollback MUST be executable within 5 minutes.
-  rationale: Rollback is the emergency brake for deployments.  If a deployment causes issues that health checks miss (performance
-    degradation, data corruption, business logic bugs), rollback is the only way to restore service quickly.  Without rollback,
-    the only option is a forward fix under pressure.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  companion_resources:
-  - type: Microsoft.ContainerRegistry/registries@2023-07-01
-    description: Container Registry with retention policy for image version history
-  - type: Microsoft.Storage/storageAccounts@2023-05-01
-    description: Storage account with versioning for Terraform state rollback
-  - type: Microsoft.Authorization/roleAssignments@2022-04-01
-    description: RBAC for state storage — Storage Blob Data Contributor for deployment identity
-  targets:
   - services:
     - Microsoft.Compute/virtualMachineScaleSets
     terraform_pattern: |
@@ -3857,20 +3542,6 @@ rules:
     - NEVER share state files across environments — use separate state files per environment
     - NEVER skip drift detection — run terraform plan or az deployment what-if on a regular schedule
     - NEVER use ARM Complete deployment mode without explicit approval — it deletes unmanaged resources
-- id: WAF-REL-DEPLOY-004
-  severity: required
-  description: ALL infrastructure MUST be defined as code (Terraform or Bicep). NEVER make manual changes to production infrastructure
-    — all changes must go through the IaC pipeline.  Terraform state MUST be stored in a remote backend (Azure Storage) with
-    locking (Azure Blob lease).  Enable drift detection to identify manual changes.  Use separate state files per environment
-    (dev, staging, production) to isolate blast radius.
-  rationale: Manual infrastructure changes are untraceable, unreproducible, and un-reviewable.  IaC provides version control,
-    peer review, audit trail, and reproducible environments.  Remote state with locking prevents concurrent modifications
-    that corrupt state.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
@@ -3979,20 +3650,6 @@ rules:
     - NEVER share state files across environments — use separate state files per environment
     - NEVER skip drift detection — run terraform plan or az deployment what-if on a regular schedule
     - NEVER use ARM Complete deployment mode without explicit approval — it deletes unmanaged resources
-- id: WAF-REL-DEPLOY-004
-  severity: required
-  description: ALL infrastructure MUST be defined as code (Terraform or Bicep). NEVER make manual changes to production infrastructure
-    — all changes must go through the IaC pipeline.  Terraform state MUST be stored in a remote backend (Azure Storage) with
-    locking (Azure Blob lease).  Enable drift detection to identify manual changes.  Use separate state files per environment
-    (dev, staging, production) to isolate blast radius.
-  rationale: Manual infrastructure changes are untraceable, unreproducible, and un-reviewable.  IaC provides version control,
-    peer review, audit trail, and reproducible environments.  Remote state with locking prevents concurrent modifications
-    that corrupt state.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
@@ -4101,20 +3758,6 @@ rules:
     - NEVER share state files across environments — use separate state files per environment
     - NEVER skip drift detection — run terraform plan or az deployment what-if on a regular schedule
     - NEVER use ARM Complete deployment mode without explicit approval — it deletes unmanaged resources
-- id: WAF-REL-DEPLOY-004
-  severity: required
-  description: ALL infrastructure MUST be defined as code (Terraform or Bicep). NEVER make manual changes to production infrastructure
-    — all changes must go through the IaC pipeline.  Terraform state MUST be stored in a remote backend (Azure Storage) with
-    locking (Azure Blob lease).  Enable drift detection to identify manual changes.  Use separate state files per environment
-    (dev, staging, production) to isolate blast radius.
-  rationale: Manual infrastructure changes are untraceable, unreproducible, and un-reviewable.  IaC provides version control,
-    peer review, audit trail, and reproducible environments.  Remote state with locking prevents concurrent modifications
-    that corrupt state.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.ContainerRegistry/registries
     terraform_pattern: |
@@ -4223,20 +3866,6 @@ rules:
     - NEVER share state files across environments — use separate state files per environment
     - NEVER skip drift detection — run terraform plan or az deployment what-if on a regular schedule
     - NEVER use ARM Complete deployment mode without explicit approval — it deletes unmanaged resources
-- id: WAF-REL-DEPLOY-004
-  severity: required
-  description: ALL infrastructure MUST be defined as code (Terraform or Bicep). NEVER make manual changes to production infrastructure
-    — all changes must go through the IaC pipeline.  Terraform state MUST be stored in a remote backend (Azure Storage) with
-    locking (Azure Blob lease).  Enable drift detection to identify manual changes.  Use separate state files per environment
-    (dev, staging, production) to isolate blast radius.
-  rationale: Manual infrastructure changes are untraceable, unreproducible, and un-reviewable.  IaC provides version control,
-    peer review, audit trail, and reproducible environments.  Remote state with locking prevents concurrent modifications
-    that corrupt state.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
@@ -4345,20 +3974,6 @@ rules:
     - NEVER share state files across environments — use separate state files per environment
     - NEVER skip drift detection — run terraform plan or az deployment what-if on a regular schedule
     - NEVER use ARM Complete deployment mode without explicit approval — it deletes unmanaged resources
-- id: WAF-REL-DEPLOY-004
-  severity: required
-  description: ALL infrastructure MUST be defined as code (Terraform or Bicep). NEVER make manual changes to production infrastructure
-    — all changes must go through the IaC pipeline.  Terraform state MUST be stored in a remote backend (Azure Storage) with
-    locking (Azure Blob lease).  Enable drift detection to identify manual changes.  Use separate state files per environment
-    (dev, staging, production) to isolate blast radius.
-  rationale: Manual infrastructure changes are untraceable, unreproducible, and un-reviewable.  IaC provides version control,
-    peer review, audit trail, and reproducible environments.  Remote state with locking prevents concurrent modifications
-    that corrupt state.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.Compute/virtualMachineScaleSets
     terraform_pattern: |
@@ -4485,10 +4100,13 @@ rules:
   - python-developer
   companion_resources:
   - type: Microsoft.ContainerRegistry/registries@2023-07-01
+    name: acr
     description: Container Registry with Premium SKU for content trust, quarantine, and retention policies
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: role-assignment
     description: AcrPush role for CI/CD identity, AcrPull role for application identity
   - type: Microsoft.Network/privateEndpoints@2023-11-01
+    name: pe-resource
     description: 'Private endpoint for Container Registry (groupId: registry)'
   targets:
   - services:
@@ -4655,30 +4273,6 @@ rules:
     - NEVER rebuild images for different environments — build once, promote the same image artifact
     - NEVER deploy unsigned images to production — enable content trust (Notary) on ACR
     - NEVER skip image scanning — enable quarantine policy to hold images until vulnerability scan completes
-- id: WAF-REL-DEPLOY-005
-  severity: required
-  description: Use immutable infrastructure patterns for ALL containerized workloads.  Container images MUST be versioned
-    with unique tags (git SHA, build number, or semantic version) — NEVER use mutable tags like 'latest'.  Images MUST be
-    built once and promoted through environments (dev -> staging -> production) without rebuilding.  NEVER modify running
-    containers in place — deploy new immutable images.  ACR MUST have content trust and image quarantine for production images.
-  rationale: Mutable infrastructure (in-place updates, SSH patches, config changes on running servers) causes configuration
-    drift, makes debugging impossible, and prevents reliable rollback.  Immutable infrastructure ensures every deployment
-    is reproducible and traceable to a specific build artifact.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  companion_resources:
-  - type: Microsoft.ContainerRegistry/registries@2023-07-01
-    description: Container Registry with Premium SKU for content trust, quarantine, and retention policies
-  - type: Microsoft.Authorization/roleAssignments@2022-04-01
-    description: AcrPush role for CI/CD identity, AcrPull role for application identity
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: 'Private endpoint for Container Registry (groupId: registry)'
-  targets:
   - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
@@ -4843,30 +4437,6 @@ rules:
     - NEVER rebuild images for different environments — build once, promote the same image artifact
     - NEVER deploy unsigned images to production — enable content trust (Notary) on ACR
     - NEVER skip image scanning — enable quarantine policy to hold images until vulnerability scan completes
-- id: WAF-REL-DEPLOY-005
-  severity: required
-  description: Use immutable infrastructure patterns for ALL containerized workloads.  Container images MUST be versioned
-    with unique tags (git SHA, build number, or semantic version) — NEVER use mutable tags like 'latest'.  Images MUST be
-    built once and promoted through environments (dev -> staging -> production) without rebuilding.  NEVER modify running
-    containers in place — deploy new immutable images.  ACR MUST have content trust and image quarantine for production images.
-  rationale: Mutable infrastructure (in-place updates, SSH patches, config changes on running servers) causes configuration
-    drift, makes debugging impossible, and prevents reliable rollback.  Immutable infrastructure ensures every deployment
-    is reproducible and traceable to a specific build artifact.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  companion_resources:
-  - type: Microsoft.ContainerRegistry/registries@2023-07-01
-    description: Container Registry with Premium SKU for content trust, quarantine, and retention policies
-  - type: Microsoft.Authorization/roleAssignments@2022-04-01
-    description: AcrPush role for CI/CD identity, AcrPull role for application identity
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: 'Private endpoint for Container Registry (groupId: registry)'
-  targets:
   - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
@@ -5031,30 +4601,6 @@ rules:
     - NEVER rebuild images for different environments — build once, promote the same image artifact
     - NEVER deploy unsigned images to production — enable content trust (Notary) on ACR
     - NEVER skip image scanning — enable quarantine policy to hold images until vulnerability scan completes
-- id: WAF-REL-DEPLOY-005
-  severity: required
-  description: Use immutable infrastructure patterns for ALL containerized workloads.  Container images MUST be versioned
-    with unique tags (git SHA, build number, or semantic version) — NEVER use mutable tags like 'latest'.  Images MUST be
-    built once and promoted through environments (dev -> staging -> production) without rebuilding.  NEVER modify running
-    containers in place — deploy new immutable images.  ACR MUST have content trust and image quarantine for production images.
-  rationale: Mutable infrastructure (in-place updates, SSH patches, config changes on running servers) causes configuration
-    drift, makes debugging impossible, and prevents reliable rollback.  Immutable infrastructure ensures every deployment
-    is reproducible and traceable to a specific build artifact.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  companion_resources:
-  - type: Microsoft.ContainerRegistry/registries@2023-07-01
-    description: Container Registry with Premium SKU for content trust, quarantine, and retention policies
-  - type: Microsoft.Authorization/roleAssignments@2022-04-01
-    description: AcrPush role for CI/CD identity, AcrPull role for application identity
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: 'Private endpoint for Container Registry (groupId: registry)'
-  targets:
   - services:
     - Microsoft.ContainerRegistry/registries
     terraform_pattern: |
@@ -5219,30 +4765,6 @@ rules:
     - NEVER rebuild images for different environments — build once, promote the same image artifact
     - NEVER deploy unsigned images to production — enable content trust (Notary) on ACR
     - NEVER skip image scanning — enable quarantine policy to hold images until vulnerability scan completes
-- id: WAF-REL-DEPLOY-005
-  severity: required
-  description: Use immutable infrastructure patterns for ALL containerized workloads.  Container images MUST be versioned
-    with unique tags (git SHA, build number, or semantic version) — NEVER use mutable tags like 'latest'.  Images MUST be
-    built once and promoted through environments (dev -> staging -> production) without rebuilding.  NEVER modify running
-    containers in place — deploy new immutable images.  ACR MUST have content trust and image quarantine for production images.
-  rationale: Mutable infrastructure (in-place updates, SSH patches, config changes on running servers) causes configuration
-    drift, makes debugging impossible, and prevents reliable rollback.  Immutable infrastructure ensures every deployment
-    is reproducible and traceable to a specific build artifact.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  companion_resources:
-  - type: Microsoft.ContainerRegistry/registries@2023-07-01
-    description: Container Registry with Premium SKU for content trust, quarantine, and retention policies
-  - type: Microsoft.Authorization/roleAssignments@2022-04-01
-    description: AcrPush role for CI/CD identity, AcrPull role for application identity
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: 'Private endpoint for Container Registry (groupId: registry)'
-  targets:
   - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
@@ -5407,30 +4929,6 @@ rules:
     - NEVER rebuild images for different environments — build once, promote the same image artifact
     - NEVER deploy unsigned images to production — enable content trust (Notary) on ACR
     - NEVER skip image scanning — enable quarantine policy to hold images until vulnerability scan completes
-- id: WAF-REL-DEPLOY-005
-  severity: required
-  description: Use immutable infrastructure patterns for ALL containerized workloads.  Container images MUST be versioned
-    with unique tags (git SHA, build number, or semantic version) — NEVER use mutable tags like 'latest'.  Images MUST be
-    built once and promoted through environments (dev -> staging -> production) without rebuilding.  NEVER modify running
-    containers in place — deploy new immutable images.  ACR MUST have content trust and image quarantine for production images.
-  rationale: Mutable infrastructure (in-place updates, SSH patches, config changes on running servers) causes configuration
-    drift, makes debugging impossible, and prevents reliable rollback.  Immutable infrastructure ensures every deployment
-    is reproducible and traceable to a specific build artifact.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  companion_resources:
-  - type: Microsoft.ContainerRegistry/registries@2023-07-01
-    description: Container Registry with Premium SKU for content trust, quarantine, and retention policies
-  - type: Microsoft.Authorization/roleAssignments@2022-04-01
-    description: AcrPush role for CI/CD identity, AcrPull role for application identity
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: 'Private endpoint for Container Registry (groupId: registry)'
-  targets:
   - services:
     - Microsoft.Compute/virtualMachineScaleSets
     terraform_pattern: |

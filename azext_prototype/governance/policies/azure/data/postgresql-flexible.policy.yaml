@@ -12,11 +12,21 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/virtualNetworks/subnets (delegated subnet with Microsoft.DBforPostgreSQL/flexibleServers delegation)
-  - Microsoft.Network/privateDnsZones (privatelink.postgres.database.azure.com)
-  - Microsoft.Network/privateDnsZones/virtualNetworkLinks (link DNS zone to VNet)
-  - Microsoft.DBforPostgreSQL/flexibleServers/administrators (Entra admin assignment)
-  - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
+  - type: Microsoft.Network/virtualNetworks/subnets@2024-01-01
+    name: snet-postgresql
+    description: Delegated subnet with Microsoft.DBforPostgreSQL/flexibleServers service delegation
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.postgres.database.azure.com
+    description: Private DNS zone for PostgreSQL Flexible Server VNet-integrated name resolution
+  - type: Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01
+    name: link-pg-dns
+    description: VNet link connecting the PostgreSQL private DNS zone to the virtual network
+  - type: Microsoft.DBforPostgreSQL/flexibleServers/administrators@2024-08-01
+    name: entra-admin
+    description: Entra ID admin assignment enabling Azure AD authentication on the server
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-postgresql
+    description: Diagnostic settings routing PostgreSQL logs to Log Analytics
   targets:
   - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
@@ -116,7 +126,9 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.DBforPostgreSQL/flexibleServers (parent server with authConfig.activeDirectoryAuth Enabled)
+  - type: Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01
+    name: pg-server
+    description: Parent PostgreSQL server with activeDirectoryAuth enabled in authConfig
   targets:
   - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
@@ -155,7 +167,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace as destination for PostgreSQL diagnostic logs
   targets:
   - services:
     - Microsoft.DBforPostgreSQL/flexibleServers

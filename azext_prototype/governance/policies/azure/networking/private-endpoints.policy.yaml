@@ -13,7 +13,10 @@ rules:
   - cloud-architect
   targets:
   - services:
-    - TODO:private-endpoint
+    - Microsoft.Network/privateEndpoints
+    - Microsoft.Network/privateDnsZones
+    - Microsoft.Network/privateDnsZones/virtualNetworkLinks
+    - Microsoft.Network/privateEndpoints/privateDnsZoneGroups
     terraform_pattern: |
       # Step 1: Private Endpoint
       resource "azapi_resource" "private_endpoint" {

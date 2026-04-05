@@ -18,14 +18,6 @@ Four-level taxonomy
   to ``domain`` for clarity.  JSON schemas, Python loaders, and tests
   updated.  Governance ``domain`` classifies documents; stage ``capability``
   classifies deployment stages.
-* **Developer ``applies_to`` expansion** — 340 governance rules updated
-  to include ``csharp-developer`` and ``python-developer`` alongside
-  ``app-developer``, ensuring language-specific developers receive relevant
-  policies.
-* **Generic application standards** — new ``generic.yaml`` with 5
-  STAN-APP principles for the generic ``app-developer`` agent, covering
-  Azure SDK auth, project structure, configuration, health checks, and
-  structured logging.
 
 Layer system
 ~~~~~~~~~~~~~
@@ -83,6 +75,15 @@ Code quality
   ``_normalize_stages()``, ``_categorise_service()`` to
   ``_categorize_service()``, and fixed British spellings in comments across
   8 files (serialise, specialised, initialised, centralises, summarise).
+
+Documentation
+~~~~~~~~~~~~~~
+* **Wiki — Layer-Architecture.md** — four-level taxonomy, layer ownership,
+  deployment order, service placement rules.
+* **Wiki — Application-Architecture.md** — sub-layer structure, architect →
+  developer delegation, developer contracts, language detection.
+* **Wiki — Agent-System.md** — updated for 20 agents with layer ownership
+  and contract sub_layers tables.
 
 Knowledge
 ~~~~~~~~~~
@@ -143,6 +144,9 @@ Build — category-aware stage generation
 
 Build resilience
 ~~~~~~~~~~~~~~~~~
+* **Debug logging for layer architecture** — generation loop log points
+  now include ``layer``, ``capability``, ``agent_name``, and ``delegated``
+  fields.  Knowledge loading logs layer and service count.
 * **Per-stage advisory with dedicated advisor agent** -- advisory notes
   are now generated per-stage immediately after QA passes, using a new
   ``advisor`` built-in agent.  Phase 4 aggregates per-stage advisories
@@ -306,9 +310,25 @@ Governance restructuring
   - ``STAN-BCP-`` for Bicep module standards (8 principles)
   - ``STAN-TF-`` for Terraform module standards (10 principles)
 
-* **Wiki governance subpages** -- 17 dedicated wiki pages with per-service
-  policy tables (rule ID, description, agents), auto-generated from YAML
-  via ``scripts/generate_wiki_governance.py``.
+* **Wiki governance subpages** -- 108 individual wiki pages (one per
+  service/resource), auto-generated via ``scripts/generate_wiki_governance.py``
+  using templates in ``scripts/templates/``.  Sidebar restructured with
+  grouped sections and individual subpages.
+* **Developer ``applies_to`` expansion** — 340 governance rules updated
+  to include ``csharp-developer`` and ``python-developer`` alongside
+  ``app-developer``, ensuring language-specific developers receive relevant
+  policies.
+* **Generic application standards** — ``generic.yaml`` with 5 STAN-APP
+  principles for the generic ``app-developer`` agent (Azure SDK auth,
+  project structure, configuration, health checks, structured logging).
+* **Companion resource consistency** — all 778 ``companion_resources``
+  entries across 72 policy files now have required ``type``, ``name``, and
+  ``description`` fields.  String entries converted to proper dicts.  JSON
+  schema updated to require ``name``.  Policy loader simplified.
+* **Duplicate rule ID consolidation** — 591 redundant rule entries across
+  22 policy files consolidated into 428 unique rules with merged targets.
+* **Taxonomy validation** — ``az prototype validate`` always includes
+  ``taxonomy.yaml`` structure validation (layer/capability/component).
 
 Anti-pattern detection
 ~~~~~~~~~~~~~~~~~~~~~~~

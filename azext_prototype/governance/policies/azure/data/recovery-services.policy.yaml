@@ -12,11 +12,21 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.RecoveryServices/vaults/backupPolicies (backup schedule and retention policies)
-  - Microsoft.RecoveryServices/vaults/backupFabrics/protectionContainers/protectedItems (protected resources)
-  - Microsoft.Network/privateEndpoints (private endpoint with groupId 'AzureBackup')
-  - Microsoft.Network/privateDnsZones (privatelink.region.backup.windowsazure.com)
-  - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
+  - type: Microsoft.RecoveryServices/vaults/backupPolicies@2024-04-01
+    name: daily-vm-policy
+    description: Backup schedule and retention policy defining RPO and recovery tiers
+  - type: Microsoft.RecoveryServices/vaults/backupFabrics/protectionContainers/protectedItems@2024-04-01
+    name: protected-vm
+    description: Protected item registering a VM or resource for backup in the vault
+  - type: Microsoft.Network/privateEndpoints@2023-04-01
+    name: pe-recovery-vault
+    description: Private endpoint for Recovery Services vault with groupId 'AzureBackup'
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.{region}.backup.windowsazure.com
+    description: Private DNS zone for Recovery Services vault backup endpoint resolution
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-recovery-vault
+    description: Diagnostic settings routing backup job and alert logs to Log Analytics
   targets:
   - services:
     - Microsoft.RecoveryServices/vaults
@@ -122,7 +132,9 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.RecoveryServices/vaults (parent recovery vault)
+  - type: Microsoft.RecoveryServices/vaults@2024-04-01
+    name: recovery-vault
+    description: Parent Recovery Services vault that owns this backup policy
   targets:
   - services:
     - Microsoft.RecoveryServices/vaults
@@ -247,9 +259,15 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/privateDnsZones (privatelink.{region}.backup.windowsazure.com)
-  - Microsoft.Network/privateDnsZones (privatelink.blob.core.windows.net for backup data)
-  - Microsoft.Network/privateDnsZones (privatelink.queue.core.windows.net for backup communication)
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.{region}.backup.windowsazure.com
+    description: Private DNS zone for Recovery Services vault backup endpoint
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.blob.core.windows.net
+    description: Private DNS zone for backup data storage blob endpoint
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.queue.core.windows.net
+    description: Private DNS zone for backup communication queue endpoint
   targets:
   - services:
     - Microsoft.RecoveryServices/vaults
@@ -307,7 +325,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace as destination for Recovery Services diagnostic logs
   targets:
   - services:
     - Microsoft.RecoveryServices/vaults

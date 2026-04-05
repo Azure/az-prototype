@@ -228,21 +228,6 @@ rules:
     - NEVER store Application Insights connection string as a public-facing environment variable — use secrets or Key Vault
       references
     - NEVER use Classic Application Insights (standalone) — always use workspace-based (LogAnalytics ingestion)
-- id: WAF-PERF-OBS-001
-  severity: required
-  description: Configure Application Insights with auto-instrumentation for .NET, Python, and Node.js — use connection string,
-    not instrumentation key
-  rationale: Application Insights provides request tracking, dependency tracing, and performance metrics. Connection strings
-    support regional ingestion endpoints
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.OperationalInsights/workspaces
     terraform_pattern: |
@@ -453,21 +438,6 @@ rules:
     - NEVER store Application Insights connection string as a public-facing environment variable — use secrets or Key Vault
       references
     - NEVER use Classic Application Insights (standalone) — always use workspace-based (LogAnalytics ingestion)
-- id: WAF-PERF-OBS-001
-  severity: required
-  description: Configure Application Insights with auto-instrumentation for .NET, Python, and Node.js — use connection string,
-    not instrumentation key
-  rationale: Application Insights provides request tracking, dependency tracing, and performance metrics. Connection strings
-    support regional ingestion endpoints
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.Web/sites
     terraform_pattern: |
@@ -678,21 +648,6 @@ rules:
     - NEVER store Application Insights connection string as a public-facing environment variable — use secrets or Key Vault
       references
     - NEVER use Classic Application Insights (standalone) — always use workspace-based (LogAnalytics ingestion)
-- id: WAF-PERF-OBS-001
-  severity: required
-  description: Configure Application Insights with auto-instrumentation for .NET, Python, and Node.js — use connection string,
-    not instrumentation key
-  rationale: Application Insights provides request tracking, dependency tracing, and performance metrics. Connection strings
-    support regional ingestion endpoints
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
@@ -903,21 +858,6 @@ rules:
     - NEVER store Application Insights connection string as a public-facing environment variable — use secrets or Key Vault
       references
     - NEVER use Classic Application Insights (standalone) — always use workspace-based (LogAnalytics ingestion)
-- id: WAF-PERF-OBS-001
-  severity: required
-  description: Configure Application Insights with auto-instrumentation for .NET, Python, and Node.js — use connection string,
-    not instrumentation key
-  rationale: Application Insights provides request tracking, dependency tracing, and performance metrics. Connection strings
-    support regional ingestion endpoints
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
@@ -1128,21 +1068,6 @@ rules:
     - NEVER store Application Insights connection string as a public-facing environment variable — use secrets or Key Vault
       references
     - NEVER use Classic Application Insights (standalone) — always use workspace-based (LogAnalytics ingestion)
-- id: WAF-PERF-OBS-001
-  severity: required
-  description: Configure Application Insights with auto-instrumentation for .NET, Python, and Node.js — use connection string,
-    not instrumentation key
-  rationale: Application Insights provides request tracking, dependency tracing, and performance metrics. Connection strings
-    support regional ingestion endpoints
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - app-developer
-  - csharp-developer
-  - python-developer
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |
@@ -1366,6 +1291,7 @@ rules:
   - monitoring-agent
   companion_resources:
   - type: Microsoft.Insights/actionGroups@2023-01-01
+    name: ag-ops
     description: Action group for alert notifications — required for metric alerts to trigger email/webhook/Logic App notifications
   targets:
   - services:
@@ -1622,21 +1548,6 @@ rules:
     - NEVER create alerts without an action group — silent alerts are useless
     - NEVER use only Sev3/Sev4 for error rate alerts — failed requests should be Sev1 or Sev2
     - NEVER set CPU alert threshold below 70% — normal load can trigger false alarms
-- id: WAF-PERF-OBS-002
-  severity: required
-  description: Configure custom metric alerts for key performance indicators — P95 latency, error rate, throughput, and resource
-    utilization
-  rationale: Metric alerts provide proactive notification before performance degradation becomes user-visible; without alerts,
-    issues are discovered by users
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - monitoring-agent
-  companion_resources:
-  - type: Microsoft.Insights/actionGroups@2023-01-01
-    description: Action group for alert notifications — required for metric alerts to trigger email/webhook/Logic App notifications
-  targets:
   - services:
     - Microsoft.OperationalInsights/workspaces
     terraform_pattern: |
@@ -1891,21 +1802,6 @@ rules:
     - NEVER create alerts without an action group — silent alerts are useless
     - NEVER use only Sev3/Sev4 for error rate alerts — failed requests should be Sev1 or Sev2
     - NEVER set CPU alert threshold below 70% — normal load can trigger false alarms
-- id: WAF-PERF-OBS-002
-  severity: required
-  description: Configure custom metric alerts for key performance indicators — P95 latency, error rate, throughput, and resource
-    utilization
-  rationale: Metric alerts provide proactive notification before performance degradation becomes user-visible; without alerts,
-    issues are discovered by users
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - monitoring-agent
-  companion_resources:
-  - type: Microsoft.Insights/actionGroups@2023-01-01
-    description: Action group for alert notifications — required for metric alerts to trigger email/webhook/Logic App notifications
-  targets:
   - services:
     - Microsoft.Web/sites
     terraform_pattern: |
@@ -2160,21 +2056,6 @@ rules:
     - NEVER create alerts without an action group — silent alerts are useless
     - NEVER use only Sev3/Sev4 for error rate alerts — failed requests should be Sev1 or Sev2
     - NEVER set CPU alert threshold below 70% — normal load can trigger false alarms
-- id: WAF-PERF-OBS-002
-  severity: required
-  description: Configure custom metric alerts for key performance indicators — P95 latency, error rate, throughput, and resource
-    utilization
-  rationale: Metric alerts provide proactive notification before performance degradation becomes user-visible; without alerts,
-    issues are discovered by users
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - monitoring-agent
-  companion_resources:
-  - type: Microsoft.Insights/actionGroups@2023-01-01
-    description: Action group for alert notifications — required for metric alerts to trigger email/webhook/Logic App notifications
-  targets:
   - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
@@ -2429,21 +2310,6 @@ rules:
     - NEVER create alerts without an action group — silent alerts are useless
     - NEVER use only Sev3/Sev4 for error rate alerts — failed requests should be Sev1 or Sev2
     - NEVER set CPU alert threshold below 70% — normal load can trigger false alarms
-- id: WAF-PERF-OBS-002
-  severity: required
-  description: Configure custom metric alerts for key performance indicators — P95 latency, error rate, throughput, and resource
-    utilization
-  rationale: Metric alerts provide proactive notification before performance degradation becomes user-visible; without alerts,
-    issues are discovered by users
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - monitoring-agent
-  companion_resources:
-  - type: Microsoft.Insights/actionGroups@2023-01-01
-    description: Action group for alert notifications — required for metric alerts to trigger email/webhook/Logic App notifications
-  targets:
   - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
@@ -2698,21 +2564,6 @@ rules:
     - NEVER create alerts without an action group — silent alerts are useless
     - NEVER use only Sev3/Sev4 for error rate alerts — failed requests should be Sev1 or Sev2
     - NEVER set CPU alert threshold below 70% — normal load can trigger false alarms
-- id: WAF-PERF-OBS-002
-  severity: required
-  description: Configure custom metric alerts for key performance indicators — P95 latency, error rate, throughput, and resource
-    utilization
-  rationale: Metric alerts provide proactive notification before performance degradation becomes user-visible; without alerts,
-    issues are discovered by users
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - monitoring-agent
-  companion_resources:
-  - type: Microsoft.Insights/actionGroups@2023-01-01
-    description: Action group for alert notifications — required for metric alerts to trigger email/webhook/Logic App notifications
-  targets:
   - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |
@@ -3072,18 +2923,6 @@ rules:
     - NEVER disable W3C trace context propagation — it is the standard for distributed tracing
     - NEVER use AI-only correlation mode — always use W3C (or AI_AND_W3C for backward compatibility)
     - NEVER omit custom span attributes for business-relevant fields (order ID, tenant ID, user ID)
-- id: WAF-PERF-OBS-003
-  severity: required
-  description: Enable W3C distributed tracing with trace context propagation across all services in the request chain
-  rationale: Without distributed tracing, diagnosing performance issues in microservices requires correlating logs across
-    multiple systems manually. W3C traceparent header provides automatic correlation
-  applies_to:
-  - app-developer
-  - csharp-developer
-  - python-developer
-  - cloud-architect
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.OperationalInsights/workspaces
     terraform_pattern: |
@@ -3177,18 +3016,6 @@ rules:
     - NEVER disable W3C trace context propagation — it is the standard for distributed tracing
     - NEVER use AI-only correlation mode — always use W3C (or AI_AND_W3C for backward compatibility)
     - NEVER omit custom span attributes for business-relevant fields (order ID, tenant ID, user ID)
-- id: WAF-PERF-OBS-003
-  severity: required
-  description: Enable W3C distributed tracing with trace context propagation across all services in the request chain
-  rationale: Without distributed tracing, diagnosing performance issues in microservices requires correlating logs across
-    multiple systems manually. W3C traceparent header provides automatic correlation
-  applies_to:
-  - app-developer
-  - csharp-developer
-  - python-developer
-  - cloud-architect
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.Web/sites
     terraform_pattern: |
@@ -3282,18 +3109,6 @@ rules:
     - NEVER disable W3C trace context propagation — it is the standard for distributed tracing
     - NEVER use AI-only correlation mode — always use W3C (or AI_AND_W3C for backward compatibility)
     - NEVER omit custom span attributes for business-relevant fields (order ID, tenant ID, user ID)
-- id: WAF-PERF-OBS-003
-  severity: required
-  description: Enable W3C distributed tracing with trace context propagation across all services in the request chain
-  rationale: Without distributed tracing, diagnosing performance issues in microservices requires correlating logs across
-    multiple systems manually. W3C traceparent header provides automatic correlation
-  applies_to:
-  - app-developer
-  - csharp-developer
-  - python-developer
-  - cloud-architect
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
@@ -3387,18 +3202,6 @@ rules:
     - NEVER disable W3C trace context propagation — it is the standard for distributed tracing
     - NEVER use AI-only correlation mode — always use W3C (or AI_AND_W3C for backward compatibility)
     - NEVER omit custom span attributes for business-relevant fields (order ID, tenant ID, user ID)
-- id: WAF-PERF-OBS-003
-  severity: required
-  description: Enable W3C distributed tracing with trace context propagation across all services in the request chain
-  rationale: Without distributed tracing, diagnosing performance issues in microservices requires correlating logs across
-    multiple systems manually. W3C traceparent header provides automatic correlation
-  applies_to:
-  - app-developer
-  - csharp-developer
-  - python-developer
-  - cloud-architect
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
@@ -3492,18 +3295,6 @@ rules:
     - NEVER disable W3C trace context propagation — it is the standard for distributed tracing
     - NEVER use AI-only correlation mode — always use W3C (or AI_AND_W3C for backward compatibility)
     - NEVER omit custom span attributes for business-relevant fields (order ID, tenant ID, user ID)
-- id: WAF-PERF-OBS-003
-  severity: required
-  description: Enable W3C distributed tracing with trace context propagation across all services in the request chain
-  rationale: Without distributed tracing, diagnosing performance issues in microservices requires correlating logs across
-    multiple systems manually. W3C traceparent header provides automatic correlation
-  applies_to:
-  - app-developer
-  - csharp-developer
-  - python-developer
-  - cloud-architect
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |
@@ -3732,17 +3523,6 @@ rules:
     - NEVER deploy without saved KQL queries for P95 latency, error rate, and throughput
     - NEVER query across multiple time ranges in a single KQL query — use parameterized time ranges
     - NEVER use count() without time bins — unbinned counts hide temporal patterns
-- id: WAF-PERF-OBS-004
-  severity: recommended
-  description: Create standard KQL queries for performance monitoring — P95 latency, error rates, throughput, and slow dependency
-    calls
-  rationale: Pre-built KQL queries enable rapid diagnosis during incidents; without them, engineers spend 15-30 minutes writing
-    queries instead of investigating
-  applies_to:
-  - monitoring-agent
-  - cloud-architect
-  - qa-engineer
-  targets:
   - services:
     - Microsoft.OperationalInsights/workspaces
     terraform_pattern: |
@@ -3867,17 +3647,6 @@ rules:
     - NEVER deploy without saved KQL queries for P95 latency, error rate, and throughput
     - NEVER query across multiple time ranges in a single KQL query — use parameterized time ranges
     - NEVER use count() without time bins — unbinned counts hide temporal patterns
-- id: WAF-PERF-OBS-004
-  severity: recommended
-  description: Create standard KQL queries for performance monitoring — P95 latency, error rates, throughput, and slow dependency
-    calls
-  rationale: Pre-built KQL queries enable rapid diagnosis during incidents; without them, engineers spend 15-30 minutes writing
-    queries instead of investigating
-  applies_to:
-  - monitoring-agent
-  - cloud-architect
-  - qa-engineer
-  targets:
   - services:
     - Microsoft.Web/sites
     terraform_pattern: |
@@ -4002,17 +3771,6 @@ rules:
     - NEVER deploy without saved KQL queries for P95 latency, error rate, and throughput
     - NEVER query across multiple time ranges in a single KQL query — use parameterized time ranges
     - NEVER use count() without time bins — unbinned counts hide temporal patterns
-- id: WAF-PERF-OBS-004
-  severity: recommended
-  description: Create standard KQL queries for performance monitoring — P95 latency, error rates, throughput, and slow dependency
-    calls
-  rationale: Pre-built KQL queries enable rapid diagnosis during incidents; without them, engineers spend 15-30 minutes writing
-    queries instead of investigating
-  applies_to:
-  - monitoring-agent
-  - cloud-architect
-  - qa-engineer
-  targets:
   - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
@@ -4137,17 +3895,6 @@ rules:
     - NEVER deploy without saved KQL queries for P95 latency, error rate, and throughput
     - NEVER query across multiple time ranges in a single KQL query — use parameterized time ranges
     - NEVER use count() without time bins — unbinned counts hide temporal patterns
-- id: WAF-PERF-OBS-004
-  severity: recommended
-  description: Create standard KQL queries for performance monitoring — P95 latency, error rates, throughput, and slow dependency
-    calls
-  rationale: Pre-built KQL queries enable rapid diagnosis during incidents; without them, engineers spend 15-30 minutes writing
-    queries instead of investigating
-  applies_to:
-  - monitoring-agent
-  - cloud-architect
-  - qa-engineer
-  targets:
   - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
@@ -4272,17 +4019,6 @@ rules:
     - NEVER deploy without saved KQL queries for P95 latency, error rate, and throughput
     - NEVER query across multiple time ranges in a single KQL query — use parameterized time ranges
     - NEVER use count() without time bins — unbinned counts hide temporal patterns
-- id: WAF-PERF-OBS-004
-  severity: recommended
-  description: Create standard KQL queries for performance monitoring — P95 latency, error rates, throughput, and slow dependency
-    calls
-  rationale: Pre-built KQL queries enable rapid diagnosis during incidents; without them, engineers spend 15-30 minutes writing
-    queries instead of investigating
-  applies_to:
-  - monitoring-agent
-  - cloud-architect
-  - qa-engineer
-  targets:
   - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |
@@ -4544,17 +4280,6 @@ rules:
     - NEVER skip the availability alert — tests without alerts only provide historical data
     - NEVER test internal/private endpoints with availability tests — they run from Azure global POPs
     - NEVER use availability tests as the sole health check — they complement, not replace, internal health probes
-- id: WAF-PERF-OBS-005
-  severity: recommended
-  description: Configure availability tests for public endpoints — standard URL ping test and multi-step web tests
-  rationale: Availability tests detect outages from external perspective (outside Azure network); internal health checks may
-    pass while external access fails
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.OperationalInsights/workspaces
     terraform_pattern: |
@@ -4681,17 +4406,6 @@ rules:
     - NEVER skip the availability alert — tests without alerts only provide historical data
     - NEVER test internal/private endpoints with availability tests — they run from Azure global POPs
     - NEVER use availability tests as the sole health check — they complement, not replace, internal health probes
-- id: WAF-PERF-OBS-005
-  severity: recommended
-  description: Configure availability tests for public endpoints — standard URL ping test and multi-step web tests
-  rationale: Availability tests detect outages from external perspective (outside Azure network); internal health checks may
-    pass while external access fails
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.Web/sites
     terraform_pattern: |
@@ -4818,17 +4532,6 @@ rules:
     - NEVER skip the availability alert — tests without alerts only provide historical data
     - NEVER test internal/private endpoints with availability tests — they run from Azure global POPs
     - NEVER use availability tests as the sole health check — they complement, not replace, internal health probes
-- id: WAF-PERF-OBS-005
-  severity: recommended
-  description: Configure availability tests for public endpoints — standard URL ping test and multi-step web tests
-  rationale: Availability tests detect outages from external perspective (outside Azure network); internal health checks may
-    pass while external access fails
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
@@ -4955,17 +4658,6 @@ rules:
     - NEVER skip the availability alert — tests without alerts only provide historical data
     - NEVER test internal/private endpoints with availability tests — they run from Azure global POPs
     - NEVER use availability tests as the sole health check — they complement, not replace, internal health probes
-- id: WAF-PERF-OBS-005
-  severity: recommended
-  description: Configure availability tests for public endpoints — standard URL ping test and multi-step web tests
-  rationale: Availability tests detect outages from external perspective (outside Azure network); internal health checks may
-    pass while external access fails
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
@@ -5092,17 +4784,6 @@ rules:
     - NEVER skip the availability alert — tests without alerts only provide historical data
     - NEVER test internal/private endpoints with availability tests — they run from Azure global POPs
     - NEVER use availability tests as the sole health check — they complement, not replace, internal health probes
-- id: WAF-PERF-OBS-005
-  severity: recommended
-  description: Configure availability tests for public endpoints — standard URL ping test and multi-step web tests
-  rationale: Availability tests detect outages from external perspective (outside Azure network); internal health checks may
-    pass while external access fails
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  - monitoring-agent
-  targets:
   - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |

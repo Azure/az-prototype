@@ -12,12 +12,24 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/privateEndpoints (private endpoint with groupId 'dataFactory')
-  - Microsoft.Network/privateDnsZones (privatelink.datafactory.azure.net)
-  - Microsoft.Network/privateDnsZones (privatelink.adf.azure.com for portal)
-  - Microsoft.DataFactory/factories/managedVirtualNetworks (managed VNet for IR)
-  - Microsoft.DataFactory/factories/integrationRuntimes (managed VNet integration runtime)
-  - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
+  - type: Microsoft.Network/privateEndpoints@2023-04-01
+    name: pe-adf
+    description: Private endpoint for Data Factory data plane with groupId 'dataFactory'
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.datafactory.azure.net
+    description: Private DNS zone for Data Factory data plane endpoint resolution
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.adf.azure.com
+    description: Private DNS zone for Data Factory portal (authoring) endpoint resolution
+  - type: Microsoft.DataFactory/factories/managedVirtualNetworks@2018-06-01
+    name: default
+    description: Managed virtual network isolating integration runtime data movement traffic
+  - type: Microsoft.DataFactory/factories/integrationRuntimes@2018-06-01
+    name: AutoResolveIntegrationRuntime
+    description: Managed VNet integration runtime for secure data movement
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-adf
+    description: Diagnostic settings routing pipeline and activity logs to Log Analytics
   targets:
   - services:
     - Microsoft.DataFactory/factories
@@ -64,7 +76,9 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints (for data source access)
+  - type: Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints@2018-06-01
+    name: mpe-datasource
+    description: Managed private endpoint connecting ADF integration runtime to data sources
   targets:
   - services:
     - Microsoft.DataFactory/factories
@@ -134,7 +148,9 @@ rules:
   - csharp-developer
   - python-developer
   companion_resources:
-  - Microsoft.KeyVault/vaults (Key Vault with secrets)
+  - type: Microsoft.KeyVault/vaults@2023-07-01
+    name: kv-secrets
+    description: Key Vault storing secrets and connection strings referenced by ADF linked services
   targets:
   - services:
     - Microsoft.DataFactory/factories
@@ -177,7 +193,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace as destination for Data Factory diagnostic logs
   targets:
   - services:
     - Microsoft.DataFactory/factories

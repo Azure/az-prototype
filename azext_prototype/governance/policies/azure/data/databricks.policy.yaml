@@ -12,11 +12,21 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - 'Microsoft.Network/virtualNetworks/subnets (two delegated subnets for Databricks: public and private)'
-  - Microsoft.Network/networkSecurityGroups (NSG with Databricks-required rules on both subnets)
-  - Microsoft.Network/privateEndpoints (private endpoints for databricks_ui_api and browser_authentication)
-  - Microsoft.Network/privateDnsZones (privatelink.azuredatabricks.net)
-  - Microsoft.Insights/diagnosticSettings (route diagnostic logs to Log Analytics)
+  - type: Microsoft.Network/virtualNetworks/subnets@2024-01-01
+    name: snet-dbr-public, snet-dbr-private
+    description: Two delegated subnets for Databricks cluster nodes (public and private)
+  - type: Microsoft.Network/networkSecurityGroups@2023-04-01
+    name: nsg-dbr
+    description: NSG with Databricks-required inbound/outbound rules on both subnets
+  - type: Microsoft.Network/privateEndpoints@2023-04-01
+    name: pe-dbr-ui-api, pe-dbr-browser
+    description: Private endpoints for Databricks workspace UI/API and browser authentication
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.azuredatabricks.net
+    description: Private DNS zone for Databricks workspace private endpoint resolution
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-databricks
+    description: Diagnostic settings routing workspace and cluster logs to Log Analytics
   targets:
   - services:
     - Microsoft.Databricks/workspaces
@@ -98,7 +108,9 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/networkSecurityGroups (NSG with required Databricks rules)
+  - type: Microsoft.Network/networkSecurityGroups@2023-04-01
+    name: nsg-dbr
+    description: NSG with required Databricks communication rules for delegated subnets
   targets:
   - services:
     - Microsoft.Databricks/workspaces
@@ -196,8 +208,12 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/privateDnsZones (privatelink.azuredatabricks.net)
-  - Microsoft.Network/privateEndpoints/privateDnsZoneGroups (DNS registration)
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.azuredatabricks.net
+    description: Private DNS zone for Databricks private endpoint name resolution
+  - type: Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-04-01
+    name: default
+    description: DNS zone group registering Databricks private endpoint records
   targets:
   - services:
     - Microsoft.Databricks/workspaces
@@ -297,7 +313,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace as destination for Databricks diagnostic logs
   targets:
   - services:
     - Microsoft.Databricks/workspaces

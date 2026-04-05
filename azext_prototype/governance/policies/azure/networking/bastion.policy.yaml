@@ -12,10 +12,18 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/publicIPAddresses (Standard SKU, static, for Bastion frontend)
-  - Microsoft.Network/virtualNetworks/subnets (dedicated AzureBastionSubnet with /26 or larger)
-  - Microsoft.Network/networkSecurityGroups (NSG on AzureBastionSubnet with required rules)
-  - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
+  - type: Microsoft.Network/publicIPAddresses@2023-04-01
+    name: pip-bastion
+    description: Standard SKU static public IP for Bastion frontend
+  - type: Microsoft.Network/virtualNetworks/subnets@2024-01-01
+    name: AzureBastionSubnet
+    description: Dedicated AzureBastionSubnet with /26 or larger CIDR
+  - type: Microsoft.Network/networkSecurityGroups@2023-04-01
+    name: nsg-bastion
+    description: NSG on AzureBastionSubnet with required Bastion inbound/outbound rules
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-bastion
+    description: Diagnostic settings routing Bastion session logs to Log Analytics
   targets:
   - services:
     - Microsoft.Network/bastionHosts
@@ -89,7 +97,9 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/networkSecurityGroups (with required inbound/outbound rules for Bastion)
+  - type: Microsoft.Network/networkSecurityGroups@2023-04-01
+    name: nsg-bastion
+    description: NSG with required inbound/outbound rules for AzureBastionSubnet
   targets:
   - services:
     - Microsoft.Network/bastionHosts
@@ -324,7 +334,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace as destination for Bastion diagnostic logs
   targets:
   - services:
     - Microsoft.Network/bastionHosts

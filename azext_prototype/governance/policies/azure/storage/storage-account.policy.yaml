@@ -15,6 +15,7 @@ rules:
   - cloud-architect
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2024-01-01
+    name: pe-storage-blob
     description: Private endpoint for blob storage — required when publicNetworkAccess is Disabled
     terraform_pattern: |
       resource "azapi_resource" "storage_private_endpoint" {
@@ -62,6 +63,7 @@ rules:
         }
       }
   - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.blob.core.windows.net
     description: Private DNS zone for blob storage private endpoint resolution
     terraform_pattern: |
       resource "azapi_resource" "storage_dns_zone" {
@@ -138,6 +140,7 @@ rules:
         }
       }
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: Storage Blob Data Contributor
     description: Storage Blob Data Contributor role (ba92f5b4-2d11-453d-a403-e96b0029c9fe) for application identity
     terraform_pattern: |
       resource "azapi_resource" "storage_blob_contributor_role" {
@@ -172,7 +175,7 @@ rules:
     error_message: 'Service ''{service_name}'' ({service_type}) missing {config_key}: true'
   targets:
   - services:
-    - TODO:storage
+    - Microsoft.Storage/storageAccounts
     terraform_pattern: |
       resource "azapi_resource" "storage_account" {
         type      = "Microsoft.Storage/storageAccounts@2023-05-01"
@@ -237,7 +240,7 @@ rules:
   - bicep-agent
   targets:
   - services:
-    - TODO:storage
+    - Microsoft.Storage/storageAccounts
     terraform_pattern: |
       resource "azapi_resource" "storage_blob_service" {
         type      = "Microsoft.Storage/storageAccounts/blobServices@2023-05-01"
@@ -285,6 +288,7 @@ rules:
   - monitoring-agent
   companion_resources:
   - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-storage
     description: Diagnostic settings for blob storage to Log Analytics
     terraform_pattern: |
       resource "azapi_resource" "storage_diagnostics" {
@@ -332,7 +336,7 @@ rules:
       }
   targets:
   - services:
-    - TODO:storage
+    - Microsoft.Storage/storageAccounts
 - id: AZ-ST-004
   severity: recommended
   description: Configure lifecycle management policies for cost optimization
@@ -344,7 +348,7 @@ rules:
   - cost-analyst
   targets:
   - services:
-    - TODO:storage
+    - Microsoft.Storage/storageAccounts
 - id: AZ-ST-005
   severity: recommended
   description: Configure zone-redundant or geo-zone-redundant storage replication
@@ -356,7 +360,7 @@ rules:
   - bicep-agent
   targets:
   - services:
-    - TODO:storage
+    - Microsoft.Storage/storageAccounts
     terraform_pattern: |
       # In ST-001, change the sku.name to the appropriate redundancy level:
       #   sku = {
@@ -378,7 +382,7 @@ rules:
   - bicep-agent
   targets:
   - services:
-    - TODO:storage
+    - Microsoft.Storage/storageAccounts
     terraform_pattern: |
       resource "azapi_resource" "storage_blob_service_restore" {
         type      = "Microsoft.Storage/storageAccounts/blobServices@2023-05-01"
@@ -431,7 +435,7 @@ rules:
   - bicep-agent
   targets:
   - services:
-    - TODO:storage
+    - Microsoft.Storage/storageAccounts
     terraform_pattern: |
       resource "azapi_resource" "storage_lock" {
         type      = "Microsoft.Authorization/locks@2020-05-01"
@@ -466,7 +470,7 @@ rules:
   - security-reviewer
   targets:
   - services:
-    - TODO:storage
+    - Microsoft.Storage/storageAccounts
 patterns:
 - name: Storage account with security baseline
   description: Complete storage deployment with RBAC, private endpoint, blob versioning, diagnostics, and role assignment

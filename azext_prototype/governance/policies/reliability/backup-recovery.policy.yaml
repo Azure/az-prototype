@@ -246,19 +246,6 @@ rules:
     - NEVER disable blob soft delete or versioning on production storage accounts
     - NEVER disable Key Vault purge protection — it prevents permanent secret/key/certificate destruction
     - NEVER use LocallyRedundant backup storage for production SQL databases — use Geo for DR
-- id: WAF-REL-BKP-001
-  severity: required
-  description: Configure automated backup for ALL data services.  Every database, storage account, and key vault MUST have
-    automated backup enabled with retention policies matching the environment tier.  SQL Database and PostgreSQL Flexible
-    have built-in automated backups — configure retention.  Cosmos DB has continuous backup mode.  Storage accounts use soft
-    delete and versioning.  Key Vault uses soft delete and purge protection.  NEVER deploy a data service without backup configuration.
-  rationale: Data loss is the most severe reliability failure.  Automated backups are the last line of defense against accidental
-    deletion, corruption, ransomware, and application bugs.  Manual backups are unreliable because they depend on human discipline.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
@@ -489,19 +476,6 @@ rules:
     - NEVER disable blob soft delete or versioning on production storage accounts
     - NEVER disable Key Vault purge protection — it prevents permanent secret/key/certificate destruction
     - NEVER use LocallyRedundant backup storage for production SQL databases — use Geo for DR
-- id: WAF-REL-BKP-001
-  severity: required
-  description: Configure automated backup for ALL data services.  Every database, storage account, and key vault MUST have
-    automated backup enabled with retention policies matching the environment tier.  SQL Database and PostgreSQL Flexible
-    have built-in automated backups — configure retention.  Cosmos DB has continuous backup mode.  Storage accounts use soft
-    delete and versioning.  Key Vault uses soft delete and purge protection.  NEVER deploy a data service without backup configuration.
-  rationale: Data loss is the most severe reliability failure.  Automated backups are the last line of defense against accidental
-    deletion, corruption, ransomware, and application bugs.  Manual backups are unreliable because they depend on human discipline.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
@@ -732,19 +706,6 @@ rules:
     - NEVER disable blob soft delete or versioning on production storage accounts
     - NEVER disable Key Vault purge protection — it prevents permanent secret/key/certificate destruction
     - NEVER use LocallyRedundant backup storage for production SQL databases — use Geo for DR
-- id: WAF-REL-BKP-001
-  severity: required
-  description: Configure automated backup for ALL data services.  Every database, storage account, and key vault MUST have
-    automated backup enabled with retention policies matching the environment tier.  SQL Database and PostgreSQL Flexible
-    have built-in automated backups — configure retention.  Cosmos DB has continuous backup mode.  Storage accounts use soft
-    delete and versioning.  Key Vault uses soft delete and purge protection.  NEVER deploy a data service without backup configuration.
-  rationale: Data loss is the most severe reliability failure.  Automated backups are the last line of defense against accidental
-    deletion, corruption, ransomware, and application bugs.  Manual backups are unreliable because they depend on human discipline.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.DBforMySQL/flexibleServers
     terraform_pattern: |
@@ -975,21 +936,14 @@ rules:
     - NEVER disable blob soft delete or versioning on production storage accounts
     - NEVER disable Key Vault purge protection — it prevents permanent secret/key/certificate destruction
     - NEVER use LocallyRedundant backup storage for production SQL databases — use Geo for DR
-- id: WAF-REL-BKP-001
-  severity: required
-  description: Configure automated backup for ALL data services.  Every database, storage account, and key vault MUST have
-    automated backup enabled with retention policies matching the environment tier.  SQL Database and PostgreSQL Flexible
-    have built-in automated backups — configure retention.  Cosmos DB has continuous backup mode.  Storage accounts use soft
-    delete and versioning.  Key Vault uses soft delete and purge protection.  NEVER deploy a data service without backup configuration.
-  rationale: Data loss is the most severe reliability failure.  Automated backups are the last line of defense against accidental
-    deletion, corruption, ransomware, and application bugs.  Manual backups are unreliable because they depend on human discipline.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
-    - TODO:storage
+    - Microsoft.Sql/servers/databases
+    - Microsoft.Sql/servers/databases/backupShortTermRetentionPolicies
+    - Microsoft.Sql/servers/databases/backupLongTermRetentionPolicies
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.DBforPostgreSQL/flexibleServers
+    - Microsoft.Storage/storageAccounts/blobServices
+    - Microsoft.KeyVault/vaults
     terraform_pattern: |
       # === SQL Database: Automated backup with retention ===
       # SQL Database backups are automatic — configure retention and redundancy.
@@ -1218,19 +1172,6 @@ rules:
     - NEVER disable blob soft delete or versioning on production storage accounts
     - NEVER disable Key Vault purge protection — it prevents permanent secret/key/certificate destruction
     - NEVER use LocallyRedundant backup storage for production SQL databases — use Geo for DR
-- id: WAF-REL-BKP-001
-  severity: required
-  description: Configure automated backup for ALL data services.  Every database, storage account, and key vault MUST have
-    automated backup enabled with retention policies matching the environment tier.  SQL Database and PostgreSQL Flexible
-    have built-in automated backups — configure retention.  Cosmos DB has continuous backup mode.  Storage accounts use soft
-    delete and versioning.  Key Vault uses soft delete and purge protection.  NEVER deploy a data service without backup configuration.
-  rationale: Data loss is the most severe reliability failure.  Automated backups are the last line of defense against accidental
-    deletion, corruption, ransomware, and application bugs.  Manual backups are unreliable because they depend on human discipline.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.KeyVault/vaults
     terraform_pattern: |
@@ -1461,19 +1402,6 @@ rules:
     - NEVER disable blob soft delete or versioning on production storage accounts
     - NEVER disable Key Vault purge protection — it prevents permanent secret/key/certificate destruction
     - NEVER use LocallyRedundant backup storage for production SQL databases — use Geo for DR
-- id: WAF-REL-BKP-001
-  severity: required
-  description: Configure automated backup for ALL data services.  Every database, storage account, and key vault MUST have
-    automated backup enabled with retention policies matching the environment tier.  SQL Database and PostgreSQL Flexible
-    have built-in automated backups — configure retention.  Cosmos DB has continuous backup mode.  Storage accounts use soft
-    delete and versioning.  Key Vault uses soft delete and purge protection.  NEVER deploy a data service without backup configuration.
-  rationale: Data loss is the most severe reliability failure.  Automated backups are the last line of defense against accidental
-    deletion, corruption, ransomware, and application bugs.  Manual backups are unreliable because they depend on human discipline.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
@@ -1704,19 +1632,6 @@ rules:
     - NEVER disable blob soft delete or versioning on production storage accounts
     - NEVER disable Key Vault purge protection — it prevents permanent secret/key/certificate destruction
     - NEVER use LocallyRedundant backup storage for production SQL databases — use Geo for DR
-- id: WAF-REL-BKP-001
-  severity: required
-  description: Configure automated backup for ALL data services.  Every database, storage account, and key vault MUST have
-    automated backup enabled with retention policies matching the environment tier.  SQL Database and PostgreSQL Flexible
-    have built-in automated backups — configure retention.  Cosmos DB has continuous backup mode.  Storage accounts use soft
-    delete and versioning.  Key Vault uses soft delete and purge protection.  NEVER deploy a data service without backup configuration.
-  rationale: Data loss is the most severe reliability failure.  Automated backups are the last line of defense against accidental
-    deletion, corruption, ransomware, and application bugs.  Manual backups are unreliable because they depend on human discipline.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.DataProtection/backupVaults
     terraform_pattern: |
@@ -1947,19 +1862,6 @@ rules:
     - NEVER disable blob soft delete or versioning on production storage accounts
     - NEVER disable Key Vault purge protection — it prevents permanent secret/key/certificate destruction
     - NEVER use LocallyRedundant backup storage for production SQL databases — use Geo for DR
-- id: WAF-REL-BKP-001
-  severity: required
-  description: Configure automated backup for ALL data services.  Every database, storage account, and key vault MUST have
-    automated backup enabled with retention policies matching the environment tier.  SQL Database and PostgreSQL Flexible
-    have built-in automated backups — configure retention.  Cosmos DB has continuous backup mode.  Storage accounts use soft
-    delete and versioning.  Key Vault uses soft delete and purge protection.  NEVER deploy a data service without backup configuration.
-  rationale: Data loss is the most severe reliability failure.  Automated backups are the last line of defense against accidental
-    deletion, corruption, ransomware, and application bugs.  Manual backups are unreliable because they depend on human discipline.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
@@ -2190,19 +2092,6 @@ rules:
     - NEVER disable blob soft delete or versioning on production storage accounts
     - NEVER disable Key Vault purge protection — it prevents permanent secret/key/certificate destruction
     - NEVER use LocallyRedundant backup storage for production SQL databases — use Geo for DR
-- id: WAF-REL-BKP-001
-  severity: required
-  description: Configure automated backup for ALL data services.  Every database, storage account, and key vault MUST have
-    automated backup enabled with retention policies matching the environment tier.  SQL Database and PostgreSQL Flexible
-    have built-in automated backups — configure retention.  Cosmos DB has continuous backup mode.  Storage accounts use soft
-    delete and versioning.  Key Vault uses soft delete and purge protection.  NEVER deploy a data service without backup configuration.
-  rationale: Data loss is the most severe reliability failure.  Automated backups are the last line of defense against accidental
-    deletion, corruption, ransomware, and application bugs.  Manual backups are unreliable because they depend on human discipline.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
@@ -2446,10 +2335,13 @@ rules:
   - cloud-architect
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2023-11-01
+    name: pe-resource
     description: 'Private endpoint for Recovery Services vault (groupId: AzureBackup)'
   - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.service.azure.com
     description: Private DNS zone privatelink.{region}.backup.windowsazure.com for vault private endpoint
   - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-udr
     description: Diagnostic settings to route vault operation logs and backup health to Log Analytics
   targets:
   - services:
@@ -2660,25 +2552,6 @@ rules:
     - NEVER disable soft delete on Recovery Services vault — backup data cannot be recovered after deletion
     - NEVER set daily retention below 7 days for dev or 30 days for production
     - NEVER configure backup storage redundancy after protecting items — it cannot be changed once items are registered
-- id: WAF-REL-BKP-002
-  severity: required
-  description: Deploy a Recovery Services vault for VM backups with geo-redundant storage, soft delete, immutability, and
-    backup policies.  Every production VM MUST be protected by a Recovery Services vault. Configure backup policies with daily
-    backups, weekly/monthly/yearly retention, and cross-region restore capability.
-  rationale: Recovery Services vault is the central backup management plane for VMs, SQL in VMs, and file shares.  Without
-    vault protection, VM data is lost on disk failure or accidental deletion.  GRS ensures backups survive regional disasters.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: 'Private endpoint for Recovery Services vault (groupId: AzureBackup)'
-  - type: Microsoft.Network/privateDnsZones@2020-06-01
-    description: Private DNS zone privatelink.{region}.backup.windowsazure.com for vault private endpoint
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings to route vault operation logs and backup health to Log Analytics
-  targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
@@ -2887,25 +2760,6 @@ rules:
     - NEVER disable soft delete on Recovery Services vault — backup data cannot be recovered after deletion
     - NEVER set daily retention below 7 days for dev or 30 days for production
     - NEVER configure backup storage redundancy after protecting items — it cannot be changed once items are registered
-- id: WAF-REL-BKP-002
-  severity: required
-  description: Deploy a Recovery Services vault for VM backups with geo-redundant storage, soft delete, immutability, and
-    backup policies.  Every production VM MUST be protected by a Recovery Services vault. Configure backup policies with daily
-    backups, weekly/monthly/yearly retention, and cross-region restore capability.
-  rationale: Recovery Services vault is the central backup management plane for VMs, SQL in VMs, and file shares.  Without
-    vault protection, VM data is lost on disk failure or accidental deletion.  GRS ensures backups survive regional disasters.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: 'Private endpoint for Recovery Services vault (groupId: AzureBackup)'
-  - type: Microsoft.Network/privateDnsZones@2020-06-01
-    description: Private DNS zone privatelink.{region}.backup.windowsazure.com for vault private endpoint
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings to route vault operation logs and backup health to Log Analytics
-  targets:
   - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
@@ -3114,25 +2968,6 @@ rules:
     - NEVER disable soft delete on Recovery Services vault — backup data cannot be recovered after deletion
     - NEVER set daily retention below 7 days for dev or 30 days for production
     - NEVER configure backup storage redundancy after protecting items — it cannot be changed once items are registered
-- id: WAF-REL-BKP-002
-  severity: required
-  description: Deploy a Recovery Services vault for VM backups with geo-redundant storage, soft delete, immutability, and
-    backup policies.  Every production VM MUST be protected by a Recovery Services vault. Configure backup policies with daily
-    backups, weekly/monthly/yearly retention, and cross-region restore capability.
-  rationale: Recovery Services vault is the central backup management plane for VMs, SQL in VMs, and file shares.  Without
-    vault protection, VM data is lost on disk failure or accidental deletion.  GRS ensures backups survive regional disasters.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: 'Private endpoint for Recovery Services vault (groupId: AzureBackup)'
-  - type: Microsoft.Network/privateDnsZones@2020-06-01
-    description: Private DNS zone privatelink.{region}.backup.windowsazure.com for vault private endpoint
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings to route vault operation logs and backup health to Log Analytics
-  targets:
   - services:
     - Microsoft.DBforMySQL/flexibleServers
     terraform_pattern: |
@@ -3341,27 +3176,11 @@ rules:
     - NEVER disable soft delete on Recovery Services vault — backup data cannot be recovered after deletion
     - NEVER set daily retention below 7 days for dev or 30 days for production
     - NEVER configure backup storage redundancy after protecting items — it cannot be changed once items are registered
-- id: WAF-REL-BKP-002
-  severity: required
-  description: Deploy a Recovery Services vault for VM backups with geo-redundant storage, soft delete, immutability, and
-    backup policies.  Every production VM MUST be protected by a Recovery Services vault. Configure backup policies with daily
-    backups, weekly/monthly/yearly retention, and cross-region restore capability.
-  rationale: Recovery Services vault is the central backup management plane for VMs, SQL in VMs, and file shares.  Without
-    vault protection, VM data is lost on disk failure or accidental deletion.  GRS ensures backups survive regional disasters.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: 'Private endpoint for Recovery Services vault (groupId: AzureBackup)'
-  - type: Microsoft.Network/privateDnsZones@2020-06-01
-    description: Private DNS zone privatelink.{region}.backup.windowsazure.com for vault private endpoint
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings to route vault operation logs and backup health to Log Analytics
-  targets:
   - services:
-    - TODO:storage
+    - Microsoft.RecoveryServices/vaults
+    - Microsoft.RecoveryServices/vaults/backupstorageconfig
+    - Microsoft.RecoveryServices/vaults/backupPolicies
+    - Microsoft.RecoveryServices/vaults/backupFabrics/protectionContainers/protectedItems
     terraform_pattern: |
       # === Recovery Services Vault ===
       resource "azapi_resource" "recovery_vault" {
@@ -3568,25 +3387,6 @@ rules:
     - NEVER disable soft delete on Recovery Services vault — backup data cannot be recovered after deletion
     - NEVER set daily retention below 7 days for dev or 30 days for production
     - NEVER configure backup storage redundancy after protecting items — it cannot be changed once items are registered
-- id: WAF-REL-BKP-002
-  severity: required
-  description: Deploy a Recovery Services vault for VM backups with geo-redundant storage, soft delete, immutability, and
-    backup policies.  Every production VM MUST be protected by a Recovery Services vault. Configure backup policies with daily
-    backups, weekly/monthly/yearly retention, and cross-region restore capability.
-  rationale: Recovery Services vault is the central backup management plane for VMs, SQL in VMs, and file shares.  Without
-    vault protection, VM data is lost on disk failure or accidental deletion.  GRS ensures backups survive regional disasters.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: 'Private endpoint for Recovery Services vault (groupId: AzureBackup)'
-  - type: Microsoft.Network/privateDnsZones@2020-06-01
-    description: Private DNS zone privatelink.{region}.backup.windowsazure.com for vault private endpoint
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings to route vault operation logs and backup health to Log Analytics
-  targets:
   - services:
     - Microsoft.KeyVault/vaults
     terraform_pattern: |
@@ -3795,25 +3595,6 @@ rules:
     - NEVER disable soft delete on Recovery Services vault — backup data cannot be recovered after deletion
     - NEVER set daily retention below 7 days for dev or 30 days for production
     - NEVER configure backup storage redundancy after protecting items — it cannot be changed once items are registered
-- id: WAF-REL-BKP-002
-  severity: required
-  description: Deploy a Recovery Services vault for VM backups with geo-redundant storage, soft delete, immutability, and
-    backup policies.  Every production VM MUST be protected by a Recovery Services vault. Configure backup policies with daily
-    backups, weekly/monthly/yearly retention, and cross-region restore capability.
-  rationale: Recovery Services vault is the central backup management plane for VMs, SQL in VMs, and file shares.  Without
-    vault protection, VM data is lost on disk failure or accidental deletion.  GRS ensures backups survive regional disasters.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: 'Private endpoint for Recovery Services vault (groupId: AzureBackup)'
-  - type: Microsoft.Network/privateDnsZones@2020-06-01
-    description: Private DNS zone privatelink.{region}.backup.windowsazure.com for vault private endpoint
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings to route vault operation logs and backup health to Log Analytics
-  targets:
   - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
@@ -4022,25 +3803,6 @@ rules:
     - NEVER disable soft delete on Recovery Services vault — backup data cannot be recovered after deletion
     - NEVER set daily retention below 7 days for dev or 30 days for production
     - NEVER configure backup storage redundancy after protecting items — it cannot be changed once items are registered
-- id: WAF-REL-BKP-002
-  severity: required
-  description: Deploy a Recovery Services vault for VM backups with geo-redundant storage, soft delete, immutability, and
-    backup policies.  Every production VM MUST be protected by a Recovery Services vault. Configure backup policies with daily
-    backups, weekly/monthly/yearly retention, and cross-region restore capability.
-  rationale: Recovery Services vault is the central backup management plane for VMs, SQL in VMs, and file shares.  Without
-    vault protection, VM data is lost on disk failure or accidental deletion.  GRS ensures backups survive regional disasters.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: 'Private endpoint for Recovery Services vault (groupId: AzureBackup)'
-  - type: Microsoft.Network/privateDnsZones@2020-06-01
-    description: Private DNS zone privatelink.{region}.backup.windowsazure.com for vault private endpoint
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings to route vault operation logs and backup health to Log Analytics
-  targets:
   - services:
     - Microsoft.DataProtection/backupVaults
     terraform_pattern: |
@@ -4249,25 +4011,6 @@ rules:
     - NEVER disable soft delete on Recovery Services vault — backup data cannot be recovered after deletion
     - NEVER set daily retention below 7 days for dev or 30 days for production
     - NEVER configure backup storage redundancy after protecting items — it cannot be changed once items are registered
-- id: WAF-REL-BKP-002
-  severity: required
-  description: Deploy a Recovery Services vault for VM backups with geo-redundant storage, soft delete, immutability, and
-    backup policies.  Every production VM MUST be protected by a Recovery Services vault. Configure backup policies with daily
-    backups, weekly/monthly/yearly retention, and cross-region restore capability.
-  rationale: Recovery Services vault is the central backup management plane for VMs, SQL in VMs, and file shares.  Without
-    vault protection, VM data is lost on disk failure or accidental deletion.  GRS ensures backups survive regional disasters.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: 'Private endpoint for Recovery Services vault (groupId: AzureBackup)'
-  - type: Microsoft.Network/privateDnsZones@2020-06-01
-    description: Private DNS zone privatelink.{region}.backup.windowsazure.com for vault private endpoint
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings to route vault operation logs and backup health to Log Analytics
-  targets:
   - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
@@ -4476,25 +4219,6 @@ rules:
     - NEVER disable soft delete on Recovery Services vault — backup data cannot be recovered after deletion
     - NEVER set daily retention below 7 days for dev or 30 days for production
     - NEVER configure backup storage redundancy after protecting items — it cannot be changed once items are registered
-- id: WAF-REL-BKP-002
-  severity: required
-  description: Deploy a Recovery Services vault for VM backups with geo-redundant storage, soft delete, immutability, and
-    backup policies.  Every production VM MUST be protected by a Recovery Services vault. Configure backup policies with daily
-    backups, weekly/monthly/yearly retention, and cross-region restore capability.
-  rationale: Recovery Services vault is the central backup management plane for VMs, SQL in VMs, and file shares.  Without
-    vault protection, VM data is lost on disk failure or accidental deletion.  GRS ensures backups survive regional disasters.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Network/privateEndpoints@2023-11-01
-    description: 'Private endpoint for Recovery Services vault (groupId: AzureBackup)'
-  - type: Microsoft.Network/privateDnsZones@2020-06-01
-    description: Private DNS zone privatelink.{region}.backup.windowsazure.com for vault private endpoint
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings to route vault operation logs and backup health to Log Analytics
-  targets:
   - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
@@ -4817,19 +4541,6 @@ rules:
     - NEVER set PostgreSQL backup retention below 7 days — insufficient for detecting and recovering from data corruption
     - NEVER assume PITR restores in-place — SQL and PostgreSQL PITR creates a NEW server/database; plan for DNS/connection
       string updates
-- id: WAF-REL-BKP-003
-  severity: required
-  description: Configure point-in-time restore (PITR) for all production databases. SQL Database supports PITR within the
-    short-term retention window (7-35 days).  Cosmos DB Continuous backup enables PITR to any second within the retention
-    period (7 or 30 days).  PostgreSQL Flexible supports PITR within the backup retention window (7-35 days).  PITR is the
-    primary recovery mechanism for application bugs, accidental deletes, and data corruption — it is NOT optional.
-  rationale: PITR enables recovery to the exact moment before a data-corrupting event.  Traditional full-backup restore loses
-    all data since the last backup (hours of RPO).  PITR provides near-zero RPO (seconds for Cosmos, minutes for SQL/PostgreSQL).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
@@ -4931,19 +4642,6 @@ rules:
     - NEVER set PostgreSQL backup retention below 7 days — insufficient for detecting and recovering from data corruption
     - NEVER assume PITR restores in-place — SQL and PostgreSQL PITR creates a NEW server/database; plan for DNS/connection
       string updates
-- id: WAF-REL-BKP-003
-  severity: required
-  description: Configure point-in-time restore (PITR) for all production databases. SQL Database supports PITR within the
-    short-term retention window (7-35 days).  Cosmos DB Continuous backup enables PITR to any second within the retention
-    period (7 or 30 days).  PostgreSQL Flexible supports PITR within the backup retention window (7-35 days).  PITR is the
-    primary recovery mechanism for application bugs, accidental deletes, and data corruption — it is NOT optional.
-  rationale: PITR enables recovery to the exact moment before a data-corrupting event.  Traditional full-backup restore loses
-    all data since the last backup (hours of RPO).  PITR provides near-zero RPO (seconds for Cosmos, minutes for SQL/PostgreSQL).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
@@ -5045,19 +4743,6 @@ rules:
     - NEVER set PostgreSQL backup retention below 7 days — insufficient for detecting and recovering from data corruption
     - NEVER assume PITR restores in-place — SQL and PostgreSQL PITR creates a NEW server/database; plan for DNS/connection
       string updates
-- id: WAF-REL-BKP-003
-  severity: required
-  description: Configure point-in-time restore (PITR) for all production databases. SQL Database supports PITR within the
-    short-term retention window (7-35 days).  Cosmos DB Continuous backup enables PITR to any second within the retention
-    period (7 or 30 days).  PostgreSQL Flexible supports PITR within the backup retention window (7-35 days).  PITR is the
-    primary recovery mechanism for application bugs, accidental deletes, and data corruption — it is NOT optional.
-  rationale: PITR enables recovery to the exact moment before a data-corrupting event.  Traditional full-backup restore loses
-    all data since the last backup (hours of RPO).  PITR provides near-zero RPO (seconds for Cosmos, minutes for SQL/PostgreSQL).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.DBforMySQL/flexibleServers
     terraform_pattern: |
@@ -5159,21 +4844,10 @@ rules:
     - NEVER set PostgreSQL backup retention below 7 days — insufficient for detecting and recovering from data corruption
     - NEVER assume PITR restores in-place — SQL and PostgreSQL PITR creates a NEW server/database; plan for DNS/connection
       string updates
-- id: WAF-REL-BKP-003
-  severity: required
-  description: Configure point-in-time restore (PITR) for all production databases. SQL Database supports PITR within the
-    short-term retention window (7-35 days).  Cosmos DB Continuous backup enables PITR to any second within the retention
-    period (7 or 30 days).  PostgreSQL Flexible supports PITR within the backup retention window (7-35 days).  PITR is the
-    primary recovery mechanism for application bugs, accidental deletes, and data corruption — it is NOT optional.
-  rationale: PITR enables recovery to the exact moment before a data-corrupting event.  Traditional full-backup restore loses
-    all data since the last backup (hours of RPO).  PITR provides near-zero RPO (seconds for Cosmos, minutes for SQL/PostgreSQL).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
-    - TODO:storage
+    - Microsoft.Sql/servers/databases/backupShortTermRetentionPolicies
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
       # === SQL Database: PITR is built-in — configure retention window ===
       # SQL Database automatically takes full, differential, and log backups.
@@ -5273,19 +4947,6 @@ rules:
     - NEVER set PostgreSQL backup retention below 7 days — insufficient for detecting and recovering from data corruption
     - NEVER assume PITR restores in-place — SQL and PostgreSQL PITR creates a NEW server/database; plan for DNS/connection
       string updates
-- id: WAF-REL-BKP-003
-  severity: required
-  description: Configure point-in-time restore (PITR) for all production databases. SQL Database supports PITR within the
-    short-term retention window (7-35 days).  Cosmos DB Continuous backup enables PITR to any second within the retention
-    period (7 or 30 days).  PostgreSQL Flexible supports PITR within the backup retention window (7-35 days).  PITR is the
-    primary recovery mechanism for application bugs, accidental deletes, and data corruption — it is NOT optional.
-  rationale: PITR enables recovery to the exact moment before a data-corrupting event.  Traditional full-backup restore loses
-    all data since the last backup (hours of RPO).  PITR provides near-zero RPO (seconds for Cosmos, minutes for SQL/PostgreSQL).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.KeyVault/vaults
     terraform_pattern: |
@@ -5387,19 +5048,6 @@ rules:
     - NEVER set PostgreSQL backup retention below 7 days — insufficient for detecting and recovering from data corruption
     - NEVER assume PITR restores in-place — SQL and PostgreSQL PITR creates a NEW server/database; plan for DNS/connection
       string updates
-- id: WAF-REL-BKP-003
-  severity: required
-  description: Configure point-in-time restore (PITR) for all production databases. SQL Database supports PITR within the
-    short-term retention window (7-35 days).  Cosmos DB Continuous backup enables PITR to any second within the retention
-    period (7 or 30 days).  PostgreSQL Flexible supports PITR within the backup retention window (7-35 days).  PITR is the
-    primary recovery mechanism for application bugs, accidental deletes, and data corruption — it is NOT optional.
-  rationale: PITR enables recovery to the exact moment before a data-corrupting event.  Traditional full-backup restore loses
-    all data since the last backup (hours of RPO).  PITR provides near-zero RPO (seconds for Cosmos, minutes for SQL/PostgreSQL).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
@@ -5501,19 +5149,6 @@ rules:
     - NEVER set PostgreSQL backup retention below 7 days — insufficient for detecting and recovering from data corruption
     - NEVER assume PITR restores in-place — SQL and PostgreSQL PITR creates a NEW server/database; plan for DNS/connection
       string updates
-- id: WAF-REL-BKP-003
-  severity: required
-  description: Configure point-in-time restore (PITR) for all production databases. SQL Database supports PITR within the
-    short-term retention window (7-35 days).  Cosmos DB Continuous backup enables PITR to any second within the retention
-    period (7 or 30 days).  PostgreSQL Flexible supports PITR within the backup retention window (7-35 days).  PITR is the
-    primary recovery mechanism for application bugs, accidental deletes, and data corruption — it is NOT optional.
-  rationale: PITR enables recovery to the exact moment before a data-corrupting event.  Traditional full-backup restore loses
-    all data since the last backup (hours of RPO).  PITR provides near-zero RPO (seconds for Cosmos, minutes for SQL/PostgreSQL).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.DataProtection/backupVaults
     terraform_pattern: |
@@ -5615,19 +5250,6 @@ rules:
     - NEVER set PostgreSQL backup retention below 7 days — insufficient for detecting and recovering from data corruption
     - NEVER assume PITR restores in-place — SQL and PostgreSQL PITR creates a NEW server/database; plan for DNS/connection
       string updates
-- id: WAF-REL-BKP-003
-  severity: required
-  description: Configure point-in-time restore (PITR) for all production databases. SQL Database supports PITR within the
-    short-term retention window (7-35 days).  Cosmos DB Continuous backup enables PITR to any second within the retention
-    period (7 or 30 days).  PostgreSQL Flexible supports PITR within the backup retention window (7-35 days).  PITR is the
-    primary recovery mechanism for application bugs, accidental deletes, and data corruption — it is NOT optional.
-  rationale: PITR enables recovery to the exact moment before a data-corrupting event.  Traditional full-backup restore loses
-    all data since the last backup (hours of RPO).  PITR provides near-zero RPO (seconds for Cosmos, minutes for SQL/PostgreSQL).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
@@ -5729,19 +5351,6 @@ rules:
     - NEVER set PostgreSQL backup retention below 7 days — insufficient for detecting and recovering from data corruption
     - NEVER assume PITR restores in-place — SQL and PostgreSQL PITR creates a NEW server/database; plan for DNS/connection
       string updates
-- id: WAF-REL-BKP-003
-  severity: required
-  description: Configure point-in-time restore (PITR) for all production databases. SQL Database supports PITR within the
-    short-term retention window (7-35 days).  Cosmos DB Continuous backup enables PITR to any second within the retention
-    period (7 or 30 days).  PostgreSQL Flexible supports PITR within the backup retention window (7-35 days).  PITR is the
-    primary recovery mechanism for application bugs, accidental deletes, and data corruption — it is NOT optional.
-  rationale: PITR enables recovery to the exact moment before a data-corrupting event.  Traditional full-backup restore loses
-    all data since the last backup (hours of RPO).  PITR provides near-zero RPO (seconds for Cosmos, minutes for SQL/PostgreSQL).
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
@@ -5972,19 +5581,6 @@ rules:
     - NEVER use Standard_LRS or Standard_ZRS for production storage containing critical data — use Standard_GZRS or Standard_RAGZRS
     - NEVER use LocallyRedundant storage for production Recovery Services vaults
     - NEVER disable cross-region restore on geo-redundant Recovery Services vaults — it is needed for regional DR
-- id: WAF-REL-BKP-004
-  severity: required
-  description: Configure geo-redundant backup storage for all production data services.  SQL Database must use Geo backup
-    storage redundancy. PostgreSQL Flexible must enable geoRedundantBackup.  Storage accounts must use GZRS or RA-GZRS for
-    critical data.  Recovery Services vaults must use GeoRedundant storage with cross-region restore enabled.  Backup data
-    must survive a full regional outage.
-  rationale: Locally-redundant backups are lost in a regional disaster (earthquake, flood, extended power outage).  Geo-redundant
-    backups are replicated to the Azure paired region, ensuring recovery even when the entire primary region is unavailable.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
@@ -6101,19 +5697,6 @@ rules:
     - NEVER use Standard_LRS or Standard_ZRS for production storage containing critical data — use Standard_GZRS or Standard_RAGZRS
     - NEVER use LocallyRedundant storage for production Recovery Services vaults
     - NEVER disable cross-region restore on geo-redundant Recovery Services vaults — it is needed for regional DR
-- id: WAF-REL-BKP-004
-  severity: required
-  description: Configure geo-redundant backup storage for all production data services.  SQL Database must use Geo backup
-    storage redundancy. PostgreSQL Flexible must enable geoRedundantBackup.  Storage accounts must use GZRS or RA-GZRS for
-    critical data.  Recovery Services vaults must use GeoRedundant storage with cross-region restore enabled.  Backup data
-    must survive a full regional outage.
-  rationale: Locally-redundant backups are lost in a regional disaster (earthquake, flood, extended power outage).  Geo-redundant
-    backups are replicated to the Azure paired region, ensuring recovery even when the entire primary region is unavailable.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
@@ -6230,19 +5813,6 @@ rules:
     - NEVER use Standard_LRS or Standard_ZRS for production storage containing critical data — use Standard_GZRS or Standard_RAGZRS
     - NEVER use LocallyRedundant storage for production Recovery Services vaults
     - NEVER disable cross-region restore on geo-redundant Recovery Services vaults — it is needed for regional DR
-- id: WAF-REL-BKP-004
-  severity: required
-  description: Configure geo-redundant backup storage for all production data services.  SQL Database must use Geo backup
-    storage redundancy. PostgreSQL Flexible must enable geoRedundantBackup.  Storage accounts must use GZRS or RA-GZRS for
-    critical data.  Recovery Services vaults must use GeoRedundant storage with cross-region restore enabled.  Backup data
-    must survive a full regional outage.
-  rationale: Locally-redundant backups are lost in a regional disaster (earthquake, flood, extended power outage).  Geo-redundant
-    backups are replicated to the Azure paired region, ensuring recovery even when the entire primary region is unavailable.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.DBforMySQL/flexibleServers
     terraform_pattern: |
@@ -6359,21 +5929,11 @@ rules:
     - NEVER use Standard_LRS or Standard_ZRS for production storage containing critical data — use Standard_GZRS or Standard_RAGZRS
     - NEVER use LocallyRedundant storage for production Recovery Services vaults
     - NEVER disable cross-region restore on geo-redundant Recovery Services vaults — it is needed for regional DR
-- id: WAF-REL-BKP-004
-  severity: required
-  description: Configure geo-redundant backup storage for all production data services.  SQL Database must use Geo backup
-    storage redundancy. PostgreSQL Flexible must enable geoRedundantBackup.  Storage accounts must use GZRS or RA-GZRS for
-    critical data.  Recovery Services vaults must use GeoRedundant storage with cross-region restore enabled.  Backup data
-    must survive a full regional outage.
-  rationale: Locally-redundant backups are lost in a regional disaster (earthquake, flood, extended power outage).  Geo-redundant
-    backups are replicated to the Azure paired region, ensuring recovery even when the entire primary region is unavailable.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
-    - TODO:storage
+    - Microsoft.Sql/servers/databases
+    - Microsoft.DBforPostgreSQL/flexibleServers
+    - Microsoft.Storage/storageAccounts
+    - Microsoft.RecoveryServices/vaults/backupstorageconfig
     terraform_pattern: |
       # === SQL Database: Geo-redundant backup storage ===
       resource "azapi_resource" "sql_database_geo_backup" {
@@ -6488,19 +6048,6 @@ rules:
     - NEVER use Standard_LRS or Standard_ZRS for production storage containing critical data — use Standard_GZRS or Standard_RAGZRS
     - NEVER use LocallyRedundant storage for production Recovery Services vaults
     - NEVER disable cross-region restore on geo-redundant Recovery Services vaults — it is needed for regional DR
-- id: WAF-REL-BKP-004
-  severity: required
-  description: Configure geo-redundant backup storage for all production data services.  SQL Database must use Geo backup
-    storage redundancy. PostgreSQL Flexible must enable geoRedundantBackup.  Storage accounts must use GZRS or RA-GZRS for
-    critical data.  Recovery Services vaults must use GeoRedundant storage with cross-region restore enabled.  Backup data
-    must survive a full regional outage.
-  rationale: Locally-redundant backups are lost in a regional disaster (earthquake, flood, extended power outage).  Geo-redundant
-    backups are replicated to the Azure paired region, ensuring recovery even when the entire primary region is unavailable.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.KeyVault/vaults
     terraform_pattern: |
@@ -6617,19 +6164,6 @@ rules:
     - NEVER use Standard_LRS or Standard_ZRS for production storage containing critical data — use Standard_GZRS or Standard_RAGZRS
     - NEVER use LocallyRedundant storage for production Recovery Services vaults
     - NEVER disable cross-region restore on geo-redundant Recovery Services vaults — it is needed for regional DR
-- id: WAF-REL-BKP-004
-  severity: required
-  description: Configure geo-redundant backup storage for all production data services.  SQL Database must use Geo backup
-    storage redundancy. PostgreSQL Flexible must enable geoRedundantBackup.  Storage accounts must use GZRS or RA-GZRS for
-    critical data.  Recovery Services vaults must use GeoRedundant storage with cross-region restore enabled.  Backup data
-    must survive a full regional outage.
-  rationale: Locally-redundant backups are lost in a regional disaster (earthquake, flood, extended power outage).  Geo-redundant
-    backups are replicated to the Azure paired region, ensuring recovery even when the entire primary region is unavailable.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
@@ -6746,19 +6280,6 @@ rules:
     - NEVER use Standard_LRS or Standard_ZRS for production storage containing critical data — use Standard_GZRS or Standard_RAGZRS
     - NEVER use LocallyRedundant storage for production Recovery Services vaults
     - NEVER disable cross-region restore on geo-redundant Recovery Services vaults — it is needed for regional DR
-- id: WAF-REL-BKP-004
-  severity: required
-  description: Configure geo-redundant backup storage for all production data services.  SQL Database must use Geo backup
-    storage redundancy. PostgreSQL Flexible must enable geoRedundantBackup.  Storage accounts must use GZRS or RA-GZRS for
-    critical data.  Recovery Services vaults must use GeoRedundant storage with cross-region restore enabled.  Backup data
-    must survive a full regional outage.
-  rationale: Locally-redundant backups are lost in a regional disaster (earthquake, flood, extended power outage).  Geo-redundant
-    backups are replicated to the Azure paired region, ensuring recovery even when the entire primary region is unavailable.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.DataProtection/backupVaults
     terraform_pattern: |
@@ -6875,19 +6396,6 @@ rules:
     - NEVER use Standard_LRS or Standard_ZRS for production storage containing critical data — use Standard_GZRS or Standard_RAGZRS
     - NEVER use LocallyRedundant storage for production Recovery Services vaults
     - NEVER disable cross-region restore on geo-redundant Recovery Services vaults — it is needed for regional DR
-- id: WAF-REL-BKP-004
-  severity: required
-  description: Configure geo-redundant backup storage for all production data services.  SQL Database must use Geo backup
-    storage redundancy. PostgreSQL Flexible must enable geoRedundantBackup.  Storage accounts must use GZRS or RA-GZRS for
-    critical data.  Recovery Services vaults must use GeoRedundant storage with cross-region restore enabled.  Backup data
-    must survive a full regional outage.
-  rationale: Locally-redundant backups are lost in a regional disaster (earthquake, flood, extended power outage).  Geo-redundant
-    backups are replicated to the Azure paired region, ensuring recovery even when the entire primary region is unavailable.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
@@ -7004,19 +6512,6 @@ rules:
     - NEVER use Standard_LRS or Standard_ZRS for production storage containing critical data — use Standard_GZRS or Standard_RAGZRS
     - NEVER use LocallyRedundant storage for production Recovery Services vaults
     - NEVER disable cross-region restore on geo-redundant Recovery Services vaults — it is needed for regional DR
-- id: WAF-REL-BKP-004
-  severity: required
-  description: Configure geo-redundant backup storage for all production data services.  SQL Database must use Geo backup
-    storage redundancy. PostgreSQL Flexible must enable geoRedundantBackup.  Storage accounts must use GZRS or RA-GZRS for
-    critical data.  Recovery Services vaults must use GeoRedundant storage with cross-region restore enabled.  Backup data
-    must survive a full regional outage.
-  rationale: Locally-redundant backups are lost in a regional disaster (earthquake, flood, extended power outage).  Geo-redundant
-    backups are replicated to the Azure paired region, ensuring recovery even when the entire primary region is unavailable.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  targets:
   - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
@@ -7148,8 +6643,10 @@ rules:
   - cloud-architect
   companion_resources:
   - type: Microsoft.Insights/actionGroups@2023-01-01
+    name: ag-ops
     description: Action group for backup failure notifications (email, SMS, webhook)
   - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-resource
     description: Diagnostic settings on Recovery Services vault to send backup logs to Log Analytics
   targets:
   - services:
@@ -7318,25 +6815,6 @@ rules:
     - NEVER deploy backup without alerting on failures — silent backup failures cause data loss
     - NEVER assume backups are valid without periodic restore testing
     - NEVER ignore backup health reports — review weekly at minimum
-- id: WAF-REL-BKP-005
-  severity: recommended
-  description: Implement backup verification and restore testing automation. Deploy Azure Automation runbooks or Logic Apps
-    that periodically validate backup health, test restores to a staging environment, and alert on backup failures.  Backup
-    without tested restores is a false sense of security.  Use Recovery Services vault backup reports and Azure Monitor alerts
-    to track backup health.
-  rationale: Untested backups frequently fail at restore time due to corruption, missing dependencies, or configuration drift.  Regular
-    restore testing proves recoverability and measures actual RTO.  Backup health monitoring catches failures before they
-    become critical.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Insights/actionGroups@2023-01-01
-    description: Action group for backup failure notifications (email, SMS, webhook)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings on Recovery Services vault to send backup logs to Log Analytics
-  targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
@@ -7503,25 +6981,6 @@ rules:
     - NEVER deploy backup without alerting on failures — silent backup failures cause data loss
     - NEVER assume backups are valid without periodic restore testing
     - NEVER ignore backup health reports — review weekly at minimum
-- id: WAF-REL-BKP-005
-  severity: recommended
-  description: Implement backup verification and restore testing automation. Deploy Azure Automation runbooks or Logic Apps
-    that periodically validate backup health, test restores to a staging environment, and alert on backup failures.  Backup
-    without tested restores is a false sense of security.  Use Recovery Services vault backup reports and Azure Monitor alerts
-    to track backup health.
-  rationale: Untested backups frequently fail at restore time due to corruption, missing dependencies, or configuration drift.  Regular
-    restore testing proves recoverability and measures actual RTO.  Backup health monitoring catches failures before they
-    become critical.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Insights/actionGroups@2023-01-01
-    description: Action group for backup failure notifications (email, SMS, webhook)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings on Recovery Services vault to send backup logs to Log Analytics
-  targets:
   - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
@@ -7688,25 +7147,6 @@ rules:
     - NEVER deploy backup without alerting on failures — silent backup failures cause data loss
     - NEVER assume backups are valid without periodic restore testing
     - NEVER ignore backup health reports — review weekly at minimum
-- id: WAF-REL-BKP-005
-  severity: recommended
-  description: Implement backup verification and restore testing automation. Deploy Azure Automation runbooks or Logic Apps
-    that periodically validate backup health, test restores to a staging environment, and alert on backup failures.  Backup
-    without tested restores is a false sense of security.  Use Recovery Services vault backup reports and Azure Monitor alerts
-    to track backup health.
-  rationale: Untested backups frequently fail at restore time due to corruption, missing dependencies, or configuration drift.  Regular
-    restore testing proves recoverability and measures actual RTO.  Backup health monitoring catches failures before they
-    become critical.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Insights/actionGroups@2023-01-01
-    description: Action group for backup failure notifications (email, SMS, webhook)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings on Recovery Services vault to send backup logs to Log Analytics
-  targets:
   - services:
     - Microsoft.DBforMySQL/flexibleServers
     terraform_pattern: |
@@ -7873,27 +7313,8 @@ rules:
     - NEVER deploy backup without alerting on failures — silent backup failures cause data loss
     - NEVER assume backups are valid without periodic restore testing
     - NEVER ignore backup health reports — review weekly at minimum
-- id: WAF-REL-BKP-005
-  severity: recommended
-  description: Implement backup verification and restore testing automation. Deploy Azure Automation runbooks or Logic Apps
-    that periodically validate backup health, test restores to a staging environment, and alert on backup failures.  Backup
-    without tested restores is a false sense of security.  Use Recovery Services vault backup reports and Azure Monitor alerts
-    to track backup health.
-  rationale: Untested backups frequently fail at restore time due to corruption, missing dependencies, or configuration drift.  Regular
-    restore testing proves recoverability and measures actual RTO.  Backup health monitoring catches failures before they
-    become critical.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Insights/actionGroups@2023-01-01
-    description: Action group for backup failure notifications (email, SMS, webhook)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings on Recovery Services vault to send backup logs to Log Analytics
-  targets:
   - services:
-    - TODO:storage
+    - Microsoft.Insights/scheduledQueryRules
     terraform_pattern: |
       # === Backup Health Monitoring: Alert on backup failure ===
       resource "azapi_resource" "backup_failure_alert" {
@@ -8058,25 +7479,6 @@ rules:
     - NEVER deploy backup without alerting on failures — silent backup failures cause data loss
     - NEVER assume backups are valid without periodic restore testing
     - NEVER ignore backup health reports — review weekly at minimum
-- id: WAF-REL-BKP-005
-  severity: recommended
-  description: Implement backup verification and restore testing automation. Deploy Azure Automation runbooks or Logic Apps
-    that periodically validate backup health, test restores to a staging environment, and alert on backup failures.  Backup
-    without tested restores is a false sense of security.  Use Recovery Services vault backup reports and Azure Monitor alerts
-    to track backup health.
-  rationale: Untested backups frequently fail at restore time due to corruption, missing dependencies, or configuration drift.  Regular
-    restore testing proves recoverability and measures actual RTO.  Backup health monitoring catches failures before they
-    become critical.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Insights/actionGroups@2023-01-01
-    description: Action group for backup failure notifications (email, SMS, webhook)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings on Recovery Services vault to send backup logs to Log Analytics
-  targets:
   - services:
     - Microsoft.KeyVault/vaults
     terraform_pattern: |
@@ -8243,25 +7645,6 @@ rules:
     - NEVER deploy backup without alerting on failures — silent backup failures cause data loss
     - NEVER assume backups are valid without periodic restore testing
     - NEVER ignore backup health reports — review weekly at minimum
-- id: WAF-REL-BKP-005
-  severity: recommended
-  description: Implement backup verification and restore testing automation. Deploy Azure Automation runbooks or Logic Apps
-    that periodically validate backup health, test restores to a staging environment, and alert on backup failures.  Backup
-    without tested restores is a false sense of security.  Use Recovery Services vault backup reports and Azure Monitor alerts
-    to track backup health.
-  rationale: Untested backups frequently fail at restore time due to corruption, missing dependencies, or configuration drift.  Regular
-    restore testing proves recoverability and measures actual RTO.  Backup health monitoring catches failures before they
-    become critical.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Insights/actionGroups@2023-01-01
-    description: Action group for backup failure notifications (email, SMS, webhook)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings on Recovery Services vault to send backup logs to Log Analytics
-  targets:
   - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
@@ -8428,25 +7811,6 @@ rules:
     - NEVER deploy backup without alerting on failures — silent backup failures cause data loss
     - NEVER assume backups are valid without periodic restore testing
     - NEVER ignore backup health reports — review weekly at minimum
-- id: WAF-REL-BKP-005
-  severity: recommended
-  description: Implement backup verification and restore testing automation. Deploy Azure Automation runbooks or Logic Apps
-    that periodically validate backup health, test restores to a staging environment, and alert on backup failures.  Backup
-    without tested restores is a false sense of security.  Use Recovery Services vault backup reports and Azure Monitor alerts
-    to track backup health.
-  rationale: Untested backups frequently fail at restore time due to corruption, missing dependencies, or configuration drift.  Regular
-    restore testing proves recoverability and measures actual RTO.  Backup health monitoring catches failures before they
-    become critical.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Insights/actionGroups@2023-01-01
-    description: Action group for backup failure notifications (email, SMS, webhook)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings on Recovery Services vault to send backup logs to Log Analytics
-  targets:
   - services:
     - Microsoft.DataProtection/backupVaults
     terraform_pattern: |
@@ -8613,25 +7977,6 @@ rules:
     - NEVER deploy backup without alerting on failures — silent backup failures cause data loss
     - NEVER assume backups are valid without periodic restore testing
     - NEVER ignore backup health reports — review weekly at minimum
-- id: WAF-REL-BKP-005
-  severity: recommended
-  description: Implement backup verification and restore testing automation. Deploy Azure Automation runbooks or Logic Apps
-    that periodically validate backup health, test restores to a staging environment, and alert on backup failures.  Backup
-    without tested restores is a false sense of security.  Use Recovery Services vault backup reports and Azure Monitor alerts
-    to track backup health.
-  rationale: Untested backups frequently fail at restore time due to corruption, missing dependencies, or configuration drift.  Regular
-    restore testing proves recoverability and measures actual RTO.  Backup health monitoring catches failures before they
-    become critical.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Insights/actionGroups@2023-01-01
-    description: Action group for backup failure notifications (email, SMS, webhook)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings on Recovery Services vault to send backup logs to Log Analytics
-  targets:
   - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
@@ -8798,25 +8143,6 @@ rules:
     - NEVER deploy backup without alerting on failures — silent backup failures cause data loss
     - NEVER assume backups are valid without periodic restore testing
     - NEVER ignore backup health reports — review weekly at minimum
-- id: WAF-REL-BKP-005
-  severity: recommended
-  description: Implement backup verification and restore testing automation. Deploy Azure Automation runbooks or Logic Apps
-    that periodically validate backup health, test restores to a staging environment, and alert on backup failures.  Backup
-    without tested restores is a false sense of security.  Use Recovery Services vault backup reports and Azure Monitor alerts
-    to track backup health.
-  rationale: Untested backups frequently fail at restore time due to corruption, missing dependencies, or configuration drift.  Regular
-    restore testing proves recoverability and measures actual RTO.  Backup health monitoring catches failures before they
-    become critical.
-  applies_to:
-  - terraform-agent
-  - bicep-agent
-  - cloud-architect
-  companion_resources:
-  - type: Microsoft.Insights/actionGroups@2023-01-01
-    description: Action group for backup failure notifications (email, SMS, webhook)
-  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
-    description: Diagnostic settings on Recovery Services vault to send backup logs to Log Analytics
-  targets:
   - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |

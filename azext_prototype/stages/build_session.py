@@ -537,6 +537,10 @@ class BuildSession(SessionMixin):
                 _dbg_flow(
                     "build_session.generate",
                     f"Stage {stage_num} task prompt",
+                    layer=layer,
+                    capability=stage.get("capability", ""),
+                    agent_name=agent.name,
+                    delegated=bool(sub_layer_context),
                     task_len=len(task),
                     has_service_policies="MANDATORY RESOURCE POLICIES" in task,
                     has_api_versions="Resource API Versions" in task,
@@ -579,6 +583,9 @@ class BuildSession(SessionMixin):
             _dbg_flow(
                 "build_session.generate",
                 f"Stage {stage_num} response",
+                layer=layer,
+                capability=stage.get("capability", ""),
+                agent_name=agent.name,
                 content_len=len(content) if content else 0,
                 content_type=type(content).__name__,
                 content_full=content if content else "(empty)",
@@ -1833,6 +1840,13 @@ class BuildSession(SessionMixin):
                 knowledge = knowledge[:65536] + "\n\n[Knowledge truncated for prompt efficiency]"
             if knowledge:
                 agent.set_knowledge_override(knowledge)
+                logger.debug(
+                    "Knowledge loaded for stage %s: layer=%s, services=%d, len=%d",
+                    stage.get("name", ""),
+                    knowledge_layer or "none",
+                    len(svc_identifiers),
+                    len(knowledge),
+                )
         except Exception:
             pass  # Never let knowledge errors block generation
 

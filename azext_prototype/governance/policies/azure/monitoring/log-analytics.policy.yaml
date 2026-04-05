@@ -14,6 +14,7 @@ rules:
   - monitoring-agent
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2024-01-01
+    name: pe-log-analytics
     description: Private endpoint for Log Analytics ingestion — required when publicNetworkAccessForIngestion is Disabled
     terraform_pattern: |
       resource "azapi_resource" "la_private_endpoint" {
@@ -61,6 +62,7 @@ rules:
         }
       }
   - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.oms.opinsights.azure.com
     description: Private DNS zones for Log Analytics private endpoint resolution (requires multiple zones)
     terraform_pattern: |
       locals {

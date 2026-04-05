@@ -12,9 +12,15 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/trafficManagerProfiles/azureEndpoints (Azure endpoint definitions)
-  - Microsoft.Network/trafficManagerProfiles/externalEndpoints (external endpoint definitions)
-  - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
+  - type: Microsoft.Network/trafficManagerProfiles/azureEndpoints@2022-04-01
+    name: ep-azure
+    description: Azure endpoint definitions
+  - type: Microsoft.Network/trafficManagerProfiles/externalEndpoints@2022-04-01
+    name: ep-external
+    description: External endpoint definitions
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-udr
+    description: Route logs to Log Analytics
   targets:
   - services:
     - Microsoft.Network/trafficManagerProfiles
@@ -89,8 +95,12 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/trafficManagerProfiles (parent profile)
-  - Microsoft.Web/sites or Microsoft.Network/publicIPAddresses (target resources)
+  - type: Microsoft.Network/trafficManagerProfiles@2022-04-01
+    name: tm-profile
+    description: Parent profile
+  - type: Microsoft.Web/sites@2023-12-01
+    name: app
+    description: Target resources
   targets:
   - services:
     - Microsoft.Network/trafficManagerProfiles
@@ -134,7 +144,9 @@ rules:
   - cloud-architect
   - monitoring-agent
   companion_resources:
-  - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace
   targets:
   - services:
     - Microsoft.Network/trafficManagerProfiles
@@ -192,7 +204,9 @@ rules:
   - bicep-agent
   - cloud-architect
   companion_resources:
-  - Microsoft.Network/trafficManagerProfiles (child profile)
+  - type: Microsoft.Network/trafficManagerProfiles@2022-04-01
+    name: tm-child
+    description: Child profile
   targets:
   - services:
     - Microsoft.Network/trafficManagerProfiles
