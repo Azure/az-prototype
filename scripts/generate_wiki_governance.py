@@ -416,17 +416,21 @@ def _generate_sidebar(
     lines.append("### Governance")
     lines.append("")
 
-    # Policies — one <details> per category
+    # Policies — outer collapsible with nested category collapsibles
+    lines.append("<details><summary>Policies</summary>")
+    lines.append("")
     for section_title, pages in sorted(policy_pages.items()):
-        lines.append(f"<details><summary>Policies — {section_title}</summary>")
+        lines.append(f"<details><summary>{section_title}</summary>")
         lines.append("")
         for display, filename in pages:
             lines.append(f"- [{display}]({filename})")
         lines.append("")
         lines.append("</details>")
         lines.append("")
+    lines.append("</details>")
+    lines.append("")
 
-    # Anti-patterns — single <details>
+    # Anti-patterns — single collapsible
     lines.append("<details><summary>Anti-Patterns</summary>")
     lines.append("")
     for display, filename in ap_pages:
@@ -435,15 +439,19 @@ def _generate_sidebar(
     lines.append("</details>")
     lines.append("")
 
-    # Standards — one <details> per section
+    # Standards — outer collapsible with nested section collapsibles
+    lines.append("<details><summary>Standards</summary>")
+    lines.append("")
     for section_title, pages in sorted(std_pages.items()):
-        lines.append(f"<details><summary>Standards — {section_title}</summary>")
+        lines.append(f"<details><summary>{section_title}</summary>")
         lines.append("")
         for display, filename in pages:
             lines.append(f"- [{display}]({filename})")
         lines.append("")
         lines.append("</details>")
         lines.append("")
+    lines.append("</details>")
+    lines.append("")
 
     lines.append(marker_end)
 
