@@ -276,13 +276,13 @@ class TestGovernanceIndex:
                 id="P-001",
                 severity="required",
                 description="test",
-                target_services=["Microsoft.Compute/virtualMachines"],
+                targets={"services": ["Microsoft.Compute/virtualMachines"]},
             ),
             PolicyRule(
                 id="P-002",
                 severity="required",
                 description="test2",
-                target_services=["Microsoft.Compute/virtualMachines"],
+                targets={"services": ["Microsoft.Compute/virtualMachines"]},
             ),
         ]
         policies = [_make_policy("vm", "compute", rules=rules)]
@@ -412,7 +412,7 @@ class TestGovernanceIndexCache:
             description="Use managed identity",
             rationale="Best practice",
             applies_to=[],
-            target_services=["Microsoft.Compute/virtualMachines"],
+            targets={"services": ["Microsoft.Compute/virtualMachines"]},
         )
         policies = [_make_policy("test", "security", rules=[rule])]
         index = GovernanceIndex(backend=TFIDFBackend())

@@ -56,7 +56,7 @@ class PolicyRule:
     rationale: str = ""
     warning_message: str = ""
     applies_to: list[str] = field(default_factory=list)
-    target_services: list[str] = field(default_factory=list)  # ARM namespaces
+    targets: dict = field(default_factory=dict)  # {"services": ["Microsoft.Sql/servers", ...]}
     terraform_pattern: str = ""
     bicep_pattern: str = ""
     csharp_pattern: str = ""
@@ -397,8 +397,8 @@ class PolicyEngine:
             policy_svcs = {s.lower() for s in p.services}
             overlap = policy_svcs & svc_set
             if not overlap:
-                # Also try per-rule target_services for new-format files
-                rule_targets = {t.lower() for r in p.rules for t in r.target_services}
+                # Also try per-rule targets.services
+                rule_targets = {t.lower() for r in p.rules for t in r.targets.get("services", [])}
                 overlap = rule_targets & svc_set
             if not overlap:
                 continue
@@ -503,10 +503,12 @@ class PolicyEngine:
                             bicep_pattern=str(cr.get("bicep_pattern", "")),
                         )
                     )
-            # Extract per-rule target services (new format)
+            # Extract per-rule targets (matches schema: targets.services)
             targets = r.get("targets", {})
-            target_services = targets.get("services", []) if isinstance(targets, dict) else []
-            all_target_services.update(target_services)
+            if not isinstance(targets, dict):
+                targets = {}
+            target_svcs = targets.get("services", [])
+            all_target_services.update(target_svcs)
 
             rules.append(
                 PolicyRule(
@@ -516,7 +518,7 @@ class PolicyEngine:
                     rationale=str(r.get("rationale", "")),
                     warning_message=str(r.get("warning_message", "")),
                     applies_to=r.get("applies_to", []),
-                    target_services=target_services,
+                    targets=targets,
                     terraform_pattern=str(r.get("terraform_pattern", "")),
                     bicep_pattern=str(r.get("bicep_pattern", "")),
                     csharp_pattern=str(r.get("csharp_pattern", "")),

@@ -61,7 +61,7 @@ class AntiPatternCheck:
     description: str = ""
     rationale: str = ""
     applies_to: list[str] = field(default_factory=list)  # agent names
-    target_services: list[str] = field(default_factory=list)  # ARM namespaces
+    targets: dict = field(default_factory=dict)  # {"services": ["Microsoft.Sql/servers", ...]}
 
 
 def load(directory: Path | None = None) -> list[AntiPatternCheck]:
@@ -106,7 +106,8 @@ def load(directory: Path | None = None) -> list[AntiPatternCheck]:
                 check_applies_to = []
 
             targets = entry.get("targets", {})
-            target_services = targets.get("services", []) if isinstance(targets, dict) else []
+            if not isinstance(targets, dict):
+                targets = {}
 
             checks.append(
                 AntiPatternCheck(
@@ -119,7 +120,7 @@ def load(directory: Path | None = None) -> list[AntiPatternCheck]:
                     description=str(entry.get("description", "")),
                     rationale=str(entry.get("rationale", "")),
                     applies_to=check_applies_to,
-                    target_services=target_services,
+                    targets=targets,
                 )
             )
 

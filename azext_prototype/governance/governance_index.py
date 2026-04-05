@@ -150,7 +150,9 @@ class GovernanceIndex:
             source_name = getattr(policy, "name", "")
             services = getattr(policy, "services", [])
             for rule in getattr(policy, "rules", []):
-                rule_services = getattr(rule, "target_services", []) or services
+                rule_targets = getattr(rule, "targets", {})
+                rule_services = rule_targets.get("services", []) if isinstance(rule_targets, dict) else []
+                rule_services = rule_services or services
                 self._items.append(
                     IndexedItem(
                         kind="policy",
@@ -179,7 +181,7 @@ class GovernanceIndex:
                         rationale=check.rationale,
                         source_name=check.domain,
                         category=check.domain,
-                        services=check.target_services,
+                        services=check.targets.get("services", []),
                         applies_to=check.applies_to,
                     )
                 )
