@@ -113,7 +113,7 @@ rules:
     name: Key Vault named values
     description: Named values backed by Key Vault secrets — never store secrets as plain text named values
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |
       resource "azapi_resource" "apim" {
@@ -200,7 +200,7 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
 - id: AZ-APIM-003
   severity: recommended
@@ -211,7 +211,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
 - id: AZ-APIM-004
   severity: recommended
@@ -223,7 +223,7 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
 - id: AZ-APIM-005
   severity: recommended
@@ -235,7 +235,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |
       # Add zones to the APIM resource in APIM-001:
@@ -255,7 +255,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
 - id: AZ-APIM-007
   severity: recommended
@@ -266,7 +266,7 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
 - id: AZ-APIM-008
   severity: recommended
@@ -279,7 +279,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
 - id: AZ-APIM-009
   severity: recommended
@@ -290,7 +290,7 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
 - id: AZ-APIM-010
   severity: recommended
@@ -300,7 +300,7 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
 patterns:
 - name: APIM with VNet integration and Key Vault

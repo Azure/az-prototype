@@ -9,12 +9,12 @@ rules:
     12+ months
   rationale: 1-year reservations save 30-40% over pay-as-you-go; 3-year reservations save 55-65%. Only applicable to stable
     production workloads
-  applies_to: &id001
+  applies_to:
   - cost-analyst
   - cloud-architect
   - project-manager
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # === Reservation Recommendation Comment Block ===
@@ -98,7 +98,7 @@ rules:
           }
         }
       }
-    prohibitions: &id002
+    prohibitions:
     - NEVER recommend reserved instances for dev/POC environments — they require 1-3 year commitment
     - NEVER recommend reservations before 1-2 months of production usage data
     - NEVER recommend 3-year reserved instances without explicit cost-analyst approval and stakeholder sign-off
@@ -110,9 +110,12 @@ rules:
     12+ months
   rationale: 1-year reservations save 30-40% over pay-as-you-go; 3-year reservations save 55-65%. Only applicable to stable
     production workloads
-  applies_to: *id001
+  applies_to:
+  - cost-analyst
+  - cloud-architect
+  - project-manager
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       # === Reservation Recommendation Comment Block ===
@@ -196,16 +199,24 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER recommend reserved instances for dev/POC environments — they require 1-3 year commitment
+    - NEVER recommend reservations before 1-2 months of production usage data
+    - NEVER recommend 3-year reserved instances without explicit cost-analyst approval and stakeholder sign-off
+    - NEVER purchase reservations for burstable B-series VMs — they are designed for variable workloads
+    - NEVER scope reservations to a single resource group unless the workload will remain in that group
 - id: WAF-COST-RI-001
   severity: recommended
   description: Recommend Azure Reserved VM Instances for production workloads with stable, predictable compute usage over
     12+ months
   rationale: 1-year reservations save 30-40% over pay-as-you-go; 3-year reservations save 55-65%. Only applicable to stable
     production workloads
-  applies_to: *id001
+  applies_to:
+  - cost-analyst
+  - cloud-architect
+  - project-manager
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # === Reservation Recommendation Comment Block ===
@@ -289,16 +300,24 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER recommend reserved instances for dev/POC environments — they require 1-3 year commitment
+    - NEVER recommend reservations before 1-2 months of production usage data
+    - NEVER recommend 3-year reserved instances without explicit cost-analyst approval and stakeholder sign-off
+    - NEVER purchase reservations for burstable B-series VMs — they are designed for variable workloads
+    - NEVER scope reservations to a single resource group unless the workload will remain in that group
 - id: WAF-COST-RI-001
   severity: recommended
   description: Recommend Azure Reserved VM Instances for production workloads with stable, predictable compute usage over
     12+ months
   rationale: 1-year reservations save 30-40% over pay-as-you-go; 3-year reservations save 55-65%. Only applicable to stable
     production workloads
-  applies_to: *id001
+  applies_to:
+  - cost-analyst
+  - cloud-architect
+  - project-manager
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === Reservation Recommendation Comment Block ===
@@ -382,16 +401,24 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER recommend reserved instances for dev/POC environments — they require 1-3 year commitment
+    - NEVER recommend reservations before 1-2 months of production usage data
+    - NEVER recommend 3-year reserved instances without explicit cost-analyst approval and stakeholder sign-off
+    - NEVER purchase reservations for burstable B-series VMs — they are designed for variable workloads
+    - NEVER scope reservations to a single resource group unless the workload will remain in that group
 - id: WAF-COST-RI-001
   severity: recommended
   description: Recommend Azure Reserved VM Instances for production workloads with stable, predictable compute usage over
     12+ months
   rationale: 1-year reservations save 30-40% over pay-as-you-go; 3-year reservations save 55-65%. Only applicable to stable
     production workloads
-  applies_to: *id001
+  applies_to:
+  - cost-analyst
+  - cloud-architect
+  - project-manager
   targets:
-    services:
+  - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
       # === Reservation Recommendation Comment Block ===
@@ -475,16 +502,24 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER recommend reserved instances for dev/POC environments — they require 1-3 year commitment
+    - NEVER recommend reservations before 1-2 months of production usage data
+    - NEVER recommend 3-year reserved instances without explicit cost-analyst approval and stakeholder sign-off
+    - NEVER purchase reservations for burstable B-series VMs — they are designed for variable workloads
+    - NEVER scope reservations to a single resource group unless the workload will remain in that group
 - id: WAF-COST-RI-001
   severity: recommended
   description: Recommend Azure Reserved VM Instances for production workloads with stable, predictable compute usage over
     12+ months
   rationale: 1-year reservations save 30-40% over pay-as-you-go; 3-year reservations save 55-65%. Only applicable to stable
     production workloads
-  applies_to: *id001
+  applies_to:
+  - cost-analyst
+  - cloud-architect
+  - project-manager
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # === Reservation Recommendation Comment Block ===
@@ -568,16 +603,24 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER recommend reserved instances for dev/POC environments — they require 1-3 year commitment
+    - NEVER recommend reservations before 1-2 months of production usage data
+    - NEVER recommend 3-year reserved instances without explicit cost-analyst approval and stakeholder sign-off
+    - NEVER purchase reservations for burstable B-series VMs — they are designed for variable workloads
+    - NEVER scope reservations to a single resource group unless the workload will remain in that group
 - id: WAF-COST-RI-001
   severity: recommended
   description: Recommend Azure Reserved VM Instances for production workloads with stable, predictable compute usage over
     12+ months
   rationale: 1-year reservations save 30-40% over pay-as-you-go; 3-year reservations save 55-65%. Only applicable to stable
     production workloads
-  applies_to: *id001
+  applies_to:
+  - cost-analyst
+  - cloud-architect
+  - project-manager
   targets:
-    services:
+  - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
       # === Reservation Recommendation Comment Block ===
@@ -661,18 +704,23 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER recommend reserved instances for dev/POC environments — they require 1-3 year commitment
+    - NEVER recommend reservations before 1-2 months of production usage data
+    - NEVER recommend 3-year reserved instances without explicit cost-analyst approval and stakeholder sign-off
+    - NEVER purchase reservations for burstable B-series VMs — they are designed for variable workloads
+    - NEVER scope reservations to a single resource group unless the workload will remain in that group
 - id: WAF-COST-RI-002
   severity: recommended
   description: Recommend Azure Savings Plans for compute when workloads may change VM size, region, or service type
   rationale: Savings Plans provide 15-25% savings with flexibility to change compute type, unlike reservations which are locked
     to a specific VM size and region
-  applies_to: &id003
+  applies_to:
   - cost-analyst
   - cloud-architect
   - project-manager
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # === Savings Plan Recommendation Comment Block ===
@@ -708,7 +756,7 @@ rules:
       // Savings: ~15-25% vs pay-as-you-go
       // Term: 1-year recommended for initial commitment
       // Scope: Subscription level for maximum flexibility
-    prohibitions: &id004
+    prohibitions:
     - NEVER recommend savings plans for dev/POC environments
     - NEVER recommend both savings plans AND reservations for the same compute without calculating overlap
     - NEVER recommend savings plans before understanding the workload's compute mix
@@ -717,9 +765,12 @@ rules:
   description: Recommend Azure Savings Plans for compute when workloads may change VM size, region, or service type
   rationale: Savings Plans provide 15-25% savings with flexibility to change compute type, unlike reservations which are locked
     to a specific VM size and region
-  applies_to: *id003
+  applies_to:
+  - cost-analyst
+  - cloud-architect
+  - project-manager
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       # === Savings Plan Recommendation Comment Block ===
@@ -755,15 +806,21 @@ rules:
       // Savings: ~15-25% vs pay-as-you-go
       // Term: 1-year recommended for initial commitment
       // Scope: Subscription level for maximum flexibility
-    prohibitions: *id004
+    prohibitions:
+    - NEVER recommend savings plans for dev/POC environments
+    - NEVER recommend both savings plans AND reservations for the same compute without calculating overlap
+    - NEVER recommend savings plans before understanding the workload's compute mix
 - id: WAF-COST-RI-002
   severity: recommended
   description: Recommend Azure Savings Plans for compute when workloads may change VM size, region, or service type
   rationale: Savings Plans provide 15-25% savings with flexibility to change compute type, unlike reservations which are locked
     to a specific VM size and region
-  applies_to: *id003
+  applies_to:
+  - cost-analyst
+  - cloud-architect
+  - project-manager
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # === Savings Plan Recommendation Comment Block ===
@@ -799,15 +856,21 @@ rules:
       // Savings: ~15-25% vs pay-as-you-go
       // Term: 1-year recommended for initial commitment
       // Scope: Subscription level for maximum flexibility
-    prohibitions: *id004
+    prohibitions:
+    - NEVER recommend savings plans for dev/POC environments
+    - NEVER recommend both savings plans AND reservations for the same compute without calculating overlap
+    - NEVER recommend savings plans before understanding the workload's compute mix
 - id: WAF-COST-RI-002
   severity: recommended
   description: Recommend Azure Savings Plans for compute when workloads may change VM size, region, or service type
   rationale: Savings Plans provide 15-25% savings with flexibility to change compute type, unlike reservations which are locked
     to a specific VM size and region
-  applies_to: *id003
+  applies_to:
+  - cost-analyst
+  - cloud-architect
+  - project-manager
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === Savings Plan Recommendation Comment Block ===
@@ -843,15 +906,21 @@ rules:
       // Savings: ~15-25% vs pay-as-you-go
       // Term: 1-year recommended for initial commitment
       // Scope: Subscription level for maximum flexibility
-    prohibitions: *id004
+    prohibitions:
+    - NEVER recommend savings plans for dev/POC environments
+    - NEVER recommend both savings plans AND reservations for the same compute without calculating overlap
+    - NEVER recommend savings plans before understanding the workload's compute mix
 - id: WAF-COST-RI-002
   severity: recommended
   description: Recommend Azure Savings Plans for compute when workloads may change VM size, region, or service type
   rationale: Savings Plans provide 15-25% savings with flexibility to change compute type, unlike reservations which are locked
     to a specific VM size and region
-  applies_to: *id003
+  applies_to:
+  - cost-analyst
+  - cloud-architect
+  - project-manager
   targets:
-    services:
+  - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
       # === Savings Plan Recommendation Comment Block ===
@@ -887,15 +956,21 @@ rules:
       // Savings: ~15-25% vs pay-as-you-go
       // Term: 1-year recommended for initial commitment
       // Scope: Subscription level for maximum flexibility
-    prohibitions: *id004
+    prohibitions:
+    - NEVER recommend savings plans for dev/POC environments
+    - NEVER recommend both savings plans AND reservations for the same compute without calculating overlap
+    - NEVER recommend savings plans before understanding the workload's compute mix
 - id: WAF-COST-RI-002
   severity: recommended
   description: Recommend Azure Savings Plans for compute when workloads may change VM size, region, or service type
   rationale: Savings Plans provide 15-25% savings with flexibility to change compute type, unlike reservations which are locked
     to a specific VM size and region
-  applies_to: *id003
+  applies_to:
+  - cost-analyst
+  - cloud-architect
+  - project-manager
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # === Savings Plan Recommendation Comment Block ===
@@ -931,15 +1006,21 @@ rules:
       // Savings: ~15-25% vs pay-as-you-go
       // Term: 1-year recommended for initial commitment
       // Scope: Subscription level for maximum flexibility
-    prohibitions: *id004
+    prohibitions:
+    - NEVER recommend savings plans for dev/POC environments
+    - NEVER recommend both savings plans AND reservations for the same compute without calculating overlap
+    - NEVER recommend savings plans before understanding the workload's compute mix
 - id: WAF-COST-RI-002
   severity: recommended
   description: Recommend Azure Savings Plans for compute when workloads may change VM size, region, or service type
   rationale: Savings Plans provide 15-25% savings with flexibility to change compute type, unlike reservations which are locked
     to a specific VM size and region
-  applies_to: *id003
+  applies_to:
+  - cost-analyst
+  - cloud-architect
+  - project-manager
   targets:
-    services:
+  - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
       # === Savings Plan Recommendation Comment Block ===
@@ -975,17 +1056,20 @@ rules:
       // Savings: ~15-25% vs pay-as-you-go
       // Term: 1-year recommended for initial commitment
       // Scope: Subscription level for maximum flexibility
-    prohibitions: *id004
+    prohibitions:
+    - NEVER recommend savings plans for dev/POC environments
+    - NEVER recommend both savings plans AND reservations for the same compute without calculating overlap
+    - NEVER recommend savings plans before understanding the workload's compute mix
 - id: WAF-COST-RI-003
   severity: recommended
   description: Recommend Cosmos DB reserved capacity for production workloads with predictable RU/s consumption
   rationale: Cosmos DB 1-year reserved capacity saves ~20% on provisioned throughput; 3-year saves ~30%. Only for provisioned
     (not serverless) accounts
-  applies_to: &id005
+  applies_to:
   - cost-analyst
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # === Cosmos DB Reserved Capacity Recommendation ===
@@ -1046,7 +1130,7 @@ rules:
           BaselineRUsPerSecond: '2000'
         })
       }
-    prohibitions: &id006
+    prohibitions:
     - NEVER recommend Cosmos DB reserved capacity for serverless accounts — serverless has no provisioned throughput to reserve
     - NEVER recommend Cosmos DB reserved capacity for dev/POC — use serverless for zero idle cost
     - NEVER reserve more RU/s than the measured baseline — spikes should use autoscale at pay-as-you-go rates
@@ -1056,9 +1140,11 @@ rules:
   description: Recommend Cosmos DB reserved capacity for production workloads with predictable RU/s consumption
   rationale: Cosmos DB 1-year reserved capacity saves ~20% on provisioned throughput; 3-year saves ~30%. Only for provisioned
     (not serverless) accounts
-  applies_to: *id005
+  applies_to:
+  - cost-analyst
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       # === Cosmos DB Reserved Capacity Recommendation ===
@@ -1119,15 +1205,21 @@ rules:
           BaselineRUsPerSecond: '2000'
         })
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER recommend Cosmos DB reserved capacity for serverless accounts — serverless has no provisioned throughput to reserve
+    - NEVER recommend Cosmos DB reserved capacity for dev/POC — use serverless for zero idle cost
+    - NEVER reserve more RU/s than the measured baseline — spikes should use autoscale at pay-as-you-go rates
+    - NEVER recommend 3-year Cosmos DB reservations without confirmed production commitment
 - id: WAF-COST-RI-003
   severity: recommended
   description: Recommend Cosmos DB reserved capacity for production workloads with predictable RU/s consumption
   rationale: Cosmos DB 1-year reserved capacity saves ~20% on provisioned throughput; 3-year saves ~30%. Only for provisioned
     (not serverless) accounts
-  applies_to: *id005
+  applies_to:
+  - cost-analyst
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # === Cosmos DB Reserved Capacity Recommendation ===
@@ -1188,15 +1280,21 @@ rules:
           BaselineRUsPerSecond: '2000'
         })
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER recommend Cosmos DB reserved capacity for serverless accounts — serverless has no provisioned throughput to reserve
+    - NEVER recommend Cosmos DB reserved capacity for dev/POC — use serverless for zero idle cost
+    - NEVER reserve more RU/s than the measured baseline — spikes should use autoscale at pay-as-you-go rates
+    - NEVER recommend 3-year Cosmos DB reservations without confirmed production commitment
 - id: WAF-COST-RI-003
   severity: recommended
   description: Recommend Cosmos DB reserved capacity for production workloads with predictable RU/s consumption
   rationale: Cosmos DB 1-year reserved capacity saves ~20% on provisioned throughput; 3-year saves ~30%. Only for provisioned
     (not serverless) accounts
-  applies_to: *id005
+  applies_to:
+  - cost-analyst
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === Cosmos DB Reserved Capacity Recommendation ===
@@ -1257,15 +1355,21 @@ rules:
           BaselineRUsPerSecond: '2000'
         })
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER recommend Cosmos DB reserved capacity for serverless accounts — serverless has no provisioned throughput to reserve
+    - NEVER recommend Cosmos DB reserved capacity for dev/POC — use serverless for zero idle cost
+    - NEVER reserve more RU/s than the measured baseline — spikes should use autoscale at pay-as-you-go rates
+    - NEVER recommend 3-year Cosmos DB reservations without confirmed production commitment
 - id: WAF-COST-RI-003
   severity: recommended
   description: Recommend Cosmos DB reserved capacity for production workloads with predictable RU/s consumption
   rationale: Cosmos DB 1-year reserved capacity saves ~20% on provisioned throughput; 3-year saves ~30%. Only for provisioned
     (not serverless) accounts
-  applies_to: *id005
+  applies_to:
+  - cost-analyst
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
       # === Cosmos DB Reserved Capacity Recommendation ===
@@ -1326,15 +1430,21 @@ rules:
           BaselineRUsPerSecond: '2000'
         })
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER recommend Cosmos DB reserved capacity for serverless accounts — serverless has no provisioned throughput to reserve
+    - NEVER recommend Cosmos DB reserved capacity for dev/POC — use serverless for zero idle cost
+    - NEVER reserve more RU/s than the measured baseline — spikes should use autoscale at pay-as-you-go rates
+    - NEVER recommend 3-year Cosmos DB reservations without confirmed production commitment
 - id: WAF-COST-RI-003
   severity: recommended
   description: Recommend Cosmos DB reserved capacity for production workloads with predictable RU/s consumption
   rationale: Cosmos DB 1-year reserved capacity saves ~20% on provisioned throughput; 3-year saves ~30%. Only for provisioned
     (not serverless) accounts
-  applies_to: *id005
+  applies_to:
+  - cost-analyst
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # === Cosmos DB Reserved Capacity Recommendation ===
@@ -1395,15 +1505,21 @@ rules:
           BaselineRUsPerSecond: '2000'
         })
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER recommend Cosmos DB reserved capacity for serverless accounts — serverless has no provisioned throughput to reserve
+    - NEVER recommend Cosmos DB reserved capacity for dev/POC — use serverless for zero idle cost
+    - NEVER reserve more RU/s than the measured baseline — spikes should use autoscale at pay-as-you-go rates
+    - NEVER recommend 3-year Cosmos DB reservations without confirmed production commitment
 - id: WAF-COST-RI-003
   severity: recommended
   description: Recommend Cosmos DB reserved capacity for production workloads with predictable RU/s consumption
   rationale: Cosmos DB 1-year reserved capacity saves ~20% on provisioned throughput; 3-year saves ~30%. Only for provisioned
     (not serverless) accounts
-  applies_to: *id005
+  applies_to:
+  - cost-analyst
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
       # === Cosmos DB Reserved Capacity Recommendation ===
@@ -1464,17 +1580,21 @@ rules:
           BaselineRUsPerSecond: '2000'
         })
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER recommend Cosmos DB reserved capacity for serverless accounts — serverless has no provisioned throughput to reserve
+    - NEVER recommend Cosmos DB reserved capacity for dev/POC — use serverless for zero idle cost
+    - NEVER reserve more RU/s than the measured baseline — spikes should use autoscale at pay-as-you-go rates
+    - NEVER recommend 3-year Cosmos DB reservations without confirmed production commitment
 - id: WAF-COST-RI-004
   severity: recommended
   description: Recommend SQL Database reserved capacity for production vCore databases with stable utilization
   rationale: SQL reserved capacity saves ~30-40% on provisioned vCore compute (not serverless). Only for databases with consistent
     CPU usage
-  applies_to: &id007
+  applies_to:
   - cost-analyst
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # === SQL Reserved Capacity Recommendation ===
@@ -1550,7 +1670,7 @@ rules:
           capacity: 2
         }
       }
-    prohibitions: &id008
+    prohibitions:
     - NEVER recommend SQL reserved capacity for serverless (GP_S_Gen5) databases — they auto-pause and have variable compute
     - NEVER recommend SQL reserved capacity for DTU-based databases — convert to vCore first
     - NEVER recommend SQL reserved capacity for dev/POC databases
@@ -1562,9 +1682,11 @@ rules:
   description: Recommend SQL Database reserved capacity for production vCore databases with stable utilization
   rationale: SQL reserved capacity saves ~30-40% on provisioned vCore compute (not serverless). Only for databases with consistent
     CPU usage
-  applies_to: *id007
+  applies_to:
+  - cost-analyst
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       # === SQL Reserved Capacity Recommendation ===
@@ -1640,15 +1762,23 @@ rules:
           capacity: 2
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER recommend SQL reserved capacity for serverless (GP_S_Gen5) databases — they auto-pause and have variable compute
+    - NEVER recommend SQL reserved capacity for DTU-based databases — convert to vCore first
+    - NEVER recommend SQL reserved capacity for dev/POC databases
+    - NEVER recommend 3-year SQL reservations without confirmed database sizing and growth projections
+    - NEVER recommend reservations for databases with average CPU utilization below 20% — consider downsizing or serverless
+      first
 - id: WAF-COST-RI-004
   severity: recommended
   description: Recommend SQL Database reserved capacity for production vCore databases with stable utilization
   rationale: SQL reserved capacity saves ~30-40% on provisioned vCore compute (not serverless). Only for databases with consistent
     CPU usage
-  applies_to: *id007
+  applies_to:
+  - cost-analyst
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # === SQL Reserved Capacity Recommendation ===
@@ -1724,15 +1854,23 @@ rules:
           capacity: 2
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER recommend SQL reserved capacity for serverless (GP_S_Gen5) databases — they auto-pause and have variable compute
+    - NEVER recommend SQL reserved capacity for DTU-based databases — convert to vCore first
+    - NEVER recommend SQL reserved capacity for dev/POC databases
+    - NEVER recommend 3-year SQL reservations without confirmed database sizing and growth projections
+    - NEVER recommend reservations for databases with average CPU utilization below 20% — consider downsizing or serverless
+      first
 - id: WAF-COST-RI-004
   severity: recommended
   description: Recommend SQL Database reserved capacity for production vCore databases with stable utilization
   rationale: SQL reserved capacity saves ~30-40% on provisioned vCore compute (not serverless). Only for databases with consistent
     CPU usage
-  applies_to: *id007
+  applies_to:
+  - cost-analyst
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === SQL Reserved Capacity Recommendation ===
@@ -1808,15 +1946,23 @@ rules:
           capacity: 2
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER recommend SQL reserved capacity for serverless (GP_S_Gen5) databases — they auto-pause and have variable compute
+    - NEVER recommend SQL reserved capacity for DTU-based databases — convert to vCore first
+    - NEVER recommend SQL reserved capacity for dev/POC databases
+    - NEVER recommend 3-year SQL reservations without confirmed database sizing and growth projections
+    - NEVER recommend reservations for databases with average CPU utilization below 20% — consider downsizing or serverless
+      first
 - id: WAF-COST-RI-004
   severity: recommended
   description: Recommend SQL Database reserved capacity for production vCore databases with stable utilization
   rationale: SQL reserved capacity saves ~30-40% on provisioned vCore compute (not serverless). Only for databases with consistent
     CPU usage
-  applies_to: *id007
+  applies_to:
+  - cost-analyst
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
       # === SQL Reserved Capacity Recommendation ===
@@ -1892,15 +2038,23 @@ rules:
           capacity: 2
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER recommend SQL reserved capacity for serverless (GP_S_Gen5) databases — they auto-pause and have variable compute
+    - NEVER recommend SQL reserved capacity for DTU-based databases — convert to vCore first
+    - NEVER recommend SQL reserved capacity for dev/POC databases
+    - NEVER recommend 3-year SQL reservations without confirmed database sizing and growth projections
+    - NEVER recommend reservations for databases with average CPU utilization below 20% — consider downsizing or serverless
+      first
 - id: WAF-COST-RI-004
   severity: recommended
   description: Recommend SQL Database reserved capacity for production vCore databases with stable utilization
   rationale: SQL reserved capacity saves ~30-40% on provisioned vCore compute (not serverless). Only for databases with consistent
     CPU usage
-  applies_to: *id007
+  applies_to:
+  - cost-analyst
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # === SQL Reserved Capacity Recommendation ===
@@ -1976,15 +2130,23 @@ rules:
           capacity: 2
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER recommend SQL reserved capacity for serverless (GP_S_Gen5) databases — they auto-pause and have variable compute
+    - NEVER recommend SQL reserved capacity for DTU-based databases — convert to vCore first
+    - NEVER recommend SQL reserved capacity for dev/POC databases
+    - NEVER recommend 3-year SQL reservations without confirmed database sizing and growth projections
+    - NEVER recommend reservations for databases with average CPU utilization below 20% — consider downsizing or serverless
+      first
 - id: WAF-COST-RI-004
   severity: recommended
   description: Recommend SQL Database reserved capacity for production vCore databases with stable utilization
   rationale: SQL reserved capacity saves ~30-40% on provisioned vCore compute (not serverless). Only for databases with consistent
     CPU usage
-  applies_to: *id007
+  applies_to:
+  - cost-analyst
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
       # === SQL Reserved Capacity Recommendation ===
@@ -2060,7 +2222,13 @@ rules:
           capacity: 2
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER recommend SQL reserved capacity for serverless (GP_S_Gen5) databases — they auto-pause and have variable compute
+    - NEVER recommend SQL reserved capacity for DTU-based databases — convert to vCore first
+    - NEVER recommend SQL reserved capacity for dev/POC databases
+    - NEVER recommend 3-year SQL reservations without confirmed database sizing and growth projections
+    - NEVER recommend reservations for databases with average CPU utilization below 20% — consider downsizing or serverless
+      first
 patterns:
 - name: Reservation strategy for production workloads
   description: After 1-2 months of production data, analyze Azure Advisor recommendations and purchase 1-year reservations

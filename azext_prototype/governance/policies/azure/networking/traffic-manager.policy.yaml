@@ -16,7 +16,7 @@ rules:
   - Microsoft.Network/trafficManagerProfiles/externalEndpoints (external endpoint definitions)
   - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
   targets:
-    services:
+  - services:
     - Microsoft.Network/trafficManagerProfiles
     terraform_pattern: |
       resource "azapi_resource" "traffic_manager" {
@@ -92,7 +92,7 @@ rules:
   - Microsoft.Network/trafficManagerProfiles (parent profile)
   - Microsoft.Web/sites or Microsoft.Network/publicIPAddresses (target resources)
   targets:
-    services:
+  - services:
     - Microsoft.Network/trafficManagerProfiles
     terraform_pattern: |
       resource "azapi_resource" "tm_endpoint" {
@@ -136,7 +136,7 @@ rules:
   companion_resources:
   - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
   targets:
-    services:
+  - services:
     - Microsoft.Network/trafficManagerProfiles
     terraform_pattern: |
       resource "azapi_resource" "tm_diagnostics" {
@@ -194,7 +194,7 @@ rules:
   companion_resources:
   - Microsoft.Network/trafficManagerProfiles (child profile)
   targets:
-    services:
+  - services:
     - Microsoft.Network/trafficManagerProfiles
     terraform_pattern: |
       resource "azapi_resource" "tm_nested_endpoint" {

@@ -18,7 +18,7 @@ rules:
   - Microsoft.DBforMySQL/flexibleServers/configurations (TLS and audit log settings)
   - Microsoft.Insights/diagnosticSettings (route audit logs to Log Analytics)
   targets:
-    services:
+  - services:
     - Microsoft.DBforMySQL/flexibleServers
     terraform_pattern: |
       resource "azapi_resource" "mysql_flexible" {
@@ -106,7 +106,7 @@ rules:
   - cloud-architect
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.DBforMySQL/flexibleServers
     terraform_pattern: |
       resource "azapi_resource" "mysql_tls_config" {
@@ -165,7 +165,7 @@ rules:
   companion_resources:
   - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
   targets:
-    services:
+  - services:
     - Microsoft.DBforMySQL/flexibleServers
     terraform_pattern: |
       resource "azapi_resource" "mysql_audit_config" {
@@ -251,7 +251,7 @@ rules:
   - cloud-architect
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.DBforMySQL/flexibleServers
     terraform_pattern: |
       # Set highAvailability.mode = "ZoneRedundant" in server properties

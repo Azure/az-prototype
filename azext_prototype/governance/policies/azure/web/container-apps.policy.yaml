@@ -18,7 +18,7 @@ rules:
     - virtual-network
     error_message: Template with container-apps must include a virtual-network service for VNet integration
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       resource "azapi_resource" "container_app_env" {
@@ -79,7 +79,7 @@ rules:
     - identity
     error_message: Service '{service_name}' ({service_type}) missing managed identity configuration
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       resource "azapi_resource" "container_app" {
@@ -252,7 +252,7 @@ rules:
   - cloud-architect
   - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
 - id: AZ-CA-004
   severity: recommended
@@ -263,7 +263,7 @@ rules:
   - bicep-agent
   - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
 - id: AZ-CA-005
   severity: recommended
@@ -275,7 +275,7 @@ rules:
   - bicep-agent
   - monitoring-agent
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
 patterns:
 - name: Container App with Key Vault references

@@ -164,7 +164,7 @@ rules:
         }
       }
   targets:
-    services:
+  - services:
     - TODO:azure-firewall
     terraform_pattern: |
       resource "azapi_resource" "firewall" {
@@ -245,7 +245,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - TODO:azure-firewall
 - id: AZ-FW-003
   severity: required
@@ -256,7 +256,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - TODO:azure-firewall
 - id: AZ-FW-004
   severity: recommended
@@ -267,7 +267,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - TODO:azure-firewall
 - id: AZ-FW-005
   severity: recommended
@@ -280,7 +280,7 @@ rules:
   - cloud-architect
   - monitoring-agent
   targets:
-    services:
+  - services:
     - TODO:azure-firewall
     prohibitions:
     - Do not enable both structured and legacy diagnostic log formats simultaneously
@@ -292,7 +292,7 @@ rules:
   - cloud-architect
   - monitoring-agent
   targets:
-    services:
+  - services:
     - TODO:azure-firewall
 - id: AZ-FW-007
   severity: recommended
@@ -304,7 +304,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - TODO:azure-firewall
 - id: AZ-FW-008
   severity: recommended
@@ -315,7 +315,7 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services:
+  - services:
     - TODO:azure-firewall
 - id: AZ-FW-009
   severity: recommended
@@ -327,7 +327,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - TODO:azure-firewall
 patterns:
 - name: Azure Firewall Premium with IDPS and TLS inspection

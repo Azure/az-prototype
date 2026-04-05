@@ -4,11 +4,13 @@ description: Network isolation, firewall rules, and public exposure detection
 last_updated: '2026-04-04'
 patterns:
 - id: ANTI-NET-001
-  warning_message: Public network access is enabled — disable public access and use private endpoints or service endpoints.
-    This applies to ALL environments including POC.
   description: Detects wildcard (*) NSG rules that allow unrestricted inbound or outbound traffic
   rationale: Public network access exposes services to internet-based attacks.
+  warning_message: Public network access is enabled — disable public access and use private endpoints or service endpoints.
+    This applies to ALL environments including POC.
+  applies_to: []
   targets:
+  - services: []
     search_patterns:
     - public_network_access_enabled = true
     - public_network_access = "enabled"
@@ -26,24 +28,26 @@ patterns:
     - public_network_access_enabled = false
     - publicNetworkAccessForIngestion = "Disabled"
     - publicNetworkAccessForQuery = "Disabled"
-  applies_to: []
 - id: ANTI-NET-002
-  warning_message: Overly permissive network rule detected (0.0.0.0/0) — use specific IP ranges or service tags.
   description: Detects missing Network Security Group (NSG) association on subnets
   rationale: Avoiding this pattern prevents common deployment failures and security issues.
+  warning_message: Overly permissive network rule detected (0.0.0.0/0) — use specific IP ranges or service tags.
+  applies_to: []
   targets:
+  - services: []
     search_patterns:
     - 0.0.0.0/0
     - 0.0.0.0-255.255.255.255
     safe_patterns:
     - do not allow 0.0.0.0
     - avoid 0.0.0.0
-  applies_to: []
 - id: ANTI-NET-003
-  warning_message: Direct external ingress detected — consider using API Management or Front Door as a gateway.
   description: Detects SSH or RDP ports (22, 3389) open to the internet via 0.0.0.0/0 CIDR
   rationale: Avoiding this pattern prevents common deployment failures and security issues.
+  warning_message: Direct external ingress detected — consider using API Management or Front Door as a gateway.
+  applies_to: []
   targets:
+  - services: []
     search_patterns:
     - ingress_type = "external"
     - external_enabled = true
@@ -52,36 +56,41 @@ patterns:
     - api management
     - front door
     - application gateway
-  applies_to: []
 - id: ANTI-NET-004
-  warning_message: VNET integration disabled — enable VNET integration for backend connectivity to private resources.
   description: Detects oversized VNet or subnet address spaces (/8, /16) inappropriate for POC workloads
   rationale: Proper network segmentation and security group configuration prevent unauthorized access between services.
+  warning_message: VNET integration disabled — enable VNET integration for backend connectivity to private resources.
+  applies_to: []
   targets:
+  - services:
+    - Microsoft.Network/virtualNetworks
     search_patterns:
     - vnet_route_all_enabled = false
     - virtual_network_subnet_id = null
     safe_patterns: []
-  applies_to: []
 - id: ANTI-NET-005
-  warning_message: Empty IP restrictions — configure IP restrictions or use VNET integration to limit access.
   description: Detects public IP addresses attached to resources that should be internal-only
   rationale: Proper network segmentation and security group configuration prevent unauthorized access between services.
+  warning_message: Empty IP restrictions — configure IP restrictions or use VNET integration to limit access.
+  applies_to: []
   targets:
+  - services:
+    - Microsoft.Network/publicIPAddresses
     search_patterns:
     - ip_restriction = []
     - scm_ip_restriction = []
     safe_patterns:
     - ip_restriction = var.
-  applies_to: []
 - id: ANTI-NET-006
-  warning_message: Private endpoint references a VNet as its privateLinkServiceId — VNets are not valid Private Link targets.
-    ARM will reject this with HTTP 400. Do NOT create placeholder private endpoints in the networking stage. Private endpoints
-    belong in their respective service stages.
   description: Private endpoint references a VNet as its privateLinkServiceId — VNets are not valid Private Link targets.
     ARM will reject this with HTTP 400. Do NOT create placeholder private endpoints in the networ
   rationale: Proper network segmentation and security group configuration prevent unauthorized access between services.
+  warning_message: Private endpoint references a VNet as its privateLinkServiceId — VNets are not valid Private Link targets.
+    ARM will reject this with HTTP 400. Do NOT create placeholder private endpoints in the networking stage. Private endpoints
+    belong in their respective service stages.
+  applies_to: []
   targets:
+  - services: []
     search_patterns:
     - privateLinkServiceId = azapi_resource.vnet
     - privateLinkServiceId = azapi_resource.virtual_network
@@ -90,14 +99,15 @@ patterns:
     correct_patterns:
     - '# Do NOT create placeholder private endpoints'
     - '# Private endpoints belong in service stages, not the networking stage'
-  applies_to: []
 - id: ANTI-NET-007
-  warning_message: VNet or NSG diagnostic settings detected. These resources only support AllMetrics for diagnostics, not
-    log categories. Using categoryGroup = "allLogs" on VNet/NSG causes ARM HTTP 400. Use category = "AllMetrics" only.
   description: VNet or NSG diagnostic settings detected. These resources only support AllMetrics for diagnostics, not log
     categories. Using categoryGroup = "allLogs" on VNet/NSG causes ARM HTTP 400. Use category = "
   rationale: Proper network segmentation and security group configuration prevent unauthorized access between services.
+  warning_message: VNet or NSG diagnostic settings detected. These resources only support AllMetrics for diagnostics, not
+    log categories. Using categoryGroup = "allLogs" on VNet/NSG causes ARM HTTP 400. Use category = "AllMetrics" only.
+  applies_to: []
   targets:
+  - services: []
     search_patterns:
     - diag_vnet
     - diag_nsg
@@ -108,14 +118,15 @@ patterns:
     correct_patterns:
     - category = "AllMetrics"
     - '# VNets and NSGs only support AllMetrics, not log categories'
-  applies_to: []
 - id: ANTI-NET-008
-  warning_message: Diagnostic settings created for NSG resource. NSGs do NOT support any diagnostic setting categories (no
-    logs, no metrics). ARM will reject with HTTP 400. Remove the diagnostic settings resource for NSGs entirely.
   description: Diagnostic settings created for NSG resource. NSGs do NOT support any diagnostic setting categories (no logs,
     no metrics). ARM will reject with HTTP 400. Remove the diagnostic settings resource for NS
   rationale: Proper network segmentation and security group configuration prevent unauthorized access between services.
+  warning_message: Diagnostic settings created for NSG resource. NSGs do NOT support any diagnostic setting categories (no
+    logs, no metrics). ARM will reject with HTTP 400. Remove the diagnostic settings resource for NSGs entirely.
+  applies_to: []
   targets:
+  - services: []
     search_patterns:
     - nsg_pe_diag
     - nsg_aca_diag
@@ -126,4 +137,3 @@ patterns:
     - '# NSGs do not support diagnostic settings'
     correct_patterns:
     - '# NSGs do NOT support diagnostic settings — no log or metric categories'
-  applies_to: []

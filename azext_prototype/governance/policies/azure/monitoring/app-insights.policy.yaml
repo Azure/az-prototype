@@ -14,7 +14,7 @@ rules:
   - cloud-architect
   - monitoring-agent
   targets:
-    services:
+  - services:
     - Microsoft.Insights/components
     terraform_pattern: |
       resource "azapi_resource" "app_insights" {
@@ -80,7 +80,7 @@ rules:
     - application-insights
     error_message: Template with compute services should include application-insights for observability
   targets:
-    services:
+  - services:
     - Microsoft.Insights/components
 - id: AZ-AI-003
   severity: recommended
@@ -91,7 +91,7 @@ rules:
   - monitoring-agent
   - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Insights/components
 - id: AZ-AI-004
   severity: recommended
@@ -102,7 +102,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Insights/components
 patterns:
 - name: Application Insights linked to Log Analytics

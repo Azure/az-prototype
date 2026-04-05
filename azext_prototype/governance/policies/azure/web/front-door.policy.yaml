@@ -147,7 +147,7 @@ rules:
         }
       }
   targets:
-    services:
+  - services:
     - Microsoft.Network/frontDoors
     terraform_pattern: |
       resource "azapi_resource" "front_door" {
@@ -198,7 +198,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Network/frontDoors
 - id: AZ-AFD-003
   severity: required
@@ -209,7 +209,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Network/frontDoors
 - id: AZ-AFD-004
   severity: recommended
@@ -220,7 +220,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Network/frontDoors
 patterns:
 - name: Front Door Premium with WAF and private link

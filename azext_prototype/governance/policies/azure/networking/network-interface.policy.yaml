@@ -15,7 +15,7 @@ rules:
   - Microsoft.Network/networkSecurityGroups (NSG with least-privilege rules)
   - Microsoft.Network/virtualNetworks/subnets (target subnet)
   targets:
-    services:
+  - services:
     - Microsoft.Network/networkInterfaces
     terraform_pattern: |
       resource "azapi_resource" "nic" {
@@ -81,7 +81,7 @@ rules:
   - Microsoft.Network/bastionHosts (for management access instead of public IPs)
   - Microsoft.Network/loadBalancers (for application traffic instead of public IPs)
   targets:
-    services:
+  - services:
     - Microsoft.Network/networkInterfaces
     terraform_pattern: |
       # ipConfigurations should NOT include publicIPAddress
@@ -144,7 +144,7 @@ rules:
   - cloud-architect
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.Network/networkInterfaces
     terraform_pattern: |
       # Set enableAcceleratedNetworking = true in NIC properties
@@ -166,7 +166,7 @@ rules:
   - cloud-architect
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.Network/networkInterfaces
     terraform_pattern: |
       resource "azapi_resource" "nic_static" {

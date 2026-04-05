@@ -18,7 +18,7 @@ rules:
     - entra_auth_only
     error_message: 'Service ''{service_name}'' ({service_type}) missing entra_auth_only: true'
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       resource "azapi_resource" "sql_server" {
@@ -111,7 +111,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       resource "azapi_resource" "sql_database" {
@@ -168,7 +168,7 @@ rules:
     - tde_enabled
     error_message: 'Service ''{service_name}'' ({service_type}) missing tde_enabled: true'
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       resource "azapi_resource" "sql_tde" {
@@ -205,7 +205,7 @@ rules:
     - threat_protection
     error_message: 'Service ''{service_name}'' ({service_type}) missing threat_protection: true'
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       resource "azapi_resource" "sql_threat_protection" {
@@ -360,7 +360,7 @@ rules:
         }
       }
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     prohibitions:
     - NEVER set publicNetworkAccess to Enabled
@@ -423,7 +423,7 @@ rules:
         }
       }
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
 - id: AZ-SQL-007
   severity: recommended
@@ -435,7 +435,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
 - id: AZ-SQL-008
   severity: required
@@ -448,7 +448,7 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       resource "azapi_resource" "sql_server_auditing" {
@@ -485,7 +485,7 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       resource "azapi_resource" "sql_vulnerability_assessment" {
@@ -517,7 +517,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     prohibitions:
     - NEVER disable zone redundancy on Business Critical tier databases in production
@@ -531,7 +531,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       resource "azapi_resource" "sql_failover_group" {

@@ -15,7 +15,7 @@ rules:
   - Microsoft.Network/ddosProtectionPlans (DDoS protection for production workloads)
   - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
   targets:
-    services:
+  - services:
     - Microsoft.Network/publicIPAddresses
     terraform_pattern: |
       resource "azapi_resource" "public_ip" {
@@ -69,7 +69,7 @@ rules:
   - cloud-architect
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.Network/publicIPAddresses
     terraform_pattern: |
       # Set zones = ["1", "2", "3"] for zone-redundant
@@ -93,7 +93,7 @@ rules:
   - Microsoft.Network/privateEndpoints (replace public endpoints)
   - Microsoft.Network/loadBalancers (internal LB instead of public)
   targets:
-    services:
+  - services:
     - Microsoft.Network/publicIPAddresses
     terraform_pattern: |
       # Prefer internal load balancers and private endpoints
@@ -124,7 +124,7 @@ rules:
   companion_resources:
   - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
   targets:
-    services:
+  - services:
     - Microsoft.Network/publicIPAddresses
     terraform_pattern: |
       resource "azapi_resource" "pip_diagnostics" {

@@ -114,7 +114,7 @@ rules:
     name: Communication Service Contributor
     description: RBAC role assignment for ACS resource management
   targets:
-    services:
+  - services:
     - Microsoft.Communication/communicationServices
     terraform_pattern: |
       resource "azapi_resource" "communication" {
@@ -159,7 +159,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Communication/communicationServices
 - id: AZ-ACS-003
   severity: required
@@ -169,7 +169,7 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Communication/communicationServices
 - id: AZ-ACS-004
   severity: recommended
@@ -180,7 +180,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Communication/communicationServices
 - id: AZ-ACS-005
   severity: recommended
@@ -192,7 +192,7 @@ rules:
   - cloud-architect
   - monitoring-agent
   targets:
-    services:
+  - services:
     - Microsoft.Communication/communicationServices
 patterns:
 - name: Communication Services with email and managed identity

@@ -18,7 +18,7 @@ rules:
   - Microsoft.Network/connections (site-to-site connection resource)
   - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
   targets:
-    services:
+  - services:
     - Microsoft.Network/virtualNetworkGateways
     terraform_pattern: |
       resource "azapi_resource" "vpn_gateway" {
@@ -122,7 +122,7 @@ rules:
   - Microsoft.Network/virtualNetworkGateways (VPN gateway)
   - Microsoft.Network/localNetworkGateways (on-premises gateway)
   targets:
-    services:
+  - services:
     - Microsoft.Network/virtualNetworkGateways
     terraform_pattern: |
       resource "azapi_resource" "vpn_connection" {
@@ -203,7 +203,7 @@ rules:
   - cloud-architect
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.Network/virtualNetworkGateways
     terraform_pattern: |
       resource "azapi_resource" "gateway_subnet" {
@@ -241,7 +241,7 @@ rules:
   companion_resources:
   - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
   targets:
-    services:
+  - services:
     - Microsoft.Network/virtualNetworkGateways
     terraform_pattern: |
       resource "azapi_resource" "vpn_diagnostics" {

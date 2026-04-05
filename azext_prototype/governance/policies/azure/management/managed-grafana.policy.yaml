@@ -69,7 +69,7 @@ rules:
     name: Monitoring Reader on data sources
     description: Grant Grafana managed identity Monitoring Reader on Log Analytics and Azure Monitor workspaces
   targets:
-    services:
+  - services:
     - Microsoft.Dashboard/grafana
     terraform_pattern: |
       resource "azapi_resource" "grafana" {
@@ -142,7 +142,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Dashboard/grafana
 - id: AZ-GRF-003
   severity: recommended
@@ -153,7 +153,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Dashboard/grafana
 - id: AZ-GRF-004
   severity: recommended
@@ -165,7 +165,7 @@ rules:
   - cloud-architect
   - monitoring-agent
   targets:
-    services:
+  - services:
     - Microsoft.Dashboard/grafana
 patterns:
 - name: Managed Grafana with private endpoint and Azure Monitor integration

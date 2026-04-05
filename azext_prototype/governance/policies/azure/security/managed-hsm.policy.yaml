@@ -114,7 +114,7 @@ rules:
     name: Managed HSM Crypto User / Officer
     description: RBAC local role assignments for key operations — separate Crypto User from Crypto Officer
   targets:
-    services:
+  - services:
     - Microsoft.KeyVault/managedHSMs
     terraform_pattern: |
       resource "azapi_resource" "managed_hsm" {
@@ -186,7 +186,7 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.KeyVault/managedHSMs
 - id: AZ-HSM-003
   severity: required
@@ -196,7 +196,7 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.KeyVault/managedHSMs
 - id: AZ-HSM-004
   severity: required
@@ -206,7 +206,7 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.KeyVault/managedHSMs
 - id: AZ-HSM-005
   severity: recommended
@@ -219,7 +219,7 @@ rules:
   - security-reviewer
   - monitoring-agent
   targets:
-    services:
+  - services:
     - Microsoft.KeyVault/managedHSMs
 patterns:
 - name: Managed HSM with private endpoint and dual control

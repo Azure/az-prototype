@@ -18,7 +18,7 @@ rules:
     Bus Data Receiver: 4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0)'
   - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
   targets:
-    services:
+  - services:
     - Microsoft.ServiceBus/namespaces
     terraform_pattern: |
       resource "azapi_resource" "servicebus_namespace" {
@@ -83,7 +83,7 @@ rules:
   - app-developer
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.ServiceBus/namespaces
     terraform_pattern: |
       resource "azapi_resource" "sb_queue" {
@@ -134,7 +134,7 @@ rules:
   - app-developer
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.ServiceBus/namespaces
     terraform_pattern: |
       resource "azapi_resource" "sb_topic" {
@@ -206,7 +206,7 @@ rules:
   companion_resources:
   - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
   targets:
-    services:
+  - services:
     - Microsoft.ServiceBus/namespaces
     terraform_pattern: |
       resource "azapi_resource" "sb_diagnostics" {

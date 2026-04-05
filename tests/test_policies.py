@@ -46,7 +46,7 @@ def _minimal_policy(**overrides) -> dict:
                 "description": "Use managed identity",
                 "rationale": "Security best practice",
                 "applies_to": ["cloud-architect", "terraform-agent"],
-                "targets": {"services": ["Microsoft.App/containerApps"]},
+                "targets": [{"services": ["Microsoft.App/containerApps"]}],
             },
         ],
     }
@@ -357,7 +357,7 @@ class TestPolicyEngine:
                         "description": "Use managed identity",
                         "rationale": "Security best practice",
                         "applies_to": ["cloud-architect", "terraform-agent"],
-                        "targets": {"services": ["Microsoft.App/containerApps"]},
+                        "targets": [{"services": ["Microsoft.App/containerApps"]}],
                     },
                     {
                         "id": "T-002",
@@ -365,7 +365,7 @@ class TestPolicyEngine:
                         "description": "Enable logging",
                         "rationale": "",
                         "applies_to": ["cloud-architect"],
-                        "targets": {"services": ["Microsoft.App/containerApps"]},
+                        "targets": [{"services": ["Microsoft.App/containerApps"]}],
                     },
                     {
                         "id": "T-003",
@@ -373,7 +373,7 @@ class TestPolicyEngine:
                         "description": "Use custom domains",
                         "rationale": "",
                         "applies_to": ["app-developer"],
-                        "targets": {"services": ["Microsoft.App/containerApps"]},
+                        "targets": [{"services": ["Microsoft.App/containerApps"]}],
                     },
                 ],
                 patterns=[
@@ -733,14 +733,14 @@ class TestValidateMain:
                     "severity": "required",
                     "description": "a",
                     "applies_to": ["terraform-agent"],
-                    "targets": {"services": ["Microsoft.App/containerApps"]},
+                    "targets": [{"services": ["Microsoft.App/containerApps"]}],
                 },
                 {
                     "id": "DUP-001",
                     "severity": "required",
                     "description": "b",
                     "applies_to": ["terraform-agent"],
-                    "targets": {"services": ["Microsoft.App/containerApps"]},
+                    "targets": [{"services": ["Microsoft.App/containerApps"]}],
                 },
             ]
         )

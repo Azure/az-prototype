@@ -17,7 +17,7 @@ rules:
   - Microsoft.Network/expressRouteCircuits/peerings (private peering configuration)
   - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
   targets:
-    services:
+  - services:
     - Microsoft.Network/expressRouteCircuits
     terraform_pattern: |
       resource "azapi_resource" "expressroute_circuit" {
@@ -75,7 +75,7 @@ rules:
   - Microsoft.Network/publicIPAddresses (Standard SKU static for ER gateway)
   - Microsoft.Network/virtualNetworks/subnets (GatewaySubnet with /27 or larger)
   targets:
-    services:
+  - services:
     - Microsoft.Network/expressRouteCircuits
     terraform_pattern: |
       resource "azapi_resource" "er_gateway" {
@@ -147,7 +147,7 @@ rules:
   companion_resources:
   - Microsoft.Network/expressRouteCircuits (parent circuit)
   targets:
-    services:
+  - services:
     - Microsoft.Network/expressRouteCircuits
     terraform_pattern: |
       resource "azapi_resource" "er_private_peering" {
@@ -191,7 +191,7 @@ rules:
   companion_resources:
   - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
   targets:
-    services:
+  - services:
     - Microsoft.Network/expressRouteCircuits
     terraform_pattern: |
       resource "azapi_resource" "er_circuit_diagnostics" {

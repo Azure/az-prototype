@@ -56,36 +56,45 @@
             "description": "Agent names this rule applies to (e.g. ['terraform-agent', 'bicep-agent'])."
           },
           "targets": {
-            "type": "object",
-            "description": "Service targets and implementation patterns for this rule.",
-            "properties": {
-              "services": {
-                "type": "array",
-                "items": { "type": "string" },
-                "description": "ARM resource type namespaces (e.g. ['Microsoft.Sql/servers'])."
+            "type": "array",
+            "description": "Service targets and implementation patterns. Each entry specifies services and patterns.",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "properties": {
+                "services": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "ARM resource type namespaces (e.g. ['Microsoft.Sql/servers'])."
+                },
+                "terraform_pattern": {
+                  "type": "string",
+                  "description": "Terraform code pattern (optional — only for infrastructure agents)."
+                },
+                "bicep_pattern": {
+                  "type": "string",
+                  "description": "Bicep code pattern (optional — only for infrastructure agents)."
+                },
+                "csharp_pattern": {
+                  "type": "string",
+                  "description": "C# code pattern (optional — only for csharp-developer)."
+                },
+                "python_pattern": {
+                  "type": "string",
+                  "description": "Python code pattern (optional — only for python-developer)."
+                },
+                "react_pattern": {
+                  "type": "string",
+                  "description": "React/TypeScript code pattern (optional — only for react-developer)."
+                },
+                "prohibitions": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "Things the agent must NEVER generate for these services."
+                }
               },
-              "terraform_pattern": {
-                "type": "string",
-                "description": "Terraform code pattern (optional — only for infrastructure agents)."
-              },
-              "bicep_pattern": {
-                "type": "string",
-                "description": "Bicep code pattern (optional — only for infrastructure agents)."
-              },
-              "csharp_pattern": {
-                "type": "string",
-                "description": "C# code pattern (optional — only for csharp-developer)."
-              },
-              "python_pattern": {
-                "type": "string",
-                "description": "Python code pattern (optional — only for python-developer)."
-              },
-              "react_pattern": {
-                "type": "string",
-                "description": "React/TypeScript code pattern (optional — only for react-developer)."
-              }
-            },
-            "additionalProperties": false
+              "additionalProperties": false
+            }
           },
           "companion_resources": {
             "type": "array",

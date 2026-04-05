@@ -19,7 +19,7 @@ rules:
     name: Fabric Capacity Contributor
     description: RBAC role assignment for Fabric capacity management — separate from workspace permissions
   targets:
-    services:
+  - services:
     - Microsoft.Fabric/capacities
     terraform_pattern: |
       resource "azapi_resource" "fabric_capacity" {
@@ -67,7 +67,7 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.Fabric/capacities
 - id: AZ-FAB-003
   severity: required
@@ -78,7 +78,7 @@ rules:
   - security-reviewer
   - monitoring-agent
   targets:
-    services:
+  - services:
     - Microsoft.Fabric/capacities
 - id: AZ-FAB-004
   severity: recommended
@@ -90,7 +90,7 @@ rules:
   - cloud-architect
   - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Fabric/capacities
 - id: AZ-FAB-005
   severity: recommended
@@ -101,7 +101,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Fabric/capacities
 patterns:
 - name: Fabric capacity with admin governance

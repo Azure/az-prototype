@@ -74,13 +74,15 @@ def validate_policies() -> list[ValidationError]:
 
 
 def validate_anti_patterns() -> list[ValidationError]:
-    """Validate all anti-pattern YAML files."""
+    """Validate all anti-pattern YAML files against the unified schema."""
     ap_dir = _GOVERNANCE_DIR / "anti_patterns"
     if not ap_dir.is_dir():
         return []
 
     errors: list[ValidationError] = []
-    all_ids: dict[str, str] = {}  # id -> filename (for duplicate detection)
+    all_ids: dict[str, str] = {}
+
+    required_top = {"kind", "category", "description", "last_updated", "patterns"}
 
     for yaml_file in sorted(ap_dir.glob("*.yaml")):
         fname = yaml_file.name
@@ -94,62 +96,44 @@ def validate_anti_patterns() -> list[ValidationError]:
             errors.append(ValidationError(fname, "Root must be a mapping"))
             continue
 
-        if "domain" not in data:
-            errors.append(ValidationError(fname, "Missing required field 'domain'"))
+        for key in required_top:
+            if key not in data:
+                errors.append(ValidationError(fname, f"Missing required field '{key}'"))
 
-        # Check applies_to types
-        domain_applies_to = data.get("applies_to")
-        if domain_applies_to is not None and not isinstance(domain_applies_to, list):
-            errors.append(ValidationError(fname, "'applies_to' at domain level must be a list"))
-            domain_applies_to = None
+        if data.get("kind") != "anti-pattern":
+            errors.append(ValidationError(fname, f"kind must be 'anti-pattern', got '{data.get('kind')}'"))
 
-        # Check for mixed domain + pattern applies_to
         patterns = data.get("patterns", [])
         if not isinstance(patterns, list):
             errors.append(ValidationError(fname, "'patterns' must be a list"))
             continue
-
-        has_pattern_applies = any(isinstance(p, dict) and "applies_to" in p for p in patterns)
-        if domain_applies_to and has_pattern_applies:
-            errors.append(
-                ValidationError(
-                    fname,
-                    "Cannot mix domain-level and pattern-level 'applies_to' in the same file. " "Use one or the other.",
-                )
-            )
 
         for idx, entry in enumerate(patterns, 1):
             if not isinstance(entry, dict):
                 errors.append(ValidationError(fname, f"Pattern {idx}: must be a mapping"))
                 continue
 
-            # ID required
             check_id = entry.get("id")
             if not check_id:
-                errors.append(ValidationError(fname, f"Pattern {idx}: missing required field 'id'"))
-            elif check_id in all_ids:
-                errors.append(
-                    ValidationError(
-                        fname,
-                        f"Duplicate id '{check_id}' (also in {all_ids[check_id]})",
-                    )
-                )
-            else:
+                errors.append(ValidationError(fname, f"Pattern {idx}: missing 'id'"))
+
+            if not entry.get("description"):
+                errors.append(ValidationError(fname, f"Pattern {idx} ({check_id}): missing 'description'"))
+
+            if not entry.get("warning_message"):
+                errors.append(ValidationError(fname, f"Pattern {idx} ({check_id}): missing 'warning_message'"))
+
+            # targets required with search_patterns inside
+            targets = entry.get("targets")
+            if not isinstance(targets, dict):
+                errors.append(ValidationError(fname, f"Pattern {idx} ({check_id}): missing or invalid 'targets'"))
+            elif not targets.get("search_patterns"):
+                errors.append(ValidationError(fname, f"Pattern {idx} ({check_id}): missing 'targets.search_patterns'"))
+
+            if check_id and check_id in all_ids:
+                errors.append(ValidationError(fname, f"Duplicate id '{check_id}' (also in {all_ids[check_id]})"))
+            elif check_id:
                 all_ids[check_id] = fname
-
-            # search_patterns required
-            if not entry.get("search_patterns"):
-                errors.append(ValidationError(fname, f"Pattern {idx} ({check_id}): missing 'search_patterns'"))
-
-            # Pattern-level applies_to type check
-            pat_applies = entry.get("applies_to")
-            if pat_applies is not None and not isinstance(pat_applies, list):
-                errors.append(
-                    ValidationError(
-                        fname,
-                        f"Pattern {idx} ({check_id}): 'applies_to' must be a list",
-                    )
-                )
 
     return errors
 
@@ -160,13 +144,15 @@ def validate_anti_patterns() -> list[ValidationError]:
 
 
 def validate_standards() -> list[ValidationError]:
-    """Validate all standards YAML files."""
+    """Validate all standards YAML files against the unified schema."""
     std_dir = _GOVERNANCE_DIR / "standards"
     if not std_dir.is_dir():
         return []
 
     errors: list[ValidationError] = []
     all_ids: dict[str, str] = {}
+
+    required_top = {"kind", "category", "description", "last_updated", "principles"}
 
     for yaml_file in sorted(std_dir.rglob("*.yaml")):
         fname = str(yaml_file.relative_to(std_dir))
@@ -180,7 +166,14 @@ def validate_standards() -> list[ValidationError]:
             errors.append(ValidationError(fname, "Root must be a mapping"))
             continue
 
-        principles = data.get("principles", data.get("standards", []))
+        for key in required_top:
+            if key not in data:
+                errors.append(ValidationError(fname, f"Missing required field '{key}'"))
+
+        if data.get("kind") != "standard":
+            errors.append(ValidationError(fname, f"kind must be 'standard', got '{data.get('kind')}'"))
+
+        principles = data.get("principles", [])
         if not isinstance(principles, list):
             errors.append(ValidationError(fname, "'principles' must be a list"))
             continue
@@ -192,19 +185,15 @@ def validate_standards() -> list[ValidationError]:
 
             pid = entry.get("id")
             if not pid:
-                errors.append(ValidationError(fname, f"Principle {idx}: missing required field 'id'"))
-            elif pid in all_ids:
-                errors.append(
-                    ValidationError(
-                        fname,
-                        f"Duplicate id '{pid}' (also in {all_ids[pid]})",
-                    )
-                )
-            else:
-                all_ids[pid] = fname
+                errors.append(ValidationError(fname, f"Principle {idx}: missing 'id'"))
 
-            if not entry.get("name"):
-                errors.append(ValidationError(fname, f"Principle {idx} ({pid}): missing 'name'"))
+            if not entry.get("description"):
+                errors.append(ValidationError(fname, f"Principle {idx} ({pid}): missing 'description'"))
+
+            if pid and pid in all_ids:
+                errors.append(ValidationError(fname, f"Duplicate id '{pid}' (also in {all_ids[pid]})"))
+            elif pid:
+                all_ids[pid] = fname
 
             applies_to = entry.get("applies_to")
             if applies_to is not None and not isinstance(applies_to, list):

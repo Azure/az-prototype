@@ -8,13 +8,13 @@ rules:
   description: Select appropriate compute SKU based on environment tier — B-series for dev/POC, D-series for production
   rationale: Compute is typically the largest cost driver; right-sizing by environment prevents overspending on dev while
     ensuring production performance
-  applies_to: &id001
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === App Service Plan: Dev/POC ===
@@ -351,7 +351,7 @@ rules:
           }
         }
       }
-    prohibitions: &id002
+    prohibitions:
     - NEVER use Premium/PremiumV3 App Service Plans for dev/POC without written justification
     - NEVER use Elastic Premium Functions plan for dev/POC — use Consumption (Y1)
     - NEVER use D-series or F-series VMs for dev/POC — use B-series burstable
@@ -363,9 +363,13 @@ rules:
   description: Select appropriate compute SKU based on environment tier — B-series for dev/POC, D-series for production
   rationale: Compute is typically the largest cost driver; right-sizing by environment prevents overspending on dev while
     ensuring production performance
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # === App Service Plan: Dev/POC ===
@@ -702,15 +706,25 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER use Premium/PremiumV3 App Service Plans for dev/POC without written justification
+    - NEVER use Elastic Premium Functions plan for dev/POC — use Consumption (Y1)
+    - NEVER use D-series or F-series VMs for dev/POC — use B-series burstable
+    - NEVER use Dedicated workload profiles in Container Apps for dev/POC — use Consumption
+    - NEVER deploy Classic Cloud Services (PaaS) — use App Service or Container Apps
+    - NEVER use A-series or legacy VM SKUs — they are deprecated and cost-inefficient
 - id: WAF-COST-SKU-001
   severity: required
   description: Select appropriate compute SKU based on environment tier — B-series for dev/POC, D-series for production
   rationale: Compute is typically the largest cost driver; right-sizing by environment prevents overspending on dev while
     ensuring production performance
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # === App Service Plan: Dev/POC ===
@@ -1047,15 +1061,25 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER use Premium/PremiumV3 App Service Plans for dev/POC without written justification
+    - NEVER use Elastic Premium Functions plan for dev/POC — use Consumption (Y1)
+    - NEVER use D-series or F-series VMs for dev/POC — use B-series burstable
+    - NEVER use Dedicated workload profiles in Container Apps for dev/POC — use Consumption
+    - NEVER deploy Classic Cloud Services (PaaS) — use App Service or Container Apps
+    - NEVER use A-series or legacy VM SKUs — they are deprecated and cost-inefficient
 - id: WAF-COST-SKU-001
   severity: required
   description: Select appropriate compute SKU based on environment tier — B-series for dev/POC, D-series for production
   rationale: Compute is typically the largest cost driver; right-sizing by environment prevents overspending on dev while
     ensuring production performance
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       # === App Service Plan: Dev/POC ===
@@ -1392,15 +1416,25 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER use Premium/PremiumV3 App Service Plans for dev/POC without written justification
+    - NEVER use Elastic Premium Functions plan for dev/POC — use Consumption (Y1)
+    - NEVER use D-series or F-series VMs for dev/POC — use B-series burstable
+    - NEVER use Dedicated workload profiles in Container Apps for dev/POC — use Consumption
+    - NEVER deploy Classic Cloud Services (PaaS) — use App Service or Container Apps
+    - NEVER use A-series or legacy VM SKUs — they are deprecated and cost-inefficient
 - id: WAF-COST-SKU-001
   severity: required
   description: Select appropriate compute SKU based on environment tier — B-series for dev/POC, D-series for production
   rationale: Compute is typically the largest cost driver; right-sizing by environment prevents overspending on dev while
     ensuring production performance
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # === App Service Plan: Dev/POC ===
@@ -1737,15 +1771,25 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER use Premium/PremiumV3 App Service Plans for dev/POC without written justification
+    - NEVER use Elastic Premium Functions plan for dev/POC — use Consumption (Y1)
+    - NEVER use D-series or F-series VMs for dev/POC — use B-series burstable
+    - NEVER use Dedicated workload profiles in Container Apps for dev/POC — use Consumption
+    - NEVER deploy Classic Cloud Services (PaaS) — use App Service or Container Apps
+    - NEVER use A-series or legacy VM SKUs — they are deprecated and cost-inefficient
 - id: WAF-COST-SKU-001
   severity: required
   description: Select appropriate compute SKU based on environment tier — B-series for dev/POC, D-series for production
   rationale: Compute is typically the largest cost driver; right-sizing by environment prevents overspending on dev while
     ensuring production performance
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
       # === App Service Plan: Dev/POC ===
@@ -2082,15 +2126,25 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER use Premium/PremiumV3 App Service Plans for dev/POC without written justification
+    - NEVER use Elastic Premium Functions plan for dev/POC — use Consumption (Y1)
+    - NEVER use D-series or F-series VMs for dev/POC — use B-series burstable
+    - NEVER use Dedicated workload profiles in Container Apps for dev/POC — use Consumption
+    - NEVER deploy Classic Cloud Services (PaaS) — use App Service or Container Apps
+    - NEVER use A-series or legacy VM SKUs — they are deprecated and cost-inefficient
 - id: WAF-COST-SKU-001
   severity: required
   description: Select appropriate compute SKU based on environment tier — B-series for dev/POC, D-series for production
   rationale: Compute is typically the largest cost driver; right-sizing by environment prevents overspending on dev while
     ensuring production performance
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - TODO:storage
     terraform_pattern: |
       # === App Service Plan: Dev/POC ===
@@ -2427,15 +2481,25 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER use Premium/PremiumV3 App Service Plans for dev/POC without written justification
+    - NEVER use Elastic Premium Functions plan for dev/POC — use Consumption (Y1)
+    - NEVER use D-series or F-series VMs for dev/POC — use B-series burstable
+    - NEVER use Dedicated workload profiles in Container Apps for dev/POC — use Consumption
+    - NEVER deploy Classic Cloud Services (PaaS) — use App Service or Container Apps
+    - NEVER use A-series or legacy VM SKUs — they are deprecated and cost-inefficient
 - id: WAF-COST-SKU-001
   severity: required
   description: Select appropriate compute SKU based on environment tier — B-series for dev/POC, D-series for production
   rationale: Compute is typically the largest cost driver; right-sizing by environment prevents overspending on dev while
     ensuring production performance
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Network/loadBalancers
     terraform_pattern: |
       # === App Service Plan: Dev/POC ===
@@ -2772,15 +2836,25 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER use Premium/PremiumV3 App Service Plans for dev/POC without written justification
+    - NEVER use Elastic Premium Functions plan for dev/POC — use Consumption (Y1)
+    - NEVER use D-series or F-series VMs for dev/POC — use B-series burstable
+    - NEVER use Dedicated workload profiles in Container Apps for dev/POC — use Consumption
+    - NEVER deploy Classic Cloud Services (PaaS) — use App Service or Container Apps
+    - NEVER use A-series or legacy VM SKUs — they are deprecated and cost-inefficient
 - id: WAF-COST-SKU-001
   severity: required
   description: Select appropriate compute SKU based on environment tier — B-series for dev/POC, D-series for production
   rationale: Compute is typically the largest cost driver; right-sizing by environment prevents overspending on dev while
     ensuring production performance
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Network/frontDoors
     terraform_pattern: |
       # === App Service Plan: Dev/POC ===
@@ -3117,15 +3191,25 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER use Premium/PremiumV3 App Service Plans for dev/POC without written justification
+    - NEVER use Elastic Premium Functions plan for dev/POC — use Consumption (Y1)
+    - NEVER use D-series or F-series VMs for dev/POC — use B-series burstable
+    - NEVER use Dedicated workload profiles in Container Apps for dev/POC — use Consumption
+    - NEVER deploy Classic Cloud Services (PaaS) — use App Service or Container Apps
+    - NEVER use A-series or legacy VM SKUs — they are deprecated and cost-inefficient
 - id: WAF-COST-SKU-001
   severity: required
   description: Select appropriate compute SKU based on environment tier — B-series for dev/POC, D-series for production
   rationale: Compute is typically the largest cost driver; right-sizing by environment prevents overspending on dev while
     ensuring production performance
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Network/virtualNetworkGateways
     terraform_pattern: |
       # === App Service Plan: Dev/POC ===
@@ -3462,15 +3546,25 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER use Premium/PremiumV3 App Service Plans for dev/POC without written justification
+    - NEVER use Elastic Premium Functions plan for dev/POC — use Consumption (Y1)
+    - NEVER use D-series or F-series VMs for dev/POC — use B-series burstable
+    - NEVER use Dedicated workload profiles in Container Apps for dev/POC — use Consumption
+    - NEVER deploy Classic Cloud Services (PaaS) — use App Service or Container Apps
+    - NEVER use A-series or legacy VM SKUs — they are deprecated and cost-inefficient
 - id: WAF-COST-SKU-001
   severity: required
   description: Select appropriate compute SKU based on environment tier — B-series for dev/POC, D-series for production
   rationale: Compute is typically the largest cost driver; right-sizing by environment prevents overspending on dev while
     ensuring production performance
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # === App Service Plan: Dev/POC ===
@@ -3807,19 +3901,25 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER use Premium/PremiumV3 App Service Plans for dev/POC without written justification
+    - NEVER use Elastic Premium Functions plan for dev/POC — use Consumption (Y1)
+    - NEVER use D-series or F-series VMs for dev/POC — use B-series burstable
+    - NEVER use Dedicated workload profiles in Container Apps for dev/POC — use Consumption
+    - NEVER deploy Classic Cloud Services (PaaS) — use App Service or Container Apps
+    - NEVER use A-series or legacy VM SKUs — they are deprecated and cost-inefficient
 - id: WAF-COST-SKU-002
   severity: required
   description: Select appropriate database SKU based on environment tier — serverless/burstable for dev, provisioned/GP for
     production
   rationale: Database costs can exceed compute; serverless and burstable tiers eliminate idle costs in dev
-  applies_to: &id003
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === Azure SQL: Dev/POC (Serverless) ===
@@ -4096,7 +4196,7 @@ rules:
           }
         }
       }
-    prohibitions: &id004
+    prohibitions:
     - NEVER use DTU-based SQL tiers (Basic, S0, S1) — always use vCore serverless or provisioned for cost predictability
     - NEVER use provisioned throughput Cosmos DB for dev/POC — use Serverless capability
     - NEVER use General Purpose or Memory Optimized PostgreSQL tiers for dev/POC — use Burstable
@@ -4107,9 +4207,13 @@ rules:
   description: Select appropriate database SKU based on environment tier — serverless/burstable for dev, provisioned/GP for
     production
   rationale: Database costs can exceed compute; serverless and burstable tiers eliminate idle costs in dev
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # === Azure SQL: Dev/POC (Serverless) ===
@@ -4386,15 +4490,24 @@ rules:
           }
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER use DTU-based SQL tiers (Basic, S0, S1) — always use vCore serverless or provisioned for cost predictability
+    - NEVER use provisioned throughput Cosmos DB for dev/POC — use Serverless capability
+    - NEVER use General Purpose or Memory Optimized PostgreSQL tiers for dev/POC — use Burstable
+    - NEVER set Cosmos DB fixed throughput (manual RU/s) in production — use autoscale
+    - NEVER use geo-redundant backup for dev/POC databases
 - id: WAF-COST-SKU-002
   severity: required
   description: Select appropriate database SKU based on environment tier — serverless/burstable for dev, provisioned/GP for
     production
   rationale: Database costs can exceed compute; serverless and burstable tiers eliminate idle costs in dev
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # === Azure SQL: Dev/POC (Serverless) ===
@@ -4671,15 +4784,24 @@ rules:
           }
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER use DTU-based SQL tiers (Basic, S0, S1) — always use vCore serverless or provisioned for cost predictability
+    - NEVER use provisioned throughput Cosmos DB for dev/POC — use Serverless capability
+    - NEVER use General Purpose or Memory Optimized PostgreSQL tiers for dev/POC — use Burstable
+    - NEVER set Cosmos DB fixed throughput (manual RU/s) in production — use autoscale
+    - NEVER use geo-redundant backup for dev/POC databases
 - id: WAF-COST-SKU-002
   severity: required
   description: Select appropriate database SKU based on environment tier — serverless/burstable for dev, provisioned/GP for
     production
   rationale: Database costs can exceed compute; serverless and burstable tiers eliminate idle costs in dev
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       # === Azure SQL: Dev/POC (Serverless) ===
@@ -4956,15 +5078,24 @@ rules:
           }
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER use DTU-based SQL tiers (Basic, S0, S1) — always use vCore serverless or provisioned for cost predictability
+    - NEVER use provisioned throughput Cosmos DB for dev/POC — use Serverless capability
+    - NEVER use General Purpose or Memory Optimized PostgreSQL tiers for dev/POC — use Burstable
+    - NEVER set Cosmos DB fixed throughput (manual RU/s) in production — use autoscale
+    - NEVER use geo-redundant backup for dev/POC databases
 - id: WAF-COST-SKU-002
   severity: required
   description: Select appropriate database SKU based on environment tier — serverless/burstable for dev, provisioned/GP for
     production
   rationale: Database costs can exceed compute; serverless and burstable tiers eliminate idle costs in dev
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # === Azure SQL: Dev/POC (Serverless) ===
@@ -5241,15 +5372,24 @@ rules:
           }
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER use DTU-based SQL tiers (Basic, S0, S1) — always use vCore serverless or provisioned for cost predictability
+    - NEVER use provisioned throughput Cosmos DB for dev/POC — use Serverless capability
+    - NEVER use General Purpose or Memory Optimized PostgreSQL tiers for dev/POC — use Burstable
+    - NEVER set Cosmos DB fixed throughput (manual RU/s) in production — use autoscale
+    - NEVER use geo-redundant backup for dev/POC databases
 - id: WAF-COST-SKU-002
   severity: required
   description: Select appropriate database SKU based on environment tier — serverless/burstable for dev, provisioned/GP for
     production
   rationale: Database costs can exceed compute; serverless and burstable tiers eliminate idle costs in dev
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
       # === Azure SQL: Dev/POC (Serverless) ===
@@ -5526,15 +5666,24 @@ rules:
           }
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER use DTU-based SQL tiers (Basic, S0, S1) — always use vCore serverless or provisioned for cost predictability
+    - NEVER use provisioned throughput Cosmos DB for dev/POC — use Serverless capability
+    - NEVER use General Purpose or Memory Optimized PostgreSQL tiers for dev/POC — use Burstable
+    - NEVER set Cosmos DB fixed throughput (manual RU/s) in production — use autoscale
+    - NEVER use geo-redundant backup for dev/POC databases
 - id: WAF-COST-SKU-002
   severity: required
   description: Select appropriate database SKU based on environment tier — serverless/burstable for dev, provisioned/GP for
     production
   rationale: Database costs can exceed compute; serverless and burstable tiers eliminate idle costs in dev
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - TODO:storage
     terraform_pattern: |
       # === Azure SQL: Dev/POC (Serverless) ===
@@ -5811,15 +5960,24 @@ rules:
           }
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER use DTU-based SQL tiers (Basic, S0, S1) — always use vCore serverless or provisioned for cost predictability
+    - NEVER use provisioned throughput Cosmos DB for dev/POC — use Serverless capability
+    - NEVER use General Purpose or Memory Optimized PostgreSQL tiers for dev/POC — use Burstable
+    - NEVER set Cosmos DB fixed throughput (manual RU/s) in production — use autoscale
+    - NEVER use geo-redundant backup for dev/POC databases
 - id: WAF-COST-SKU-002
   severity: required
   description: Select appropriate database SKU based on environment tier — serverless/burstable for dev, provisioned/GP for
     production
   rationale: Database costs can exceed compute; serverless and burstable tiers eliminate idle costs in dev
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Network/loadBalancers
     terraform_pattern: |
       # === Azure SQL: Dev/POC (Serverless) ===
@@ -6096,15 +6254,24 @@ rules:
           }
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER use DTU-based SQL tiers (Basic, S0, S1) — always use vCore serverless or provisioned for cost predictability
+    - NEVER use provisioned throughput Cosmos DB for dev/POC — use Serverless capability
+    - NEVER use General Purpose or Memory Optimized PostgreSQL tiers for dev/POC — use Burstable
+    - NEVER set Cosmos DB fixed throughput (manual RU/s) in production — use autoscale
+    - NEVER use geo-redundant backup for dev/POC databases
 - id: WAF-COST-SKU-002
   severity: required
   description: Select appropriate database SKU based on environment tier — serverless/burstable for dev, provisioned/GP for
     production
   rationale: Database costs can exceed compute; serverless and burstable tiers eliminate idle costs in dev
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Network/frontDoors
     terraform_pattern: |
       # === Azure SQL: Dev/POC (Serverless) ===
@@ -6381,15 +6548,24 @@ rules:
           }
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER use DTU-based SQL tiers (Basic, S0, S1) — always use vCore serverless or provisioned for cost predictability
+    - NEVER use provisioned throughput Cosmos DB for dev/POC — use Serverless capability
+    - NEVER use General Purpose or Memory Optimized PostgreSQL tiers for dev/POC — use Burstable
+    - NEVER set Cosmos DB fixed throughput (manual RU/s) in production — use autoscale
+    - NEVER use geo-redundant backup for dev/POC databases
 - id: WAF-COST-SKU-002
   severity: required
   description: Select appropriate database SKU based on environment tier — serverless/burstable for dev, provisioned/GP for
     production
   rationale: Database costs can exceed compute; serverless and burstable tiers eliminate idle costs in dev
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Network/virtualNetworkGateways
     terraform_pattern: |
       # === Azure SQL: Dev/POC (Serverless) ===
@@ -6666,15 +6842,24 @@ rules:
           }
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER use DTU-based SQL tiers (Basic, S0, S1) — always use vCore serverless or provisioned for cost predictability
+    - NEVER use provisioned throughput Cosmos DB for dev/POC — use Serverless capability
+    - NEVER use General Purpose or Memory Optimized PostgreSQL tiers for dev/POC — use Burstable
+    - NEVER set Cosmos DB fixed throughput (manual RU/s) in production — use autoscale
+    - NEVER use geo-redundant backup for dev/POC databases
 - id: WAF-COST-SKU-002
   severity: required
   description: Select appropriate database SKU based on environment tier — serverless/burstable for dev, provisioned/GP for
     production
   rationale: Database costs can exceed compute; serverless and burstable tiers eliminate idle costs in dev
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # === Azure SQL: Dev/POC (Serverless) ===
@@ -6951,19 +7136,24 @@ rules:
           }
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER use DTU-based SQL tiers (Basic, S0, S1) — always use vCore serverless or provisioned for cost predictability
+    - NEVER use provisioned throughput Cosmos DB for dev/POC — use Serverless capability
+    - NEVER use General Purpose or Memory Optimized PostgreSQL tiers for dev/POC — use Burstable
+    - NEVER set Cosmos DB fixed throughput (manual RU/s) in production — use autoscale
+    - NEVER use geo-redundant backup for dev/POC databases
 - id: WAF-COST-SKU-003
   severity: required
   description: Select appropriate storage redundancy — LRS for dev/POC, GRS or ZRS for production; use tiered access (Hot/Cool/Archive)
   rationale: Storage redundancy costs scale linearly; LRS is 2-3x cheaper than GRS. Access tiers reduce costs for infrequently
     accessed data
-  applies_to: &id005
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === Storage Account: Dev/POC (LRS, Hot) ===
@@ -7076,7 +7266,7 @@ rules:
           supportsHttpsTrafficOnly: true
         }
       }
-    prohibitions: &id006
+    prohibitions:
     - NEVER use GRS/RAGRS/GZRS for dev/POC storage accounts — use LRS
     - NEVER use Premium storage for blob/file workloads that do not require low-latency IOPS
     - NEVER use Classic storage accounts — always use StorageV2
@@ -7087,9 +7277,13 @@ rules:
   description: Select appropriate storage redundancy — LRS for dev/POC, GRS or ZRS for production; use tiered access (Hot/Cool/Archive)
   rationale: Storage redundancy costs scale linearly; LRS is 2-3x cheaper than GRS. Access tiers reduce costs for infrequently
     accessed data
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # === Storage Account: Dev/POC (LRS, Hot) ===
@@ -7202,15 +7396,24 @@ rules:
           supportsHttpsTrafficOnly: true
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER use GRS/RAGRS/GZRS for dev/POC storage accounts — use LRS
+    - NEVER use Premium storage for blob/file workloads that do not require low-latency IOPS
+    - NEVER use Classic storage accounts — always use StorageV2
+    - NEVER use BlobStorage kind — use StorageV2 which supports all storage services
+    - NEVER leave large infrequently-accessed blobs in Hot tier — use lifecycle management to tier to Cool/Archive
 - id: WAF-COST-SKU-003
   severity: required
   description: Select appropriate storage redundancy — LRS for dev/POC, GRS or ZRS for production; use tiered access (Hot/Cool/Archive)
   rationale: Storage redundancy costs scale linearly; LRS is 2-3x cheaper than GRS. Access tiers reduce costs for infrequently
     accessed data
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # === Storage Account: Dev/POC (LRS, Hot) ===
@@ -7323,15 +7526,24 @@ rules:
           supportsHttpsTrafficOnly: true
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER use GRS/RAGRS/GZRS for dev/POC storage accounts — use LRS
+    - NEVER use Premium storage for blob/file workloads that do not require low-latency IOPS
+    - NEVER use Classic storage accounts — always use StorageV2
+    - NEVER use BlobStorage kind — use StorageV2 which supports all storage services
+    - NEVER leave large infrequently-accessed blobs in Hot tier — use lifecycle management to tier to Cool/Archive
 - id: WAF-COST-SKU-003
   severity: required
   description: Select appropriate storage redundancy — LRS for dev/POC, GRS or ZRS for production; use tiered access (Hot/Cool/Archive)
   rationale: Storage redundancy costs scale linearly; LRS is 2-3x cheaper than GRS. Access tiers reduce costs for infrequently
     accessed data
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       # === Storage Account: Dev/POC (LRS, Hot) ===
@@ -7444,15 +7656,24 @@ rules:
           supportsHttpsTrafficOnly: true
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER use GRS/RAGRS/GZRS for dev/POC storage accounts — use LRS
+    - NEVER use Premium storage for blob/file workloads that do not require low-latency IOPS
+    - NEVER use Classic storage accounts — always use StorageV2
+    - NEVER use BlobStorage kind — use StorageV2 which supports all storage services
+    - NEVER leave large infrequently-accessed blobs in Hot tier — use lifecycle management to tier to Cool/Archive
 - id: WAF-COST-SKU-003
   severity: required
   description: Select appropriate storage redundancy — LRS for dev/POC, GRS or ZRS for production; use tiered access (Hot/Cool/Archive)
   rationale: Storage redundancy costs scale linearly; LRS is 2-3x cheaper than GRS. Access tiers reduce costs for infrequently
     accessed data
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # === Storage Account: Dev/POC (LRS, Hot) ===
@@ -7565,15 +7786,24 @@ rules:
           supportsHttpsTrafficOnly: true
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER use GRS/RAGRS/GZRS for dev/POC storage accounts — use LRS
+    - NEVER use Premium storage for blob/file workloads that do not require low-latency IOPS
+    - NEVER use Classic storage accounts — always use StorageV2
+    - NEVER use BlobStorage kind — use StorageV2 which supports all storage services
+    - NEVER leave large infrequently-accessed blobs in Hot tier — use lifecycle management to tier to Cool/Archive
 - id: WAF-COST-SKU-003
   severity: required
   description: Select appropriate storage redundancy — LRS for dev/POC, GRS or ZRS for production; use tiered access (Hot/Cool/Archive)
   rationale: Storage redundancy costs scale linearly; LRS is 2-3x cheaper than GRS. Access tiers reduce costs for infrequently
     accessed data
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
       # === Storage Account: Dev/POC (LRS, Hot) ===
@@ -7686,15 +7916,24 @@ rules:
           supportsHttpsTrafficOnly: true
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER use GRS/RAGRS/GZRS for dev/POC storage accounts — use LRS
+    - NEVER use Premium storage for blob/file workloads that do not require low-latency IOPS
+    - NEVER use Classic storage accounts — always use StorageV2
+    - NEVER use BlobStorage kind — use StorageV2 which supports all storage services
+    - NEVER leave large infrequently-accessed blobs in Hot tier — use lifecycle management to tier to Cool/Archive
 - id: WAF-COST-SKU-003
   severity: required
   description: Select appropriate storage redundancy — LRS for dev/POC, GRS or ZRS for production; use tiered access (Hot/Cool/Archive)
   rationale: Storage redundancy costs scale linearly; LRS is 2-3x cheaper than GRS. Access tiers reduce costs for infrequently
     accessed data
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - TODO:storage
     terraform_pattern: |
       # === Storage Account: Dev/POC (LRS, Hot) ===
@@ -7807,15 +8046,24 @@ rules:
           supportsHttpsTrafficOnly: true
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER use GRS/RAGRS/GZRS for dev/POC storage accounts — use LRS
+    - NEVER use Premium storage for blob/file workloads that do not require low-latency IOPS
+    - NEVER use Classic storage accounts — always use StorageV2
+    - NEVER use BlobStorage kind — use StorageV2 which supports all storage services
+    - NEVER leave large infrequently-accessed blobs in Hot tier — use lifecycle management to tier to Cool/Archive
 - id: WAF-COST-SKU-003
   severity: required
   description: Select appropriate storage redundancy — LRS for dev/POC, GRS or ZRS for production; use tiered access (Hot/Cool/Archive)
   rationale: Storage redundancy costs scale linearly; LRS is 2-3x cheaper than GRS. Access tiers reduce costs for infrequently
     accessed data
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Network/loadBalancers
     terraform_pattern: |
       # === Storage Account: Dev/POC (LRS, Hot) ===
@@ -7928,15 +8176,24 @@ rules:
           supportsHttpsTrafficOnly: true
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER use GRS/RAGRS/GZRS for dev/POC storage accounts — use LRS
+    - NEVER use Premium storage for blob/file workloads that do not require low-latency IOPS
+    - NEVER use Classic storage accounts — always use StorageV2
+    - NEVER use BlobStorage kind — use StorageV2 which supports all storage services
+    - NEVER leave large infrequently-accessed blobs in Hot tier — use lifecycle management to tier to Cool/Archive
 - id: WAF-COST-SKU-003
   severity: required
   description: Select appropriate storage redundancy — LRS for dev/POC, GRS or ZRS for production; use tiered access (Hot/Cool/Archive)
   rationale: Storage redundancy costs scale linearly; LRS is 2-3x cheaper than GRS. Access tiers reduce costs for infrequently
     accessed data
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Network/frontDoors
     terraform_pattern: |
       # === Storage Account: Dev/POC (LRS, Hot) ===
@@ -8049,15 +8306,24 @@ rules:
           supportsHttpsTrafficOnly: true
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER use GRS/RAGRS/GZRS for dev/POC storage accounts — use LRS
+    - NEVER use Premium storage for blob/file workloads that do not require low-latency IOPS
+    - NEVER use Classic storage accounts — always use StorageV2
+    - NEVER use BlobStorage kind — use StorageV2 which supports all storage services
+    - NEVER leave large infrequently-accessed blobs in Hot tier — use lifecycle management to tier to Cool/Archive
 - id: WAF-COST-SKU-003
   severity: required
   description: Select appropriate storage redundancy — LRS for dev/POC, GRS or ZRS for production; use tiered access (Hot/Cool/Archive)
   rationale: Storage redundancy costs scale linearly; LRS is 2-3x cheaper than GRS. Access tiers reduce costs for infrequently
     accessed data
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Network/virtualNetworkGateways
     terraform_pattern: |
       # === Storage Account: Dev/POC (LRS, Hot) ===
@@ -8170,15 +8436,24 @@ rules:
           supportsHttpsTrafficOnly: true
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER use GRS/RAGRS/GZRS for dev/POC storage accounts — use LRS
+    - NEVER use Premium storage for blob/file workloads that do not require low-latency IOPS
+    - NEVER use Classic storage accounts — always use StorageV2
+    - NEVER use BlobStorage kind — use StorageV2 which supports all storage services
+    - NEVER leave large infrequently-accessed blobs in Hot tier — use lifecycle management to tier to Cool/Archive
 - id: WAF-COST-SKU-003
   severity: required
   description: Select appropriate storage redundancy — LRS for dev/POC, GRS or ZRS for production; use tiered access (Hot/Cool/Archive)
   rationale: Storage redundancy costs scale linearly; LRS is 2-3x cheaper than GRS. Access tiers reduce costs for infrequently
     accessed data
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # === Storage Account: Dev/POC (LRS, Hot) ===
@@ -8291,18 +8566,23 @@ rules:
           supportsHttpsTrafficOnly: true
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER use GRS/RAGRS/GZRS for dev/POC storage accounts — use LRS
+    - NEVER use Premium storage for blob/file workloads that do not require low-latency IOPS
+    - NEVER use Classic storage accounts — always use StorageV2
+    - NEVER use BlobStorage kind — use StorageV2 which supports all storage services
+    - NEVER leave large infrequently-accessed blobs in Hot tier — use lifecycle management to tier to Cool/Archive
 - id: WAF-COST-SKU-004
   severity: required
   description: Select appropriate networking SKU — Basic for dev/POC, Standard for production
   rationale: Networking services vary significantly in cost by tier; Basic SKUs are sufficient for development
-  applies_to: &id007
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === Load Balancer: Dev/POC (Basic — free) ===
@@ -8466,7 +8746,7 @@ rules:
           }
         }
       }
-    prohibitions: &id008
+    prohibitions:
     - NEVER use Premium Front Door for dev/POC — Standard is sufficient
     - NEVER use VpnGw3/VpnGw4/VpnGw5 for dev/POC — VpnGw1 provides adequate throughput
     - NEVER use Basic Load Balancer for production — it lacks availability zone support and SLA
@@ -8476,9 +8756,13 @@ rules:
   severity: required
   description: Select appropriate networking SKU — Basic for dev/POC, Standard for production
   rationale: Networking services vary significantly in cost by tier; Basic SKUs are sufficient for development
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # === Load Balancer: Dev/POC (Basic — free) ===
@@ -8642,14 +8926,23 @@ rules:
           }
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER use Premium Front Door for dev/POC — Standard is sufficient
+    - NEVER use VpnGw3/VpnGw4/VpnGw5 for dev/POC — VpnGw1 provides adequate throughput
+    - NEVER use Basic Load Balancer for production — it lacks availability zone support and SLA
+    - NEVER use legacy VPN Gateway SKUs (Basic) — they do not support IKEv2 or active-active
+    - NEVER deploy Application Gateway WAF v1 — use v2 for autoscaling and zone-redundancy
 - id: WAF-COST-SKU-004
   severity: required
   description: Select appropriate networking SKU — Basic for dev/POC, Standard for production
   rationale: Networking services vary significantly in cost by tier; Basic SKUs are sufficient for development
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # === Load Balancer: Dev/POC (Basic — free) ===
@@ -8813,14 +9106,23 @@ rules:
           }
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER use Premium Front Door for dev/POC — Standard is sufficient
+    - NEVER use VpnGw3/VpnGw4/VpnGw5 for dev/POC — VpnGw1 provides adequate throughput
+    - NEVER use Basic Load Balancer for production — it lacks availability zone support and SLA
+    - NEVER use legacy VPN Gateway SKUs (Basic) — they do not support IKEv2 or active-active
+    - NEVER deploy Application Gateway WAF v1 — use v2 for autoscaling and zone-redundancy
 - id: WAF-COST-SKU-004
   severity: required
   description: Select appropriate networking SKU — Basic for dev/POC, Standard for production
   rationale: Networking services vary significantly in cost by tier; Basic SKUs are sufficient for development
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       # === Load Balancer: Dev/POC (Basic — free) ===
@@ -8984,14 +9286,23 @@ rules:
           }
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER use Premium Front Door for dev/POC — Standard is sufficient
+    - NEVER use VpnGw3/VpnGw4/VpnGw5 for dev/POC — VpnGw1 provides adequate throughput
+    - NEVER use Basic Load Balancer for production — it lacks availability zone support and SLA
+    - NEVER use legacy VPN Gateway SKUs (Basic) — they do not support IKEv2 or active-active
+    - NEVER deploy Application Gateway WAF v1 — use v2 for autoscaling and zone-redundancy
 - id: WAF-COST-SKU-004
   severity: required
   description: Select appropriate networking SKU — Basic for dev/POC, Standard for production
   rationale: Networking services vary significantly in cost by tier; Basic SKUs are sufficient for development
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # === Load Balancer: Dev/POC (Basic — free) ===
@@ -9155,14 +9466,23 @@ rules:
           }
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER use Premium Front Door for dev/POC — Standard is sufficient
+    - NEVER use VpnGw3/VpnGw4/VpnGw5 for dev/POC — VpnGw1 provides adequate throughput
+    - NEVER use Basic Load Balancer for production — it lacks availability zone support and SLA
+    - NEVER use legacy VPN Gateway SKUs (Basic) — they do not support IKEv2 or active-active
+    - NEVER deploy Application Gateway WAF v1 — use v2 for autoscaling and zone-redundancy
 - id: WAF-COST-SKU-004
   severity: required
   description: Select appropriate networking SKU — Basic for dev/POC, Standard for production
   rationale: Networking services vary significantly in cost by tier; Basic SKUs are sufficient for development
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
       # === Load Balancer: Dev/POC (Basic — free) ===
@@ -9326,14 +9646,23 @@ rules:
           }
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER use Premium Front Door for dev/POC — Standard is sufficient
+    - NEVER use VpnGw3/VpnGw4/VpnGw5 for dev/POC — VpnGw1 provides adequate throughput
+    - NEVER use Basic Load Balancer for production — it lacks availability zone support and SLA
+    - NEVER use legacy VPN Gateway SKUs (Basic) — they do not support IKEv2 or active-active
+    - NEVER deploy Application Gateway WAF v1 — use v2 for autoscaling and zone-redundancy
 - id: WAF-COST-SKU-004
   severity: required
   description: Select appropriate networking SKU — Basic for dev/POC, Standard for production
   rationale: Networking services vary significantly in cost by tier; Basic SKUs are sufficient for development
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - TODO:storage
     terraform_pattern: |
       # === Load Balancer: Dev/POC (Basic — free) ===
@@ -9497,14 +9826,23 @@ rules:
           }
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER use Premium Front Door for dev/POC — Standard is sufficient
+    - NEVER use VpnGw3/VpnGw4/VpnGw5 for dev/POC — VpnGw1 provides adequate throughput
+    - NEVER use Basic Load Balancer for production — it lacks availability zone support and SLA
+    - NEVER use legacy VPN Gateway SKUs (Basic) — they do not support IKEv2 or active-active
+    - NEVER deploy Application Gateway WAF v1 — use v2 for autoscaling and zone-redundancy
 - id: WAF-COST-SKU-004
   severity: required
   description: Select appropriate networking SKU — Basic for dev/POC, Standard for production
   rationale: Networking services vary significantly in cost by tier; Basic SKUs are sufficient for development
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Network/loadBalancers
     terraform_pattern: |
       # === Load Balancer: Dev/POC (Basic — free) ===
@@ -9668,14 +10006,23 @@ rules:
           }
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER use Premium Front Door for dev/POC — Standard is sufficient
+    - NEVER use VpnGw3/VpnGw4/VpnGw5 for dev/POC — VpnGw1 provides adequate throughput
+    - NEVER use Basic Load Balancer for production — it lacks availability zone support and SLA
+    - NEVER use legacy VPN Gateway SKUs (Basic) — they do not support IKEv2 or active-active
+    - NEVER deploy Application Gateway WAF v1 — use v2 for autoscaling and zone-redundancy
 - id: WAF-COST-SKU-004
   severity: required
   description: Select appropriate networking SKU — Basic for dev/POC, Standard for production
   rationale: Networking services vary significantly in cost by tier; Basic SKUs are sufficient for development
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Network/frontDoors
     terraform_pattern: |
       # === Load Balancer: Dev/POC (Basic — free) ===
@@ -9839,14 +10186,23 @@ rules:
           }
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER use Premium Front Door for dev/POC — Standard is sufficient
+    - NEVER use VpnGw3/VpnGw4/VpnGw5 for dev/POC — VpnGw1 provides adequate throughput
+    - NEVER use Basic Load Balancer for production — it lacks availability zone support and SLA
+    - NEVER use legacy VPN Gateway SKUs (Basic) — they do not support IKEv2 or active-active
+    - NEVER deploy Application Gateway WAF v1 — use v2 for autoscaling and zone-redundancy
 - id: WAF-COST-SKU-004
   severity: required
   description: Select appropriate networking SKU — Basic for dev/POC, Standard for production
   rationale: Networking services vary significantly in cost by tier; Basic SKUs are sufficient for development
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Network/virtualNetworkGateways
     terraform_pattern: |
       # === Load Balancer: Dev/POC (Basic — free) ===
@@ -10010,14 +10366,23 @@ rules:
           }
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER use Premium Front Door for dev/POC — Standard is sufficient
+    - NEVER use VpnGw3/VpnGw4/VpnGw5 for dev/POC — VpnGw1 provides adequate throughput
+    - NEVER use Basic Load Balancer for production — it lacks availability zone support and SLA
+    - NEVER use legacy VPN Gateway SKUs (Basic) — they do not support IKEv2 or active-active
+    - NEVER deploy Application Gateway WAF v1 — use v2 for autoscaling and zone-redundancy
 - id: WAF-COST-SKU-004
   severity: required
   description: Select appropriate networking SKU — Basic for dev/POC, Standard for production
   rationale: Networking services vary significantly in cost by tier; Basic SKUs are sufficient for development
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # === Load Balancer: Dev/POC (Basic — free) ===
@@ -10181,18 +10546,23 @@ rules:
           }
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER use Premium Front Door for dev/POC — Standard is sufficient
+    - NEVER use VpnGw3/VpnGw4/VpnGw5 for dev/POC — VpnGw1 provides adequate throughput
+    - NEVER use Basic Load Balancer for production — it lacks availability zone support and SLA
+    - NEVER use legacy VPN Gateway SKUs (Basic) — they do not support IKEv2 or active-active
+    - NEVER deploy Application Gateway WAF v1 — use v2 for autoscaling and zone-redundancy
 - id: WAF-COST-SKU-005
   severity: required
   description: Select appropriate cache SKU — Basic C0 for dev/POC, Standard C1+ for staging, Premium for production clustering
   rationale: Redis cache pricing varies 10x between tiers; Basic is sufficient for development caching scenarios
-  applies_to: &id009
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === Redis Cache: Dev/POC (Basic C0) ===
@@ -10319,7 +10689,7 @@ rules:
           }
         }
       }
-    prohibitions: &id010
+    prohibitions:
     - NEVER use Premium or Enterprise Redis for dev/POC without justification — Basic C0 is sufficient
     - NEVER use Standard or Basic Redis for production workloads requiring clustering or persistence
     - NEVER set shardCount > 4 for POC — each shard doubles cost
@@ -10328,9 +10698,13 @@ rules:
   severity: required
   description: Select appropriate cache SKU — Basic C0 for dev/POC, Standard C1+ for staging, Premium for production clustering
   rationale: Redis cache pricing varies 10x between tiers; Basic is sufficient for development caching scenarios
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # === Redis Cache: Dev/POC (Basic C0) ===
@@ -10457,14 +10831,22 @@ rules:
           }
         }
       }
-    prohibitions: *id010
+    prohibitions:
+    - NEVER use Premium or Enterprise Redis for dev/POC without justification — Basic C0 is sufficient
+    - NEVER use Standard or Basic Redis for production workloads requiring clustering or persistence
+    - NEVER set shardCount > 4 for POC — each shard doubles cost
+    - NEVER enable Redis Enterprise for POC — use Premium P1 as the ceiling
 - id: WAF-COST-SKU-005
   severity: required
   description: Select appropriate cache SKU — Basic C0 for dev/POC, Standard C1+ for staging, Premium for production clustering
   rationale: Redis cache pricing varies 10x between tiers; Basic is sufficient for development caching scenarios
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # === Redis Cache: Dev/POC (Basic C0) ===
@@ -10591,14 +10973,22 @@ rules:
           }
         }
       }
-    prohibitions: *id010
+    prohibitions:
+    - NEVER use Premium or Enterprise Redis for dev/POC without justification — Basic C0 is sufficient
+    - NEVER use Standard or Basic Redis for production workloads requiring clustering or persistence
+    - NEVER set shardCount > 4 for POC — each shard doubles cost
+    - NEVER enable Redis Enterprise for POC — use Premium P1 as the ceiling
 - id: WAF-COST-SKU-005
   severity: required
   description: Select appropriate cache SKU — Basic C0 for dev/POC, Standard C1+ for staging, Premium for production clustering
   rationale: Redis cache pricing varies 10x between tiers; Basic is sufficient for development caching scenarios
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       # === Redis Cache: Dev/POC (Basic C0) ===
@@ -10725,14 +11115,22 @@ rules:
           }
         }
       }
-    prohibitions: *id010
+    prohibitions:
+    - NEVER use Premium or Enterprise Redis for dev/POC without justification — Basic C0 is sufficient
+    - NEVER use Standard or Basic Redis for production workloads requiring clustering or persistence
+    - NEVER set shardCount > 4 for POC — each shard doubles cost
+    - NEVER enable Redis Enterprise for POC — use Premium P1 as the ceiling
 - id: WAF-COST-SKU-005
   severity: required
   description: Select appropriate cache SKU — Basic C0 for dev/POC, Standard C1+ for staging, Premium for production clustering
   rationale: Redis cache pricing varies 10x between tiers; Basic is sufficient for development caching scenarios
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # === Redis Cache: Dev/POC (Basic C0) ===
@@ -10859,14 +11257,22 @@ rules:
           }
         }
       }
-    prohibitions: *id010
+    prohibitions:
+    - NEVER use Premium or Enterprise Redis for dev/POC without justification — Basic C0 is sufficient
+    - NEVER use Standard or Basic Redis for production workloads requiring clustering or persistence
+    - NEVER set shardCount > 4 for POC — each shard doubles cost
+    - NEVER enable Redis Enterprise for POC — use Premium P1 as the ceiling
 - id: WAF-COST-SKU-005
   severity: required
   description: Select appropriate cache SKU — Basic C0 for dev/POC, Standard C1+ for staging, Premium for production clustering
   rationale: Redis cache pricing varies 10x between tiers; Basic is sufficient for development caching scenarios
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
       # === Redis Cache: Dev/POC (Basic C0) ===
@@ -10993,14 +11399,22 @@ rules:
           }
         }
       }
-    prohibitions: *id010
+    prohibitions:
+    - NEVER use Premium or Enterprise Redis for dev/POC without justification — Basic C0 is sufficient
+    - NEVER use Standard or Basic Redis for production workloads requiring clustering or persistence
+    - NEVER set shardCount > 4 for POC — each shard doubles cost
+    - NEVER enable Redis Enterprise for POC — use Premium P1 as the ceiling
 - id: WAF-COST-SKU-005
   severity: required
   description: Select appropriate cache SKU — Basic C0 for dev/POC, Standard C1+ for staging, Premium for production clustering
   rationale: Redis cache pricing varies 10x between tiers; Basic is sufficient for development caching scenarios
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - TODO:storage
     terraform_pattern: |
       # === Redis Cache: Dev/POC (Basic C0) ===
@@ -11127,14 +11541,22 @@ rules:
           }
         }
       }
-    prohibitions: *id010
+    prohibitions:
+    - NEVER use Premium or Enterprise Redis for dev/POC without justification — Basic C0 is sufficient
+    - NEVER use Standard or Basic Redis for production workloads requiring clustering or persistence
+    - NEVER set shardCount > 4 for POC — each shard doubles cost
+    - NEVER enable Redis Enterprise for POC — use Premium P1 as the ceiling
 - id: WAF-COST-SKU-005
   severity: required
   description: Select appropriate cache SKU — Basic C0 for dev/POC, Standard C1+ for staging, Premium for production clustering
   rationale: Redis cache pricing varies 10x between tiers; Basic is sufficient for development caching scenarios
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Network/loadBalancers
     terraform_pattern: |
       # === Redis Cache: Dev/POC (Basic C0) ===
@@ -11261,14 +11683,22 @@ rules:
           }
         }
       }
-    prohibitions: *id010
+    prohibitions:
+    - NEVER use Premium or Enterprise Redis for dev/POC without justification — Basic C0 is sufficient
+    - NEVER use Standard or Basic Redis for production workloads requiring clustering or persistence
+    - NEVER set shardCount > 4 for POC — each shard doubles cost
+    - NEVER enable Redis Enterprise for POC — use Premium P1 as the ceiling
 - id: WAF-COST-SKU-005
   severity: required
   description: Select appropriate cache SKU — Basic C0 for dev/POC, Standard C1+ for staging, Premium for production clustering
   rationale: Redis cache pricing varies 10x between tiers; Basic is sufficient for development caching scenarios
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Network/frontDoors
     terraform_pattern: |
       # === Redis Cache: Dev/POC (Basic C0) ===
@@ -11395,14 +11825,22 @@ rules:
           }
         }
       }
-    prohibitions: *id010
+    prohibitions:
+    - NEVER use Premium or Enterprise Redis for dev/POC without justification — Basic C0 is sufficient
+    - NEVER use Standard or Basic Redis for production workloads requiring clustering or persistence
+    - NEVER set shardCount > 4 for POC — each shard doubles cost
+    - NEVER enable Redis Enterprise for POC — use Premium P1 as the ceiling
 - id: WAF-COST-SKU-005
   severity: required
   description: Select appropriate cache SKU — Basic C0 for dev/POC, Standard C1+ for staging, Premium for production clustering
   rationale: Redis cache pricing varies 10x between tiers; Basic is sufficient for development caching scenarios
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Network/virtualNetworkGateways
     terraform_pattern: |
       # === Redis Cache: Dev/POC (Basic C0) ===
@@ -11529,14 +11967,22 @@ rules:
           }
         }
       }
-    prohibitions: *id010
+    prohibitions:
+    - NEVER use Premium or Enterprise Redis for dev/POC without justification — Basic C0 is sufficient
+    - NEVER use Standard or Basic Redis for production workloads requiring clustering or persistence
+    - NEVER set shardCount > 4 for POC — each shard doubles cost
+    - NEVER enable Redis Enterprise for POC — use Premium P1 as the ceiling
 - id: WAF-COST-SKU-005
   severity: required
   description: Select appropriate cache SKU — Basic C0 for dev/POC, Standard C1+ for staging, Premium for production clustering
   rationale: Redis cache pricing varies 10x between tiers; Basic is sufficient for development caching scenarios
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # === Redis Cache: Dev/POC (Basic C0) ===
@@ -11663,7 +12109,11 @@ rules:
           }
         }
       }
-    prohibitions: *id010
+    prohibitions:
+    - NEVER use Premium or Enterprise Redis for dev/POC without justification — Basic C0 is sufficient
+    - NEVER use Standard or Basic Redis for production workloads requiring clustering or persistence
+    - NEVER set shardCount > 4 for POC — each shard doubles cost
+    - NEVER enable Redis Enterprise for POC — use Premium P1 as the ceiling
 patterns:
 - name: Environment-tiered SKU selection
   description: 'Select SKUs based on environment: dev/POC uses lowest viable tier, production uses appropriate performance

@@ -112,7 +112,7 @@ rules:
     name: Search Index Data Reader / Contributor
     description: RBAC role assignment granting consuming identity the appropriate Search data-plane role
   targets:
-    services:
+  - services:
     - Microsoft.Search/searchServices
     terraform_pattern: |
       resource "azapi_resource" "search" {
@@ -187,7 +187,7 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Search/searchServices
 - id: AZ-AIS-003
   severity: recommended
@@ -199,7 +199,7 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.Search/searchServices
 patterns:
 - name: Azure AI Search with private endpoint and RBAC

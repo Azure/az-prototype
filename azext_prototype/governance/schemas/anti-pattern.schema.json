@@ -51,33 +51,37 @@
             "description": "Agent names this pattern applies to (e.g. ['terraform-agent', 'bicep-agent'])."
           },
           "targets": {
-            "type": "object",
-            "description": "Detection targets — services, search patterns, safe patterns, and correct alternatives.",
-            "properties": {
-              "services": {
-                "type": "array",
-                "items": { "type": "string" },
-                "description": "ARM resource type namespaces. Empty or absent means all services."
+            "type": "array",
+            "description": "Detection targets — each entry specifies services and search/safe/correct patterns.",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "properties": {
+                "services": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "ARM resource type namespaces. Empty or absent means all services."
+                },
+                "search_patterns": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "minItems": 1,
+                  "description": "Substrings to search for (case-insensitive)."
+                },
+                "safe_patterns": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "Substrings that exempt a match (case-insensitive)."
+                },
+                "correct_patterns": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "Examples of correct code to show when pattern is detected."
+                }
               },
-              "search_patterns": {
-                "type": "array",
-                "items": { "type": "string" },
-                "minItems": 1,
-                "description": "Substrings to search for (case-insensitive)."
-              },
-              "safe_patterns": {
-                "type": "array",
-                "items": { "type": "string" },
-                "description": "Substrings that exempt a match (case-insensitive)."
-              },
-              "correct_patterns": {
-                "type": "array",
-                "items": { "type": "string" },
-                "description": "Examples of correct code to show when pattern is detected."
-              }
-            },
-            "required": ["search_patterns"],
-            "additionalProperties": false
+              "required": ["search_patterns"],
+              "additionalProperties": false
+            }
           }
         },
         "required": ["id", "description", "warning_message", "targets"]

@@ -16,7 +16,7 @@ rules:
   - Microsoft.Network/virtualNetworks/subnets (associate NAT gateway with subnet)
   - Microsoft.Insights/diagnosticSettings (route metrics to Log Analytics)
   targets:
-    services:
+  - services:
     - Microsoft.Network/natGateways
     terraform_pattern: |
       resource "azapi_resource" "nat_gateway" {
@@ -64,7 +64,7 @@ rules:
   companion_resources:
   - Microsoft.Network/natGateways (parent NAT gateway resource)
   targets:
-    services:
+  - services:
     - Microsoft.Network/natGateways
     terraform_pattern: |
       resource "azapi_resource" "nat_public_ip" {
@@ -112,7 +112,7 @@ rules:
   companion_resources:
   - Microsoft.Network/networkSecurityGroups (NSG on subnet for inbound filtering)
   targets:
-    services:
+  - services:
     - Microsoft.Network/natGateways
     terraform_pattern: |
       resource "azapi_resource" "subnet" {
@@ -153,7 +153,7 @@ rules:
   companion_resources:
   - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
   targets:
-    services:
+  - services:
     - Microsoft.Network/natGateways
     terraform_pattern: |
       resource "azapi_resource" "nat_diagnostics" {

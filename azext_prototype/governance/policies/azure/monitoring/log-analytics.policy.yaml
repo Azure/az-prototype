@@ -153,7 +153,7 @@ rules:
         }
       }
   targets:
-    services:
+  - services:
     - Microsoft.OperationalInsights/workspaces
     terraform_pattern: |
       resource "azapi_resource" "log_analytics_workspace" {
@@ -217,7 +217,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.OperationalInsights/workspaces
 - id: AZ-LA-003
   severity: recommended
@@ -227,7 +227,7 @@ rules:
   - cloud-architect
   - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.OperationalInsights/workspaces
 patterns:
 - name: Log Analytics Workspace with private endpoint

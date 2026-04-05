@@ -17,7 +17,7 @@ rules:
   - Microsoft.Authorization/roleAssignments (Backup Contributor role for vault identity on source resources)
   - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
   targets:
-    services:
+  - services:
     - Microsoft.DataProtection/backupVaults
     terraform_pattern: |
       resource "azapi_resource" "backup_vault" {
@@ -88,7 +88,7 @@ rules:
   companion_resources:
   - Microsoft.DataProtection/backupVaults (parent backup vault)
   targets:
-    services:
+  - services:
     - Microsoft.DataProtection/backupVaults
     terraform_pattern: |
       resource "azapi_resource" "backup_policy" {
@@ -218,7 +218,7 @@ rules:
   companion_resources:
   - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
   targets:
-    services:
+  - services:
     - Microsoft.DataProtection/backupVaults
     terraform_pattern: |
       resource "azapi_resource" "bkv_diagnostics" {

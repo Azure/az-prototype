@@ -113,7 +113,7 @@ rules:
     name: SignalR App Server
     description: 'RBAC role assignment granting the app server identity the SignalR App Server role (roleDefinitionId: 420fcaa2-552c-430f-98ca-3264be4806c7)'
   targets:
-    services:
+  - services:
     - Microsoft.SignalRService/signalR
     terraform_pattern: |
       resource "azapi_resource" "signalr" {
@@ -234,7 +234,7 @@ rules:
   - cloud-architect
   - monitoring-agent
   targets:
-    services:
+  - services:
     - Microsoft.SignalRService/signalR
 - id: AZ-SIG-003
   severity: recommended
@@ -246,7 +246,7 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.SignalRService/signalR
 patterns:
 - name: SignalR with private endpoint and Microsoft Entra auth

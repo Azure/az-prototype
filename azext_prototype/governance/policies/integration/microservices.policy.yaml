@@ -7,23 +7,23 @@ rules:
   severity: required
   description: Authenticate service-to-service calls via managed identity and RBAC — never shared keys or hardcoded tokens
   rationale: Managed identity eliminates credential management between microservices; RBAC provides auditable access control
-  applies_to: &id001
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
   - app-developer
-  companion_resources: &id002
+  companion_resources:
   - type: Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31
     name: id-svc-*
     description: User-assigned managed identity per microservice for cross-service authentication
-  template_check: &id003
+  template_check:
     scope:
     - container-apps
     require_config:
     - identity
     error_message: Service '{service_name}' ({service_type}) missing managed identity for service-to-service authentication
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # Container App A calling Container App B via managed identity
@@ -219,7 +219,7 @@ rules:
           }
         }
       }
-    prohibitions: &id004
+    prohibitions:
     - NEVER hardcode service URLs in container images — pass them as environment variables or use service discovery
     - NEVER use shared API keys or tokens for service-to-service auth — use managed identity with DefaultAzureCredential
     - NEVER use the same managed identity across all services — use per-service identities for least privilege
@@ -228,11 +228,23 @@ rules:
   severity: required
   description: Authenticate service-to-service calls via managed identity and RBAC — never shared keys or hardcoded tokens
   rationale: Managed identity eliminates credential management between microservices; RBAC provides auditable access control
-  applies_to: *id001
-  companion_resources: *id002
-  template_check: *id003
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31
+    name: id-svc-*
+    description: User-assigned managed identity per microservice for cross-service authentication
+  template_check:
+    scope:
+    - container-apps
+    require_config:
+    - identity
+    error_message: Service '{service_name}' ({service_type}) missing managed identity for service-to-service authentication
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # Container App A calling Container App B via managed identity
@@ -428,16 +440,32 @@ rules:
           }
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER hardcode service URLs in container images — pass them as environment variables or use service discovery
+    - NEVER use shared API keys or tokens for service-to-service auth — use managed identity with DefaultAzureCredential
+    - NEVER use the same managed identity across all services — use per-service identities for least privilege
+    - 'NEVER expose internal services externally (ingress.external: true) unless they serve external traffic'
 - id: CC-INT-MS-001
   severity: required
   description: Authenticate service-to-service calls via managed identity and RBAC — never shared keys or hardcoded tokens
   rationale: Managed identity eliminates credential management between microservices; RBAC provides auditable access control
-  applies_to: *id001
-  companion_resources: *id002
-  template_check: *id003
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31
+    name: id-svc-*
+    description: User-assigned managed identity per microservice for cross-service authentication
+  template_check:
+    scope:
+    - container-apps
+    require_config:
+    - identity
+    error_message: Service '{service_name}' ({service_type}) missing managed identity for service-to-service authentication
   targets:
-    services:
+  - services:
     - Microsoft.Insights/components
     terraform_pattern: |
       # Container App A calling Container App B via managed identity
@@ -633,17 +661,21 @@ rules:
           }
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER hardcode service URLs in container images — pass them as environment variables or use service discovery
+    - NEVER use shared API keys or tokens for service-to-service auth — use managed identity with DefaultAzureCredential
+    - NEVER use the same managed identity across all services — use per-service identities for least privilege
+    - 'NEVER expose internal services externally (ingress.external: true) unless they serve external traffic'
 - id: CC-INT-MS-002
   severity: recommended
   description: Enable Dapr sidecar for service invocation, pub/sub, and state management in Container Apps
   rationale: Dapr provides service discovery, mTLS, pub/sub abstraction, and state management without application-level implementation
-  applies_to: &id005
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
   - app-developer
-  companion_resources: &id006
+  companion_resources:
   - type: Microsoft.App/managedEnvironments/daprComponents@2024-03-01
     name: pubsub-servicebus
     description: Dapr pub/sub component backed by Azure Service Bus with managed identity
@@ -651,7 +683,7 @@ rules:
     name: statestore-cosmos
     description: Dapr state store component backed by Azure Cosmos DB with managed identity
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # Container Apps Environment with Dapr components
@@ -852,7 +884,7 @@ rules:
           }
         }
       }
-    prohibitions: &id007
+    prohibitions:
     - NEVER use connection strings in Dapr component metadata — use managed identity via azureClientId
     - NEVER omit scopes on Dapr components — unscoped components are accessible to all apps in the environment
     - NEVER set appPort incorrectly — Dapr cannot route to the application if the port is wrong
@@ -861,10 +893,20 @@ rules:
   severity: recommended
   description: Enable Dapr sidecar for service invocation, pub/sub, and state management in Container Apps
   rationale: Dapr provides service discovery, mTLS, pub/sub abstraction, and state management without application-level implementation
-  applies_to: *id005
-  companion_resources: *id006
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.App/managedEnvironments/daprComponents@2024-03-01
+    name: pubsub-servicebus
+    description: Dapr pub/sub component backed by Azure Service Bus with managed identity
+  - type: Microsoft.App/managedEnvironments/daprComponents@2024-03-01
+    name: statestore-cosmos
+    description: Dapr state store component backed by Azure Cosmos DB with managed identity
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # Container Apps Environment with Dapr components
@@ -1065,15 +1107,29 @@ rules:
           }
         }
       }
-    prohibitions: *id007
+    prohibitions:
+    - NEVER use connection strings in Dapr component metadata — use managed identity via azureClientId
+    - NEVER omit scopes on Dapr components — unscoped components are accessible to all apps in the environment
+    - NEVER set appPort incorrectly — Dapr cannot route to the application if the port is wrong
+    - NEVER use Dapr secrets component to store secrets — use Key Vault references in Container Apps secrets array
 - id: CC-INT-MS-002
   severity: recommended
   description: Enable Dapr sidecar for service invocation, pub/sub, and state management in Container Apps
   rationale: Dapr provides service discovery, mTLS, pub/sub abstraction, and state management without application-level implementation
-  applies_to: *id005
-  companion_resources: *id006
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.App/managedEnvironments/daprComponents@2024-03-01
+    name: pubsub-servicebus
+    description: Dapr pub/sub component backed by Azure Service Bus with managed identity
+  - type: Microsoft.App/managedEnvironments/daprComponents@2024-03-01
+    name: statestore-cosmos
+    description: Dapr state store component backed by Azure Cosmos DB with managed identity
   targets:
-    services:
+  - services:
     - Microsoft.Insights/components
     terraform_pattern: |
       # Container Apps Environment with Dapr components
@@ -1274,26 +1330,30 @@ rules:
           }
         }
       }
-    prohibitions: *id007
+    prohibitions:
+    - NEVER use connection strings in Dapr component metadata — use managed identity via azureClientId
+    - NEVER omit scopes on Dapr components — unscoped components are accessible to all apps in the environment
+    - NEVER set appPort incorrectly — Dapr cannot route to the application if the port is wrong
+    - NEVER use Dapr secrets component to store secrets — use Key Vault references in Container Apps secrets array
 - id: CC-INT-MS-003
   severity: required
   description: Configure distributed tracing with Application Insights and OpenTelemetry for all microservices
   rationale: Distributed tracing correlates requests across microservices; without it, debugging cross-service failures is
     impossible
-  applies_to: &id008
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
   - app-developer
   - monitoring-agent
-  companion_resources: &id009
+  companion_resources:
   - type: Microsoft.Insights/components@2020-02-02
     name: app-insights
     description: Workspace-based Application Insights for distributed tracing and metrics
   - type: Microsoft.OperationalInsights/workspaces@2023-09-01
     name: log-analytics
     description: Log Analytics workspace backing Application Insights
-  template_check: &id010
+  template_check:
     when_services_present:
     - container-apps
     require_service:
@@ -1301,7 +1361,7 @@ rules:
     severity: warning
     error_message: Microservices template must include Application Insights for distributed tracing
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # Application Insights workspace-based instance
@@ -1515,7 +1575,7 @@ rules:
           }
         }
       }
-    prohibitions: &id011
+    prohibitions:
     - NEVER deploy microservices without distributed tracing — cross-service debugging is impossible without it
     - NEVER hardcode Application Insights connection strings in images — use Key Vault references or environment variables
     - NEVER omit OTEL_SERVICE_NAME — traces without service names are unattributable
@@ -1525,11 +1585,28 @@ rules:
   description: Configure distributed tracing with Application Insights and OpenTelemetry for all microservices
   rationale: Distributed tracing correlates requests across microservices; without it, debugging cross-service failures is
     impossible
-  applies_to: *id008
-  companion_resources: *id009
-  template_check: *id010
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - monitoring-agent
+  companion_resources:
+  - type: Microsoft.Insights/components@2020-02-02
+    name: app-insights
+    description: Workspace-based Application Insights for distributed tracing and metrics
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace backing Application Insights
+  template_check:
+    when_services_present:
+    - container-apps
+    require_service:
+    - application-insights
+    severity: warning
+    error_message: Microservices template must include Application Insights for distributed tracing
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # Application Insights workspace-based instance
@@ -1743,17 +1820,38 @@ rules:
           }
         }
       }
-    prohibitions: *id011
+    prohibitions:
+    - NEVER deploy microservices without distributed tracing — cross-service debugging is impossible without it
+    - NEVER hardcode Application Insights connection strings in images — use Key Vault references or environment variables
+    - NEVER omit OTEL_SERVICE_NAME — traces without service names are unattributable
+    - NEVER enable public network access on Application Insights for production — use private endpoints
 - id: CC-INT-MS-003
   severity: required
   description: Configure distributed tracing with Application Insights and OpenTelemetry for all microservices
   rationale: Distributed tracing correlates requests across microservices; without it, debugging cross-service failures is
     impossible
-  applies_to: *id008
-  companion_resources: *id009
-  template_check: *id010
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - monitoring-agent
+  companion_resources:
+  - type: Microsoft.Insights/components@2020-02-02
+    name: app-insights
+    description: Workspace-based Application Insights for distributed tracing and metrics
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace backing Application Insights
+  template_check:
+    when_services_present:
+    - container-apps
+    require_service:
+    - application-insights
+    severity: warning
+    error_message: Microservices template must include Application Insights for distributed tracing
   targets:
-    services:
+  - services:
     - Microsoft.Insights/components
     terraform_pattern: |
       # Application Insights workspace-based instance
@@ -1967,18 +2065,22 @@ rules:
           }
         }
       }
-    prohibitions: *id011
+    prohibitions:
+    - NEVER deploy microservices without distributed tracing — cross-service debugging is impossible without it
+    - NEVER hardcode Application Insights connection strings in images — use Key Vault references or environment variables
+    - NEVER omit OTEL_SERVICE_NAME — traces without service names are unattributable
+    - NEVER enable public network access on Application Insights for production — use private endpoints
 - id: CC-INT-MS-004
   severity: required
   description: Configure health checks (liveness and readiness probes) on all Container Apps and App Service instances
   rationale: Health probes enable automatic restart of unhealthy instances and prevent traffic routing to unready services
-  applies_to: &id012
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # Container App with liveness, readiness, and startup probes
@@ -2154,7 +2256,7 @@ rules:
           }
         }
       }
-    prohibitions: &id013
+    prohibitions:
     - NEVER deploy microservices without liveness and readiness probes — unhealthy instances receive traffic and are not restarted
     - NEVER use the same path for liveness and readiness probes — liveness checks if the process is alive, readiness checks
       if it can accept traffic
@@ -2164,9 +2266,13 @@ rules:
   severity: required
   description: Configure health checks (liveness and readiness probes) on all Container Apps and App Service instances
   rationale: Health probes enable automatic restart of unhealthy instances and prevent traffic routing to unready services
-  applies_to: *id012
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # Container App with liveness, readiness, and startup probes
@@ -2342,14 +2448,23 @@ rules:
           }
         }
       }
-    prohibitions: *id013
+    prohibitions:
+    - NEVER deploy microservices without liveness and readiness probes — unhealthy instances receive traffic and are not restarted
+    - NEVER use the same path for liveness and readiness probes — liveness checks if the process is alive, readiness checks
+      if it can accept traffic
+    - NEVER set failureThreshold to 1 on liveness probes — a single failure will immediately restart the container
+    - NEVER skip startup probes on slow-starting containers — liveness probes will kill them before they are ready
 - id: CC-INT-MS-004
   severity: required
   description: Configure health checks (liveness and readiness probes) on all Container Apps and App Service instances
   rationale: Health probes enable automatic restart of unhealthy instances and prevent traffic routing to unready services
-  applies_to: *id012
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Insights/components
     terraform_pattern: |
       # Container App with liveness, readiness, and startup probes
@@ -2525,18 +2640,23 @@ rules:
           }
         }
       }
-    prohibitions: *id013
+    prohibitions:
+    - NEVER deploy microservices without liveness and readiness probes — unhealthy instances receive traffic and are not restarted
+    - NEVER use the same path for liveness and readiness probes — liveness checks if the process is alive, readiness checks
+      if it can accept traffic
+    - NEVER set failureThreshold to 1 on liveness probes — a single failure will immediately restart the container
+    - NEVER skip startup probes on slow-starting containers — liveness probes will kill them before they are ready
 - id: CC-INT-MS-005
   severity: recommended
   description: Configure circuit breaker and retry patterns using Dapr resiliency policies
   rationale: Circuit breakers prevent cascade failures; retries with backoff handle transient errors gracefully
-  applies_to: &id014
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # Dapr resiliency component for Container Apps
@@ -2630,7 +2750,7 @@ rules:
           ]
         }
       }
-    prohibitions: &id015
+    prohibitions:
     - NEVER make synchronous inter-service calls without timeouts — a hanging downstream service will exhaust caller resources
     - NEVER retry non-idempotent operations (POST without idempotency key) — retries may duplicate side effects
     - NEVER set circuit breaker threshold too low (< 3) — normal jitter will trip the breaker unnecessarily
@@ -2639,9 +2759,13 @@ rules:
   severity: recommended
   description: Configure circuit breaker and retry patterns using Dapr resiliency policies
   rationale: Circuit breakers prevent cascade failures; retries with backoff handle transient errors gracefully
-  applies_to: *id014
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # Dapr resiliency component for Container Apps
@@ -2735,14 +2859,22 @@ rules:
           ]
         }
       }
-    prohibitions: *id015
+    prohibitions:
+    - NEVER make synchronous inter-service calls without timeouts — a hanging downstream service will exhaust caller resources
+    - NEVER retry non-idempotent operations (POST without idempotency key) — retries may duplicate side effects
+    - NEVER set circuit breaker threshold too low (< 3) — normal jitter will trip the breaker unnecessarily
+    - NEVER use linear retry for high-throughput services — use exponential backoff with jitter to prevent thundering herd
 - id: CC-INT-MS-005
   severity: recommended
   description: Configure circuit breaker and retry patterns using Dapr resiliency policies
   rationale: Circuit breakers prevent cascade failures; retries with backoff handle transient errors gracefully
-  applies_to: *id014
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Insights/components
     terraform_pattern: |
       # Dapr resiliency component for Container Apps
@@ -2836,7 +2968,11 @@ rules:
           ]
         }
       }
-    prohibitions: *id015
+    prohibitions:
+    - NEVER make synchronous inter-service calls without timeouts — a hanging downstream service will exhaust caller resources
+    - NEVER retry non-idempotent operations (POST without idempotency key) — retries may duplicate side effects
+    - NEVER set circuit breaker threshold too low (< 3) — normal jitter will trip the breaker unnecessarily
+    - NEVER use linear retry for high-throughput services — use exponential backoff with jitter to prevent thundering herd
 patterns:
 - name: Service-to-service auth via managed identity
   description: Container Apps calling each other using user-assigned managed identities and DefaultAzureCredential

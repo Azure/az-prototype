@@ -198,7 +198,7 @@ rules:
         }
       }
   targets:
-    services:
+  - services:
     - Microsoft.Cdn/profiles
     terraform_pattern: |
       resource "azapi_resource" "cdn_profile" {
@@ -242,7 +242,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Cdn/profiles
 - id: AZ-CDN-003
   severity: recommended
@@ -253,7 +253,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Cdn/profiles
 - id: AZ-CDN-004
   severity: recommended
@@ -264,7 +264,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Cdn/profiles
 - id: AZ-CDN-005
   severity: recommended
@@ -275,7 +275,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Cdn/profiles
 patterns:
 - name: CDN Standard with HTTPS enforcement and compression

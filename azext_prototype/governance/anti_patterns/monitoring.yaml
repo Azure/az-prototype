@@ -4,10 +4,12 @@ description: Logging, diagnostics, and observability gap detection
 last_updated: '2026-04-04'
 patterns:
 - id: ANTI-MON-001
-  warning_message: Log retention set to 0 days — configure at least 30 days for compliance and incident investigation.
   description: Detects missing diagnostic settings on Azure resources that support them
   rationale: Observability is essential for detecting issues, debugging failures, and ensuring operational health.
+  warning_message: Log retention set to 0 days — configure at least 30 days for compliance and incident investigation.
+  applies_to: []
   targets:
+  - services: []
     search_patterns:
     - retention_in_days = 0
     - retention_days = 0
@@ -15,12 +17,13 @@ patterns:
     correct_patterns:
     - retention_in_days = 30
     - retentionInDays = 30
-  applies_to: []
 - id: ANTI-MON-002
-  warning_message: Diagnostic logs or metrics disabled — enable logging for all PaaS resources.
   description: Detects disabled Application Insights or missing telemetry configuration
   rationale: Observability is essential for detecting issues, debugging failures, and ensuring operational health.
+  warning_message: Diagnostic logs or metrics disabled — enable logging for all PaaS resources.
+  applies_to: []
   targets:
+  - services: []
     search_patterns:
     - enabled_log_category = []
     - logs_enabled = false
@@ -31,13 +34,14 @@ patterns:
     - metrics_enabled = true
     - enabled = true
     - '# Enable diagnostic settings for all PaaS resources'
-  applies_to: []
 - id: ANTI-MON-003
-  warning_message: InstrumentationKey output detected — InstrumentationKey is deprecated and does not support regional ingestion.
-    Use connection_string instead.
   description: 'Monitoring anti-pattern: InstrumentationKey output detected'
   rationale: Hardcoded credentials or access keys create security vulnerabilities and prevent key rotation.
+  warning_message: InstrumentationKey output detected — InstrumentationKey is deprecated and does not support regional ingestion.
+    Use connection_string instead.
+  applies_to: []
   targets:
+  - services: []
     search_patterns:
     - instrumentation_key
     - instrumentationkey
@@ -48,4 +52,3 @@ patterns:
     correct_patterns:
     - connection_string
     - '# Use connection_string instead of InstrumentationKey'
-  applies_to: []

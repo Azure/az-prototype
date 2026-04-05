@@ -191,7 +191,7 @@ rules:
     - purge_protection
     error_message: 'Service ''{service_name}'' ({service_type}) missing {config_key}: true'
   targets:
-    services:
+  - services:
     - Microsoft.KeyVault/vaults
     terraform_pattern: |
       resource "azapi_resource" "key_vault" {
@@ -310,7 +310,7 @@ rules:
         }
       }
   targets:
-    services:
+  - services:
     - Microsoft.KeyVault/vaults
 patterns:
 - name: Key Vault with RBAC and private endpoint

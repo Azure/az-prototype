@@ -4,11 +4,14 @@ description: Authentication method and RBAC assignment detection
 last_updated: '2026-04-04'
 patterns:
 - id: ANTI-AUTH-001
-  warning_message: SQL authentication with username/password detected — use Microsoft Entra (Azure AD) authentication with
-    managed identity.
   description: Detects SQL authentication (username/password) instead of Microsoft Entra (AAD) authentication
   rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  warning_message: SQL authentication with username/password detected — use Microsoft Entra (Azure AD) authentication with
+    managed identity.
+  applies_to: []
   targets:
+  - services:
+    - Microsoft.Sql/servers
     search_patterns:
     - sql authentication
     - username/password
@@ -27,12 +30,14 @@ patterns:
     - azureADOnlyAuthentication = true
     - azuread_authentication_only = true
     - '# Use Microsoft Entra authentication with managed identity'
-  applies_to: []
 - id: ANTI-AUTH-002
-  warning_message: Key Vault access policies detected — use enable_rbac_authorization = true with role assignments instead.
   description: Detects shared access signature (SAS) tokens where managed identity with RBAC should be used
   rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  warning_message: Key Vault access policies detected — use enable_rbac_authorization = true with role assignments instead.
+  applies_to: []
   targets:
+  - services:
+    - Microsoft.Storage/storageAccounts
     search_patterns:
     - access_policy {
     - access_policy =
@@ -45,13 +50,15 @@ patterns:
     - enable_rbac_authorization = true
     - enableRbacAuthorization = true
     - azurerm_role_assignment
-  applies_to: []
 - id: ANTI-AUTH-003
-  warning_message: Broad role assignment detected (Owner/Contributor at subscription/RG scope) -- use the most specific built-in
-    role at the narrowest scope.
   description: Detects access policy authorization on Key Vault instead of RBAC authorization model
   rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  warning_message: Broad role assignment detected (Owner/Contributor at subscription/RG scope) -- use the most specific built-in
+    role at the narrowest scope.
+  applies_to: []
   targets:
+  - services:
+    - Microsoft.KeyVault/vaults
     search_patterns:
     - '"owner"'
     - '"contributor"'
@@ -74,4 +81,3 @@ patterns:
     - '"Key Vault Secrets User"'
     - '"Cosmos DB Account Reader Role"'
     - '# Use the most specific built-in role at the narrowest scope'
-  applies_to: []

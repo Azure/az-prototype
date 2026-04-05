@@ -16,7 +16,7 @@ rules:
   - Microsoft.KeyVault/vaults/keys (RSA 2048-bit or higher encryption key)
   - Microsoft.Authorization/roleAssignments (Key Vault Crypto Service Encryption User role for DES identity)
   targets:
-    services:
+  - services:
     - Microsoft.Compute/diskEncryptionSets
     terraform_pattern: |
       resource "azapi_resource" "disk_encryption_set" {
@@ -74,7 +74,7 @@ rules:
   - Microsoft.Compute/diskEncryptionSets (DES with system-assigned identity)
   - Microsoft.KeyVault/vaults (Key Vault with RBAC authorization)
   targets:
-    services:
+  - services:
     - Microsoft.Compute/diskEncryptionSets
     terraform_pattern: |
       resource "azapi_resource" "des_role_assignment" {
@@ -112,7 +112,7 @@ rules:
   - cloud-architect
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.Compute/diskEncryptionSets
     terraform_pattern: |
       # Set rotationToLatestKeyVersionEnabled = true in DES properties
@@ -138,7 +138,7 @@ rules:
   - Microsoft.KeyVault/vaults (Key Vault with purge protection)
   - Microsoft.KeyVault/vaults/keys (RSA encryption key)
   targets:
-    services:
+  - services:
     - Microsoft.Compute/diskEncryptionSets
     terraform_pattern: |
       resource "azapi_resource" "des_double_encryption" {

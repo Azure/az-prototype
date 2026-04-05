@@ -17,7 +17,7 @@ rules:
   - Microsoft.Network/networkSecurityGroups (NSG on AzureBastionSubnet with required rules)
   - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
   targets:
-    services:
+  - services:
     - Microsoft.Network/bastionHosts
     terraform_pattern: |
       resource "azapi_resource" "bastion" {
@@ -91,7 +91,7 @@ rules:
   companion_resources:
   - Microsoft.Network/networkSecurityGroups (with required inbound/outbound rules for Bastion)
   targets:
-    services:
+  - services:
     - Microsoft.Network/bastionHosts
     terraform_pattern: |
       resource "azapi_resource" "bastion_subnet" {
@@ -131,7 +131,7 @@ rules:
   - cloud-architect
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.Network/bastionHosts
     terraform_pattern: |
       resource "azapi_resource" "bastion_nsg" {
@@ -326,7 +326,7 @@ rules:
   companion_resources:
   - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
   targets:
-    services:
+  - services:
     - Microsoft.Network/bastionHosts
     terraform_pattern: |
       resource "azapi_resource" "bastion_diagnostics" {

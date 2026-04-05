@@ -18,7 +18,7 @@ rules:
   - Microsoft.Insights/diagnosticSettings (VM diagnostics and metrics)
   - Microsoft.Insights/autoscaleSettings (autoscale rules based on metrics)
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachineScaleSets
     terraform_pattern: |
       resource "azapi_resource" "vmss" {
@@ -211,7 +211,7 @@ rules:
   - security-reviewer
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachineScaleSets
     terraform_pattern: |
       # Set securityProfile.encryptionAtHost = true in virtualMachineProfile
@@ -232,7 +232,7 @@ rules:
   companion_resources:
   - Microsoft.Compute/virtualMachineScaleSets (target VMSS)
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachineScaleSets
     terraform_pattern: |
       resource "azapi_resource" "vmss_autoscale" {
@@ -366,7 +366,7 @@ rules:
   companion_resources:
   - Microsoft.Network/loadBalancers/probes (health probe for automatic repairs)
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachineScaleSets
     terraform_pattern: |
       # Add to VMSS properties:

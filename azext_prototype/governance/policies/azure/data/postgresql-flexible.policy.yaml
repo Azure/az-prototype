@@ -18,7 +18,7 @@ rules:
   - Microsoft.DBforPostgreSQL/flexibleServers/administrators (Entra admin assignment)
   - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
   targets:
-    services:
+  - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
       resource "azapi_resource" "pg_flexible" {
@@ -118,7 +118,7 @@ rules:
   companion_resources:
   - Microsoft.DBforPostgreSQL/flexibleServers (parent server with authConfig.activeDirectoryAuth Enabled)
   targets:
-    services:
+  - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
       resource "azapi_resource" "pg_entra_admin" {
@@ -157,7 +157,7 @@ rules:
   companion_resources:
   - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
   targets:
-    services:
+  - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
       resource "azapi_resource" "pg_diagnostics" {
@@ -222,7 +222,7 @@ rules:
   - cloud-architect
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
     terraform_pattern: |
       # Set highAvailability.mode = "ZoneRedundant" in server properties

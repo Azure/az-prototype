@@ -23,7 +23,7 @@ rules:
     name: AcrPull role
     description: RBAC role assignment granting ACI managed identity the AcrPull role on the container registry
   targets:
-    services:
+  - services:
     - Microsoft.ContainerInstance/containerGroups
     terraform_pattern: |
       resource "azapi_resource" "container_group" {
@@ -174,7 +174,7 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ContainerInstance/containerGroups
 - id: AZ-ACI-003
   severity: recommended
@@ -185,7 +185,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.ContainerInstance/containerGroups
 - id: AZ-ACI-004
   severity: recommended
@@ -197,7 +197,7 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ContainerInstance/containerGroups
 patterns:
 - name: ACI with VNet injection and managed identity

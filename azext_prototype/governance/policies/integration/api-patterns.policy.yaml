@@ -8,12 +8,12 @@ rules:
   description: Implement API versioning using URL path segments in APIM with version sets
   rationale: API versioning prevents breaking changes for existing consumers; URL path versioning is the most discoverable
     approach
-  applies_to: &id001
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
   - app-developer
-  companion_resources: &id002
+  companion_resources:
   - type: Microsoft.ApiManagement/service/apiVersionSets@2023-09-01-preview
     name: api-version-set
     description: API version set grouping related API versions under a single path
@@ -21,7 +21,7 @@ rules:
     name: deprecation-policy
     description: Outbound policy adding Sunset and Deprecation headers to deprecated API versions
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |
       # APIM API version set — groups related API versions
@@ -187,7 +187,7 @@ rules:
           '''
         }
       }
-    prohibitions: &id003
+    prohibitions:
     - NEVER deploy APIs without versioning — unversioned APIs cannot evolve without breaking consumers
     - NEVER remove an API version without a sunset period and migration guide
     - NEVER mix versioning schemes within the same API — pick one (Segment, Header, or Query) and be consistent
@@ -197,10 +197,20 @@ rules:
   description: Implement API versioning using URL path segments in APIM with version sets
   rationale: API versioning prevents breaking changes for existing consumers; URL path versioning is the most discoverable
     approach
-  applies_to: *id001
-  companion_resources: *id002
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.ApiManagement/service/apiVersionSets@2023-09-01-preview
+    name: api-version-set
+    description: API version set grouping related API versions under a single path
+  - type: Microsoft.ApiManagement/service/apis/policies@2023-09-01-preview
+    name: deprecation-policy
+    description: Outbound policy adding Sunset and Deprecation headers to deprecated API versions
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # APIM API version set — groups related API versions
@@ -366,16 +376,30 @@ rules:
           '''
         }
       }
-    prohibitions: *id003
+    prohibitions:
+    - NEVER deploy APIs without versioning — unversioned APIs cannot evolve without breaking consumers
+    - NEVER remove an API version without a sunset period and migration guide
+    - NEVER mix versioning schemes within the same API — pick one (Segment, Header, or Query) and be consistent
+    - NEVER use date-based versions (2024-01-01) for REST APIs — use semantic versions (v1, v2)
 - id: CC-INT-API-001
   severity: required
   description: Implement API versioning using URL path segments in APIM with version sets
   rationale: API versioning prevents breaking changes for existing consumers; URL path versioning is the most discoverable
     approach
-  applies_to: *id001
-  companion_resources: *id002
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.ApiManagement/service/apiVersionSets@2023-09-01-preview
+    name: api-version-set
+    description: API version set grouping related API versions under a single path
+  - type: Microsoft.ApiManagement/service/apis/policies@2023-09-01-preview
+    name: deprecation-policy
+    description: Outbound policy adding Sunset and Deprecation headers to deprecated API versions
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # APIM API version set — groups related API versions
@@ -541,23 +565,27 @@ rules:
           '''
         }
       }
-    prohibitions: *id003
+    prohibitions:
+    - NEVER deploy APIs without versioning — unversioned APIs cannot evolve without breaking consumers
+    - NEVER remove an API version without a sunset period and migration guide
+    - NEVER mix versioning schemes within the same API — pick one (Segment, Header, or Query) and be consistent
+    - NEVER use date-based versions (2024-01-01) for REST APIs — use semantic versions (v1, v2)
 - id: CC-INT-API-002
   severity: required
   description: Configure OAuth 2.0 / JWT validation in APIM inbound policies for all API endpoints
   rationale: APIs without authentication allow unrestricted access; JWT validation at the gateway prevents unauthorized requests
     from reaching backends
-  applies_to: &id004
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
   - app-developer
-  companion_resources: &id005
+  companion_resources:
   - type: Microsoft.ApiManagement/service/authorizationServers@2023-09-01-preview
     name: entra-id-oauth
     description: OAuth 2.0 authorization server for Entra ID integration in developer portal
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |
       # APIM API policy with JWT validation (Entra ID / OAuth 2.0)
@@ -701,7 +729,7 @@ rules:
           bearerTokenSendingMethods: ['authorizationHeader']
         }
       }
-    prohibitions: &id006
+    prohibitions:
     - NEVER deploy APIs without authentication — unauthenticated APIs allow unrestricted access
     - NEVER validate JWTs without checking audience (aud) and issuer (iss) claims
     - NEVER accept tokens without expiration (require-expiration-time must be true)
@@ -713,10 +741,17 @@ rules:
   description: Configure OAuth 2.0 / JWT validation in APIM inbound policies for all API endpoints
   rationale: APIs without authentication allow unrestricted access; JWT validation at the gateway prevents unauthorized requests
     from reaching backends
-  applies_to: *id004
-  companion_resources: *id005
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.ApiManagement/service/authorizationServers@2023-09-01-preview
+    name: entra-id-oauth
+    description: OAuth 2.0 authorization server for Entra ID integration in developer portal
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # APIM API policy with JWT validation (Entra ID / OAuth 2.0)
@@ -860,16 +895,29 @@ rules:
           bearerTokenSendingMethods: ['authorizationHeader']
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER deploy APIs without authentication — unauthenticated APIs allow unrestricted access
+    - NEVER validate JWTs without checking audience (aud) and issuer (iss) claims
+    - NEVER accept tokens without expiration (require-expiration-time must be true)
+    - NEVER accept unsigned tokens (require-signed-tokens must be true)
+    - NEVER hardcode client secrets in APIM policies — use named values backed by Key Vault
+    - NEVER trust JWT claims without server-side validation — client-provided claims are untrustworthy
 - id: CC-INT-API-002
   severity: required
   description: Configure OAuth 2.0 / JWT validation in APIM inbound policies for all API endpoints
   rationale: APIs without authentication allow unrestricted access; JWT validation at the gateway prevents unauthorized requests
     from reaching backends
-  applies_to: *id004
-  companion_resources: *id005
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.ApiManagement/service/authorizationServers@2023-09-01-preview
+    name: entra-id-oauth
+    description: OAuth 2.0 authorization server for Entra ID integration in developer portal
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # APIM API policy with JWT validation (Entra ID / OAuth 2.0)
@@ -1013,19 +1061,25 @@ rules:
           bearerTokenSendingMethods: ['authorizationHeader']
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER deploy APIs without authentication — unauthenticated APIs allow unrestricted access
+    - NEVER validate JWTs without checking audience (aud) and issuer (iss) claims
+    - NEVER accept tokens without expiration (require-expiration-time must be true)
+    - NEVER accept unsigned tokens (require-signed-tokens must be true)
+    - NEVER hardcode client secrets in APIM policies — use named values backed by Key Vault
+    - NEVER trust JWT claims without server-side validation — client-provided claims are untrustworthy
 - id: CC-INT-API-003
   severity: required
   description: Configure request and response validation policies in APIM to enforce API contracts
   rationale: Request validation prevents malformed input from reaching backends; response validation ensures API contract
     compliance
-  applies_to: &id007
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |
       # APIM API with OpenAPI specification import and validation policies
@@ -1193,7 +1247,7 @@ rules:
           '''
         }
       }
-    prohibitions: &id008
+    prohibitions:
     - NEVER skip request validation — malformed input causes unpredictable backend behavior
     - NEVER allow additional properties in request validation unless the schema explicitly permits it
     - NEVER expose internal error details (stack traces, SQL errors) in validation error responses
@@ -1204,9 +1258,13 @@ rules:
   description: Configure request and response validation policies in APIM to enforce API contracts
   rationale: Request validation prevents malformed input from reaching backends; response validation ensures API contract
     compliance
-  applies_to: *id007
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # APIM API with OpenAPI specification import and validation policies
@@ -1374,15 +1432,24 @@ rules:
           '''
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER skip request validation — malformed input causes unpredictable backend behavior
+    - NEVER allow additional properties in request validation unless the schema explicitly permits it
+    - NEVER expose internal error details (stack traces, SQL errors) in validation error responses
+    - NEVER set max-size to unlimited — always cap request body size to prevent abuse
+    - NEVER block on response validation in production (use action='ignore') — outbound validation should log, not reject
 - id: CC-INT-API-003
   severity: required
   description: Configure request and response validation policies in APIM to enforce API contracts
   rationale: Request validation prevents malformed input from reaching backends; response validation ensures API contract
     compliance
-  applies_to: *id007
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # APIM API with OpenAPI specification import and validation policies
@@ -1550,18 +1617,23 @@ rules:
           '''
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER skip request validation — malformed input causes unpredictable backend behavior
+    - NEVER allow additional properties in request validation unless the schema explicitly permits it
+    - NEVER expose internal error details (stack traces, SQL errors) in validation error responses
+    - NEVER set max-size to unlimited — always cap request body size to prevent abuse
+    - NEVER block on response validation in production (use action='ignore') — outbound validation should log, not reject
 - id: CC-INT-API-004
   severity: recommended
   description: Integrate OpenAPI specification with APIM for auto-generated documentation and developer portal
   rationale: OpenAPI specs provide machine-readable API contracts; APIM developer portal auto-generates interactive documentation
-  applies_to: &id009
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |
       # APIM API imported from OpenAPI spec URL
@@ -1645,7 +1717,7 @@ rules:
         parent: apimDevProduct
         name: apiName
       }
-    prohibitions: &id010
+    prohibitions:
     - NEVER deploy APIs without an OpenAPI specification — undocumented APIs are unusable by consumers
     - NEVER use 'swagger' format for new APIs — use 'openapi+json' (OpenAPI 3.0+)
     - NEVER expose the developer portal without authentication — configure Entra ID or other IdP
@@ -1654,9 +1726,13 @@ rules:
   severity: recommended
   description: Integrate OpenAPI specification with APIM for auto-generated documentation and developer portal
   rationale: OpenAPI specs provide machine-readable API contracts; APIM developer portal auto-generates interactive documentation
-  applies_to: *id009
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # APIM API imported from OpenAPI spec URL
@@ -1740,14 +1816,22 @@ rules:
         parent: apimDevProduct
         name: apiName
       }
-    prohibitions: *id010
+    prohibitions:
+    - NEVER deploy APIs without an OpenAPI specification — undocumented APIs are unusable by consumers
+    - NEVER use 'swagger' format for new APIs — use 'openapi+json' (OpenAPI 3.0+)
+    - NEVER expose the developer portal without authentication — configure Entra ID or other IdP
+    - NEVER publish APIs to products without rate limiting policies
 - id: CC-INT-API-004
   severity: recommended
   description: Integrate OpenAPI specification with APIM for auto-generated documentation and developer portal
   rationale: OpenAPI specs provide machine-readable API contracts; APIM developer portal auto-generates interactive documentation
-  applies_to: *id009
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # APIM API imported from OpenAPI spec URL
@@ -1831,7 +1915,11 @@ rules:
         parent: apimDevProduct
         name: apiName
       }
-    prohibitions: *id010
+    prohibitions:
+    - NEVER deploy APIs without an OpenAPI specification — undocumented APIs are unusable by consumers
+    - NEVER use 'swagger' format for new APIs — use 'openapi+json' (OpenAPI 3.0+)
+    - NEVER expose the developer portal without authentication — configure Entra ID or other IdP
+    - NEVER publish APIs to products without rate limiting policies
 patterns:
 - name: Versioned API with APIM version sets
   description: URL path-segmented API versioning with sunset headers on deprecated versions

@@ -9,13 +9,13 @@ rules:
     eviction policy
   rationale: Redis is the backbone of distributed caching; misconfigured connections cause connection exhaustion and managed
     identity eliminates key rotation burden
-  applies_to: &id001
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # === Redis Cache with Entra Auth and Connection Configuration ===
@@ -102,7 +102,7 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: &id002
+    prohibitions:
     - 'NEVER use access keys for Redis authentication — use Entra (aad-enabled: true) with managed identity'
     - NEVER use allkeys-random or noeviction policy — volatile-lru ensures only TTL-bearing keys are evicted
     - NEVER set maxmemory-reserved to 0 — reserve at least 10% of cache size for non-cache operations
@@ -115,9 +115,13 @@ rules:
     eviction policy
   rationale: Redis is the backbone of distributed caching; misconfigured connections cause connection exhaustion and managed
     identity eliminates key rotation burden
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Network/frontDoors
     terraform_pattern: |
       # === Redis Cache with Entra Auth and Connection Configuration ===
@@ -204,16 +208,26 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - 'NEVER use access keys for Redis authentication — use Entra (aad-enabled: true) with managed identity'
+    - NEVER use allkeys-random or noeviction policy — volatile-lru ensures only TTL-bearing keys are evicted
+    - NEVER set maxmemory-reserved to 0 — reserve at least 10% of cache size for non-cache operations
+    - NEVER create one connection per request — use connection multiplexing (StackExchange.Redis ConnectionMultiplexer or
+      equivalent)
+    - NEVER store cache entries without TTL — all cache entries must have explicit expiration
 - id: WAF-PERF-CACHE-001
   severity: required
   description: Configure Azure Cache for Redis with managed identity authentication, connection multiplexing, and appropriate
     eviction policy
   rationale: Redis is the backbone of distributed caching; misconfigured connections cause connection exhaustion and managed
     identity eliminates key rotation burden
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Cdn/profiles
     terraform_pattern: |
       # === Redis Cache with Entra Auth and Connection Configuration ===
@@ -300,16 +314,26 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - 'NEVER use access keys for Redis authentication — use Entra (aad-enabled: true) with managed identity'
+    - NEVER use allkeys-random or noeviction policy — volatile-lru ensures only TTL-bearing keys are evicted
+    - NEVER set maxmemory-reserved to 0 — reserve at least 10% of cache size for non-cache operations
+    - NEVER create one connection per request — use connection multiplexing (StackExchange.Redis ConnectionMultiplexer or
+      equivalent)
+    - NEVER store cache entries without TTL — all cache entries must have explicit expiration
 - id: WAF-PERF-CACHE-001
   severity: required
   description: Configure Azure Cache for Redis with managed identity authentication, connection multiplexing, and appropriate
     eviction policy
   rationale: Redis is the backbone of distributed caching; misconfigured connections cause connection exhaustion and managed
     identity eliminates key rotation burden
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |
       # === Redis Cache with Entra Auth and Connection Configuration ===
@@ -396,16 +420,26 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - 'NEVER use access keys for Redis authentication — use Entra (aad-enabled: true) with managed identity'
+    - NEVER use allkeys-random or noeviction policy — volatile-lru ensures only TTL-bearing keys are evicted
+    - NEVER set maxmemory-reserved to 0 — reserve at least 10% of cache size for non-cache operations
+    - NEVER create one connection per request — use connection multiplexing (StackExchange.Redis ConnectionMultiplexer or
+      equivalent)
+    - NEVER store cache entries without TTL — all cache entries must have explicit expiration
 - id: WAF-PERF-CACHE-001
   severity: required
   description: Configure Azure Cache for Redis with managed identity authentication, connection multiplexing, and appropriate
     eviction policy
   rationale: Redis is the backbone of distributed caching; misconfigured connections cause connection exhaustion and managed
     identity eliminates key rotation burden
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # === Redis Cache with Entra Auth and Connection Configuration ===
@@ -492,16 +526,26 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - 'NEVER use access keys for Redis authentication — use Entra (aad-enabled: true) with managed identity'
+    - NEVER use allkeys-random or noeviction policy — volatile-lru ensures only TTL-bearing keys are evicted
+    - NEVER set maxmemory-reserved to 0 — reserve at least 10% of cache size for non-cache operations
+    - NEVER create one connection per request — use connection multiplexing (StackExchange.Redis ConnectionMultiplexer or
+      equivalent)
+    - NEVER store cache entries without TTL — all cache entries must have explicit expiration
 - id: WAF-PERF-CACHE-001
   severity: required
   description: Configure Azure Cache for Redis with managed identity authentication, connection multiplexing, and appropriate
     eviction policy
   rationale: Redis is the backbone of distributed caching; misconfigured connections cause connection exhaustion and managed
     identity eliminates key rotation burden
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === Redis Cache with Entra Auth and Connection Configuration ===
@@ -588,16 +632,26 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - 'NEVER use access keys for Redis authentication — use Entra (aad-enabled: true) with managed identity'
+    - NEVER use allkeys-random or noeviction policy — volatile-lru ensures only TTL-bearing keys are evicted
+    - NEVER set maxmemory-reserved to 0 — reserve at least 10% of cache size for non-cache operations
+    - NEVER create one connection per request — use connection multiplexing (StackExchange.Redis ConnectionMultiplexer or
+      equivalent)
+    - NEVER store cache entries without TTL — all cache entries must have explicit expiration
 - id: WAF-PERF-CACHE-001
   severity: required
   description: Configure Azure Cache for Redis with managed identity authentication, connection multiplexing, and appropriate
     eviction policy
   rationale: Redis is the backbone of distributed caching; misconfigured connections cause connection exhaustion and managed
     identity eliminates key rotation burden
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # === Redis Cache with Entra Auth and Connection Configuration ===
@@ -684,18 +738,24 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - 'NEVER use access keys for Redis authentication — use Entra (aad-enabled: true) with managed identity'
+    - NEVER use allkeys-random or noeviction policy — volatile-lru ensures only TTL-bearing keys are evicted
+    - NEVER set maxmemory-reserved to 0 — reserve at least 10% of cache size for non-cache operations
+    - NEVER create one connection per request — use connection multiplexing (StackExchange.Redis ConnectionMultiplexer or
+      equivalent)
+    - NEVER store cache entries without TTL — all cache entries must have explicit expiration
 - id: WAF-PERF-CACHE-002
   severity: required
   description: Configure Front Door or CDN caching with appropriate TTL, cache key customization, and compression
   rationale: Edge caching reduces origin load by 70-90% for static content and improves latency from seconds to milliseconds
-  applies_to: &id003
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # === Front Door Caching Rule Set ===
@@ -946,7 +1006,7 @@ rules:
           ]
         }
       }
-    prohibitions: &id004
+    prohibitions:
     - NEVER cache responses containing Authorization headers or Set-Cookie headers
     - NEVER set static asset cache TTL below 1 day — use cache-busting filenames (hash in URL) for versioning
     - NEVER cache POST, PUT, DELETE, or PATCH requests
@@ -957,9 +1017,13 @@ rules:
   severity: required
   description: Configure Front Door or CDN caching with appropriate TTL, cache key customization, and compression
   rationale: Edge caching reduces origin load by 70-90% for static content and improves latency from seconds to milliseconds
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Network/frontDoors
     terraform_pattern: |
       # === Front Door Caching Rule Set ===
@@ -1210,14 +1274,24 @@ rules:
           ]
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER cache responses containing Authorization headers or Set-Cookie headers
+    - NEVER set static asset cache TTL below 1 day — use cache-busting filenames (hash in URL) for versioning
+    - NEVER cache POST, PUT, DELETE, or PATCH requests
+    - NEVER use the same cache TTL for static assets and API responses — static assets should be 30+ days, API responses 1-15
+      minutes
+    - NEVER skip compression for text-based content types (HTML, CSS, JS, JSON, SVG)
 - id: WAF-PERF-CACHE-002
   severity: required
   description: Configure Front Door or CDN caching with appropriate TTL, cache key customization, and compression
   rationale: Edge caching reduces origin load by 70-90% for static content and improves latency from seconds to milliseconds
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Cdn/profiles
     terraform_pattern: |
       # === Front Door Caching Rule Set ===
@@ -1468,14 +1542,24 @@ rules:
           ]
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER cache responses containing Authorization headers or Set-Cookie headers
+    - NEVER set static asset cache TTL below 1 day — use cache-busting filenames (hash in URL) for versioning
+    - NEVER cache POST, PUT, DELETE, or PATCH requests
+    - NEVER use the same cache TTL for static assets and API responses — static assets should be 30+ days, API responses 1-15
+      minutes
+    - NEVER skip compression for text-based content types (HTML, CSS, JS, JSON, SVG)
 - id: WAF-PERF-CACHE-002
   severity: required
   description: Configure Front Door or CDN caching with appropriate TTL, cache key customization, and compression
   rationale: Edge caching reduces origin load by 70-90% for static content and improves latency from seconds to milliseconds
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |
       # === Front Door Caching Rule Set ===
@@ -1726,14 +1810,24 @@ rules:
           ]
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER cache responses containing Authorization headers or Set-Cookie headers
+    - NEVER set static asset cache TTL below 1 day — use cache-busting filenames (hash in URL) for versioning
+    - NEVER cache POST, PUT, DELETE, or PATCH requests
+    - NEVER use the same cache TTL for static assets and API responses — static assets should be 30+ days, API responses 1-15
+      minutes
+    - NEVER skip compression for text-based content types (HTML, CSS, JS, JSON, SVG)
 - id: WAF-PERF-CACHE-002
   severity: required
   description: Configure Front Door or CDN caching with appropriate TTL, cache key customization, and compression
   rationale: Edge caching reduces origin load by 70-90% for static content and improves latency from seconds to milliseconds
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # === Front Door Caching Rule Set ===
@@ -1984,14 +2078,24 @@ rules:
           ]
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER cache responses containing Authorization headers or Set-Cookie headers
+    - NEVER set static asset cache TTL below 1 day — use cache-busting filenames (hash in URL) for versioning
+    - NEVER cache POST, PUT, DELETE, or PATCH requests
+    - NEVER use the same cache TTL for static assets and API responses — static assets should be 30+ days, API responses 1-15
+      minutes
+    - NEVER skip compression for text-based content types (HTML, CSS, JS, JSON, SVG)
 - id: WAF-PERF-CACHE-002
   severity: required
   description: Configure Front Door or CDN caching with appropriate TTL, cache key customization, and compression
   rationale: Edge caching reduces origin load by 70-90% for static content and improves latency from seconds to milliseconds
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === Front Door Caching Rule Set ===
@@ -2242,14 +2346,24 @@ rules:
           ]
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER cache responses containing Authorization headers or Set-Cookie headers
+    - NEVER set static asset cache TTL below 1 day — use cache-busting filenames (hash in URL) for versioning
+    - NEVER cache POST, PUT, DELETE, or PATCH requests
+    - NEVER use the same cache TTL for static assets and API responses — static assets should be 30+ days, API responses 1-15
+      minutes
+    - NEVER skip compression for text-based content types (HTML, CSS, JS, JSON, SVG)
 - id: WAF-PERF-CACHE-002
   severity: required
   description: Configure Front Door or CDN caching with appropriate TTL, cache key customization, and compression
   rationale: Edge caching reduces origin load by 70-90% for static content and improves latency from seconds to milliseconds
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # === Front Door Caching Rule Set ===
@@ -2500,17 +2614,23 @@ rules:
           ]
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER cache responses containing Authorization headers or Set-Cookie headers
+    - NEVER set static asset cache TTL below 1 day — use cache-busting filenames (hash in URL) for versioning
+    - NEVER cache POST, PUT, DELETE, or PATCH requests
+    - NEVER use the same cache TTL for static assets and API responses — static assets should be 30+ days, API responses 1-15
+      minutes
+    - NEVER skip compression for text-based content types (HTML, CSS, JS, JSON, SVG)
 - id: WAF-PERF-CACHE-003
   severity: recommended
   description: Implement application-level cache-aside pattern with distributed cache and local memory fallback
   rationale: Cache-aside reduces database load by 80-95% for read-heavy workloads; layered caching (L1 memory + L2 Redis)
     minimizes network round-trips
-  applies_to: &id005
+  applies_to:
   - app-developer
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # Application-level caching is implemented in application code, not IaC.
@@ -2579,7 +2699,7 @@ rules:
           }
         }
       }
-    prohibitions: &id006
+    prohibitions:
     - NEVER cache without TTL — all cached entries must expire
     - NEVER use unbounded in-memory cache — set SizeLimit to prevent OOM
     - NEVER skip cache invalidation strategy — define how cache entries are invalidated on writes
@@ -2590,9 +2710,11 @@ rules:
   description: Implement application-level cache-aside pattern with distributed cache and local memory fallback
   rationale: Cache-aside reduces database load by 80-95% for read-heavy workloads; layered caching (L1 memory + L2 Redis)
     minimizes network round-trips
-  applies_to: *id005
+  applies_to:
+  - app-developer
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Network/frontDoors
     terraform_pattern: |
       # Application-level caching is implemented in application code, not IaC.
@@ -2661,15 +2783,22 @@ rules:
           }
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER cache without TTL — all cached entries must expire
+    - NEVER use unbounded in-memory cache — set SizeLimit to prevent OOM
+    - NEVER skip cache invalidation strategy — define how cache entries are invalidated on writes
+    - NEVER cache sensitive data (PII, credentials, tokens) in shared/distributed cache without encryption
+    - NEVER use cache as primary data store — cache is volatile and can be evicted at any time
 - id: WAF-PERF-CACHE-003
   severity: recommended
   description: Implement application-level cache-aside pattern with distributed cache and local memory fallback
   rationale: Cache-aside reduces database load by 80-95% for read-heavy workloads; layered caching (L1 memory + L2 Redis)
     minimizes network round-trips
-  applies_to: *id005
+  applies_to:
+  - app-developer
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Cdn/profiles
     terraform_pattern: |
       # Application-level caching is implemented in application code, not IaC.
@@ -2738,15 +2867,22 @@ rules:
           }
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER cache without TTL — all cached entries must expire
+    - NEVER use unbounded in-memory cache — set SizeLimit to prevent OOM
+    - NEVER skip cache invalidation strategy — define how cache entries are invalidated on writes
+    - NEVER cache sensitive data (PII, credentials, tokens) in shared/distributed cache without encryption
+    - NEVER use cache as primary data store — cache is volatile and can be evicted at any time
 - id: WAF-PERF-CACHE-003
   severity: recommended
   description: Implement application-level cache-aside pattern with distributed cache and local memory fallback
   rationale: Cache-aside reduces database load by 80-95% for read-heavy workloads; layered caching (L1 memory + L2 Redis)
     minimizes network round-trips
-  applies_to: *id005
+  applies_to:
+  - app-developer
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |
       # Application-level caching is implemented in application code, not IaC.
@@ -2815,15 +2951,22 @@ rules:
           }
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER cache without TTL — all cached entries must expire
+    - NEVER use unbounded in-memory cache — set SizeLimit to prevent OOM
+    - NEVER skip cache invalidation strategy — define how cache entries are invalidated on writes
+    - NEVER cache sensitive data (PII, credentials, tokens) in shared/distributed cache without encryption
+    - NEVER use cache as primary data store — cache is volatile and can be evicted at any time
 - id: WAF-PERF-CACHE-003
   severity: recommended
   description: Implement application-level cache-aside pattern with distributed cache and local memory fallback
   rationale: Cache-aside reduces database load by 80-95% for read-heavy workloads; layered caching (L1 memory + L2 Redis)
     minimizes network round-trips
-  applies_to: *id005
+  applies_to:
+  - app-developer
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # Application-level caching is implemented in application code, not IaC.
@@ -2892,15 +3035,22 @@ rules:
           }
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER cache without TTL — all cached entries must expire
+    - NEVER use unbounded in-memory cache — set SizeLimit to prevent OOM
+    - NEVER skip cache invalidation strategy — define how cache entries are invalidated on writes
+    - NEVER cache sensitive data (PII, credentials, tokens) in shared/distributed cache without encryption
+    - NEVER use cache as primary data store — cache is volatile and can be evicted at any time
 - id: WAF-PERF-CACHE-003
   severity: recommended
   description: Implement application-level cache-aside pattern with distributed cache and local memory fallback
   rationale: Cache-aside reduces database load by 80-95% for read-heavy workloads; layered caching (L1 memory + L2 Redis)
     minimizes network round-trips
-  applies_to: *id005
+  applies_to:
+  - app-developer
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # Application-level caching is implemented in application code, not IaC.
@@ -2969,15 +3119,22 @@ rules:
           }
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER cache without TTL — all cached entries must expire
+    - NEVER use unbounded in-memory cache — set SizeLimit to prevent OOM
+    - NEVER skip cache invalidation strategy — define how cache entries are invalidated on writes
+    - NEVER cache sensitive data (PII, credentials, tokens) in shared/distributed cache without encryption
+    - NEVER use cache as primary data store — cache is volatile and can be evicted at any time
 - id: WAF-PERF-CACHE-003
   severity: recommended
   description: Implement application-level cache-aside pattern with distributed cache and local memory fallback
   rationale: Cache-aside reduces database load by 80-95% for read-heavy workloads; layered caching (L1 memory + L2 Redis)
     minimizes network round-trips
-  applies_to: *id005
+  applies_to:
+  - app-developer
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # Application-level caching is implemented in application code, not IaC.
@@ -3046,19 +3203,24 @@ rules:
           }
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER cache without TTL — all cached entries must expire
+    - NEVER use unbounded in-memory cache — set SizeLimit to prevent OOM
+    - NEVER skip cache invalidation strategy — define how cache entries are invalidated on writes
+    - NEVER cache sensitive data (PII, credentials, tokens) in shared/distributed cache without encryption
+    - NEVER use cache as primary data store — cache is volatile and can be evicted at any time
 - id: WAF-PERF-CACHE-004
   severity: recommended
   description: Configure API Management caching policies for frequently accessed API responses
   rationale: APIM built-in cache reduces backend load and latency without application code changes; external Redis cache provides
     persistence
-  applies_to: &id007
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # === APIM External Cache (Redis) ===
@@ -3123,7 +3285,7 @@ rules:
       //     <cache-store duration="300" cache-response="true" />
       //   </outbound>
       // </policies>
-    prohibitions: &id008
+    prohibitions:
     - NEVER cache POST/PUT/DELETE/PATCH responses in APIM
     - NEVER use APIM internal cache for production — use external Redis cache for persistence and scale
     - NEVER set cache-store duration > 3600 seconds (1 hour) for API responses — stale data risks outweigh performance gains
@@ -3134,9 +3296,13 @@ rules:
   description: Configure API Management caching policies for frequently accessed API responses
   rationale: APIM built-in cache reduces backend load and latency without application code changes; external Redis cache provides
     persistence
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Network/frontDoors
     terraform_pattern: |
       # === APIM External Cache (Redis) ===
@@ -3201,15 +3367,24 @@ rules:
       //     <cache-store duration="300" cache-response="true" />
       //   </outbound>
       // </policies>
-    prohibitions: *id008
+    prohibitions:
+    - NEVER cache POST/PUT/DELETE/PATCH responses in APIM
+    - NEVER use APIM internal cache for production — use external Redis cache for persistence and scale
+    - NEVER set cache-store duration > 3600 seconds (1 hour) for API responses — stale data risks outweigh performance gains
+    - NEVER omit vary-by-header for Accept and Accept-Encoding — different representations must be cached separately
+    - NEVER cache responses with Set-Cookie or Authorization headers
 - id: WAF-PERF-CACHE-004
   severity: recommended
   description: Configure API Management caching policies for frequently accessed API responses
   rationale: APIM built-in cache reduces backend load and latency without application code changes; external Redis cache provides
     persistence
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Cdn/profiles
     terraform_pattern: |
       # === APIM External Cache (Redis) ===
@@ -3274,15 +3449,24 @@ rules:
       //     <cache-store duration="300" cache-response="true" />
       //   </outbound>
       // </policies>
-    prohibitions: *id008
+    prohibitions:
+    - NEVER cache POST/PUT/DELETE/PATCH responses in APIM
+    - NEVER use APIM internal cache for production — use external Redis cache for persistence and scale
+    - NEVER set cache-store duration > 3600 seconds (1 hour) for API responses — stale data risks outweigh performance gains
+    - NEVER omit vary-by-header for Accept and Accept-Encoding — different representations must be cached separately
+    - NEVER cache responses with Set-Cookie or Authorization headers
 - id: WAF-PERF-CACHE-004
   severity: recommended
   description: Configure API Management caching policies for frequently accessed API responses
   rationale: APIM built-in cache reduces backend load and latency without application code changes; external Redis cache provides
     persistence
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |
       # === APIM External Cache (Redis) ===
@@ -3347,15 +3531,24 @@ rules:
       //     <cache-store duration="300" cache-response="true" />
       //   </outbound>
       // </policies>
-    prohibitions: *id008
+    prohibitions:
+    - NEVER cache POST/PUT/DELETE/PATCH responses in APIM
+    - NEVER use APIM internal cache for production — use external Redis cache for persistence and scale
+    - NEVER set cache-store duration > 3600 seconds (1 hour) for API responses — stale data risks outweigh performance gains
+    - NEVER omit vary-by-header for Accept and Accept-Encoding — different representations must be cached separately
+    - NEVER cache responses with Set-Cookie or Authorization headers
 - id: WAF-PERF-CACHE-004
   severity: recommended
   description: Configure API Management caching policies for frequently accessed API responses
   rationale: APIM built-in cache reduces backend load and latency without application code changes; external Redis cache provides
     persistence
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # === APIM External Cache (Redis) ===
@@ -3420,15 +3613,24 @@ rules:
       //     <cache-store duration="300" cache-response="true" />
       //   </outbound>
       // </policies>
-    prohibitions: *id008
+    prohibitions:
+    - NEVER cache POST/PUT/DELETE/PATCH responses in APIM
+    - NEVER use APIM internal cache for production — use external Redis cache for persistence and scale
+    - NEVER set cache-store duration > 3600 seconds (1 hour) for API responses — stale data risks outweigh performance gains
+    - NEVER omit vary-by-header for Accept and Accept-Encoding — different representations must be cached separately
+    - NEVER cache responses with Set-Cookie or Authorization headers
 - id: WAF-PERF-CACHE-004
   severity: recommended
   description: Configure API Management caching policies for frequently accessed API responses
   rationale: APIM built-in cache reduces backend load and latency without application code changes; external Redis cache provides
     persistence
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === APIM External Cache (Redis) ===
@@ -3493,15 +3695,24 @@ rules:
       //     <cache-store duration="300" cache-response="true" />
       //   </outbound>
       // </policies>
-    prohibitions: *id008
+    prohibitions:
+    - NEVER cache POST/PUT/DELETE/PATCH responses in APIM
+    - NEVER use APIM internal cache for production — use external Redis cache for persistence and scale
+    - NEVER set cache-store duration > 3600 seconds (1 hour) for API responses — stale data risks outweigh performance gains
+    - NEVER omit vary-by-header for Accept and Accept-Encoding — different representations must be cached separately
+    - NEVER cache responses with Set-Cookie or Authorization headers
 - id: WAF-PERF-CACHE-004
   severity: recommended
   description: Configure API Management caching policies for frequently accessed API responses
   rationale: APIM built-in cache reduces backend load and latency without application code changes; external Redis cache provides
     persistence
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # === APIM External Cache (Redis) ===
@@ -3566,19 +3777,24 @@ rules:
       //     <cache-store duration="300" cache-response="true" />
       //   </outbound>
       // </policies>
-    prohibitions: *id008
+    prohibitions:
+    - NEVER cache POST/PUT/DELETE/PATCH responses in APIM
+    - NEVER use APIM internal cache for production — use external Redis cache for persistence and scale
+    - NEVER set cache-store duration > 3600 seconds (1 hour) for API responses — stale data risks outweigh performance gains
+    - NEVER omit vary-by-header for Accept and Accept-Encoding — different representations must be cached separately
+    - NEVER cache responses with Set-Cookie or Authorization headers
 - id: WAF-PERF-CACHE-005
   severity: recommended
   description: Enable Cosmos DB integrated cache for read-heavy workloads to reduce RU consumption
   rationale: Cosmos DB integrated cache provides item and query cache at the gateway level, reducing RU consumption by 50-90%
     for repeated reads
-  applies_to: &id009
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # === Cosmos DB with Dedicated Gateway (Integrated Cache) ===
@@ -3631,7 +3847,7 @@ rules:
       //   https://<account>.sqlx.cosmos.azure.com
       //   Connection mode: Gateway (NOT Direct)
       //   Consistency: Eventual or Session for cache hits
-    prohibitions: &id010
+    prohibitions:
     - NEVER use Cosmos DB integrated cache with Strong consistency — cache requires Eventual or Session
     - NEVER use Direct connection mode with dedicated gateway — only Gateway mode routes through the cache
     - NEVER provision dedicated gateway for serverless Cosmos DB accounts — it is not supported
@@ -3641,9 +3857,13 @@ rules:
   description: Enable Cosmos DB integrated cache for read-heavy workloads to reduce RU consumption
   rationale: Cosmos DB integrated cache provides item and query cache at the gateway level, reducing RU consumption by 50-90%
     for repeated reads
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Network/frontDoors
     terraform_pattern: |
       # === Cosmos DB with Dedicated Gateway (Integrated Cache) ===
@@ -3696,15 +3916,23 @@ rules:
       //   https://<account>.sqlx.cosmos.azure.com
       //   Connection mode: Gateway (NOT Direct)
       //   Consistency: Eventual or Session for cache hits
-    prohibitions: *id010
+    prohibitions:
+    - NEVER use Cosmos DB integrated cache with Strong consistency — cache requires Eventual or Session
+    - NEVER use Direct connection mode with dedicated gateway — only Gateway mode routes through the cache
+    - NEVER provision dedicated gateway for serverless Cosmos DB accounts — it is not supported
+    - NEVER assume integrated cache handles write-through — it is a read-only cache with automatic invalidation
 - id: WAF-PERF-CACHE-005
   severity: recommended
   description: Enable Cosmos DB integrated cache for read-heavy workloads to reduce RU consumption
   rationale: Cosmos DB integrated cache provides item and query cache at the gateway level, reducing RU consumption by 50-90%
     for repeated reads
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Cdn/profiles
     terraform_pattern: |
       # === Cosmos DB with Dedicated Gateway (Integrated Cache) ===
@@ -3757,15 +3985,23 @@ rules:
       //   https://<account>.sqlx.cosmos.azure.com
       //   Connection mode: Gateway (NOT Direct)
       //   Consistency: Eventual or Session for cache hits
-    prohibitions: *id010
+    prohibitions:
+    - NEVER use Cosmos DB integrated cache with Strong consistency — cache requires Eventual or Session
+    - NEVER use Direct connection mode with dedicated gateway — only Gateway mode routes through the cache
+    - NEVER provision dedicated gateway for serverless Cosmos DB accounts — it is not supported
+    - NEVER assume integrated cache handles write-through — it is a read-only cache with automatic invalidation
 - id: WAF-PERF-CACHE-005
   severity: recommended
   description: Enable Cosmos DB integrated cache for read-heavy workloads to reduce RU consumption
   rationale: Cosmos DB integrated cache provides item and query cache at the gateway level, reducing RU consumption by 50-90%
     for repeated reads
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |
       # === Cosmos DB with Dedicated Gateway (Integrated Cache) ===
@@ -3818,15 +4054,23 @@ rules:
       //   https://<account>.sqlx.cosmos.azure.com
       //   Connection mode: Gateway (NOT Direct)
       //   Consistency: Eventual or Session for cache hits
-    prohibitions: *id010
+    prohibitions:
+    - NEVER use Cosmos DB integrated cache with Strong consistency — cache requires Eventual or Session
+    - NEVER use Direct connection mode with dedicated gateway — only Gateway mode routes through the cache
+    - NEVER provision dedicated gateway for serverless Cosmos DB accounts — it is not supported
+    - NEVER assume integrated cache handles write-through — it is a read-only cache with automatic invalidation
 - id: WAF-PERF-CACHE-005
   severity: recommended
   description: Enable Cosmos DB integrated cache for read-heavy workloads to reduce RU consumption
   rationale: Cosmos DB integrated cache provides item and query cache at the gateway level, reducing RU consumption by 50-90%
     for repeated reads
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # === Cosmos DB with Dedicated Gateway (Integrated Cache) ===
@@ -3879,15 +4123,23 @@ rules:
       //   https://<account>.sqlx.cosmos.azure.com
       //   Connection mode: Gateway (NOT Direct)
       //   Consistency: Eventual or Session for cache hits
-    prohibitions: *id010
+    prohibitions:
+    - NEVER use Cosmos DB integrated cache with Strong consistency — cache requires Eventual or Session
+    - NEVER use Direct connection mode with dedicated gateway — only Gateway mode routes through the cache
+    - NEVER provision dedicated gateway for serverless Cosmos DB accounts — it is not supported
+    - NEVER assume integrated cache handles write-through — it is a read-only cache with automatic invalidation
 - id: WAF-PERF-CACHE-005
   severity: recommended
   description: Enable Cosmos DB integrated cache for read-heavy workloads to reduce RU consumption
   rationale: Cosmos DB integrated cache provides item and query cache at the gateway level, reducing RU consumption by 50-90%
     for repeated reads
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === Cosmos DB with Dedicated Gateway (Integrated Cache) ===
@@ -3940,15 +4192,23 @@ rules:
       //   https://<account>.sqlx.cosmos.azure.com
       //   Connection mode: Gateway (NOT Direct)
       //   Consistency: Eventual or Session for cache hits
-    prohibitions: *id010
+    prohibitions:
+    - NEVER use Cosmos DB integrated cache with Strong consistency — cache requires Eventual or Session
+    - NEVER use Direct connection mode with dedicated gateway — only Gateway mode routes through the cache
+    - NEVER provision dedicated gateway for serverless Cosmos DB accounts — it is not supported
+    - NEVER assume integrated cache handles write-through — it is a read-only cache with automatic invalidation
 - id: WAF-PERF-CACHE-005
   severity: recommended
   description: Enable Cosmos DB integrated cache for read-heavy workloads to reduce RU consumption
   rationale: Cosmos DB integrated cache provides item and query cache at the gateway level, reducing RU consumption by 50-90%
     for repeated reads
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # === Cosmos DB with Dedicated Gateway (Integrated Cache) ===
@@ -4001,7 +4261,11 @@ rules:
       //   https://<account>.sqlx.cosmos.azure.com
       //   Connection mode: Gateway (NOT Direct)
       //   Consistency: Eventual or Session for cache hits
-    prohibitions: *id010
+    prohibitions:
+    - NEVER use Cosmos DB integrated cache with Strong consistency — cache requires Eventual or Session
+    - NEVER use Direct connection mode with dedicated gateway — only Gateway mode routes through the cache
+    - NEVER provision dedicated gateway for serverless Cosmos DB accounts — it is not supported
+    - NEVER assume integrated cache handles write-through — it is a read-only cache with automatic invalidation
 patterns:
 - name: Layered caching strategy
   description: L1 in-memory cache (per-instance, <1ms) → L2 Redis cache (distributed, 1-5ms) → L3 CDN/Front Door (edge, <10ms)

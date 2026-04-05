@@ -4,10 +4,13 @@ description: Container Apps, ACR, and container runtime configuration detection
 last_updated: '2026-04-04'
 patterns:
 - id: ANTI-CONT-001
-  warning_message: Secrets in environment variables detected — use Key Vault references with managed identity instead.
   description: Detects container registry admin credentials instead of AcrPull role assignment with managed identity
   rationale: Hardcoded credentials or access keys create security vulnerabilities and prevent key rotation.
+  warning_message: Secrets in environment variables detected — use Key Vault references with managed identity instead.
+  applies_to: []
   targets:
+  - services:
+    - Microsoft.ContainerRegistry/registries
     search_patterns:
     - environment_variable
     - env_var
@@ -22,12 +25,15 @@ patterns:
     - secretRef
     - '# Use Key Vault references with managed identity'
     - keyVaultUrl
-  applies_to: []
 - id: ANTI-CONT-002
-  warning_message: Container registry admin credentials detected — use managed identity with AcrPull role assignment.
   description: Detects latest tag on container images instead of immutable SHA or version tags
   rationale: Hardcoded credentials or access keys create security vulnerabilities and prevent key rotation.
+  warning_message: Container registry admin credentials detected — use managed identity with AcrPull role assignment.
+  applies_to: []
   targets:
+  - services:
+    - Microsoft.ContainerRegistry/registries
+    - Microsoft.App/containerApps
     search_patterns:
     - admin_user_enabled = true
     - acrpush
@@ -39,15 +45,16 @@ patterns:
     - adminUserEnabled = false
     - '"AcrPull"'
     - '# Use managed identity with AcrPull role assignment'
-  applies_to: []
 - id: ANTI-CONT-003
-  warning_message: Container App detected. Ensure the identity block uses UserAssigned (or SystemAssigned, UserAssigned) with
-    the UAMI attached in userAssignedIdentities for ACR image pull. SystemAssigned alone causes image pull failures on first
-    provision.
   description: Container App detected. Ensure the identity block uses UserAssigned (or SystemAssigned, UserAssigned) with
     the UAMI attached in userAssignedIdentities for ACR image pull. SystemAssigned alone causes i
   rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  warning_message: Container App detected. Ensure the identity block uses UserAssigned (or SystemAssigned, UserAssigned) with
+    the UAMI attached in userAssignedIdentities for ACR image pull. SystemAssigned alone causes image pull failures on first
+    provision.
+  applies_to: []
   targets:
+  - services: []
     search_patterns:
     - microsoft.app/containerapps
     safe_patterns:
@@ -56,4 +63,3 @@ patterns:
     correct_patterns:
     - type = "SystemAssigned, UserAssigned"
     - identity.userAssignedIdentities
-  applies_to: []

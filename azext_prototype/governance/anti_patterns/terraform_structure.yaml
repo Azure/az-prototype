@@ -4,12 +4,13 @@ description: Provider hygiene, version consistency, tag placement, and azapi con
 last_updated: '2026-04-04'
 patterns:
 - id: ANTI-TFS-001
-  warning_message: azurerm provider declared — use hashicorp/azapi for all Azure resources. The only allowed provider is hashicorp/azapi.
-  applies_to: &id001
-  - terraform-agent
   description: Detects Terraform provider blocks in files other than providers.tf
   rationale: Following established patterns ensures consistency and reduces deployment failures.
+  warning_message: azurerm provider declared — use hashicorp/azapi for all Azure resources. The only allowed provider is hashicorp/azapi.
+  applies_to:
+  - terraform-agent
   targets:
+  - services: []
     search_patterns:
     - source  = "hashicorp/azurerm"
     - source = "hashicorp/azurerm"
@@ -21,12 +22,14 @@ patterns:
     correct_patterns:
     - source = "hashicorp/azapi"
 - id: ANTI-TFS-002
-  warning_message: azurerm resource detected — use azapi_resource with the corresponding ARM resource type instead (e.g.,
-    Microsoft.Authorization/roleAssignments@2022-04-01).
-  applies_to: *id001
   description: Detects deprecated azurerm provider resources instead of azapi_resource
   rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  warning_message: azurerm resource detected — use azapi_resource with the corresponding ARM resource type instead (e.g.,
+    Microsoft.Authorization/roleAssignments@2022-04-01).
+  applies_to:
+  - terraform-agent
   targets:
+  - services: []
     search_patterns:
     - azurerm_role_assignment
     - azurerm_monitor_metric_alert
@@ -40,12 +43,14 @@ patterns:
     - Microsoft.Authorization/roleAssignments@
     - Microsoft.Insights/diagnosticSettings@
 - id: ANTI-TFS-003
-  warning_message: random provider detected — use Terraform built-in functions (e.g., substr(md5("seed"), 0, 8)) instead of
-    the random provider.
-  applies_to: *id001
   description: Detects random provider usage which introduces non-deterministic behavior
   rationale: Following established patterns ensures consistency and reduces deployment failures.
+  warning_message: random provider detected — use Terraform built-in functions (e.g., substr(md5("seed"), 0, 8)) instead of
+    the random provider.
+  applies_to:
+  - terraform-agent
   targets:
+  - services: []
     search_patterns:
     - source  = "hashicorp/random"
     - source = "hashicorp/random"
@@ -58,12 +63,14 @@ patterns:
     correct_patterns:
     - substr(md5("
 - id: ANTI-TFS-004
-  warning_message: azapi v1.x version detected — use ~> 2.8.0 or later. v1.x has different tag placement and output access
-    semantics that are incompatible with v2.x patterns.
-  applies_to: *id001
   description: Detects data.azurerm_client_config which requires azurerm provider — use variables instead
   rationale: Missing outputs or incomplete configurations cause downstream failures in dependent stages.
+  warning_message: azapi v1.x version detected — use ~> 2.8.0 or later. v1.x has different tag placement and output access
+    semantics that are incompatible with v2.x patterns.
+  applies_to:
+  - terraform-agent
   targets:
+  - services: []
     search_patterns:
     - ~> 1.15
     - ~> 1.14
@@ -76,12 +83,14 @@ patterns:
     - ~> 2.8
     - ~> 2.
 - id: ANTI-TFS-005
-  warning_message: Non-deterministic uuid() detected — use uuidv5() with deterministic seeds (resource ID + principal ID +
-    role ID) to ensure idempotent plans.
-  applies_to: *id001
   description: Detects data.azurerm_subscription which requires azurerm provider — use variables instead
   rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  warning_message: Non-deterministic uuid() detected — use uuidv5() with deterministic seeds (resource ID + principal ID +
+    role ID) to ensure idempotent plans.
+  applies_to:
+  - terraform-agent
   targets:
+  - services: []
     search_patterns:
     - uuid()
     safe_patterns:
@@ -91,12 +100,14 @@ patterns:
     correct_patterns:
     - uuidv5("6ba7b811-9dad-11d1-80b4-00c04fd430c8"
 - id: ANTI-TFS-006
-  warning_message: jsondecode() on azapi_resource output detected — in azapi v2.x, output is already a parsed object. Access
-    directly via .output.properties.PropertyName.
-  applies_to: *id001
   description: Detects versions.tf file which conflicts with the providers.tf convention
   rationale: Missing outputs or incomplete configurations cause downstream failures in dependent stages.
+  warning_message: jsondecode() on azapi_resource output detected — in azapi v2.x, output is already a parsed object. Access
+    directly via .output.properties.PropertyName.
+  applies_to:
+  - terraform-agent
   targets:
+  - services: []
     search_patterns:
     - jsondecode(azapi_resource.
     - jsondecode( azapi_resource.
@@ -105,12 +116,14 @@ patterns:
     correct_patterns:
     - .output.properties.
 - id: ANTI-TFS-007
-  warning_message: .output.properties referenced but no response_export_values declaration found in this file. Add response_export_values
-    = ["*"] to the azapi_resource whose output properties are being referenced.
-  applies_to: *id001
   description: Detects terraform block in files other than providers.tf
   rationale: Consistent file structure and modularization improve maintainability and code review efficiency.
+  warning_message: .output.properties referenced but no response_export_values declaration found in this file. Add response_export_values
+    = ["*"] to the azapi_resource whose output properties are being referenced.
+  applies_to:
+  - terraform-agent
   targets:
+  - services: []
     search_patterns:
     - .output.properties.
     safe_patterns:

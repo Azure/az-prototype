@@ -115,7 +115,7 @@ rules:
     name: AzureML Data Scientist / Compute Operator
     description: RBAC role assignments for data scientists and compute operators
   targets:
-    services:
+  - services:
     - Microsoft.MachineLearningServices/workspaces
     terraform_pattern: |
       resource "azapi_resource" "ml_workspace" {
@@ -203,7 +203,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.MachineLearningServices/workspaces
     terraform_pattern: |
       resource "azapi_resource" "ml_compute" {
@@ -259,7 +259,7 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.MachineLearningServices/workspaces
 patterns:
 - name: ML workspace with managed network and CMK

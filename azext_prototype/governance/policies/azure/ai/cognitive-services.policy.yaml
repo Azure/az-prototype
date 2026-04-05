@@ -112,7 +112,7 @@ rules:
     name: Cognitive Services User
     description: RBAC role assignment granting consuming identity the Cognitive Services User role
   targets:
-    services:
+  - services:
     - Microsoft.CognitiveServices/accounts
     terraform_pattern: |
       resource "azapi_resource" "cognitive" {
@@ -184,7 +184,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.CognitiveServices/accounts
 - id: AZ-CS-003
   severity: recommended
@@ -196,7 +196,7 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.CognitiveServices/accounts
 patterns:
 - name: Cognitive Services with private endpoint and RBAC

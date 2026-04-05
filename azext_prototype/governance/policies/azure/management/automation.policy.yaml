@@ -112,7 +112,7 @@ rules:
     name: Automation Contributor
     description: RBAC role assignment for automation account management
   targets:
-    services:
+  - services:
     - Microsoft.Automation/automationAccounts
     terraform_pattern: |
       resource "azapi_resource" "automation" {
@@ -172,7 +172,7 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Automation/automationAccounts
 - id: AZ-AUTO-003
   severity: recommended
@@ -184,7 +184,7 @@ rules:
   - cloud-architect
   - monitoring-agent
   targets:
-    services:
+  - services:
     - Microsoft.Automation/automationAccounts
 - id: AZ-AUTO-004
   severity: recommended
@@ -196,7 +196,7 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Automation/automationAccounts
 patterns:
 - name: Automation account with managed identity and private endpoint

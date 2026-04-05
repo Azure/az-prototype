@@ -7,13 +7,13 @@ rules:
   severity: required
   description: Configure auto-shutdown schedules for dev/POC VMs — shut down at 7 PM, no auto-start
   rationale: Dev VMs running 24/7 cost 3x more than VMs with 10-hour daily usage; auto-shutdown eliminates forgotten instances
-  applies_to: &id001
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # === VM Auto-Shutdown Schedule ===
@@ -62,7 +62,7 @@ rules:
           }
         }
       }
-    prohibitions: &id002
+    prohibitions:
     - NEVER deploy dev/POC VMs without an auto-shutdown schedule
     - NEVER set auto-shutdown status to Disabled — if a VM needs 24/7 uptime, it should be in a production resource group
     - NEVER set auto-shutdown notification to Disabled — users must have the option to extend
@@ -70,9 +70,13 @@ rules:
   severity: required
   description: Configure auto-shutdown schedules for dev/POC VMs — shut down at 7 PM, no auto-start
   rationale: Dev VMs running 24/7 cost 3x more than VMs with 10-hour daily usage; auto-shutdown eliminates forgotten instances
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - TODO:storage
     terraform_pattern: |
       # === VM Auto-Shutdown Schedule ===
@@ -121,14 +125,21 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER deploy dev/POC VMs without an auto-shutdown schedule
+    - NEVER set auto-shutdown status to Disabled — if a VM needs 24/7 uptime, it should be in a production resource group
+    - NEVER set auto-shutdown notification to Disabled — users must have the option to extend
 - id: WAF-COST-LIFE-001
   severity: required
   description: Configure auto-shutdown schedules for dev/POC VMs — shut down at 7 PM, no auto-start
   rationale: Dev VMs running 24/7 cost 3x more than VMs with 10-hour daily usage; auto-shutdown eliminates forgotten instances
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.OperationalInsights/workspaces
     terraform_pattern: |
       # === VM Auto-Shutdown Schedule ===
@@ -177,14 +188,21 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER deploy dev/POC VMs without an auto-shutdown schedule
+    - NEVER set auto-shutdown status to Disabled — if a VM needs 24/7 uptime, it should be in a production resource group
+    - NEVER set auto-shutdown notification to Disabled — users must have the option to extend
 - id: WAF-COST-LIFE-001
   severity: required
   description: Configure auto-shutdown schedules for dev/POC VMs — shut down at 7 PM, no auto-start
   rationale: Dev VMs running 24/7 cost 3x more than VMs with 10-hour daily usage; auto-shutdown eliminates forgotten instances
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.KeyVault/vaults
     terraform_pattern: |
       # === VM Auto-Shutdown Schedule ===
@@ -233,14 +251,21 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER deploy dev/POC VMs without an auto-shutdown schedule
+    - NEVER set auto-shutdown status to Disabled — if a VM needs 24/7 uptime, it should be in a production resource group
+    - NEVER set auto-shutdown notification to Disabled — users must have the option to extend
 - id: WAF-COST-LIFE-001
   severity: required
   description: Configure auto-shutdown schedules for dev/POC VMs — shut down at 7 PM, no auto-start
   rationale: Dev VMs running 24/7 cost 3x more than VMs with 10-hour daily usage; auto-shutdown eliminates forgotten instances
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
       # === VM Auto-Shutdown Schedule ===
@@ -289,14 +314,21 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER deploy dev/POC VMs without an auto-shutdown schedule
+    - NEVER set auto-shutdown status to Disabled — if a VM needs 24/7 uptime, it should be in a production resource group
+    - NEVER set auto-shutdown notification to Disabled — users must have the option to extend
 - id: WAF-COST-LIFE-001
   severity: required
   description: Configure auto-shutdown schedules for dev/POC VMs — shut down at 7 PM, no auto-start
   rationale: Dev VMs running 24/7 cost 3x more than VMs with 10-hour daily usage; auto-shutdown eliminates forgotten instances
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Resources/resourceGroups
     terraform_pattern: |
       # === VM Auto-Shutdown Schedule ===
@@ -345,20 +377,23 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER deploy dev/POC VMs without an auto-shutdown schedule
+    - NEVER set auto-shutdown status to Disabled — if a VM needs 24/7 uptime, it should be in a production resource group
+    - NEVER set auto-shutdown notification to Disabled — users must have the option to extend
 - id: WAF-COST-LIFE-002
   severity: required
   description: Configure storage lifecycle management policies — move to Cool after 30 days, Archive after 90 days, delete
     after 365 days
   rationale: Storage lifecycle policies automatically tier data by age; Cool tier is 50% cheaper than Hot, Archive is 90%
     cheaper
-  applies_to: &id003
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # === Storage Lifecycle Management Policy ===
@@ -492,7 +527,7 @@ rules:
           }
         }
       }
-    prohibitions: &id004
+    prohibitions:
     - NEVER deploy storage accounts without lifecycle management policies
     - NEVER set lifecycle delete retention > 365 days for dev/POC
     - NEVER use Archive tier for data that needs frequent access — rehydration takes up to 15 hours
@@ -503,9 +538,13 @@ rules:
     after 365 days
   rationale: Storage lifecycle policies automatically tier data by age; Cool tier is 50% cheaper than Hot, Archive is 90%
     cheaper
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - TODO:storage
     terraform_pattern: |
       # === Storage Lifecycle Management Policy ===
@@ -639,16 +678,24 @@ rules:
           }
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER deploy storage accounts without lifecycle management policies
+    - NEVER set lifecycle delete retention > 365 days for dev/POC
+    - NEVER use Archive tier for data that needs frequent access — rehydration takes up to 15 hours
+    - NEVER skip temp/staging cleanup rules — temporary data accumulates indefinitely without lifecycle policies
 - id: WAF-COST-LIFE-002
   severity: required
   description: Configure storage lifecycle management policies — move to Cool after 30 days, Archive after 90 days, delete
     after 365 days
   rationale: Storage lifecycle policies automatically tier data by age; Cool tier is 50% cheaper than Hot, Archive is 90%
     cheaper
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.OperationalInsights/workspaces
     terraform_pattern: |
       # === Storage Lifecycle Management Policy ===
@@ -782,16 +829,24 @@ rules:
           }
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER deploy storage accounts without lifecycle management policies
+    - NEVER set lifecycle delete retention > 365 days for dev/POC
+    - NEVER use Archive tier for data that needs frequent access — rehydration takes up to 15 hours
+    - NEVER skip temp/staging cleanup rules — temporary data accumulates indefinitely without lifecycle policies
 - id: WAF-COST-LIFE-002
   severity: required
   description: Configure storage lifecycle management policies — move to Cool after 30 days, Archive after 90 days, delete
     after 365 days
   rationale: Storage lifecycle policies automatically tier data by age; Cool tier is 50% cheaper than Hot, Archive is 90%
     cheaper
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.KeyVault/vaults
     terraform_pattern: |
       # === Storage Lifecycle Management Policy ===
@@ -925,16 +980,24 @@ rules:
           }
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER deploy storage accounts without lifecycle management policies
+    - NEVER set lifecycle delete retention > 365 days for dev/POC
+    - NEVER use Archive tier for data that needs frequent access — rehydration takes up to 15 hours
+    - NEVER skip temp/staging cleanup rules — temporary data accumulates indefinitely without lifecycle policies
 - id: WAF-COST-LIFE-002
   severity: required
   description: Configure storage lifecycle management policies — move to Cool after 30 days, Archive after 90 days, delete
     after 365 days
   rationale: Storage lifecycle policies automatically tier data by age; Cool tier is 50% cheaper than Hot, Archive is 90%
     cheaper
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
       # === Storage Lifecycle Management Policy ===
@@ -1068,16 +1131,24 @@ rules:
           }
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER deploy storage accounts without lifecycle management policies
+    - NEVER set lifecycle delete retention > 365 days for dev/POC
+    - NEVER use Archive tier for data that needs frequent access — rehydration takes up to 15 hours
+    - NEVER skip temp/staging cleanup rules — temporary data accumulates indefinitely without lifecycle policies
 - id: WAF-COST-LIFE-002
   severity: required
   description: Configure storage lifecycle management policies — move to Cool after 30 days, Archive after 90 days, delete
     after 365 days
   rationale: Storage lifecycle policies automatically tier data by age; Cool tier is 50% cheaper than Hot, Archive is 90%
     cheaper
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Resources/resourceGroups
     terraform_pattern: |
       # === Storage Lifecycle Management Policy ===
@@ -1211,21 +1282,25 @@ rules:
           }
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER deploy storage accounts without lifecycle management policies
+    - NEVER set lifecycle delete retention > 365 days for dev/POC
+    - NEVER use Archive tier for data that needs frequent access — rehydration takes up to 15 hours
+    - NEVER skip temp/staging cleanup rules — temporary data accumulates indefinitely without lifecycle policies
 - id: WAF-COST-LIFE-003
   severity: required
   description: Set appropriate Log Analytics retention — 30 days for dev/POC, 90 days for production, with archive tier for
     compliance
   rationale: Log Analytics charges per GB ingested and per day retained beyond 31 days; reducing retention from 90 to 30 days
     saves ~65%
-  applies_to: &id005
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - cost-analyst
   - monitoring-agent
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # === Log Analytics Workspace: Dev/POC (30 days) ===
@@ -1309,7 +1384,7 @@ rules:
           }
         }
       }
-    prohibitions: &id006
+    prohibitions:
     - NEVER set Log Analytics retention > 90 days for dev/POC — excessive retention wastes budget
     - NEVER remove daily ingestion cap for dev/POC workspaces — runaway logging can generate huge costs
     - NEVER set retention below 30 days — it is the minimum and provides free retention
@@ -1320,9 +1395,14 @@ rules:
     compliance
   rationale: Log Analytics charges per GB ingested and per day retained beyond 31 days; reducing retention from 90 to 30 days
     saves ~65%
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
+  - monitoring-agent
   targets:
-    services:
+  - services:
     - TODO:storage
     terraform_pattern: |
       # === Log Analytics Workspace: Dev/POC (30 days) ===
@@ -1406,16 +1486,25 @@ rules:
           }
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER set Log Analytics retention > 90 days for dev/POC — excessive retention wastes budget
+    - NEVER remove daily ingestion cap for dev/POC workspaces — runaway logging can generate huge costs
+    - NEVER set retention below 30 days — it is the minimum and provides free retention
+    - NEVER use Free or Standalone SKU — PerGB2018 is the current pricing tier
 - id: WAF-COST-LIFE-003
   severity: required
   description: Set appropriate Log Analytics retention — 30 days for dev/POC, 90 days for production, with archive tier for
     compliance
   rationale: Log Analytics charges per GB ingested and per day retained beyond 31 days; reducing retention from 90 to 30 days
     saves ~65%
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
+  - monitoring-agent
   targets:
-    services:
+  - services:
     - Microsoft.OperationalInsights/workspaces
     terraform_pattern: |
       # === Log Analytics Workspace: Dev/POC (30 days) ===
@@ -1499,16 +1588,25 @@ rules:
           }
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER set Log Analytics retention > 90 days for dev/POC — excessive retention wastes budget
+    - NEVER remove daily ingestion cap for dev/POC workspaces — runaway logging can generate huge costs
+    - NEVER set retention below 30 days — it is the minimum and provides free retention
+    - NEVER use Free or Standalone SKU — PerGB2018 is the current pricing tier
 - id: WAF-COST-LIFE-003
   severity: required
   description: Set appropriate Log Analytics retention — 30 days for dev/POC, 90 days for production, with archive tier for
     compliance
   rationale: Log Analytics charges per GB ingested and per day retained beyond 31 days; reducing retention from 90 to 30 days
     saves ~65%
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
+  - monitoring-agent
   targets:
-    services:
+  - services:
     - Microsoft.KeyVault/vaults
     terraform_pattern: |
       # === Log Analytics Workspace: Dev/POC (30 days) ===
@@ -1592,16 +1690,25 @@ rules:
           }
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER set Log Analytics retention > 90 days for dev/POC — excessive retention wastes budget
+    - NEVER remove daily ingestion cap for dev/POC workspaces — runaway logging can generate huge costs
+    - NEVER set retention below 30 days — it is the minimum and provides free retention
+    - NEVER use Free or Standalone SKU — PerGB2018 is the current pricing tier
 - id: WAF-COST-LIFE-003
   severity: required
   description: Set appropriate Log Analytics retention — 30 days for dev/POC, 90 days for production, with archive tier for
     compliance
   rationale: Log Analytics charges per GB ingested and per day retained beyond 31 days; reducing retention from 90 to 30 days
     saves ~65%
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
+  - monitoring-agent
   targets:
-    services:
+  - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
       # === Log Analytics Workspace: Dev/POC (30 days) ===
@@ -1685,16 +1792,25 @@ rules:
           }
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER set Log Analytics retention > 90 days for dev/POC — excessive retention wastes budget
+    - NEVER remove daily ingestion cap for dev/POC workspaces — runaway logging can generate huge costs
+    - NEVER set retention below 30 days — it is the minimum and provides free retention
+    - NEVER use Free or Standalone SKU — PerGB2018 is the current pricing tier
 - id: WAF-COST-LIFE-003
   severity: required
   description: Set appropriate Log Analytics retention — 30 days for dev/POC, 90 days for production, with archive tier for
     compliance
   rationale: Log Analytics charges per GB ingested and per day retained beyond 31 days; reducing retention from 90 to 30 days
     saves ~65%
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
+  - monitoring-agent
   targets:
-    services:
+  - services:
     - Microsoft.Resources/resourceGroups
     terraform_pattern: |
       # === Log Analytics Workspace: Dev/POC (30 days) ===
@@ -1778,18 +1894,22 @@ rules:
           }
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER set Log Analytics retention > 90 days for dev/POC — excessive retention wastes budget
+    - NEVER remove daily ingestion cap for dev/POC workspaces — runaway logging can generate huge costs
+    - NEVER set retention below 30 days — it is the minimum and provides free retention
+    - NEVER use Free or Standalone SKU — PerGB2018 is the current pricing tier
 - id: WAF-COST-LIFE-004
   severity: required
   description: Configure appropriate soft-delete retention periods — shorter for dev/POC, longer for production
   rationale: Soft-delete protects against accidental deletion but costs storage; longer retention in dev wastes budget
-  applies_to: &id007
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # === Key Vault Soft-Delete ===
@@ -1893,7 +2013,7 @@ rules:
           publicNetworkAccess: 'Disabled'
         }
       }
-    prohibitions: &id008
+    prohibitions:
     - NEVER disable soft-delete on Key Vault — it is now mandatory and cannot be disabled after creation
     - NEVER set softDeleteRetentionInDays > 30 for dev/POC Key Vaults
     - NEVER enable purge protection on dev/POC Key Vaults — it prevents resource group cleanup
@@ -1903,9 +2023,13 @@ rules:
   severity: required
   description: Configure appropriate soft-delete retention periods — shorter for dev/POC, longer for production
   rationale: Soft-delete protects against accidental deletion but costs storage; longer retention in dev wastes budget
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - TODO:storage
     terraform_pattern: |
       # === Key Vault Soft-Delete ===
@@ -2009,14 +2133,23 @@ rules:
           publicNetworkAccess: 'Disabled'
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER disable soft-delete on Key Vault — it is now mandatory and cannot be disabled after creation
+    - NEVER set softDeleteRetentionInDays > 30 for dev/POC Key Vaults
+    - NEVER enable purge protection on dev/POC Key Vaults — it prevents resource group cleanup
+    - NEVER set blob soft-delete retention > 14 days for dev/POC
+    - NEVER deploy Recovery Services Vault for dev/POC unless backup is an explicit requirement
 - id: WAF-COST-LIFE-004
   severity: required
   description: Configure appropriate soft-delete retention periods — shorter for dev/POC, longer for production
   rationale: Soft-delete protects against accidental deletion but costs storage; longer retention in dev wastes budget
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.OperationalInsights/workspaces
     terraform_pattern: |
       # === Key Vault Soft-Delete ===
@@ -2120,14 +2253,23 @@ rules:
           publicNetworkAccess: 'Disabled'
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER disable soft-delete on Key Vault — it is now mandatory and cannot be disabled after creation
+    - NEVER set softDeleteRetentionInDays > 30 for dev/POC Key Vaults
+    - NEVER enable purge protection on dev/POC Key Vaults — it prevents resource group cleanup
+    - NEVER set blob soft-delete retention > 14 days for dev/POC
+    - NEVER deploy Recovery Services Vault for dev/POC unless backup is an explicit requirement
 - id: WAF-COST-LIFE-004
   severity: required
   description: Configure appropriate soft-delete retention periods — shorter for dev/POC, longer for production
   rationale: Soft-delete protects against accidental deletion but costs storage; longer retention in dev wastes budget
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.KeyVault/vaults
     terraform_pattern: |
       # === Key Vault Soft-Delete ===
@@ -2231,14 +2373,23 @@ rules:
           publicNetworkAccess: 'Disabled'
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER disable soft-delete on Key Vault — it is now mandatory and cannot be disabled after creation
+    - NEVER set softDeleteRetentionInDays > 30 for dev/POC Key Vaults
+    - NEVER enable purge protection on dev/POC Key Vaults — it prevents resource group cleanup
+    - NEVER set blob soft-delete retention > 14 days for dev/POC
+    - NEVER deploy Recovery Services Vault for dev/POC unless backup is an explicit requirement
 - id: WAF-COST-LIFE-004
   severity: required
   description: Configure appropriate soft-delete retention periods — shorter for dev/POC, longer for production
   rationale: Soft-delete protects against accidental deletion but costs storage; longer retention in dev wastes budget
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
       # === Key Vault Soft-Delete ===
@@ -2342,14 +2493,23 @@ rules:
           publicNetworkAccess: 'Disabled'
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER disable soft-delete on Key Vault — it is now mandatory and cannot be disabled after creation
+    - NEVER set softDeleteRetentionInDays > 30 for dev/POC Key Vaults
+    - NEVER enable purge protection on dev/POC Key Vaults — it prevents resource group cleanup
+    - NEVER set blob soft-delete retention > 14 days for dev/POC
+    - NEVER deploy Recovery Services Vault for dev/POC unless backup is an explicit requirement
 - id: WAF-COST-LIFE-004
   severity: required
   description: Configure appropriate soft-delete retention periods — shorter for dev/POC, longer for production
   rationale: Soft-delete protects against accidental deletion but costs storage; longer retention in dev wastes budget
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Resources/resourceGroups
     terraform_pattern: |
       # === Key Vault Soft-Delete ===
@@ -2453,19 +2613,24 @@ rules:
           publicNetworkAccess: 'Disabled'
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER disable soft-delete on Key Vault — it is now mandatory and cannot be disabled after creation
+    - NEVER set softDeleteRetentionInDays > 30 for dev/POC Key Vaults
+    - NEVER enable purge protection on dev/POC Key Vaults — it prevents resource group cleanup
+    - NEVER set blob soft-delete retention > 14 days for dev/POC
+    - NEVER deploy Recovery Services Vault for dev/POC unless backup is an explicit requirement
 - id: WAF-COST-LIFE-005
   severity: required
   description: Apply mandatory cost tracking tags to all resources — Environment, CostCenter, Owner, Project
   rationale: Tags enable cost allocation, showback/chargeback, and automated cleanup of orphaned resources
-  applies_to: &id009
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - cost-analyst
   - project-manager
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # === Mandatory Tags (apply to all resources) ===
@@ -2534,7 +2699,7 @@ rules:
         tags: mandatoryTags
         // ... resource properties
       }
-    prohibitions: &id010
+    prohibitions:
     - NEVER deploy resources without at minimum Environment, CostCenter, Owner, and Project tags
     - NEVER use free-form tag values for Environment — restrict to 'dev', 'staging', 'prod'
     - NEVER omit the ManagedBy tag — it distinguishes IaC-managed from manually-created resources
@@ -2543,9 +2708,14 @@ rules:
   severity: required
   description: Apply mandatory cost tracking tags to all resources — Environment, CostCenter, Owner, Project
   rationale: Tags enable cost allocation, showback/chargeback, and automated cleanup of orphaned resources
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
+  - project-manager
   targets:
-    services:
+  - services:
     - TODO:storage
     terraform_pattern: |
       # === Mandatory Tags (apply to all resources) ===
@@ -2614,14 +2784,23 @@ rules:
         tags: mandatoryTags
         // ... resource properties
       }
-    prohibitions: *id010
+    prohibitions:
+    - NEVER deploy resources without at minimum Environment, CostCenter, Owner, and Project tags
+    - NEVER use free-form tag values for Environment — restrict to 'dev', 'staging', 'prod'
+    - NEVER omit the ManagedBy tag — it distinguishes IaC-managed from manually-created resources
+    - NEVER hardcode tag values — always use variables/parameters for reusability
 - id: WAF-COST-LIFE-005
   severity: required
   description: Apply mandatory cost tracking tags to all resources — Environment, CostCenter, Owner, Project
   rationale: Tags enable cost allocation, showback/chargeback, and automated cleanup of orphaned resources
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
+  - project-manager
   targets:
-    services:
+  - services:
     - Microsoft.OperationalInsights/workspaces
     terraform_pattern: |
       # === Mandatory Tags (apply to all resources) ===
@@ -2690,14 +2869,23 @@ rules:
         tags: mandatoryTags
         // ... resource properties
       }
-    prohibitions: *id010
+    prohibitions:
+    - NEVER deploy resources without at minimum Environment, CostCenter, Owner, and Project tags
+    - NEVER use free-form tag values for Environment — restrict to 'dev', 'staging', 'prod'
+    - NEVER omit the ManagedBy tag — it distinguishes IaC-managed from manually-created resources
+    - NEVER hardcode tag values — always use variables/parameters for reusability
 - id: WAF-COST-LIFE-005
   severity: required
   description: Apply mandatory cost tracking tags to all resources — Environment, CostCenter, Owner, Project
   rationale: Tags enable cost allocation, showback/chargeback, and automated cleanup of orphaned resources
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
+  - project-manager
   targets:
-    services:
+  - services:
     - Microsoft.KeyVault/vaults
     terraform_pattern: |
       # === Mandatory Tags (apply to all resources) ===
@@ -2766,14 +2954,23 @@ rules:
         tags: mandatoryTags
         // ... resource properties
       }
-    prohibitions: *id010
+    prohibitions:
+    - NEVER deploy resources without at minimum Environment, CostCenter, Owner, and Project tags
+    - NEVER use free-form tag values for Environment — restrict to 'dev', 'staging', 'prod'
+    - NEVER omit the ManagedBy tag — it distinguishes IaC-managed from manually-created resources
+    - NEVER hardcode tag values — always use variables/parameters for reusability
 - id: WAF-COST-LIFE-005
   severity: required
   description: Apply mandatory cost tracking tags to all resources — Environment, CostCenter, Owner, Project
   rationale: Tags enable cost allocation, showback/chargeback, and automated cleanup of orphaned resources
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
+  - project-manager
   targets:
-    services:
+  - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
       # === Mandatory Tags (apply to all resources) ===
@@ -2842,14 +3039,23 @@ rules:
         tags: mandatoryTags
         // ... resource properties
       }
-    prohibitions: *id010
+    prohibitions:
+    - NEVER deploy resources without at minimum Environment, CostCenter, Owner, and Project tags
+    - NEVER use free-form tag values for Environment — restrict to 'dev', 'staging', 'prod'
+    - NEVER omit the ManagedBy tag — it distinguishes IaC-managed from manually-created resources
+    - NEVER hardcode tag values — always use variables/parameters for reusability
 - id: WAF-COST-LIFE-005
   severity: required
   description: Apply mandatory cost tracking tags to all resources — Environment, CostCenter, Owner, Project
   rationale: Tags enable cost allocation, showback/chargeback, and automated cleanup of orphaned resources
-  applies_to: *id009
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
+  - project-manager
   targets:
-    services:
+  - services:
     - Microsoft.Resources/resourceGroups
     terraform_pattern: |
       # === Mandatory Tags (apply to all resources) ===
@@ -2918,22 +3124,26 @@ rules:
         tags: mandatoryTags
         // ... resource properties
       }
-    prohibitions: *id010
+    prohibitions:
+    - NEVER deploy resources without at minimum Environment, CostCenter, Owner, and Project tags
+    - NEVER use free-form tag values for Environment — restrict to 'dev', 'staging', 'prod'
+    - NEVER omit the ManagedBy tag — it distinguishes IaC-managed from manually-created resources
+    - NEVER hardcode tag values — always use variables/parameters for reusability
 - id: WAF-COST-LIFE-006
   severity: required
   description: Configure Azure budget alerts with action groups — monthly budget with 50%, 80%, 100%, and 120% thresholds
   rationale: Budget alerts provide early warning before costs exceed expectations; without them, overspend is only discovered
     on invoices
-  applies_to: &id011
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - cost-analyst
-  companion_resources: &id012
+  companion_resources:
   - type: Microsoft.Insights/actionGroups@2023-01-01
     description: Action group for budget alert notifications — required for budget alerts to trigger email/webhook notifications
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # === Budget with Alert Thresholds ===
@@ -3085,7 +3295,7 @@ rules:
           ]
         }
       }
-    prohibitions: &id013
+    prohibitions:
     - NEVER deploy a project without a budget resource and alert thresholds
     - NEVER skip the 80% and 100% actual-spend thresholds — they are the primary early warnings
     - NEVER skip the forecasted threshold — it provides advance warning before actual spend occurs
@@ -3096,10 +3306,16 @@ rules:
   description: Configure Azure budget alerts with action groups — monthly budget with 50%, 80%, 100%, and 120% thresholds
   rationale: Budget alerts provide early warning before costs exceed expectations; without them, overspend is only discovered
     on invoices
-  applies_to: *id011
-  companion_resources: *id012
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
+  companion_resources:
+  - type: Microsoft.Insights/actionGroups@2023-01-01
+    description: Action group for budget alert notifications — required for budget alerts to trigger email/webhook notifications
   targets:
-    services:
+  - services:
     - TODO:storage
     terraform_pattern: |
       # === Budget with Alert Thresholds ===
@@ -3251,16 +3467,27 @@ rules:
           ]
         }
       }
-    prohibitions: *id013
+    prohibitions:
+    - NEVER deploy a project without a budget resource and alert thresholds
+    - NEVER skip the 80% and 100% actual-spend thresholds — they are the primary early warnings
+    - NEVER skip the forecasted threshold — it provides advance warning before actual spend occurs
+    - NEVER set budget amount without consulting cost-analyst for estimation
+    - NEVER use only contactEmails without an action group — action groups support webhooks, Logic Apps, and runbook automation
 - id: WAF-COST-LIFE-006
   severity: required
   description: Configure Azure budget alerts with action groups — monthly budget with 50%, 80%, 100%, and 120% thresholds
   rationale: Budget alerts provide early warning before costs exceed expectations; without them, overspend is only discovered
     on invoices
-  applies_to: *id011
-  companion_resources: *id012
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
+  companion_resources:
+  - type: Microsoft.Insights/actionGroups@2023-01-01
+    description: Action group for budget alert notifications — required for budget alerts to trigger email/webhook notifications
   targets:
-    services:
+  - services:
     - Microsoft.OperationalInsights/workspaces
     terraform_pattern: |
       # === Budget with Alert Thresholds ===
@@ -3412,16 +3639,27 @@ rules:
           ]
         }
       }
-    prohibitions: *id013
+    prohibitions:
+    - NEVER deploy a project without a budget resource and alert thresholds
+    - NEVER skip the 80% and 100% actual-spend thresholds — they are the primary early warnings
+    - NEVER skip the forecasted threshold — it provides advance warning before actual spend occurs
+    - NEVER set budget amount without consulting cost-analyst for estimation
+    - NEVER use only contactEmails without an action group — action groups support webhooks, Logic Apps, and runbook automation
 - id: WAF-COST-LIFE-006
   severity: required
   description: Configure Azure budget alerts with action groups — monthly budget with 50%, 80%, 100%, and 120% thresholds
   rationale: Budget alerts provide early warning before costs exceed expectations; without them, overspend is only discovered
     on invoices
-  applies_to: *id011
-  companion_resources: *id012
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
+  companion_resources:
+  - type: Microsoft.Insights/actionGroups@2023-01-01
+    description: Action group for budget alert notifications — required for budget alerts to trigger email/webhook notifications
   targets:
-    services:
+  - services:
     - Microsoft.KeyVault/vaults
     terraform_pattern: |
       # === Budget with Alert Thresholds ===
@@ -3573,16 +3811,27 @@ rules:
           ]
         }
       }
-    prohibitions: *id013
+    prohibitions:
+    - NEVER deploy a project without a budget resource and alert thresholds
+    - NEVER skip the 80% and 100% actual-spend thresholds — they are the primary early warnings
+    - NEVER skip the forecasted threshold — it provides advance warning before actual spend occurs
+    - NEVER set budget amount without consulting cost-analyst for estimation
+    - NEVER use only contactEmails without an action group — action groups support webhooks, Logic Apps, and runbook automation
 - id: WAF-COST-LIFE-006
   severity: required
   description: Configure Azure budget alerts with action groups — monthly budget with 50%, 80%, 100%, and 120% thresholds
   rationale: Budget alerts provide early warning before costs exceed expectations; without them, overspend is only discovered
     on invoices
-  applies_to: *id011
-  companion_resources: *id012
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
+  companion_resources:
+  - type: Microsoft.Insights/actionGroups@2023-01-01
+    description: Action group for budget alert notifications — required for budget alerts to trigger email/webhook notifications
   targets:
-    services:
+  - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
       # === Budget with Alert Thresholds ===
@@ -3734,16 +3983,27 @@ rules:
           ]
         }
       }
-    prohibitions: *id013
+    prohibitions:
+    - NEVER deploy a project without a budget resource and alert thresholds
+    - NEVER skip the 80% and 100% actual-spend thresholds — they are the primary early warnings
+    - NEVER skip the forecasted threshold — it provides advance warning before actual spend occurs
+    - NEVER set budget amount without consulting cost-analyst for estimation
+    - NEVER use only contactEmails without an action group — action groups support webhooks, Logic Apps, and runbook automation
 - id: WAF-COST-LIFE-006
   severity: required
   description: Configure Azure budget alerts with action groups — monthly budget with 50%, 80%, 100%, and 120% thresholds
   rationale: Budget alerts provide early warning before costs exceed expectations; without them, overspend is only discovered
     on invoices
-  applies_to: *id011
-  companion_resources: *id012
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
+  companion_resources:
+  - type: Microsoft.Insights/actionGroups@2023-01-01
+    description: Action group for budget alert notifications — required for budget alerts to trigger email/webhook notifications
   targets:
-    services:
+  - services:
     - Microsoft.Resources/resourceGroups
     terraform_pattern: |
       # === Budget with Alert Thresholds ===
@@ -3895,7 +4155,12 @@ rules:
           ]
         }
       }
-    prohibitions: *id013
+    prohibitions:
+    - NEVER deploy a project without a budget resource and alert thresholds
+    - NEVER skip the 80% and 100% actual-spend thresholds — they are the primary early warnings
+    - NEVER skip the forecasted threshold — it provides advance warning before actual spend occurs
+    - NEVER set budget amount without consulting cost-analyst for estimation
+    - NEVER use only contactEmails without an action group — action groups support webhooks, Logic Apps, and runbook automation
 patterns:
 - name: Cost-optimized resource lifecycle
   description: Combine auto-shutdown, lifecycle policies, retention limits, mandatory tags, and budget alerts for comprehensive

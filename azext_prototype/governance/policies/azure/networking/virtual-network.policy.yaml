@@ -12,7 +12,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Network/virtualNetworks
     terraform_pattern: |
       # VNet declares ONLY addressSpace — subnets are separate child resources
@@ -179,7 +179,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Network/virtualNetworks
     terraform_pattern: |
       resource "azapi_resource" "nsg_app" {
@@ -314,7 +314,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Network/virtualNetworks
     prohibitions:
     - NEVER create a subnet for App Service without Microsoft.Web/serverFarms delegation
@@ -330,7 +330,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Network/virtualNetworks
     prohibitions:
     - NEVER create an App Service integration subnet smaller than /26
@@ -345,7 +345,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Network/virtualNetworks
 patterns:
 - name: VNet with delegated subnets and NSGs

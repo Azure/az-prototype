@@ -113,7 +113,7 @@ rules:
     name: Batch Account Contributor
     description: RBAC role assignment for Batch account management and pool operations
   targets:
-    services:
+  - services:
     - Microsoft.Batch/batchAccounts
     terraform_pattern: |
       resource "azapi_resource" "batch_account" {
@@ -208,7 +208,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Batch/batchAccounts
 - id: AZ-BATCH-003
   severity: recommended
@@ -220,7 +220,7 @@ rules:
   - cloud-architect
   - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Batch/batchAccounts
 - id: AZ-BATCH-004
   severity: recommended
@@ -232,7 +232,7 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Batch/batchAccounts
 patterns:
 - name: Batch account with user-subscription pools and private networking

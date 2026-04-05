@@ -18,7 +18,7 @@ rules:
   - Microsoft.KeyVault/vaults (Key Vault for CMK encryption)
   - Microsoft.Insights/diagnosticSettings (route audit logs to Log Analytics)
   targets:
-    services:
+  - services:
     - Microsoft.Synapse/workspaces
     terraform_pattern: |
       resource "azapi_resource" "synapse_workspace" {
@@ -106,7 +106,7 @@ rules:
   companion_resources:
   - Microsoft.Synapse/workspaces/administrators (Entra admin assignment)
   targets:
-    services:
+  - services:
     - Microsoft.Synapse/workspaces
     terraform_pattern: |
       resource "azapi_resource" "synapse_aad_admin" {
@@ -143,7 +143,7 @@ rules:
   - Microsoft.Network/privateDnsZones (privatelink.azuresynapse.net)
   - Microsoft.Network/privateEndpoints/privateDnsZoneGroups (DNS registration)
   targets:
-    services:
+  - services:
     - Microsoft.Synapse/workspaces
     terraform_pattern: |
       resource "azapi_resource" "synapse_pe_sql" {
@@ -285,7 +285,7 @@ rules:
   companion_resources:
   - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
   targets:
-    services:
+  - services:
     - Microsoft.Synapse/workspaces
     terraform_pattern: |
       resource "azapi_resource" "synapse_diagnostics" {

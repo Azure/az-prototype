@@ -15,7 +15,7 @@ rules:
   - Microsoft.Network/virtualNetworks/subnets (associate route table with target subnets)
   - Microsoft.Network/azureFirewalls or NVA (next-hop target for forced tunneling)
   targets:
-    services:
+  - services:
     - Microsoft.Network/routeTables
     terraform_pattern: |
       resource "azapi_resource" "route_table" {
@@ -53,7 +53,7 @@ rules:
   companion_resources:
   - Microsoft.Network/routeTables (parent route table)
   targets:
-    services:
+  - services:
     - Microsoft.Network/routeTables
     terraform_pattern: |
       resource "azapi_resource" "route_to_firewall" {
@@ -92,7 +92,7 @@ rules:
   companion_resources:
   - Microsoft.Network/networkSecurityGroups (always pair UDR with NSG)
   targets:
-    services:
+  - services:
     - Microsoft.Network/routeTables
     terraform_pattern: |
       resource "azapi_resource" "subnet_with_udr" {
@@ -138,7 +138,7 @@ rules:
   - cloud-architect
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.Network/routeTables
     terraform_pattern: |
       resource "azapi_resource" "route_table_tagged" {

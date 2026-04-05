@@ -15,7 +15,7 @@ rules:
   - Microsoft.Network/privateDnsZones/virtualNetworkLinks (link to VNets for resolution)
   - Microsoft.Network/privateEndpoints/privateDnsZoneGroups (auto-registration for private endpoints)
   targets:
-    services:
+  - services:
     - Microsoft.Network/dnsZones
     terraform_pattern: |
       resource "azapi_resource" "private_dns_zone" {
@@ -45,7 +45,7 @@ rules:
   - Microsoft.Network/privateDnsZones (parent zone)
   - Microsoft.Network/virtualNetworks (target VNet)
   targets:
-    services:
+  - services:
     - Microsoft.Network/dnsZones
     terraform_pattern: |
       resource "azapi_resource" "dns_vnet_link" {
@@ -89,7 +89,7 @@ rules:
   - Microsoft.Network/privateEndpoints (private endpoint for the service)
   - Microsoft.Network/privateDnsZones/virtualNetworkLinks (link zone to VNet)
   targets:
-    services:
+  - services:
     - Microsoft.Network/dnsZones
     terraform_pattern: |
       # Standard private DNS zone names for common Azure services:
@@ -135,7 +135,7 @@ rules:
   companion_resources:
   - Microsoft.Insights/diagnosticSettings (route query logs to Log Analytics)
   targets:
-    services:
+  - services:
     - Microsoft.Network/dnsZones
     terraform_pattern: |
       resource "azapi_resource" "public_dns_zone" {
@@ -197,7 +197,7 @@ rules:
   companion_resources:
   - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
   targets:
-    services:
+  - services:
     - Microsoft.Network/dnsZones
     terraform_pattern: |
       resource "azapi_resource" "dns_diagnostics" {

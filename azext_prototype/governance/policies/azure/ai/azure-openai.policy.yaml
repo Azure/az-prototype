@@ -112,7 +112,7 @@ rules:
     name: Cognitive Services OpenAI User
     description: RBAC role assignment granting consuming identity the Cognitive Services OpenAI User role
   targets:
-    services:
+  - services:
     - Microsoft.CognitiveServices/accounts
     terraform_pattern: |
       resource "azapi_resource" "openai" {
@@ -183,7 +183,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.CognitiveServices/accounts
     terraform_pattern: |
       resource "azapi_resource" "openai_deployment" {
@@ -236,7 +236,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.CognitiveServices/accounts
 - id: AZ-AOI-004
   severity: recommended
@@ -246,7 +246,7 @@ rules:
   - app-developer
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.CognitiveServices/accounts
 patterns:
 - name: Azure OpenAI with private endpoint and RBAC

@@ -19,7 +19,7 @@ rules:
   - Microsoft.Insights/diagnosticSettings (guest OS diagnostics)
   - Microsoft.Compute/virtualMachines/extensions (Azure Monitor Agent)
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       resource "azapi_resource" "vm" {
@@ -200,7 +200,7 @@ rules:
   - security-reviewer
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # Set in securityProfile:
@@ -228,7 +228,7 @@ rules:
   - Microsoft.Compute/diskEncryptionSets (CMK encryption set)
   - Microsoft.KeyVault/vaults (Key Vault for encryption keys)
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # Set securityProfile.encryptionAtHost = true
@@ -254,7 +254,7 @@ rules:
   - Microsoft.Insights/dataCollectionRuleAssociations (link DCR to VM)
   - Microsoft.OperationalInsights/workspaces (Log Analytics destination)
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       resource "azapi_resource" "ama_extension" {
@@ -313,7 +313,7 @@ rules:
   - cloud-architect
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # Set patchSettings in osProfile.linuxConfiguration:

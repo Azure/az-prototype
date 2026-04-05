@@ -90,7 +90,7 @@ rules:
     name: diag-nh
     description: Diagnostic settings for push notification delivery logs
   targets:
-    services:
+  - services:
     - Microsoft.NotificationHubs/namespaces
     terraform_pattern: |
       resource "azapi_resource" "nh_namespace" {
@@ -153,7 +153,7 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.NotificationHubs/namespaces
 - id: AZ-NH-003
   severity: recommended
@@ -163,7 +163,7 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.NotificationHubs/namespaces
 - id: AZ-NH-004
   severity: recommended
@@ -174,7 +174,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.NotificationHubs/namespaces
 patterns:
 - name: Notification Hubs with private endpoint and zone redundancy

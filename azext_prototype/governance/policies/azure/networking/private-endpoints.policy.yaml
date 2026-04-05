@@ -12,7 +12,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - TODO:private-endpoint
     terraform_pattern: |
       # Step 1: Private Endpoint
@@ -156,7 +156,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - TODO:private-endpoint
     prohibitions:
     - NEVER use a custom DNS zone name — use the exact Azure-defined zone name for each service
@@ -170,7 +170,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - TODO:private-endpoint
 - id: AZ-PE-004
   severity: recommended
@@ -179,7 +179,7 @@ rules:
   applies_to:
   - cloud-architect
   targets:
-    services:
+  - services:
     - TODO:private-endpoint
 patterns:
 - name: Private Endpoint with DNS Zone and VNet Link

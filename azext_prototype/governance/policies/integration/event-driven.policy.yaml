@@ -9,12 +9,12 @@ rules:
     identity delivery
   rationale: Event Grid provides at-least-once delivery; dead-letter captures undeliverable events; managed identity eliminates
     connection strings
-  applies_to: &id001
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
   - app-developer
-  companion_resources: &id002
+  companion_resources:
   - type: Microsoft.EventGrid/systemTopics@2024-06-01-preview
     name: system-topic
     description: System topic with managed identity for secure event delivery
@@ -24,7 +24,7 @@ rules:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: eg-dlq-role
     description: Storage Blob Data Contributor role for Event Grid to write dead-letter blobs
-  template_check: &id003
+  template_check:
     when_services_present:
     - event-grid
     - functions
@@ -33,7 +33,7 @@ rules:
     severity: warning
     error_message: Event Grid + Functions template must include a storage account for dead-letter configuration
   targets:
-    services:
+  - services:
     - Microsoft.EventGrid/topics
     terraform_pattern: |
       # Event Grid system topic for Azure resource events
@@ -256,7 +256,7 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: &id004
+    prohibitions:
     - NEVER create Event Grid subscriptions without a deadLetterDestination — undeliverable events are silently lost
     - NEVER use connection strings for Event Grid delivery — use deliveryWithResourceIdentity with managed identity
     - NEVER set maxDeliveryAttempts to 1 — transient failures will immediately dead-letter events
@@ -267,11 +267,31 @@ rules:
     identity delivery
   rationale: Event Grid provides at-least-once delivery; dead-letter captures undeliverable events; managed identity eliminates
     connection strings
-  applies_to: *id001
-  companion_resources: *id002
-  template_check: *id003
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.EventGrid/systemTopics@2024-06-01-preview
+    name: system-topic
+    description: System topic with managed identity for secure event delivery
+  - type: Microsoft.Storage/storageAccounts@2023-05-01
+    name: dead-letter-storage
+    description: Storage account with blob container for dead-letter event capture
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: eg-dlq-role
+    description: Storage Blob Data Contributor role for Event Grid to write dead-letter blobs
+  template_check:
+    when_services_present:
+    - event-grid
+    - functions
+    require_service:
+    - storage-account
+    severity: warning
+    error_message: Event Grid + Functions template must include a storage account for dead-letter configuration
   targets:
-    services:
+  - services:
     - Microsoft.ServiceBus/namespaces
     terraform_pattern: |
       # Event Grid system topic for Azure resource events
@@ -494,18 +514,42 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER create Event Grid subscriptions without a deadLetterDestination — undeliverable events are silently lost
+    - NEVER use connection strings for Event Grid delivery — use deliveryWithResourceIdentity with managed identity
+    - NEVER set maxDeliveryAttempts to 1 — transient failures will immediately dead-letter events
+    - NEVER hardcode webhook URLs with embedded credentials or SAS tokens
 - id: CC-INT-ED-001
   severity: required
   description: Wire Event Grid subscriptions to Function App or Container App endpoints with dead-letter storage and managed
     identity delivery
   rationale: Event Grid provides at-least-once delivery; dead-letter captures undeliverable events; managed identity eliminates
     connection strings
-  applies_to: *id001
-  companion_resources: *id002
-  template_check: *id003
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.EventGrid/systemTopics@2024-06-01-preview
+    name: system-topic
+    description: System topic with managed identity for secure event delivery
+  - type: Microsoft.Storage/storageAccounts@2023-05-01
+    name: dead-letter-storage
+    description: Storage account with blob container for dead-letter event capture
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: eg-dlq-role
+    description: Storage Blob Data Contributor role for Event Grid to write dead-letter blobs
+  template_check:
+    when_services_present:
+    - event-grid
+    - functions
+    require_service:
+    - storage-account
+    severity: warning
+    error_message: Event Grid + Functions template must include a storage account for dead-letter configuration
   targets:
-    services:
+  - services:
     - Microsoft.EventHub/namespaces
     terraform_pattern: |
       # Event Grid system topic for Azure resource events
@@ -728,18 +772,42 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER create Event Grid subscriptions without a deadLetterDestination — undeliverable events are silently lost
+    - NEVER use connection strings for Event Grid delivery — use deliveryWithResourceIdentity with managed identity
+    - NEVER set maxDeliveryAttempts to 1 — transient failures will immediately dead-letter events
+    - NEVER hardcode webhook URLs with embedded credentials or SAS tokens
 - id: CC-INT-ED-001
   severity: required
   description: Wire Event Grid subscriptions to Function App or Container App endpoints with dead-letter storage and managed
     identity delivery
   rationale: Event Grid provides at-least-once delivery; dead-letter captures undeliverable events; managed identity eliminates
     connection strings
-  applies_to: *id001
-  companion_resources: *id002
-  template_check: *id003
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.EventGrid/systemTopics@2024-06-01-preview
+    name: system-topic
+    description: System topic with managed identity for secure event delivery
+  - type: Microsoft.Storage/storageAccounts@2023-05-01
+    name: dead-letter-storage
+    description: Storage account with blob container for dead-letter event capture
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: eg-dlq-role
+    description: Storage Blob Data Contributor role for Event Grid to write dead-letter blobs
+  template_check:
+    when_services_present:
+    - event-grid
+    - functions
+    require_service:
+    - storage-account
+    severity: warning
+    error_message: Event Grid + Functions template must include a storage account for dead-letter configuration
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # Event Grid system topic for Azure resource events
@@ -962,18 +1030,42 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER create Event Grid subscriptions without a deadLetterDestination — undeliverable events are silently lost
+    - NEVER use connection strings for Event Grid delivery — use deliveryWithResourceIdentity with managed identity
+    - NEVER set maxDeliveryAttempts to 1 — transient failures will immediately dead-letter events
+    - NEVER hardcode webhook URLs with embedded credentials or SAS tokens
 - id: CC-INT-ED-001
   severity: required
   description: Wire Event Grid subscriptions to Function App or Container App endpoints with dead-letter storage and managed
     identity delivery
   rationale: Event Grid provides at-least-once delivery; dead-letter captures undeliverable events; managed identity eliminates
     connection strings
-  applies_to: *id001
-  companion_resources: *id002
-  template_check: *id003
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.EventGrid/systemTopics@2024-06-01-preview
+    name: system-topic
+    description: System topic with managed identity for secure event delivery
+  - type: Microsoft.Storage/storageAccounts@2023-05-01
+    name: dead-letter-storage
+    description: Storage account with blob container for dead-letter event capture
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: eg-dlq-role
+    description: Storage Blob Data Contributor role for Event Grid to write dead-letter blobs
+  template_check:
+    when_services_present:
+    - event-grid
+    - functions
+    require_service:
+    - storage-account
+    severity: warning
+    error_message: Event Grid + Functions template must include a storage account for dead-letter configuration
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # Event Grid system topic for Azure resource events
@@ -1196,18 +1288,42 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER create Event Grid subscriptions without a deadLetterDestination — undeliverable events are silently lost
+    - NEVER use connection strings for Event Grid delivery — use deliveryWithResourceIdentity with managed identity
+    - NEVER set maxDeliveryAttempts to 1 — transient failures will immediately dead-letter events
+    - NEVER hardcode webhook URLs with embedded credentials or SAS tokens
 - id: CC-INT-ED-001
   severity: required
   description: Wire Event Grid subscriptions to Function App or Container App endpoints with dead-letter storage and managed
     identity delivery
   rationale: Event Grid provides at-least-once delivery; dead-letter captures undeliverable events; managed identity eliminates
     connection strings
-  applies_to: *id001
-  companion_resources: *id002
-  template_check: *id003
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.EventGrid/systemTopics@2024-06-01-preview
+    name: system-topic
+    description: System topic with managed identity for secure event delivery
+  - type: Microsoft.Storage/storageAccounts@2023-05-01
+    name: dead-letter-storage
+    description: Storage account with blob container for dead-letter event capture
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: eg-dlq-role
+    description: Storage Blob Data Contributor role for Event Grid to write dead-letter blobs
+  template_check:
+    when_services_present:
+    - event-grid
+    - functions
+    require_service:
+    - storage-account
+    severity: warning
+    error_message: Event Grid + Functions template must include a storage account for dead-letter configuration
   targets:
-    services:
+  - services:
     - Microsoft.StreamAnalytics/streamingjobs
     terraform_pattern: |
       # Event Grid system topic for Azure resource events
@@ -1430,25 +1546,29 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER create Event Grid subscriptions without a deadLetterDestination — undeliverable events are silently lost
+    - NEVER use connection strings for Event Grid delivery — use deliveryWithResourceIdentity with managed identity
+    - NEVER set maxDeliveryAttempts to 1 — transient failures will immediately dead-letter events
+    - NEVER hardcode webhook URLs with embedded credentials or SAS tokens
 - id: CC-INT-ED-002
   severity: required
   description: Wire Service Bus triggers to Function App or Container App using managed identity connections
   rationale: Service Bus provides reliable ordered messaging; managed identity eliminates connection string management and
     rotation burden
-  applies_to: &id005
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
   - app-developer
-  companion_resources: &id006
+  companion_resources:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: fn-sb-data-receiver
     description: Azure Service Bus Data Receiver role (4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0) for Function App identity
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: fn-sb-data-sender
     description: Azure Service Bus Data Sender role (69a216fc-b8fb-44d8-bc22-1f3c2cd27a39) if Function App also sends messages
-  template_check: &id007
+  template_check:
     when_services_present:
     - service-bus
     - functions
@@ -1457,7 +1577,7 @@ rules:
     severity: warning
     error_message: Service Bus + Functions template must include managed identity for connection string-free triggers
   targets:
-    services:
+  - services:
     - Microsoft.EventGrid/topics
     terraform_pattern: |
       # Service Bus namespace with managed identity (see SB-001 for full namespace config)
@@ -1549,7 +1669,7 @@ rules:
           FUNCTIONS_WORKER_RUNTIME: functionsWorkerRuntime
         }
       }
-    prohibitions: &id008
+    prohibitions:
     - NEVER use connection strings for Service Bus triggers — use __fullyQualifiedNamespace with managed identity
     - NEVER set lockDuration shorter than expected processing time — messages will be abandoned and redelivered
     - NEVER disable deadLetteringOnMessageExpiration — expired messages will be silently lost
@@ -1559,11 +1679,28 @@ rules:
   description: Wire Service Bus triggers to Function App or Container App using managed identity connections
   rationale: Service Bus provides reliable ordered messaging; managed identity eliminates connection string management and
     rotation burden
-  applies_to: *id005
-  companion_resources: *id006
-  template_check: *id007
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: fn-sb-data-receiver
+    description: Azure Service Bus Data Receiver role (4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0) for Function App identity
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: fn-sb-data-sender
+    description: Azure Service Bus Data Sender role (69a216fc-b8fb-44d8-bc22-1f3c2cd27a39) if Function App also sends messages
+  template_check:
+    when_services_present:
+    - service-bus
+    - functions
+    require_service:
+    - managed-identity
+    severity: warning
+    error_message: Service Bus + Functions template must include managed identity for connection string-free triggers
   targets:
-    services:
+  - services:
     - Microsoft.ServiceBus/namespaces
     terraform_pattern: |
       # Service Bus namespace with managed identity (see SB-001 for full namespace config)
@@ -1655,17 +1792,38 @@ rules:
           FUNCTIONS_WORKER_RUNTIME: functionsWorkerRuntime
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER use connection strings for Service Bus triggers — use __fullyQualifiedNamespace with managed identity
+    - NEVER set lockDuration shorter than expected processing time — messages will be abandoned and redelivered
+    - NEVER disable deadLetteringOnMessageExpiration — expired messages will be silently lost
+    - NEVER share a single queue between multiple unrelated consumers — use topics with subscriptions instead
 - id: CC-INT-ED-002
   severity: required
   description: Wire Service Bus triggers to Function App or Container App using managed identity connections
   rationale: Service Bus provides reliable ordered messaging; managed identity eliminates connection string management and
     rotation burden
-  applies_to: *id005
-  companion_resources: *id006
-  template_check: *id007
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: fn-sb-data-receiver
+    description: Azure Service Bus Data Receiver role (4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0) for Function App identity
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: fn-sb-data-sender
+    description: Azure Service Bus Data Sender role (69a216fc-b8fb-44d8-bc22-1f3c2cd27a39) if Function App also sends messages
+  template_check:
+    when_services_present:
+    - service-bus
+    - functions
+    require_service:
+    - managed-identity
+    severity: warning
+    error_message: Service Bus + Functions template must include managed identity for connection string-free triggers
   targets:
-    services:
+  - services:
     - Microsoft.EventHub/namespaces
     terraform_pattern: |
       # Service Bus namespace with managed identity (see SB-001 for full namespace config)
@@ -1757,17 +1915,38 @@ rules:
           FUNCTIONS_WORKER_RUNTIME: functionsWorkerRuntime
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER use connection strings for Service Bus triggers — use __fullyQualifiedNamespace with managed identity
+    - NEVER set lockDuration shorter than expected processing time — messages will be abandoned and redelivered
+    - NEVER disable deadLetteringOnMessageExpiration — expired messages will be silently lost
+    - NEVER share a single queue between multiple unrelated consumers — use topics with subscriptions instead
 - id: CC-INT-ED-002
   severity: required
   description: Wire Service Bus triggers to Function App or Container App using managed identity connections
   rationale: Service Bus provides reliable ordered messaging; managed identity eliminates connection string management and
     rotation burden
-  applies_to: *id005
-  companion_resources: *id006
-  template_check: *id007
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: fn-sb-data-receiver
+    description: Azure Service Bus Data Receiver role (4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0) for Function App identity
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: fn-sb-data-sender
+    description: Azure Service Bus Data Sender role (69a216fc-b8fb-44d8-bc22-1f3c2cd27a39) if Function App also sends messages
+  template_check:
+    when_services_present:
+    - service-bus
+    - functions
+    require_service:
+    - managed-identity
+    severity: warning
+    error_message: Service Bus + Functions template must include managed identity for connection string-free triggers
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # Service Bus namespace with managed identity (see SB-001 for full namespace config)
@@ -1859,17 +2038,38 @@ rules:
           FUNCTIONS_WORKER_RUNTIME: functionsWorkerRuntime
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER use connection strings for Service Bus triggers — use __fullyQualifiedNamespace with managed identity
+    - NEVER set lockDuration shorter than expected processing time — messages will be abandoned and redelivered
+    - NEVER disable deadLetteringOnMessageExpiration — expired messages will be silently lost
+    - NEVER share a single queue between multiple unrelated consumers — use topics with subscriptions instead
 - id: CC-INT-ED-002
   severity: required
   description: Wire Service Bus triggers to Function App or Container App using managed identity connections
   rationale: Service Bus provides reliable ordered messaging; managed identity eliminates connection string management and
     rotation burden
-  applies_to: *id005
-  companion_resources: *id006
-  template_check: *id007
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: fn-sb-data-receiver
+    description: Azure Service Bus Data Receiver role (4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0) for Function App identity
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: fn-sb-data-sender
+    description: Azure Service Bus Data Sender role (69a216fc-b8fb-44d8-bc22-1f3c2cd27a39) if Function App also sends messages
+  template_check:
+    when_services_present:
+    - service-bus
+    - functions
+    require_service:
+    - managed-identity
+    severity: warning
+    error_message: Service Bus + Functions template must include managed identity for connection string-free triggers
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # Service Bus namespace with managed identity (see SB-001 for full namespace config)
@@ -1961,17 +2161,38 @@ rules:
           FUNCTIONS_WORKER_RUNTIME: functionsWorkerRuntime
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER use connection strings for Service Bus triggers — use __fullyQualifiedNamespace with managed identity
+    - NEVER set lockDuration shorter than expected processing time — messages will be abandoned and redelivered
+    - NEVER disable deadLetteringOnMessageExpiration — expired messages will be silently lost
+    - NEVER share a single queue between multiple unrelated consumers — use topics with subscriptions instead
 - id: CC-INT-ED-002
   severity: required
   description: Wire Service Bus triggers to Function App or Container App using managed identity connections
   rationale: Service Bus provides reliable ordered messaging; managed identity eliminates connection string management and
     rotation burden
-  applies_to: *id005
-  companion_resources: *id006
-  template_check: *id007
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: fn-sb-data-receiver
+    description: Azure Service Bus Data Receiver role (4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0) for Function App identity
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: fn-sb-data-sender
+    description: Azure Service Bus Data Sender role (69a216fc-b8fb-44d8-bc22-1f3c2cd27a39) if Function App also sends messages
+  template_check:
+    when_services_present:
+    - service-bus
+    - functions
+    require_service:
+    - managed-identity
+    severity: warning
+    error_message: Service Bus + Functions template must include managed identity for connection string-free triggers
   targets:
-    services:
+  - services:
     - Microsoft.StreamAnalytics/streamingjobs
     terraform_pattern: |
       # Service Bus namespace with managed identity (see SB-001 for full namespace config)
@@ -2063,18 +2284,22 @@ rules:
           FUNCTIONS_WORKER_RUNTIME: functionsWorkerRuntime
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER use connection strings for Service Bus triggers — use __fullyQualifiedNamespace with managed identity
+    - NEVER set lockDuration shorter than expected processing time — messages will be abandoned and redelivered
+    - NEVER disable deadLetteringOnMessageExpiration — expired messages will be silently lost
+    - NEVER share a single queue between multiple unrelated consumers — use topics with subscriptions instead
 - id: CC-INT-ED-003
   severity: required
   description: Wire Event Hubs to Stream Analytics to Storage/SQL for real-time stream processing pipelines
   rationale: Event Hubs provides high-throughput ingestion; Stream Analytics handles windowed aggregation; output to durable
     storage completes the pipeline
-  applies_to: &id009
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
   - app-developer
-  companion_resources: &id010
+  companion_resources:
   - type: Microsoft.EventHub/namespaces/eventhubs/consumergroups@2024-01-01
     name: asa-consumer-group
     description: Dedicated consumer group for Stream Analytics — never use $Default
@@ -2085,7 +2310,7 @@ rules:
     name: asa-storage-contributor
     description: Storage Blob Data Contributor role for Stream Analytics output
   targets:
-    services:
+  - services:
     - Microsoft.EventGrid/topics
     terraform_pattern: |
       # Stream Analytics job consuming from Event Hub
@@ -2293,7 +2518,7 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: &id011
+    prohibitions:
     - 'NEVER use connection strings for Stream Analytics inputs or outputs — use authenticationMode: Msi'
     - NEVER use the $Default consumer group for Stream Analytics — create a dedicated consumer group
     - NEVER set outputErrorPolicy to Drop in production — use Stop to surface data issues
@@ -2303,10 +2528,23 @@ rules:
   description: Wire Event Hubs to Stream Analytics to Storage/SQL for real-time stream processing pipelines
   rationale: Event Hubs provides high-throughput ingestion; Stream Analytics handles windowed aggregation; output to durable
     storage completes the pipeline
-  applies_to: *id009
-  companion_resources: *id010
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.EventHub/namespaces/eventhubs/consumergroups@2024-01-01
+    name: asa-consumer-group
+    description: Dedicated consumer group for Stream Analytics — never use $Default
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: asa-eh-receiver
+    description: Azure Event Hubs Data Receiver role for Stream Analytics managed identity
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: asa-storage-contributor
+    description: Storage Blob Data Contributor role for Stream Analytics output
   targets:
-    services:
+  - services:
     - Microsoft.ServiceBus/namespaces
     terraform_pattern: |
       # Stream Analytics job consuming from Event Hub
@@ -2514,16 +2752,33 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id011
+    prohibitions:
+    - 'NEVER use connection strings for Stream Analytics inputs or outputs — use authenticationMode: Msi'
+    - NEVER use the $Default consumer group for Stream Analytics — create a dedicated consumer group
+    - NEVER set outputErrorPolicy to Drop in production — use Stop to surface data issues
+    - NEVER skip eventsOutOfOrderPolicy — unordered events corrupt aggregation results
 - id: CC-INT-ED-003
   severity: required
   description: Wire Event Hubs to Stream Analytics to Storage/SQL for real-time stream processing pipelines
   rationale: Event Hubs provides high-throughput ingestion; Stream Analytics handles windowed aggregation; output to durable
     storage completes the pipeline
-  applies_to: *id009
-  companion_resources: *id010
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.EventHub/namespaces/eventhubs/consumergroups@2024-01-01
+    name: asa-consumer-group
+    description: Dedicated consumer group for Stream Analytics — never use $Default
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: asa-eh-receiver
+    description: Azure Event Hubs Data Receiver role for Stream Analytics managed identity
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: asa-storage-contributor
+    description: Storage Blob Data Contributor role for Stream Analytics output
   targets:
-    services:
+  - services:
     - Microsoft.EventHub/namespaces
     terraform_pattern: |
       # Stream Analytics job consuming from Event Hub
@@ -2731,16 +2986,33 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id011
+    prohibitions:
+    - 'NEVER use connection strings for Stream Analytics inputs or outputs — use authenticationMode: Msi'
+    - NEVER use the $Default consumer group for Stream Analytics — create a dedicated consumer group
+    - NEVER set outputErrorPolicy to Drop in production — use Stop to surface data issues
+    - NEVER skip eventsOutOfOrderPolicy — unordered events corrupt aggregation results
 - id: CC-INT-ED-003
   severity: required
   description: Wire Event Hubs to Stream Analytics to Storage/SQL for real-time stream processing pipelines
   rationale: Event Hubs provides high-throughput ingestion; Stream Analytics handles windowed aggregation; output to durable
     storage completes the pipeline
-  applies_to: *id009
-  companion_resources: *id010
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.EventHub/namespaces/eventhubs/consumergroups@2024-01-01
+    name: asa-consumer-group
+    description: Dedicated consumer group for Stream Analytics — never use $Default
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: asa-eh-receiver
+    description: Azure Event Hubs Data Receiver role for Stream Analytics managed identity
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: asa-storage-contributor
+    description: Storage Blob Data Contributor role for Stream Analytics output
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # Stream Analytics job consuming from Event Hub
@@ -2948,16 +3220,33 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id011
+    prohibitions:
+    - 'NEVER use connection strings for Stream Analytics inputs or outputs — use authenticationMode: Msi'
+    - NEVER use the $Default consumer group for Stream Analytics — create a dedicated consumer group
+    - NEVER set outputErrorPolicy to Drop in production — use Stop to surface data issues
+    - NEVER skip eventsOutOfOrderPolicy — unordered events corrupt aggregation results
 - id: CC-INT-ED-003
   severity: required
   description: Wire Event Hubs to Stream Analytics to Storage/SQL for real-time stream processing pipelines
   rationale: Event Hubs provides high-throughput ingestion; Stream Analytics handles windowed aggregation; output to durable
     storage completes the pipeline
-  applies_to: *id009
-  companion_resources: *id010
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.EventHub/namespaces/eventhubs/consumergroups@2024-01-01
+    name: asa-consumer-group
+    description: Dedicated consumer group for Stream Analytics — never use $Default
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: asa-eh-receiver
+    description: Azure Event Hubs Data Receiver role for Stream Analytics managed identity
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: asa-storage-contributor
+    description: Storage Blob Data Contributor role for Stream Analytics output
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # Stream Analytics job consuming from Event Hub
@@ -3165,16 +3454,33 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id011
+    prohibitions:
+    - 'NEVER use connection strings for Stream Analytics inputs or outputs — use authenticationMode: Msi'
+    - NEVER use the $Default consumer group for Stream Analytics — create a dedicated consumer group
+    - NEVER set outputErrorPolicy to Drop in production — use Stop to surface data issues
+    - NEVER skip eventsOutOfOrderPolicy — unordered events corrupt aggregation results
 - id: CC-INT-ED-003
   severity: required
   description: Wire Event Hubs to Stream Analytics to Storage/SQL for real-time stream processing pipelines
   rationale: Event Hubs provides high-throughput ingestion; Stream Analytics handles windowed aggregation; output to durable
     storage completes the pipeline
-  applies_to: *id009
-  companion_resources: *id010
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.EventHub/namespaces/eventhubs/consumergroups@2024-01-01
+    name: asa-consumer-group
+    description: Dedicated consumer group for Stream Analytics — never use $Default
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: asa-eh-receiver
+    description: Azure Event Hubs Data Receiver role for Stream Analytics managed identity
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: asa-storage-contributor
+    description: Storage Blob Data Contributor role for Stream Analytics output
   targets:
-    services:
+  - services:
     - Microsoft.StreamAnalytics/streamingjobs
     terraform_pattern: |
       # Stream Analytics job consuming from Event Hub
@@ -3382,18 +3688,22 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id011
+    prohibitions:
+    - 'NEVER use connection strings for Stream Analytics inputs or outputs — use authenticationMode: Msi'
+    - NEVER use the $Default consumer group for Stream Analytics — create a dedicated consumer group
+    - NEVER set outputErrorPolicy to Drop in production — use Stop to surface data issues
+    - NEVER skip eventsOutOfOrderPolicy — unordered events corrupt aggregation results
 - id: CC-INT-ED-004
   severity: required
   description: Configure dead-letter queues for Service Bus and dead-letter storage for Event Grid
   rationale: Dead-letter captures messages/events that cannot be delivered or processed, enabling investigation and replay
-  applies_to: &id012
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.EventGrid/topics
     terraform_pattern: |
       # Service Bus queue with dead-letter enabled (dead-letter sub-queue is automatic)
@@ -3479,7 +3789,7 @@ rules:
           publicAccess: 'None'
         }
       }
-    prohibitions: &id013
+    prohibitions:
     - NEVER disable deadLetteringOnMessageExpiration — expired messages are silently discarded
     - NEVER set maxDeliveryCount below 3 — transient failures will prematurely dead-letter messages
     - NEVER skip dead-letter configuration on Event Grid subscriptions — undeliverable events are lost permanently
@@ -3488,9 +3798,13 @@ rules:
   severity: required
   description: Configure dead-letter queues for Service Bus and dead-letter storage for Event Grid
   rationale: Dead-letter captures messages/events that cannot be delivered or processed, enabling investigation and replay
-  applies_to: *id012
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ServiceBus/namespaces
     terraform_pattern: |
       # Service Bus queue with dead-letter enabled (dead-letter sub-queue is automatic)
@@ -3576,14 +3890,22 @@ rules:
           publicAccess: 'None'
         }
       }
-    prohibitions: *id013
+    prohibitions:
+    - NEVER disable deadLetteringOnMessageExpiration — expired messages are silently discarded
+    - NEVER set maxDeliveryCount below 3 — transient failures will prematurely dead-letter messages
+    - NEVER skip dead-letter configuration on Event Grid subscriptions — undeliverable events are lost permanently
+    - NEVER grant public access to dead-letter storage containers
 - id: CC-INT-ED-004
   severity: required
   description: Configure dead-letter queues for Service Bus and dead-letter storage for Event Grid
   rationale: Dead-letter captures messages/events that cannot be delivered or processed, enabling investigation and replay
-  applies_to: *id012
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.EventHub/namespaces
     terraform_pattern: |
       # Service Bus queue with dead-letter enabled (dead-letter sub-queue is automatic)
@@ -3669,14 +3991,22 @@ rules:
           publicAccess: 'None'
         }
       }
-    prohibitions: *id013
+    prohibitions:
+    - NEVER disable deadLetteringOnMessageExpiration — expired messages are silently discarded
+    - NEVER set maxDeliveryCount below 3 — transient failures will prematurely dead-letter messages
+    - NEVER skip dead-letter configuration on Event Grid subscriptions — undeliverable events are lost permanently
+    - NEVER grant public access to dead-letter storage containers
 - id: CC-INT-ED-004
   severity: required
   description: Configure dead-letter queues for Service Bus and dead-letter storage for Event Grid
   rationale: Dead-letter captures messages/events that cannot be delivered or processed, enabling investigation and replay
-  applies_to: *id012
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # Service Bus queue with dead-letter enabled (dead-letter sub-queue is automatic)
@@ -3762,14 +4092,22 @@ rules:
           publicAccess: 'None'
         }
       }
-    prohibitions: *id013
+    prohibitions:
+    - NEVER disable deadLetteringOnMessageExpiration — expired messages are silently discarded
+    - NEVER set maxDeliveryCount below 3 — transient failures will prematurely dead-letter messages
+    - NEVER skip dead-letter configuration on Event Grid subscriptions — undeliverable events are lost permanently
+    - NEVER grant public access to dead-letter storage containers
 - id: CC-INT-ED-004
   severity: required
   description: Configure dead-letter queues for Service Bus and dead-letter storage for Event Grid
   rationale: Dead-letter captures messages/events that cannot be delivered or processed, enabling investigation and replay
-  applies_to: *id012
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # Service Bus queue with dead-letter enabled (dead-letter sub-queue is automatic)
@@ -3855,14 +4193,22 @@ rules:
           publicAccess: 'None'
         }
       }
-    prohibitions: *id013
+    prohibitions:
+    - NEVER disable deadLetteringOnMessageExpiration — expired messages are silently discarded
+    - NEVER set maxDeliveryCount below 3 — transient failures will prematurely dead-letter messages
+    - NEVER skip dead-letter configuration on Event Grid subscriptions — undeliverable events are lost permanently
+    - NEVER grant public access to dead-letter storage containers
 - id: CC-INT-ED-004
   severity: required
   description: Configure dead-letter queues for Service Bus and dead-letter storage for Event Grid
   rationale: Dead-letter captures messages/events that cannot be delivered or processed, enabling investigation and replay
-  applies_to: *id012
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.StreamAnalytics/streamingjobs
     terraform_pattern: |
       # Service Bus queue with dead-letter enabled (dead-letter sub-queue is automatic)
@@ -3948,17 +4294,21 @@ rules:
           publicAccess: 'None'
         }
       }
-    prohibitions: *id013
+    prohibitions:
+    - NEVER disable deadLetteringOnMessageExpiration — expired messages are silently discarded
+    - NEVER set maxDeliveryCount below 3 — transient failures will prematurely dead-letter messages
+    - NEVER skip dead-letter configuration on Event Grid subscriptions — undeliverable events are lost permanently
+    - NEVER grant public access to dead-letter storage containers
 - id: CC-INT-ED-005
   severity: required
   description: Implement poison message handling patterns for failed message processing
   rationale: Poison messages that repeatedly fail processing block other messages; explicit handling prevents queue stalls
-  applies_to: &id014
+  applies_to:
   - cloud-architect
   - app-developer
   - terraform-agent
   - bicep-agent
-  companion_resources: &id015
+  companion_resources:
   - type: Microsoft.Insights/metricAlerts@2018-03-01
     name: dlq-depth-alert
     description: Alert when dead-letter queue depth exceeds threshold — triggers investigation
@@ -3966,7 +4316,7 @@ rules:
     name: ops-action-group
     description: Action group for dead-letter alerts — email and webhook notifications
   targets:
-    services:
+  - services:
     - Microsoft.EventGrid/topics
     terraform_pattern: |
       # Poison message handling queue — messages moved here after maxDeliveryCount exceeded
@@ -4041,7 +4391,7 @@ rules:
           ]
         }
       }
-    prohibitions: &id016
+    prohibitions:
     - NEVER process events or messages without idempotency — at-least-once delivery means duplicates are expected
     - NEVER ignore dead-letter queues — they contain messages that need investigation and potential replay
     - NEVER set maxDeliveryCount to maximum (2147483647) — poison messages will retry indefinitely and block processing
@@ -4050,10 +4400,20 @@ rules:
   severity: required
   description: Implement poison message handling patterns for failed message processing
   rationale: Poison messages that repeatedly fail processing block other messages; explicit handling prevents queue stalls
-  applies_to: *id014
-  companion_resources: *id015
+  applies_to:
+  - cloud-architect
+  - app-developer
+  - terraform-agent
+  - bicep-agent
+  companion_resources:
+  - type: Microsoft.Insights/metricAlerts@2018-03-01
+    name: dlq-depth-alert
+    description: Alert when dead-letter queue depth exceeds threshold — triggers investigation
+  - type: Microsoft.Insights/actionGroups@2023-01-01
+    name: ops-action-group
+    description: Action group for dead-letter alerts — email and webhook notifications
   targets:
-    services:
+  - services:
     - Microsoft.ServiceBus/namespaces
     terraform_pattern: |
       # Poison message handling queue — messages moved here after maxDeliveryCount exceeded
@@ -4128,15 +4488,29 @@ rules:
           ]
         }
       }
-    prohibitions: *id016
+    prohibitions:
+    - NEVER process events or messages without idempotency — at-least-once delivery means duplicates are expected
+    - NEVER ignore dead-letter queues — they contain messages that need investigation and potential replay
+    - NEVER set maxDeliveryCount to maximum (2147483647) — poison messages will retry indefinitely and block processing
+    - NEVER process poison messages in the same pipeline as normal messages — use a separate handler
 - id: CC-INT-ED-005
   severity: required
   description: Implement poison message handling patterns for failed message processing
   rationale: Poison messages that repeatedly fail processing block other messages; explicit handling prevents queue stalls
-  applies_to: *id014
-  companion_resources: *id015
+  applies_to:
+  - cloud-architect
+  - app-developer
+  - terraform-agent
+  - bicep-agent
+  companion_resources:
+  - type: Microsoft.Insights/metricAlerts@2018-03-01
+    name: dlq-depth-alert
+    description: Alert when dead-letter queue depth exceeds threshold — triggers investigation
+  - type: Microsoft.Insights/actionGroups@2023-01-01
+    name: ops-action-group
+    description: Action group for dead-letter alerts — email and webhook notifications
   targets:
-    services:
+  - services:
     - Microsoft.EventHub/namespaces
     terraform_pattern: |
       # Poison message handling queue — messages moved here after maxDeliveryCount exceeded
@@ -4211,15 +4585,29 @@ rules:
           ]
         }
       }
-    prohibitions: *id016
+    prohibitions:
+    - NEVER process events or messages without idempotency — at-least-once delivery means duplicates are expected
+    - NEVER ignore dead-letter queues — they contain messages that need investigation and potential replay
+    - NEVER set maxDeliveryCount to maximum (2147483647) — poison messages will retry indefinitely and block processing
+    - NEVER process poison messages in the same pipeline as normal messages — use a separate handler
 - id: CC-INT-ED-005
   severity: required
   description: Implement poison message handling patterns for failed message processing
   rationale: Poison messages that repeatedly fail processing block other messages; explicit handling prevents queue stalls
-  applies_to: *id014
-  companion_resources: *id015
+  applies_to:
+  - cloud-architect
+  - app-developer
+  - terraform-agent
+  - bicep-agent
+  companion_resources:
+  - type: Microsoft.Insights/metricAlerts@2018-03-01
+    name: dlq-depth-alert
+    description: Alert when dead-letter queue depth exceeds threshold — triggers investigation
+  - type: Microsoft.Insights/actionGroups@2023-01-01
+    name: ops-action-group
+    description: Action group for dead-letter alerts — email and webhook notifications
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # Poison message handling queue — messages moved here after maxDeliveryCount exceeded
@@ -4294,15 +4682,29 @@ rules:
           ]
         }
       }
-    prohibitions: *id016
+    prohibitions:
+    - NEVER process events or messages without idempotency — at-least-once delivery means duplicates are expected
+    - NEVER ignore dead-letter queues — they contain messages that need investigation and potential replay
+    - NEVER set maxDeliveryCount to maximum (2147483647) — poison messages will retry indefinitely and block processing
+    - NEVER process poison messages in the same pipeline as normal messages — use a separate handler
 - id: CC-INT-ED-005
   severity: required
   description: Implement poison message handling patterns for failed message processing
   rationale: Poison messages that repeatedly fail processing block other messages; explicit handling prevents queue stalls
-  applies_to: *id014
-  companion_resources: *id015
+  applies_to:
+  - cloud-architect
+  - app-developer
+  - terraform-agent
+  - bicep-agent
+  companion_resources:
+  - type: Microsoft.Insights/metricAlerts@2018-03-01
+    name: dlq-depth-alert
+    description: Alert when dead-letter queue depth exceeds threshold — triggers investigation
+  - type: Microsoft.Insights/actionGroups@2023-01-01
+    name: ops-action-group
+    description: Action group for dead-letter alerts — email and webhook notifications
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # Poison message handling queue — messages moved here after maxDeliveryCount exceeded
@@ -4377,15 +4779,29 @@ rules:
           ]
         }
       }
-    prohibitions: *id016
+    prohibitions:
+    - NEVER process events or messages without idempotency — at-least-once delivery means duplicates are expected
+    - NEVER ignore dead-letter queues — they contain messages that need investigation and potential replay
+    - NEVER set maxDeliveryCount to maximum (2147483647) — poison messages will retry indefinitely and block processing
+    - NEVER process poison messages in the same pipeline as normal messages — use a separate handler
 - id: CC-INT-ED-005
   severity: required
   description: Implement poison message handling patterns for failed message processing
   rationale: Poison messages that repeatedly fail processing block other messages; explicit handling prevents queue stalls
-  applies_to: *id014
-  companion_resources: *id015
+  applies_to:
+  - cloud-architect
+  - app-developer
+  - terraform-agent
+  - bicep-agent
+  companion_resources:
+  - type: Microsoft.Insights/metricAlerts@2018-03-01
+    name: dlq-depth-alert
+    description: Alert when dead-letter queue depth exceeds threshold — triggers investigation
+  - type: Microsoft.Insights/actionGroups@2023-01-01
+    name: ops-action-group
+    description: Action group for dead-letter alerts — email and webhook notifications
   targets:
-    services:
+  - services:
     - Microsoft.StreamAnalytics/streamingjobs
     terraform_pattern: |
       # Poison message handling queue — messages moved here after maxDeliveryCount exceeded
@@ -4460,7 +4876,11 @@ rules:
           ]
         }
       }
-    prohibitions: *id016
+    prohibitions:
+    - NEVER process events or messages without idempotency — at-least-once delivery means duplicates are expected
+    - NEVER ignore dead-letter queues — they contain messages that need investigation and potential replay
+    - NEVER set maxDeliveryCount to maximum (2147483647) — poison messages will retry indefinitely and block processing
+    - NEVER process poison messages in the same pipeline as normal messages — use a separate handler
 patterns:
 - name: Event Grid to Function App with dead-letter
   description: System topic subscription delivering to Azure Function with managed identity and dead-letter storage

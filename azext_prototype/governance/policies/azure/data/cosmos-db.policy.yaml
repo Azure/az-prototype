@@ -169,7 +169,7 @@ rules:
     - local_auth_disabled
     error_message: 'Service ''{service_name}'' ({service_type}) missing {config_key}: true'
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       resource "azapi_resource" "cosmos_account" {
@@ -249,7 +249,7 @@ rules:
     error_message: Service '{service_name}' ({service_type}) uses 'strong' consistency — consider Session or Eventual unless
       Strong is justified
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
 - id: AZ-CDB-003
   severity: recommended
@@ -269,7 +269,7 @@ rules:
     error_message: Service '{service_name}' ({service_type}) missing autoscale configuration — consider autoscale throughput
       for variable workloads
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # For provisioned autoscale (non-serverless):
@@ -321,7 +321,7 @@ rules:
     - partition_key
     error_message: Service '{service_name}' ({service_type}) missing partition_key definition
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
 - id: AZ-CDB-005
   severity: recommended
@@ -333,7 +333,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # Set backupPolicy on the Cosmos DB account resource (CDB-001)
@@ -365,7 +365,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # In the locations block of CDB-001, set isZoneRedundant = true:
@@ -394,7 +394,7 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
 - id: AZ-CDB-008
   severity: recommended
@@ -406,7 +406,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
 - id: AZ-CDB-009
   severity: recommended
@@ -419,7 +419,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
 - id: AZ-CDB-010
   severity: required
@@ -478,7 +478,7 @@ rules:
         }
       }
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
 patterns:
 - name: Cosmos DB with Entra RBAC and private endpoint

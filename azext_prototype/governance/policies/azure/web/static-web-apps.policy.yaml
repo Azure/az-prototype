@@ -69,7 +69,7 @@ rules:
     name: linked-backend
     description: Linked backend API (e.g., Container Apps, Functions) for managed API routing
   targets:
-    services:
+  - services:
     - Microsoft.Web/staticSites
     terraform_pattern: |
       resource "azapi_resource" "static_web_app" {
@@ -126,7 +126,7 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Web/staticSites
 - id: AZ-SWA-003
   severity: recommended
@@ -137,7 +137,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Web/staticSites
 - id: AZ-SWA-004
   severity: recommended
@@ -148,7 +148,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Web/staticSites
 patterns:
 - name: Static Web App with linked backend and custom auth

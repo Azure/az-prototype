@@ -17,7 +17,7 @@ rules:
   - Microsoft.Insights/scheduledQueryRules (log alert rules that reference this action group)
   - Microsoft.Insights/activityLogAlerts (activity log alerts for subscription-level events)
   targets:
-    services:
+  - services:
     - Microsoft.Insights/actionGroups
     terraform_pattern: |
       resource "azapi_resource" "action_group" {
@@ -105,7 +105,7 @@ rules:
   - monitoring-agent
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.Insights/actionGroups
     terraform_pattern: |
       # Set useCommonAlertSchema = true on all receivers
@@ -127,7 +127,7 @@ rules:
   companion_resources:
   - Microsoft.Insights/actionGroups (action group for notifications)
   targets:
-    services:
+  - services:
     - Microsoft.Insights/actionGroups
     terraform_pattern: |
       resource "azapi_resource" "metric_alert" {
@@ -212,7 +212,7 @@ rules:
   companion_resources:
   - Microsoft.Insights/actionGroups (action group for notifications)
   targets:
-    services:
+  - services:
     - Microsoft.Insights/actionGroups
     terraform_pattern: |
       resource "azapi_resource" "activity_log_alert" {

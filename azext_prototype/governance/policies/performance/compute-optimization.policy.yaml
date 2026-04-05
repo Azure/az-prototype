@@ -9,13 +9,13 @@ rules:
     and noisy neighbor issues
   rationale: Containers without resource limits can consume all available CPU/memory, starving co-located containers and causing
     OOM kills
-  applies_to: &id001
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # === Container App with Resource Limits ===
@@ -164,7 +164,7 @@ rules:
           }
         }
       }
-    prohibitions: &id002
+    prohibitions:
     - NEVER deploy containers without explicit CPU and memory resource limits
     - NEVER set CPU > 2.0 or memory > 4Gi per container in Container Apps — use dedicated workload profiles for larger workloads
     - NEVER omit health probes (liveness, readiness, startup) — they are essential for reliable scaling and self-healing
@@ -176,9 +176,13 @@ rules:
     and noisy neighbor issues
   rationale: Containers without resource limits can consume all available CPU/memory, starving co-located containers and causing
     OOM kills
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
       # === Container App with Resource Limits ===
@@ -327,16 +331,25 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER deploy containers without explicit CPU and memory resource limits
+    - NEVER set CPU > 2.0 or memory > 4Gi per container in Container Apps — use dedicated workload profiles for larger workloads
+    - NEVER omit health probes (liveness, readiness, startup) — they are essential for reliable scaling and self-healing
+    - NEVER set liveness probe initialDelaySeconds < 5 — give the application time to start
+    - NEVER skip the startup probe for slow-starting applications — liveness probes will kill containers during startup
 - id: WAF-PERF-COMP-001
   severity: required
   description: Define explicit CPU and memory resource limits for Container Apps — prevent unbounded resource consumption
     and noisy neighbor issues
   rationale: Containers without resource limits can consume all available CPU/memory, starving co-located containers and causing
     OOM kills
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === Container App with Resource Limits ===
@@ -485,16 +498,25 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER deploy containers without explicit CPU and memory resource limits
+    - NEVER set CPU > 2.0 or memory > 4Gi per container in Container Apps — use dedicated workload profiles for larger workloads
+    - NEVER omit health probes (liveness, readiness, startup) — they are essential for reliable scaling and self-healing
+    - NEVER set liveness probe initialDelaySeconds < 5 — give the application time to start
+    - NEVER skip the startup probe for slow-starting applications — liveness probes will kill containers during startup
 - id: WAF-PERF-COMP-001
   severity: required
   description: Define explicit CPU and memory resource limits for Container Apps — prevent unbounded resource consumption
     and noisy neighbor issues
   rationale: Containers without resource limits can consume all available CPU/memory, starving co-located containers and causing
     OOM kills
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # === Container App with Resource Limits ===
@@ -643,18 +665,23 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER deploy containers without explicit CPU and memory resource limits
+    - NEVER set CPU > 2.0 or memory > 4Gi per container in Container Apps — use dedicated workload profiles for larger workloads
+    - NEVER omit health probes (liveness, readiness, startup) — they are essential for reliable scaling and self-healing
+    - NEVER set liveness probe initialDelaySeconds < 5 — give the application time to start
+    - NEVER skip the startup probe for slow-starting applications — liveness probes will kill containers during startup
 - id: WAF-PERF-COMP-002
   severity: recommended
   description: Configure App Service per-app scaling and deployment slots for density optimization and zero-downtime deployments
   rationale: Per-app scaling prevents a single app from consuming all plan capacity; slots enable blue-green deployments without
     downtime
-  applies_to: &id003
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # === App Service Plan with Per-App Scaling ===
@@ -740,7 +767,7 @@ rules:
           }
         }
       }
-    prohibitions: &id004
+    prohibitions:
     - NEVER deploy directly to the production slot — always deploy to staging and swap
     - NEVER use slots on Basic (B1) tier — slots require Standard (S1) or higher
     - NEVER omit slot-sticky settings for environment-specific configuration (connection strings, feature flags)
@@ -750,9 +777,12 @@ rules:
   description: Configure App Service per-app scaling and deployment slots for density optimization and zero-downtime deployments
   rationale: Per-app scaling prevents a single app from consuming all plan capacity; slots enable blue-green deployments without
     downtime
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
       # === App Service Plan with Per-App Scaling ===
@@ -838,15 +868,22 @@ rules:
           }
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER deploy directly to the production slot — always deploy to staging and swap
+    - NEVER use slots on Basic (B1) tier — slots require Standard (S1) or higher
+    - NEVER omit slot-sticky settings for environment-specific configuration (connection strings, feature flags)
+    - NEVER forget to warm up the staging slot before swapping — cold swaps cause latency spikes
 - id: WAF-PERF-COMP-002
   severity: recommended
   description: Configure App Service per-app scaling and deployment slots for density optimization and zero-downtime deployments
   rationale: Per-app scaling prevents a single app from consuming all plan capacity; slots enable blue-green deployments without
     downtime
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === App Service Plan with Per-App Scaling ===
@@ -932,15 +969,22 @@ rules:
           }
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER deploy directly to the production slot — always deploy to staging and swap
+    - NEVER use slots on Basic (B1) tier — slots require Standard (S1) or higher
+    - NEVER omit slot-sticky settings for environment-specific configuration (connection strings, feature flags)
+    - NEVER forget to warm up the staging slot before swapping — cold swaps cause latency spikes
 - id: WAF-PERF-COMP-002
   severity: recommended
   description: Configure App Service per-app scaling and deployment slots for density optimization and zero-downtime deployments
   rationale: Per-app scaling prevents a single app from consuming all plan capacity; slots enable blue-green deployments without
     downtime
-  applies_to: *id003
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # === App Service Plan with Per-App Scaling ===
@@ -1026,20 +1070,24 @@ rules:
           }
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER deploy directly to the production slot — always deploy to staging and swap
+    - NEVER use slots on Basic (B1) tier — slots require Standard (S1) or higher
+    - NEVER omit slot-sticky settings for environment-specific configuration (connection strings, feature flags)
+    - NEVER forget to warm up the staging slot before swapping — cold swaps cause latency spikes
 - id: WAF-PERF-COMP-003
   severity: required
   description: Define Kubernetes pod resource requests and limits for AKS workloads — prevent scheduling issues and resource
     contention
   rationale: Pods without requests cannot be scheduled efficiently; pods without limits can starve other workloads. Requests
     drive scheduling, limits prevent starvation
-  applies_to: &id005
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # === AKS Pod Resource Configuration ===
@@ -1144,7 +1192,7 @@ rules:
           ]
         }
       }
-    prohibitions: &id006
+    prohibitions:
     - NEVER deploy Kubernetes pods without resource requests — the scheduler cannot make optimal placement decisions
     - NEVER deploy pods without resource limits — a single pod can consume all node resources
     - NEVER set CPU limits equal to requests for bursty workloads — allow 1.5-2x headroom
@@ -1157,9 +1205,13 @@ rules:
     contention
   rationale: Pods without requests cannot be scheduled efficiently; pods without limits can starve other workloads. Requests
     drive scheduling, limits prevent starvation
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
       # === AKS Pod Resource Configuration ===
@@ -1264,16 +1316,26 @@ rules:
           ]
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER deploy Kubernetes pods without resource requests — the scheduler cannot make optimal placement decisions
+    - NEVER deploy pods without resource limits — a single pod can consume all node resources
+    - NEVER set CPU limits equal to requests for bursty workloads — allow 1.5-2x headroom
+    - NEVER set memory limits lower than requests — this is invalid and will be rejected
+    - NEVER omit health probes (liveness, readiness, startup) on AKS pods
+    - NEVER skip LimitRange on namespaces — it provides defaults for pods that omit resource specs
 - id: WAF-PERF-COMP-003
   severity: required
   description: Define Kubernetes pod resource requests and limits for AKS workloads — prevent scheduling issues and resource
     contention
   rationale: Pods without requests cannot be scheduled efficiently; pods without limits can starve other workloads. Requests
     drive scheduling, limits prevent starvation
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === AKS Pod Resource Configuration ===
@@ -1378,16 +1440,26 @@ rules:
           ]
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER deploy Kubernetes pods without resource requests — the scheduler cannot make optimal placement decisions
+    - NEVER deploy pods without resource limits — a single pod can consume all node resources
+    - NEVER set CPU limits equal to requests for bursty workloads — allow 1.5-2x headroom
+    - NEVER set memory limits lower than requests — this is invalid and will be rejected
+    - NEVER omit health probes (liveness, readiness, startup) on AKS pods
+    - NEVER skip LimitRange on namespaces — it provides defaults for pods that omit resource specs
 - id: WAF-PERF-COMP-003
   severity: required
   description: Define Kubernetes pod resource requests and limits for AKS workloads — prevent scheduling issues and resource
     contention
   rationale: Pods without requests cannot be scheduled efficiently; pods without limits can starve other workloads. Requests
     drive scheduling, limits prevent starvation
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # === AKS Pod Resource Configuration ===
@@ -1492,19 +1564,25 @@ rules:
           ]
         }
       }
-    prohibitions: *id006
+    prohibitions:
+    - NEVER deploy Kubernetes pods without resource requests — the scheduler cannot make optimal placement decisions
+    - NEVER deploy pods without resource limits — a single pod can consume all node resources
+    - NEVER set CPU limits equal to requests for bursty workloads — allow 1.5-2x headroom
+    - NEVER set memory limits lower than requests — this is invalid and will be rejected
+    - NEVER omit health probes (liveness, readiness, startup) on AKS pods
+    - NEVER skip LimitRange on namespaces — it provides defaults for pods that omit resource specs
 - id: WAF-PERF-COMP-004
   severity: required
   description: Configure Azure Functions timeout, concurrency, and batching settings in host.json
   rationale: Default Function settings are not optimized for production; incorrect timeout causes failures, incorrect concurrency
     causes throttling or resource exhaustion
-  applies_to: &id007
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # === Azure Functions host.json Configuration ===
@@ -1621,7 +1699,7 @@ rules:
       //     }
       //   }
       // }
-    prohibitions: &id008
+    prohibitions:
     - NEVER set functionTimeout > 10 minutes on Consumption plan — it will be rejected
     - NEVER set maxConcurrentRequests > 500 — this can exhaust downstream resources
     - NEVER set maxDequeueCount > 10 — poison messages should fail fast and move to dead-letter queue
@@ -1633,9 +1711,13 @@ rules:
   description: Configure Azure Functions timeout, concurrency, and batching settings in host.json
   rationale: Default Function settings are not optimized for production; incorrect timeout causes failures, incorrect concurrency
     causes throttling or resource exhaustion
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
       # === Azure Functions host.json Configuration ===
@@ -1752,15 +1834,25 @@ rules:
       //     }
       //   }
       // }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER set functionTimeout > 10 minutes on Consumption plan — it will be rejected
+    - NEVER set maxConcurrentRequests > 500 — this can exhaust downstream resources
+    - NEVER set maxDequeueCount > 10 — poison messages should fail fast and move to dead-letter queue
+    - NEVER disable dynamicThrottlesEnabled — it prevents resource exhaustion under load
+    - NEVER omit Application Insights sampling — unsampled telemetry can cost more than the function itself
+    - NEVER use in-process .NET model for new functions — use isolated worker model (.NET 8+)
 - id: WAF-PERF-COMP-004
   severity: required
   description: Configure Azure Functions timeout, concurrency, and batching settings in host.json
   rationale: Default Function settings are not optimized for production; incorrect timeout causes failures, incorrect concurrency
     causes throttling or resource exhaustion
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === Azure Functions host.json Configuration ===
@@ -1877,15 +1969,25 @@ rules:
       //     }
       //   }
       // }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER set functionTimeout > 10 minutes on Consumption plan — it will be rejected
+    - NEVER set maxConcurrentRequests > 500 — this can exhaust downstream resources
+    - NEVER set maxDequeueCount > 10 — poison messages should fail fast and move to dead-letter queue
+    - NEVER disable dynamicThrottlesEnabled — it prevents resource exhaustion under load
+    - NEVER omit Application Insights sampling — unsampled telemetry can cost more than the function itself
+    - NEVER use in-process .NET model for new functions — use isolated worker model (.NET 8+)
 - id: WAF-PERF-COMP-004
   severity: required
   description: Configure Azure Functions timeout, concurrency, and batching settings in host.json
   rationale: Default Function settings are not optimized for production; incorrect timeout causes failures, incorrect concurrency
     causes throttling or resource exhaustion
-  applies_to: *id007
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # === Azure Functions host.json Configuration ===
@@ -2002,19 +2104,25 @@ rules:
       //     }
       //   }
       // }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER set functionTimeout > 10 minutes on Consumption plan — it will be rejected
+    - NEVER set maxConcurrentRequests > 500 — this can exhaust downstream resources
+    - NEVER set maxDequeueCount > 10 — poison messages should fail fast and move to dead-letter queue
+    - NEVER disable dynamicThrottlesEnabled — it prevents resource exhaustion under load
+    - NEVER omit Application Insights sampling — unsampled telemetry can cost more than the function itself
+    - NEVER use in-process .NET model for new functions — use isolated worker model (.NET 8+)
 - id: WAF-PERF-COMP-005
   severity: required
   description: Offload long-running operations to asynchronous processing with queues and background workers
   rationale: Synchronous processing of operations > 5 seconds blocks threads, degrades UX, and causes timeout failures. Async
     processing decouples producers from consumers
-  applies_to: &id009
+  applies_to:
   - cloud-architect
   - app-developer
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # === Service Bus Queue for Async Processing ===
@@ -2106,7 +2214,7 @@ rules:
 
       // Pattern: API returns 202 Accepted + enqueues to Service Bus
       // Worker processes asynchronously and updates status
-    prohibitions: &id010
+    prohibitions:
     - NEVER process operations > 5 seconds synchronously in HTTP request handlers
     - NEVER use HTTP polling without a status endpoint — always provide a status URL in the 202 response
     - NEVER use Storage Queues for mission-critical workloads — use Service Bus for guaranteed delivery, dead-lettering, and
@@ -2119,9 +2227,13 @@ rules:
   description: Offload long-running operations to asynchronous processing with queues and background workers
   rationale: Synchronous processing of operations > 5 seconds blocks threads, degrades UX, and causes timeout failures. Async
     processing decouples producers from consumers
-  applies_to: *id009
+  applies_to:
+  - cloud-architect
+  - app-developer
+  - terraform-agent
+  - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
       # === Service Bus Queue for Async Processing ===
@@ -2213,15 +2325,26 @@ rules:
 
       // Pattern: API returns 202 Accepted + enqueues to Service Bus
       // Worker processes asynchronously and updates status
-    prohibitions: *id010
+    prohibitions:
+    - NEVER process operations > 5 seconds synchronously in HTTP request handlers
+    - NEVER use HTTP polling without a status endpoint — always provide a status URL in the 202 response
+    - NEVER use Storage Queues for mission-critical workloads — use Service Bus for guaranteed delivery, dead-lettering, and
+      ordering
+    - NEVER set lockDuration < 1 minute for processing queues — short locks cause duplicate processing
+    - NEVER skip dead-letter queue monitoring — failed messages accumulate silently
+    - NEVER disable duplicate detection for idempotency-sensitive workloads
 - id: WAF-PERF-COMP-005
   severity: required
   description: Offload long-running operations to asynchronous processing with queues and background workers
   rationale: Synchronous processing of operations > 5 seconds blocks threads, degrades UX, and causes timeout failures. Async
     processing decouples producers from consumers
-  applies_to: *id009
+  applies_to:
+  - cloud-architect
+  - app-developer
+  - terraform-agent
+  - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === Service Bus Queue for Async Processing ===
@@ -2313,15 +2436,26 @@ rules:
 
       // Pattern: API returns 202 Accepted + enqueues to Service Bus
       // Worker processes asynchronously and updates status
-    prohibitions: *id010
+    prohibitions:
+    - NEVER process operations > 5 seconds synchronously in HTTP request handlers
+    - NEVER use HTTP polling without a status endpoint — always provide a status URL in the 202 response
+    - NEVER use Storage Queues for mission-critical workloads — use Service Bus for guaranteed delivery, dead-lettering, and
+      ordering
+    - NEVER set lockDuration < 1 minute for processing queues — short locks cause duplicate processing
+    - NEVER skip dead-letter queue monitoring — failed messages accumulate silently
+    - NEVER disable duplicate detection for idempotency-sensitive workloads
 - id: WAF-PERF-COMP-005
   severity: required
   description: Offload long-running operations to asynchronous processing with queues and background workers
   rationale: Synchronous processing of operations > 5 seconds blocks threads, degrades UX, and causes timeout failures. Async
     processing decouples producers from consumers
-  applies_to: *id009
+  applies_to:
+  - cloud-architect
+  - app-developer
+  - terraform-agent
+  - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Compute/virtualMachines
     terraform_pattern: |
       # === Service Bus Queue for Async Processing ===
@@ -2413,7 +2547,14 @@ rules:
 
       // Pattern: API returns 202 Accepted + enqueues to Service Bus
       // Worker processes asynchronously and updates status
-    prohibitions: *id010
+    prohibitions:
+    - NEVER process operations > 5 seconds synchronously in HTTP request handlers
+    - NEVER use HTTP polling without a status endpoint — always provide a status URL in the 202 response
+    - NEVER use Storage Queues for mission-critical workloads — use Service Bus for guaranteed delivery, dead-lettering, and
+      ordering
+    - NEVER set lockDuration < 1 minute for processing queues — short locks cause duplicate processing
+    - NEVER skip dead-letter queue monitoring — failed messages accumulate silently
+    - NEVER disable duplicate detection for idempotency-sensitive workloads
 patterns:
 - name: Right-sized container resources
   description: 'Define CPU/memory based on workload type: API (0.5 CPU/1Gi), worker (0.25 CPU/0.5Gi), data processing (1.0

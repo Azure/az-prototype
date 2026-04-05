@@ -12,7 +12,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       resource "azapi_resource" "app_service_plan" {
@@ -232,7 +232,7 @@ rules:
     - identity
     error_message: 'Service ''{service_name}'' ({service_type}) missing {config_key}: true'
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       resource "azapi_resource" "app_service" {
@@ -309,7 +309,7 @@ rules:
     - virtual-network
     error_message: Template with app-service must include a virtual-network service for VNet integration
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
 - id: AZ-AS-004
   severity: recommended
@@ -320,7 +320,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
 - id: AZ-AS-005
   severity: recommended
@@ -330,7 +330,7 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
 - id: AZ-AS-006
   severity: recommended
@@ -343,7 +343,7 @@ rules:
   - bicep-agent
   - monitoring-agent
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # Add to the siteConfig properties in AS-002:
@@ -361,7 +361,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # Add to the properties block in AS-002:
@@ -379,7 +379,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # Add to the App Service Plan properties in AS-001:
@@ -404,7 +404,7 @@ rules:
   - bicep-agent
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # Add to the siteConfig properties in AS-002:
@@ -465,7 +465,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
 patterns:
 - name: App Service with managed identity and VNet

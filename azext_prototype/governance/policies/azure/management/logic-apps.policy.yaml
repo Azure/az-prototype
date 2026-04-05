@@ -64,7 +64,7 @@ rules:
     name: Logic App Contributor
     description: RBAC role assignments for Logic App management
   targets:
-    services:
+  - services:
     - Microsoft.Logic/workflows
     terraform_pattern: |
       resource "azapi_resource" "logic_app" {
@@ -163,7 +163,7 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Logic/workflows
 - id: AZ-LA-003
   severity: recommended
@@ -175,7 +175,7 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.Logic/workflows
 - id: AZ-LA-004
   severity: recommended
@@ -187,7 +187,7 @@ rules:
   - cloud-architect
   - monitoring-agent
   targets:
-    services:
+  - services:
     - Microsoft.Logic/workflows
 patterns:
 - name: Logic App with managed identity and access control

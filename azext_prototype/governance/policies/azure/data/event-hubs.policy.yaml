@@ -17,7 +17,7 @@ rules:
   - Microsoft.Authorization/roleAssignments (Azure Event Hubs Data Sender/Receiver roles)
   - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
   targets:
-    services:
+  - services:
     - Microsoft.EventHub/namespaces
     terraform_pattern: |
       resource "azapi_resource" "eventhub_namespace" {
@@ -83,7 +83,7 @@ rules:
   companion_resources:
   - Microsoft.EventHub/namespaces/eventhubs/consumergroups (consumer groups for each application)
   targets:
-    services:
+  - services:
     - Microsoft.EventHub/namespaces
     terraform_pattern: |
       resource "azapi_resource" "eventhub" {
@@ -122,7 +122,7 @@ rules:
   - app-developer
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.EventHub/namespaces
     terraform_pattern: |
       resource "azapi_resource" "consumer_group" {
@@ -156,7 +156,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.EventHub/namespaces
     terraform_pattern: |
       resource "azapi_resource" "eventhub_with_capture" {
@@ -217,7 +217,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.EventHub/namespaces
 - id: AZ-EH-006
   severity: recommended
@@ -228,7 +228,7 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.EventHub/namespaces
 - id: AZ-EH-007
   severity: recommended
@@ -242,7 +242,7 @@ rules:
   companion_resources:
   - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
   targets:
-    services:
+  - services:
     - Microsoft.EventHub/namespaces
     terraform_pattern: |
       resource "azapi_resource" "eh_diagnostics" {

@@ -16,7 +16,7 @@ rules:
     name: diag-waf
     description: Diagnostic settings for WAF logs to monitor blocked requests and rule matches
   targets:
-    services:
+  - services:
     - Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies
     terraform_pattern: |
       resource "azapi_resource" "waf_policy" {
@@ -102,7 +102,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies
 - id: AZ-WAF-003
   severity: recommended
@@ -114,7 +114,7 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies
     terraform_pattern: |
       # Add to customRules array in WAF policy
@@ -174,7 +174,7 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies
 patterns:
 - name: WAF policy with OWASP 3.2 and bot protection

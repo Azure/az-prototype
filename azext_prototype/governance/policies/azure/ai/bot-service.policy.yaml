@@ -81,7 +81,7 @@ rules:
     name: diag-bot
     description: Diagnostic settings to route bot activity logs to Log Analytics
   targets:
-    services:
+  - services:
     - Microsoft.BotService/botServices
     terraform_pattern: |
       resource "azapi_resource" "bot" {
@@ -146,7 +146,7 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.BotService/botServices
 - id: AZ-BOT-003
   severity: recommended
@@ -158,7 +158,7 @@ rules:
   - cloud-architect
   - monitoring-agent
   targets:
-    services:
+  - services:
     - Microsoft.BotService/botServices
 patterns:
 - name: Bot Service with managed identity and secure Direct Line

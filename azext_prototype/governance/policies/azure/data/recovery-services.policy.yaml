@@ -18,7 +18,7 @@ rules:
   - Microsoft.Network/privateDnsZones (privatelink.region.backup.windowsazure.com)
   - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
   targets:
-    services:
+  - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
       resource "azapi_resource" "recovery_vault" {
@@ -87,7 +87,7 @@ rules:
   - cloud-architect
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
       resource "azapi_resource" "vault_storage_config" {
@@ -124,7 +124,7 @@ rules:
   companion_resources:
   - Microsoft.RecoveryServices/vaults (parent recovery vault)
   targets:
-    services:
+  - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
       resource "azapi_resource" "vm_backup_policy" {
@@ -251,7 +251,7 @@ rules:
   - Microsoft.Network/privateDnsZones (privatelink.blob.core.windows.net for backup data)
   - Microsoft.Network/privateDnsZones (privatelink.queue.core.windows.net for backup communication)
   targets:
-    services:
+  - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
       resource "azapi_resource" "rsv_pe" {
@@ -309,7 +309,7 @@ rules:
   companion_resources:
   - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
   targets:
-    services:
+  - services:
     - Microsoft.RecoveryServices/vaults
     terraform_pattern: |
       resource "azapi_resource" "rsv_diagnostics" {

@@ -124,7 +124,7 @@ rules:
         }
       }
   targets:
-    services:
+  - services:
     - Microsoft.Network/ddosProtectionPlans
     terraform_pattern: |
       resource "azapi_resource" "ddos_plan" {
@@ -157,7 +157,7 @@ rules:
   - cloud-architect
   - monitoring-agent
   targets:
-    services:
+  - services:
     - Microsoft.Network/ddosProtectionPlans
 - id: AZ-DDOS-003
   severity: recommended
@@ -169,7 +169,7 @@ rules:
   - cloud-architect
   - monitoring-agent
   targets:
-    services:
+  - services:
     - Microsoft.Network/ddosProtectionPlans
 patterns:
 - name: DDoS Protection with VNet association and alerts

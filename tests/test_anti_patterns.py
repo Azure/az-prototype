@@ -118,10 +118,12 @@ class TestAntiPatternLoader:
             "  - id: ANTI-TEST-001\n"
             "    description: Test detection\n"
             '    warning_message: "Test warning"\n'
+            "    applies_to: []\n"
             "    targets:\n"
-            "      search_patterns:\n"
-            '        - "test_pattern"\n'
-            "      safe_patterns: []\n"
+            "      - services: []\n"
+            "        search_patterns:\n"
+            '          - "test_pattern"\n'
+            "        safe_patterns: []\n"
         )
         (tmp_path / "test.yaml").write_text(yaml_content)
         reset_cache()
@@ -141,8 +143,9 @@ class TestAntiPatternLoader:
             "  - description: Test detection\n"
             '    warning_message: "Test warning"\n'
             "    targets:\n"
-            "      search_patterns:\n"
-            '        - "test_pattern"\n'
+            "      - services: []\n"
+            "        search_patterns:\n"
+            '          - "test_pattern"\n'
         )
         (tmp_path / "test.yaml").write_text(yaml_content)
         reset_cache()

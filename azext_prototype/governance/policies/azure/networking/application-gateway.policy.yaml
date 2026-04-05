@@ -18,7 +18,7 @@ rules:
   - Microsoft.Insights/diagnosticSettings (access logs and WAF logs to Log Analytics)
   - Microsoft.ManagedIdentity/userAssignedIdentities (for Key Vault SSL certificate access)
   targets:
-    services:
+  - services:
     - Microsoft.Network/applicationGateways
     terraform_pattern: |
       resource "azapi_resource" "app_gateway" {
@@ -138,7 +138,7 @@ rules:
   companion_resources:
   - Microsoft.Network/applicationGateways (associate WAF policy with AGW)
   targets:
-    services:
+  - services:
     - Microsoft.Network/applicationGateways
     terraform_pattern: |
       resource "azapi_resource" "waf_policy" {
@@ -204,7 +204,7 @@ rules:
   companion_resources:
   - Microsoft.KeyVault/vaults (store SSL certificates)
   targets:
-    services:
+  - services:
     - Microsoft.Network/applicationGateways
     terraform_pattern: |
       # Configure sslPolicy in the Application Gateway resource
@@ -230,7 +230,7 @@ rules:
   companion_resources:
   - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
   targets:
-    services:
+  - services:
     - Microsoft.Network/applicationGateways
     terraform_pattern: |
       resource "azapi_resource" "agw_diagnostics" {
@@ -303,7 +303,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Network/applicationGateways
     terraform_pattern: |
       # In AGW-001, the autoscaleConfiguration is already present.
@@ -332,7 +332,7 @@ rules:
   - bicep-agent
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.Network/applicationGateways
     terraform_pattern: |
       # Add identity and sslCertificates referencing Key Vault to AGW:
@@ -374,7 +374,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Network/applicationGateways
     terraform_pattern: |
       # Add to backendHttpSettingsCollection in AGW:
@@ -398,7 +398,7 @@ rules:
   - cloud-architect
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.Network/applicationGateways
     terraform_pattern: |
       # Add to Application Gateway properties

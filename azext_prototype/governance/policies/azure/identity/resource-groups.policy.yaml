@@ -13,7 +13,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - TODO:resource-group
     terraform_pattern: |
       resource "azapi_resource" "resource_group" {
@@ -56,7 +56,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - TODO:resource-group
     prohibitions:
     - NEVER omit the project tag — it identifies which POC this resource group belongs to
@@ -70,7 +70,7 @@ rules:
   applies_to:
   - bicep-agent
   targets:
-    services:
+  - services:
     - TODO:resource-group
     prohibitions:
     - NEVER omit targetScope = 'subscription' in the Bicep file that creates resource groups
@@ -83,7 +83,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - TODO:resource-group
 - id: AZ-RG-005
   severity: recommended
@@ -93,7 +93,7 @@ rules:
   applies_to:
   - cloud-architect
   targets:
-    services:
+  - services:
     - TODO:resource-group
 patterns:
 - name: Resource Group with tags

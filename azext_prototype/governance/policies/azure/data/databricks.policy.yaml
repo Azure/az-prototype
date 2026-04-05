@@ -18,7 +18,7 @@ rules:
   - Microsoft.Network/privateDnsZones (privatelink.azuredatabricks.net)
   - Microsoft.Insights/diagnosticSettings (route diagnostic logs to Log Analytics)
   targets:
-    services:
+  - services:
     - Microsoft.Databricks/workspaces
     terraform_pattern: |
       resource "azapi_resource" "databricks_workspace" {
@@ -100,7 +100,7 @@ rules:
   companion_resources:
   - Microsoft.Network/networkSecurityGroups (NSG with required Databricks rules)
   targets:
-    services:
+  - services:
     - Microsoft.Databricks/workspaces
     terraform_pattern: |
       resource "azapi_resource" "dbr_public_subnet" {
@@ -199,7 +199,7 @@ rules:
   - Microsoft.Network/privateDnsZones (privatelink.azuredatabricks.net)
   - Microsoft.Network/privateEndpoints/privateDnsZoneGroups (DNS registration)
   targets:
-    services:
+  - services:
     - Microsoft.Databricks/workspaces
     terraform_pattern: |
       resource "azapi_resource" "dbr_pe_ui_api" {
@@ -299,7 +299,7 @@ rules:
   companion_resources:
   - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
   targets:
-    services:
+  - services:
     - Microsoft.Databricks/workspaces
     terraform_pattern: |
       resource "azapi_resource" "dbr_diagnostics" {

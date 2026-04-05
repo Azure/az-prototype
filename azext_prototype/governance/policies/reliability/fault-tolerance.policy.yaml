@@ -12,13 +12,13 @@ rules:
   rationale: Without circuit breakers, a single failing dependency causes all callers to block on timeout, exhausting connection
     pools and thread pools, which cascades failure to the entire system.  Circuit breakers fail fast, preserve resources,
     and allow recovery.
-  applies_to: &id001
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # === Dapr Resiliency Policy for Container Apps ===
@@ -140,7 +140,7 @@ rules:
           }
         }
       }
-    prohibitions: &id002
+    prohibitions:
     - NEVER call external services without a circuit breaker — cascading failures will take down the entire system
     - NEVER set circuit breaker trip threshold to 1 — single transient failures will open the circuit prematurely
     - NEVER set circuit breaker timeout (open duration) longer than 5 minutes — stuck-open circuits cause prolonged outages
@@ -154,9 +154,13 @@ rules:
   rationale: Without circuit breakers, a single failing dependency causes all callers to block on timeout, exhausting connection
     pools and thread pools, which cascades failure to the entire system.  Circuit breakers fail fast, preserve resources,
     and allow recovery.
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === Dapr Resiliency Policy for Container Apps ===
@@ -278,7 +282,11 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER call external services without a circuit breaker — cascading failures will take down the entire system
+    - NEVER set circuit breaker trip threshold to 1 — single transient failures will open the circuit prematurely
+    - NEVER set circuit breaker timeout (open duration) longer than 5 minutes — stuck-open circuits cause prolonged outages
+    - NEVER use circuit breakers without also configuring retry with backoff — they complement each other
 - id: WAF-REL-FT-001
   severity: required
   description: 'Implement the circuit breaker pattern for ALL external service calls. Circuit breakers prevent cascading failures
@@ -288,9 +296,13 @@ rules:
   rationale: Without circuit breakers, a single failing dependency causes all callers to block on timeout, exhausting connection
     pools and thread pools, which cascades failure to the entire system.  Circuit breakers fail fast, preserve resources,
     and allow recovery.
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
       # === Dapr Resiliency Policy for Container Apps ===
@@ -412,7 +424,11 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER call external services without a circuit breaker — cascading failures will take down the entire system
+    - NEVER set circuit breaker trip threshold to 1 — single transient failures will open the circuit prematurely
+    - NEVER set circuit breaker timeout (open duration) longer than 5 minutes — stuck-open circuits cause prolonged outages
+    - NEVER use circuit breakers without also configuring retry with backoff — they complement each other
 - id: WAF-REL-FT-001
   severity: required
   description: 'Implement the circuit breaker pattern for ALL external service calls. Circuit breakers prevent cascading failures
@@ -422,9 +438,13 @@ rules:
   rationale: Without circuit breakers, a single failing dependency causes all callers to block on timeout, exhausting connection
     pools and thread pools, which cascades failure to the entire system.  Circuit breakers fail fast, preserve resources,
     and allow recovery.
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |
       # === Dapr Resiliency Policy for Container Apps ===
@@ -546,7 +566,11 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER call external services without a circuit breaker — cascading failures will take down the entire system
+    - NEVER set circuit breaker trip threshold to 1 — single transient failures will open the circuit prematurely
+    - NEVER set circuit breaker timeout (open duration) longer than 5 minutes — stuck-open circuits cause prolonged outages
+    - NEVER use circuit breakers without also configuring retry with backoff — they complement each other
 - id: WAF-REL-FT-001
   severity: required
   description: 'Implement the circuit breaker pattern for ALL external service calls. Circuit breakers prevent cascading failures
@@ -556,9 +580,13 @@ rules:
   rationale: Without circuit breakers, a single failing dependency causes all callers to block on timeout, exhausting connection
     pools and thread pools, which cascades failure to the entire system.  Circuit breakers fail fast, preserve resources,
     and allow recovery.
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ServiceBus/namespaces
     terraform_pattern: |
       # === Dapr Resiliency Policy for Container Apps ===
@@ -680,7 +708,11 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER call external services without a circuit breaker — cascading failures will take down the entire system
+    - NEVER set circuit breaker trip threshold to 1 — single transient failures will open the circuit prematurely
+    - NEVER set circuit breaker timeout (open duration) longer than 5 minutes — stuck-open circuits cause prolonged outages
+    - NEVER use circuit breakers without also configuring retry with backoff — they complement each other
 - id: WAF-REL-FT-001
   severity: required
   description: 'Implement the circuit breaker pattern for ALL external service calls. Circuit breakers prevent cascading failures
@@ -690,9 +722,13 @@ rules:
   rationale: Without circuit breakers, a single failing dependency causes all callers to block on timeout, exhausting connection
     pools and thread pools, which cascades failure to the entire system.  Circuit breakers fail fast, preserve resources,
     and allow recovery.
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.EventHub/namespaces
     terraform_pattern: |
       # === Dapr Resiliency Policy for Container Apps ===
@@ -814,7 +850,11 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER call external services without a circuit breaker — cascading failures will take down the entire system
+    - NEVER set circuit breaker trip threshold to 1 — single transient failures will open the circuit prematurely
+    - NEVER set circuit breaker timeout (open duration) longer than 5 minutes — stuck-open circuits cause prolonged outages
+    - NEVER use circuit breakers without also configuring retry with backoff — they complement each other
 - id: WAF-REL-FT-001
   severity: required
   description: 'Implement the circuit breaker pattern for ALL external service calls. Circuit breakers prevent cascading failures
@@ -824,9 +864,13 @@ rules:
   rationale: Without circuit breakers, a single failing dependency causes all callers to block on timeout, exhausting connection
     pools and thread pools, which cascades failure to the entire system.  Circuit breakers fail fast, preserve resources,
     and allow recovery.
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # === Dapr Resiliency Policy for Container Apps ===
@@ -948,7 +992,11 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER call external services without a circuit breaker — cascading failures will take down the entire system
+    - NEVER set circuit breaker trip threshold to 1 — single transient failures will open the circuit prematurely
+    - NEVER set circuit breaker timeout (open duration) longer than 5 minutes — stuck-open circuits cause prolonged outages
+    - NEVER use circuit breakers without also configuring retry with backoff — they complement each other
 - id: WAF-REL-FT-001
   severity: required
   description: 'Implement the circuit breaker pattern for ALL external service calls. Circuit breakers prevent cascading failures
@@ -958,9 +1006,13 @@ rules:
   rationale: Without circuit breakers, a single failing dependency causes all callers to block on timeout, exhausting connection
     pools and thread pools, which cascades failure to the entire system.  Circuit breakers fail fast, preserve resources,
     and allow recovery.
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # === Dapr Resiliency Policy for Container Apps ===
@@ -1082,7 +1134,11 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER call external services without a circuit breaker — cascading failures will take down the entire system
+    - NEVER set circuit breaker trip threshold to 1 — single transient failures will open the circuit prematurely
+    - NEVER set circuit breaker timeout (open duration) longer than 5 minutes — stuck-open circuits cause prolonged outages
+    - NEVER use circuit breakers without also configuring retry with backoff — they complement each other
 - id: WAF-REL-FT-001
   severity: required
   description: 'Implement the circuit breaker pattern for ALL external service calls. Circuit breakers prevent cascading failures
@@ -1092,9 +1148,13 @@ rules:
   rationale: Without circuit breakers, a single failing dependency causes all callers to block on timeout, exhausting connection
     pools and thread pools, which cascades failure to the entire system.  Circuit breakers fail fast, preserve resources,
     and allow recovery.
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       # === Dapr Resiliency Policy for Container Apps ===
@@ -1216,7 +1276,11 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER call external services without a circuit breaker — cascading failures will take down the entire system
+    - NEVER set circuit breaker trip threshold to 1 — single transient failures will open the circuit prematurely
+    - NEVER set circuit breaker timeout (open duration) longer than 5 minutes — stuck-open circuits cause prolonged outages
+    - NEVER use circuit breakers without also configuring retry with backoff — they complement each other
 - id: WAF-REL-FT-001
   severity: required
   description: 'Implement the circuit breaker pattern for ALL external service calls. Circuit breakers prevent cascading failures
@@ -1226,9 +1290,13 @@ rules:
   rationale: Without circuit breakers, a single failing dependency causes all callers to block on timeout, exhausting connection
     pools and thread pools, which cascades failure to the entire system.  Circuit breakers fail fast, preserve resources,
     and allow recovery.
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Network/loadBalancers
     terraform_pattern: |
       # === Dapr Resiliency Policy for Container Apps ===
@@ -1350,7 +1418,11 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER call external services without a circuit breaker — cascading failures will take down the entire system
+    - NEVER set circuit breaker trip threshold to 1 — single transient failures will open the circuit prematurely
+    - NEVER set circuit breaker timeout (open duration) longer than 5 minutes — stuck-open circuits cause prolonged outages
+    - NEVER use circuit breakers without also configuring retry with backoff — they complement each other
 - id: WAF-REL-FT-001
   severity: required
   description: 'Implement the circuit breaker pattern for ALL external service calls. Circuit breakers prevent cascading failures
@@ -1360,9 +1432,13 @@ rules:
   rationale: Without circuit breakers, a single failing dependency causes all callers to block on timeout, exhausting connection
     pools and thread pools, which cascades failure to the entire system.  Circuit breakers fail fast, preserve resources,
     and allow recovery.
-  applies_to: *id001
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Network/applicationGateways
     terraform_pattern: |
       # === Dapr Resiliency Policy for Container Apps ===
@@ -1484,7 +1560,11 @@ rules:
           }
         }
       }
-    prohibitions: *id002
+    prohibitions:
+    - NEVER call external services without a circuit breaker — cascading failures will take down the entire system
+    - NEVER set circuit breaker trip threshold to 1 — single transient failures will open the circuit prematurely
+    - NEVER set circuit breaker timeout (open duration) longer than 5 minutes — stuck-open circuits cause prolonged outages
+    - NEVER use circuit breakers without also configuring retry with backoff — they complement each other
 - id: WAF-REL-FT-002
   severity: required
   description: Configure retry policies with exponential backoff and jitter for ALL external service calls.  Azure SDK clients
@@ -1494,11 +1574,11 @@ rules:
   rationale: Transient failures (network glitches, throttling, brief service restarts) are inevitable in distributed systems.  Without
     retry, every transient failure becomes a user-visible error.  Without backoff, rapid retries overwhelm the recovering
     service.  Without jitter, synchronized retries from multiple clients create load spikes.
-  applies_to: &id003
+  applies_to:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # === Retry policies are APPLICATION-LEVEL configuration ===
@@ -1583,7 +1663,7 @@ rules:
       //        first-fast-retry="false">
       //     <forward-request buffer-request-body="true" />
       // </retry>
-    prohibitions: &id004
+    prohibitions:
     - NEVER make external calls without retry logic — transient failures are guaranteed in distributed systems
     - NEVER use fixed-interval retry — use exponential backoff to avoid overwhelming recovering services
     - NEVER retry without jitter — synchronized retries from multiple clients create thundering herd effects
@@ -1599,9 +1679,11 @@ rules:
   rationale: Transient failures (network glitches, throttling, brief service restarts) are inevitable in distributed systems.  Without
     retry, every transient failure becomes a user-visible error.  Without backoff, rapid retries overwhelm the recovering
     service.  Without jitter, synchronized retries from multiple clients create load spikes.
-  applies_to: *id003
+  applies_to:
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === Retry policies are APPLICATION-LEVEL configuration ===
@@ -1686,7 +1768,13 @@ rules:
       //        first-fast-retry="false">
       //     <forward-request buffer-request-body="true" />
       // </retry>
-    prohibitions: *id004
+    prohibitions:
+    - NEVER make external calls without retry logic — transient failures are guaranteed in distributed systems
+    - NEVER use fixed-interval retry — use exponential backoff to avoid overwhelming recovering services
+    - NEVER retry without jitter — synchronized retries from multiple clients create thundering herd effects
+    - NEVER retry indefinitely — cap retries at 3-5 attempts to prevent resource exhaustion
+    - NEVER retry non-idempotent operations (POST creating resources) without idempotency keys
+    - NEVER retry on 4xx client errors (except 429 Too Many Requests) — they will never succeed
 - id: WAF-REL-FT-002
   severity: required
   description: Configure retry policies with exponential backoff and jitter for ALL external service calls.  Azure SDK clients
@@ -1696,9 +1784,11 @@ rules:
   rationale: Transient failures (network glitches, throttling, brief service restarts) are inevitable in distributed systems.  Without
     retry, every transient failure becomes a user-visible error.  Without backoff, rapid retries overwhelm the recovering
     service.  Without jitter, synchronized retries from multiple clients create load spikes.
-  applies_to: *id003
+  applies_to:
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
       # === Retry policies are APPLICATION-LEVEL configuration ===
@@ -1783,7 +1873,13 @@ rules:
       //        first-fast-retry="false">
       //     <forward-request buffer-request-body="true" />
       // </retry>
-    prohibitions: *id004
+    prohibitions:
+    - NEVER make external calls without retry logic — transient failures are guaranteed in distributed systems
+    - NEVER use fixed-interval retry — use exponential backoff to avoid overwhelming recovering services
+    - NEVER retry without jitter — synchronized retries from multiple clients create thundering herd effects
+    - NEVER retry indefinitely — cap retries at 3-5 attempts to prevent resource exhaustion
+    - NEVER retry non-idempotent operations (POST creating resources) without idempotency keys
+    - NEVER retry on 4xx client errors (except 429 Too Many Requests) — they will never succeed
 - id: WAF-REL-FT-002
   severity: required
   description: Configure retry policies with exponential backoff and jitter for ALL external service calls.  Azure SDK clients
@@ -1793,9 +1889,11 @@ rules:
   rationale: Transient failures (network glitches, throttling, brief service restarts) are inevitable in distributed systems.  Without
     retry, every transient failure becomes a user-visible error.  Without backoff, rapid retries overwhelm the recovering
     service.  Without jitter, synchronized retries from multiple clients create load spikes.
-  applies_to: *id003
+  applies_to:
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |
       # === Retry policies are APPLICATION-LEVEL configuration ===
@@ -1880,7 +1978,13 @@ rules:
       //        first-fast-retry="false">
       //     <forward-request buffer-request-body="true" />
       // </retry>
-    prohibitions: *id004
+    prohibitions:
+    - NEVER make external calls without retry logic — transient failures are guaranteed in distributed systems
+    - NEVER use fixed-interval retry — use exponential backoff to avoid overwhelming recovering services
+    - NEVER retry without jitter — synchronized retries from multiple clients create thundering herd effects
+    - NEVER retry indefinitely — cap retries at 3-5 attempts to prevent resource exhaustion
+    - NEVER retry non-idempotent operations (POST creating resources) without idempotency keys
+    - NEVER retry on 4xx client errors (except 429 Too Many Requests) — they will never succeed
 - id: WAF-REL-FT-002
   severity: required
   description: Configure retry policies with exponential backoff and jitter for ALL external service calls.  Azure SDK clients
@@ -1890,9 +1994,11 @@ rules:
   rationale: Transient failures (network glitches, throttling, brief service restarts) are inevitable in distributed systems.  Without
     retry, every transient failure becomes a user-visible error.  Without backoff, rapid retries overwhelm the recovering
     service.  Without jitter, synchronized retries from multiple clients create load spikes.
-  applies_to: *id003
+  applies_to:
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ServiceBus/namespaces
     terraform_pattern: |
       # === Retry policies are APPLICATION-LEVEL configuration ===
@@ -1977,7 +2083,13 @@ rules:
       //        first-fast-retry="false">
       //     <forward-request buffer-request-body="true" />
       // </retry>
-    prohibitions: *id004
+    prohibitions:
+    - NEVER make external calls without retry logic — transient failures are guaranteed in distributed systems
+    - NEVER use fixed-interval retry — use exponential backoff to avoid overwhelming recovering services
+    - NEVER retry without jitter — synchronized retries from multiple clients create thundering herd effects
+    - NEVER retry indefinitely — cap retries at 3-5 attempts to prevent resource exhaustion
+    - NEVER retry non-idempotent operations (POST creating resources) without idempotency keys
+    - NEVER retry on 4xx client errors (except 429 Too Many Requests) — they will never succeed
 - id: WAF-REL-FT-002
   severity: required
   description: Configure retry policies with exponential backoff and jitter for ALL external service calls.  Azure SDK clients
@@ -1987,9 +2099,11 @@ rules:
   rationale: Transient failures (network glitches, throttling, brief service restarts) are inevitable in distributed systems.  Without
     retry, every transient failure becomes a user-visible error.  Without backoff, rapid retries overwhelm the recovering
     service.  Without jitter, synchronized retries from multiple clients create load spikes.
-  applies_to: *id003
+  applies_to:
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.EventHub/namespaces
     terraform_pattern: |
       # === Retry policies are APPLICATION-LEVEL configuration ===
@@ -2074,7 +2188,13 @@ rules:
       //        first-fast-retry="false">
       //     <forward-request buffer-request-body="true" />
       // </retry>
-    prohibitions: *id004
+    prohibitions:
+    - NEVER make external calls without retry logic — transient failures are guaranteed in distributed systems
+    - NEVER use fixed-interval retry — use exponential backoff to avoid overwhelming recovering services
+    - NEVER retry without jitter — synchronized retries from multiple clients create thundering herd effects
+    - NEVER retry indefinitely — cap retries at 3-5 attempts to prevent resource exhaustion
+    - NEVER retry non-idempotent operations (POST creating resources) without idempotency keys
+    - NEVER retry on 4xx client errors (except 429 Too Many Requests) — they will never succeed
 - id: WAF-REL-FT-002
   severity: required
   description: Configure retry policies with exponential backoff and jitter for ALL external service calls.  Azure SDK clients
@@ -2084,9 +2204,11 @@ rules:
   rationale: Transient failures (network glitches, throttling, brief service restarts) are inevitable in distributed systems.  Without
     retry, every transient failure becomes a user-visible error.  Without backoff, rapid retries overwhelm the recovering
     service.  Without jitter, synchronized retries from multiple clients create load spikes.
-  applies_to: *id003
+  applies_to:
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # === Retry policies are APPLICATION-LEVEL configuration ===
@@ -2171,7 +2293,13 @@ rules:
       //        first-fast-retry="false">
       //     <forward-request buffer-request-body="true" />
       // </retry>
-    prohibitions: *id004
+    prohibitions:
+    - NEVER make external calls without retry logic — transient failures are guaranteed in distributed systems
+    - NEVER use fixed-interval retry — use exponential backoff to avoid overwhelming recovering services
+    - NEVER retry without jitter — synchronized retries from multiple clients create thundering herd effects
+    - NEVER retry indefinitely — cap retries at 3-5 attempts to prevent resource exhaustion
+    - NEVER retry non-idempotent operations (POST creating resources) without idempotency keys
+    - NEVER retry on 4xx client errors (except 429 Too Many Requests) — they will never succeed
 - id: WAF-REL-FT-002
   severity: required
   description: Configure retry policies with exponential backoff and jitter for ALL external service calls.  Azure SDK clients
@@ -2181,9 +2309,11 @@ rules:
   rationale: Transient failures (network glitches, throttling, brief service restarts) are inevitable in distributed systems.  Without
     retry, every transient failure becomes a user-visible error.  Without backoff, rapid retries overwhelm the recovering
     service.  Without jitter, synchronized retries from multiple clients create load spikes.
-  applies_to: *id003
+  applies_to:
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # === Retry policies are APPLICATION-LEVEL configuration ===
@@ -2268,7 +2398,13 @@ rules:
       //        first-fast-retry="false">
       //     <forward-request buffer-request-body="true" />
       // </retry>
-    prohibitions: *id004
+    prohibitions:
+    - NEVER make external calls without retry logic — transient failures are guaranteed in distributed systems
+    - NEVER use fixed-interval retry — use exponential backoff to avoid overwhelming recovering services
+    - NEVER retry without jitter — synchronized retries from multiple clients create thundering herd effects
+    - NEVER retry indefinitely — cap retries at 3-5 attempts to prevent resource exhaustion
+    - NEVER retry non-idempotent operations (POST creating resources) without idempotency keys
+    - NEVER retry on 4xx client errors (except 429 Too Many Requests) — they will never succeed
 - id: WAF-REL-FT-002
   severity: required
   description: Configure retry policies with exponential backoff and jitter for ALL external service calls.  Azure SDK clients
@@ -2278,9 +2414,11 @@ rules:
   rationale: Transient failures (network glitches, throttling, brief service restarts) are inevitable in distributed systems.  Without
     retry, every transient failure becomes a user-visible error.  Without backoff, rapid retries overwhelm the recovering
     service.  Without jitter, synchronized retries from multiple clients create load spikes.
-  applies_to: *id003
+  applies_to:
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       # === Retry policies are APPLICATION-LEVEL configuration ===
@@ -2365,7 +2503,13 @@ rules:
       //        first-fast-retry="false">
       //     <forward-request buffer-request-body="true" />
       // </retry>
-    prohibitions: *id004
+    prohibitions:
+    - NEVER make external calls without retry logic — transient failures are guaranteed in distributed systems
+    - NEVER use fixed-interval retry — use exponential backoff to avoid overwhelming recovering services
+    - NEVER retry without jitter — synchronized retries from multiple clients create thundering herd effects
+    - NEVER retry indefinitely — cap retries at 3-5 attempts to prevent resource exhaustion
+    - NEVER retry non-idempotent operations (POST creating resources) without idempotency keys
+    - NEVER retry on 4xx client errors (except 429 Too Many Requests) — they will never succeed
 - id: WAF-REL-FT-002
   severity: required
   description: Configure retry policies with exponential backoff and jitter for ALL external service calls.  Azure SDK clients
@@ -2375,9 +2519,11 @@ rules:
   rationale: Transient failures (network glitches, throttling, brief service restarts) are inevitable in distributed systems.  Without
     retry, every transient failure becomes a user-visible error.  Without backoff, rapid retries overwhelm the recovering
     service.  Without jitter, synchronized retries from multiple clients create load spikes.
-  applies_to: *id003
+  applies_to:
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Network/loadBalancers
     terraform_pattern: |
       # === Retry policies are APPLICATION-LEVEL configuration ===
@@ -2462,7 +2608,13 @@ rules:
       //        first-fast-retry="false">
       //     <forward-request buffer-request-body="true" />
       // </retry>
-    prohibitions: *id004
+    prohibitions:
+    - NEVER make external calls without retry logic — transient failures are guaranteed in distributed systems
+    - NEVER use fixed-interval retry — use exponential backoff to avoid overwhelming recovering services
+    - NEVER retry without jitter — synchronized retries from multiple clients create thundering herd effects
+    - NEVER retry indefinitely — cap retries at 3-5 attempts to prevent resource exhaustion
+    - NEVER retry non-idempotent operations (POST creating resources) without idempotency keys
+    - NEVER retry on 4xx client errors (except 429 Too Many Requests) — they will never succeed
 - id: WAF-REL-FT-002
   severity: required
   description: Configure retry policies with exponential backoff and jitter for ALL external service calls.  Azure SDK clients
@@ -2472,9 +2624,11 @@ rules:
   rationale: Transient failures (network glitches, throttling, brief service restarts) are inevitable in distributed systems.  Without
     retry, every transient failure becomes a user-visible error.  Without backoff, rapid retries overwhelm the recovering
     service.  Without jitter, synchronized retries from multiple clients create load spikes.
-  applies_to: *id003
+  applies_to:
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Network/applicationGateways
     terraform_pattern: |
       # === Retry policies are APPLICATION-LEVEL configuration ===
@@ -2559,7 +2713,13 @@ rules:
       //        first-fast-retry="false">
       //     <forward-request buffer-request-body="true" />
       // </retry>
-    prohibitions: *id004
+    prohibitions:
+    - NEVER make external calls without retry logic — transient failures are guaranteed in distributed systems
+    - NEVER use fixed-interval retry — use exponential backoff to avoid overwhelming recovering services
+    - NEVER retry without jitter — synchronized retries from multiple clients create thundering herd effects
+    - NEVER retry indefinitely — cap retries at 3-5 attempts to prevent resource exhaustion
+    - NEVER retry non-idempotent operations (POST creating resources) without idempotency keys
+    - NEVER retry on 4xx client errors (except 429 Too Many Requests) — they will never succeed
 - id: WAF-REL-FT-003
   severity: required
   description: Implement bulkhead isolation to prevent a single failing component from consuming all system resources.  Container
@@ -2569,13 +2729,13 @@ rules:
   rationale: Without bulkhead isolation, a single runaway process can consume all CPU/memory, starving healthy workloads.  Connection
     pool exhaustion from one dependency blocks all other outbound calls. PDBs prevent Kubernetes evictions from violating
     availability requirements.
-  applies_to: &id005
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # === Container Apps: Resource limits per container ===
@@ -2708,7 +2868,7 @@ rules:
       // AKS Pod Disruption Budgets, Resource Quotas, and LimitRanges
       // are Kubernetes resources — deploy via deploy.sh post-deployment script.
       // See terraform_pattern for kubectl manifest examples.
-    prohibitions: &id006
+    prohibitions:
     - NEVER deploy containers without CPU and memory limits — unlimited containers can starve the entire node
     - NEVER set Container Apps maxReplicas to 0 or unbounded — cap scaling to prevent runaway cost and resource exhaustion
     - NEVER deploy AKS workloads without Pod Disruption Budgets — voluntary disruptions (upgrades, scaling) may take down
@@ -2725,9 +2885,13 @@ rules:
   rationale: Without bulkhead isolation, a single runaway process can consume all CPU/memory, starving healthy workloads.  Connection
     pool exhaustion from one dependency blocks all other outbound calls. PDBs prevent Kubernetes evictions from violating
     availability requirements.
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === Container Apps: Resource limits per container ===
@@ -2860,7 +3024,14 @@ rules:
       // AKS Pod Disruption Budgets, Resource Quotas, and LimitRanges
       // are Kubernetes resources — deploy via deploy.sh post-deployment script.
       // See terraform_pattern for kubectl manifest examples.
-    prohibitions: *id006
+    prohibitions:
+    - NEVER deploy containers without CPU and memory limits — unlimited containers can starve the entire node
+    - NEVER set Container Apps maxReplicas to 0 or unbounded — cap scaling to prevent runaway cost and resource exhaustion
+    - NEVER deploy AKS workloads without Pod Disruption Budgets — voluntary disruptions (upgrades, scaling) may take down
+      all replicas
+    - NEVER deploy AKS namespaces without ResourceQuotas — a single tenant can exhaust cluster resources
+    - NEVER use unbounded connection pools — set maximum connections per dependency
+    - NEVER set minReplicas to 0 for production services — cold start latency causes request failures
 - id: WAF-REL-FT-003
   severity: required
   description: Implement bulkhead isolation to prevent a single failing component from consuming all system resources.  Container
@@ -2870,9 +3041,13 @@ rules:
   rationale: Without bulkhead isolation, a single runaway process can consume all CPU/memory, starving healthy workloads.  Connection
     pool exhaustion from one dependency blocks all other outbound calls. PDBs prevent Kubernetes evictions from violating
     availability requirements.
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
       # === Container Apps: Resource limits per container ===
@@ -3005,7 +3180,14 @@ rules:
       // AKS Pod Disruption Budgets, Resource Quotas, and LimitRanges
       // are Kubernetes resources — deploy via deploy.sh post-deployment script.
       // See terraform_pattern for kubectl manifest examples.
-    prohibitions: *id006
+    prohibitions:
+    - NEVER deploy containers without CPU and memory limits — unlimited containers can starve the entire node
+    - NEVER set Container Apps maxReplicas to 0 or unbounded — cap scaling to prevent runaway cost and resource exhaustion
+    - NEVER deploy AKS workloads without Pod Disruption Budgets — voluntary disruptions (upgrades, scaling) may take down
+      all replicas
+    - NEVER deploy AKS namespaces without ResourceQuotas — a single tenant can exhaust cluster resources
+    - NEVER use unbounded connection pools — set maximum connections per dependency
+    - NEVER set minReplicas to 0 for production services — cold start latency causes request failures
 - id: WAF-REL-FT-003
   severity: required
   description: Implement bulkhead isolation to prevent a single failing component from consuming all system resources.  Container
@@ -3015,9 +3197,13 @@ rules:
   rationale: Without bulkhead isolation, a single runaway process can consume all CPU/memory, starving healthy workloads.  Connection
     pool exhaustion from one dependency blocks all other outbound calls. PDBs prevent Kubernetes evictions from violating
     availability requirements.
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |
       # === Container Apps: Resource limits per container ===
@@ -3150,7 +3336,14 @@ rules:
       // AKS Pod Disruption Budgets, Resource Quotas, and LimitRanges
       // are Kubernetes resources — deploy via deploy.sh post-deployment script.
       // See terraform_pattern for kubectl manifest examples.
-    prohibitions: *id006
+    prohibitions:
+    - NEVER deploy containers without CPU and memory limits — unlimited containers can starve the entire node
+    - NEVER set Container Apps maxReplicas to 0 or unbounded — cap scaling to prevent runaway cost and resource exhaustion
+    - NEVER deploy AKS workloads without Pod Disruption Budgets — voluntary disruptions (upgrades, scaling) may take down
+      all replicas
+    - NEVER deploy AKS namespaces without ResourceQuotas — a single tenant can exhaust cluster resources
+    - NEVER use unbounded connection pools — set maximum connections per dependency
+    - NEVER set minReplicas to 0 for production services — cold start latency causes request failures
 - id: WAF-REL-FT-003
   severity: required
   description: Implement bulkhead isolation to prevent a single failing component from consuming all system resources.  Container
@@ -3160,9 +3353,13 @@ rules:
   rationale: Without bulkhead isolation, a single runaway process can consume all CPU/memory, starving healthy workloads.  Connection
     pool exhaustion from one dependency blocks all other outbound calls. PDBs prevent Kubernetes evictions from violating
     availability requirements.
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.ServiceBus/namespaces
     terraform_pattern: |
       # === Container Apps: Resource limits per container ===
@@ -3295,7 +3492,14 @@ rules:
       // AKS Pod Disruption Budgets, Resource Quotas, and LimitRanges
       // are Kubernetes resources — deploy via deploy.sh post-deployment script.
       // See terraform_pattern for kubectl manifest examples.
-    prohibitions: *id006
+    prohibitions:
+    - NEVER deploy containers without CPU and memory limits — unlimited containers can starve the entire node
+    - NEVER set Container Apps maxReplicas to 0 or unbounded — cap scaling to prevent runaway cost and resource exhaustion
+    - NEVER deploy AKS workloads without Pod Disruption Budgets — voluntary disruptions (upgrades, scaling) may take down
+      all replicas
+    - NEVER deploy AKS namespaces without ResourceQuotas — a single tenant can exhaust cluster resources
+    - NEVER use unbounded connection pools — set maximum connections per dependency
+    - NEVER set minReplicas to 0 for production services — cold start latency causes request failures
 - id: WAF-REL-FT-003
   severity: required
   description: Implement bulkhead isolation to prevent a single failing component from consuming all system resources.  Container
@@ -3305,9 +3509,13 @@ rules:
   rationale: Without bulkhead isolation, a single runaway process can consume all CPU/memory, starving healthy workloads.  Connection
     pool exhaustion from one dependency blocks all other outbound calls. PDBs prevent Kubernetes evictions from violating
     availability requirements.
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.EventHub/namespaces
     terraform_pattern: |
       # === Container Apps: Resource limits per container ===
@@ -3440,7 +3648,14 @@ rules:
       // AKS Pod Disruption Budgets, Resource Quotas, and LimitRanges
       // are Kubernetes resources — deploy via deploy.sh post-deployment script.
       // See terraform_pattern for kubectl manifest examples.
-    prohibitions: *id006
+    prohibitions:
+    - NEVER deploy containers without CPU and memory limits — unlimited containers can starve the entire node
+    - NEVER set Container Apps maxReplicas to 0 or unbounded — cap scaling to prevent runaway cost and resource exhaustion
+    - NEVER deploy AKS workloads without Pod Disruption Budgets — voluntary disruptions (upgrades, scaling) may take down
+      all replicas
+    - NEVER deploy AKS namespaces without ResourceQuotas — a single tenant can exhaust cluster resources
+    - NEVER use unbounded connection pools — set maximum connections per dependency
+    - NEVER set minReplicas to 0 for production services — cold start latency causes request failures
 - id: WAF-REL-FT-003
   severity: required
   description: Implement bulkhead isolation to prevent a single failing component from consuming all system resources.  Container
@@ -3450,9 +3665,13 @@ rules:
   rationale: Without bulkhead isolation, a single runaway process can consume all CPU/memory, starving healthy workloads.  Connection
     pool exhaustion from one dependency blocks all other outbound calls. PDBs prevent Kubernetes evictions from violating
     availability requirements.
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # === Container Apps: Resource limits per container ===
@@ -3585,7 +3804,14 @@ rules:
       // AKS Pod Disruption Budgets, Resource Quotas, and LimitRanges
       // are Kubernetes resources — deploy via deploy.sh post-deployment script.
       // See terraform_pattern for kubectl manifest examples.
-    prohibitions: *id006
+    prohibitions:
+    - NEVER deploy containers without CPU and memory limits — unlimited containers can starve the entire node
+    - NEVER set Container Apps maxReplicas to 0 or unbounded — cap scaling to prevent runaway cost and resource exhaustion
+    - NEVER deploy AKS workloads without Pod Disruption Budgets — voluntary disruptions (upgrades, scaling) may take down
+      all replicas
+    - NEVER deploy AKS namespaces without ResourceQuotas — a single tenant can exhaust cluster resources
+    - NEVER use unbounded connection pools — set maximum connections per dependency
+    - NEVER set minReplicas to 0 for production services — cold start latency causes request failures
 - id: WAF-REL-FT-003
   severity: required
   description: Implement bulkhead isolation to prevent a single failing component from consuming all system resources.  Container
@@ -3595,9 +3821,13 @@ rules:
   rationale: Without bulkhead isolation, a single runaway process can consume all CPU/memory, starving healthy workloads.  Connection
     pool exhaustion from one dependency blocks all other outbound calls. PDBs prevent Kubernetes evictions from violating
     availability requirements.
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # === Container Apps: Resource limits per container ===
@@ -3730,7 +3960,14 @@ rules:
       // AKS Pod Disruption Budgets, Resource Quotas, and LimitRanges
       // are Kubernetes resources — deploy via deploy.sh post-deployment script.
       // See terraform_pattern for kubectl manifest examples.
-    prohibitions: *id006
+    prohibitions:
+    - NEVER deploy containers without CPU and memory limits — unlimited containers can starve the entire node
+    - NEVER set Container Apps maxReplicas to 0 or unbounded — cap scaling to prevent runaway cost and resource exhaustion
+    - NEVER deploy AKS workloads without Pod Disruption Budgets — voluntary disruptions (upgrades, scaling) may take down
+      all replicas
+    - NEVER deploy AKS namespaces without ResourceQuotas — a single tenant can exhaust cluster resources
+    - NEVER use unbounded connection pools — set maximum connections per dependency
+    - NEVER set minReplicas to 0 for production services — cold start latency causes request failures
 - id: WAF-REL-FT-003
   severity: required
   description: Implement bulkhead isolation to prevent a single failing component from consuming all system resources.  Container
@@ -3740,9 +3977,13 @@ rules:
   rationale: Without bulkhead isolation, a single runaway process can consume all CPU/memory, starving healthy workloads.  Connection
     pool exhaustion from one dependency blocks all other outbound calls. PDBs prevent Kubernetes evictions from violating
     availability requirements.
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       # === Container Apps: Resource limits per container ===
@@ -3875,7 +4116,14 @@ rules:
       // AKS Pod Disruption Budgets, Resource Quotas, and LimitRanges
       // are Kubernetes resources — deploy via deploy.sh post-deployment script.
       // See terraform_pattern for kubectl manifest examples.
-    prohibitions: *id006
+    prohibitions:
+    - NEVER deploy containers without CPU and memory limits — unlimited containers can starve the entire node
+    - NEVER set Container Apps maxReplicas to 0 or unbounded — cap scaling to prevent runaway cost and resource exhaustion
+    - NEVER deploy AKS workloads without Pod Disruption Budgets — voluntary disruptions (upgrades, scaling) may take down
+      all replicas
+    - NEVER deploy AKS namespaces without ResourceQuotas — a single tenant can exhaust cluster resources
+    - NEVER use unbounded connection pools — set maximum connections per dependency
+    - NEVER set minReplicas to 0 for production services — cold start latency causes request failures
 - id: WAF-REL-FT-003
   severity: required
   description: Implement bulkhead isolation to prevent a single failing component from consuming all system resources.  Container
@@ -3885,9 +4133,13 @@ rules:
   rationale: Without bulkhead isolation, a single runaway process can consume all CPU/memory, starving healthy workloads.  Connection
     pool exhaustion from one dependency blocks all other outbound calls. PDBs prevent Kubernetes evictions from violating
     availability requirements.
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Network/loadBalancers
     terraform_pattern: |
       # === Container Apps: Resource limits per container ===
@@ -4020,7 +4272,14 @@ rules:
       // AKS Pod Disruption Budgets, Resource Quotas, and LimitRanges
       // are Kubernetes resources — deploy via deploy.sh post-deployment script.
       // See terraform_pattern for kubectl manifest examples.
-    prohibitions: *id006
+    prohibitions:
+    - NEVER deploy containers without CPU and memory limits — unlimited containers can starve the entire node
+    - NEVER set Container Apps maxReplicas to 0 or unbounded — cap scaling to prevent runaway cost and resource exhaustion
+    - NEVER deploy AKS workloads without Pod Disruption Budgets — voluntary disruptions (upgrades, scaling) may take down
+      all replicas
+    - NEVER deploy AKS namespaces without ResourceQuotas — a single tenant can exhaust cluster resources
+    - NEVER use unbounded connection pools — set maximum connections per dependency
+    - NEVER set minReplicas to 0 for production services — cold start latency causes request failures
 - id: WAF-REL-FT-003
   severity: required
   description: Implement bulkhead isolation to prevent a single failing component from consuming all system resources.  Container
@@ -4030,9 +4289,13 @@ rules:
   rationale: Without bulkhead isolation, a single runaway process can consume all CPU/memory, starving healthy workloads.  Connection
     pool exhaustion from one dependency blocks all other outbound calls. PDBs prevent Kubernetes evictions from violating
     availability requirements.
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Network/applicationGateways
     terraform_pattern: |
       # === Container Apps: Resource limits per container ===
@@ -4165,7 +4428,14 @@ rules:
       // AKS Pod Disruption Budgets, Resource Quotas, and LimitRanges
       // are Kubernetes resources — deploy via deploy.sh post-deployment script.
       // See terraform_pattern for kubectl manifest examples.
-    prohibitions: *id006
+    prohibitions:
+    - NEVER deploy containers without CPU and memory limits — unlimited containers can starve the entire node
+    - NEVER set Container Apps maxReplicas to 0 or unbounded — cap scaling to prevent runaway cost and resource exhaustion
+    - NEVER deploy AKS workloads without Pod Disruption Budgets — voluntary disruptions (upgrades, scaling) may take down
+      all replicas
+    - NEVER deploy AKS namespaces without ResourceQuotas — a single tenant can exhaust cluster resources
+    - NEVER use unbounded connection pools — set maximum connections per dependency
+    - NEVER set minReplicas to 0 for production services — cold start latency causes request failures
 - id: WAF-REL-FT-004
   severity: recommended
   description: Implement graceful degradation patterns so that partial failures do not cause total service unavailability.  Use
@@ -4175,12 +4445,12 @@ rules:
   rationale: Users prefer a degraded experience over a complete outage.  If the recommendation engine fails, the e-commerce
     site should still show products without recommendations — not return a 500 error. Feature flags enable instant degradation
     without redeployment.
-  applies_to: &id007
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - app-developer
-  companion_resources: &id008
+  companion_resources:
   - type: Microsoft.Network/privateEndpoints@2023-11-01
     description: 'Private endpoint for App Configuration (groupId: configurationStores)'
   - type: Microsoft.Network/privateDnsZones@2020-06-01
@@ -4188,7 +4458,7 @@ rules:
   - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
     description: Diagnostic settings for App Configuration audit and request logs
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # === Azure App Configuration for Feature Flags ===
@@ -4320,7 +4590,7 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: &id009
+    prohibitions:
     - NEVER return 500 errors when a non-critical dependency fails — serve degraded content or cached responses
     - NEVER hardcode feature flags in application code — use Azure App Configuration for centralized management
     - NEVER deploy App Configuration without disableLocalAuth and managed identity — use RBAC for authentication
@@ -4334,10 +4604,20 @@ rules:
   rationale: Users prefer a degraded experience over a complete outage.  If the recommendation engine fails, the e-commerce
     site should still show products without recommendations — not return a 500 error. Feature flags enable instant degradation
     without redeployment.
-  applies_to: *id007
-  companion_resources: *id008
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  companion_resources:
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    description: 'Private endpoint for App Configuration (groupId: configurationStores)'
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    description: Private DNS zone privatelink.azconfig.io for App Configuration private endpoint
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    description: Diagnostic settings for App Configuration audit and request logs
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === Azure App Configuration for Feature Flags ===
@@ -4469,7 +4749,11 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id009
+    prohibitions:
+    - NEVER return 500 errors when a non-critical dependency fails — serve degraded content or cached responses
+    - NEVER hardcode feature flags in application code — use Azure App Configuration for centralized management
+    - NEVER deploy App Configuration without disableLocalAuth and managed identity — use RBAC for authentication
+    - NEVER couple critical path operations to non-critical dependencies — use async processing for non-essential features
 - id: WAF-REL-FT-004
   severity: recommended
   description: Implement graceful degradation patterns so that partial failures do not cause total service unavailability.  Use
@@ -4479,10 +4763,20 @@ rules:
   rationale: Users prefer a degraded experience over a complete outage.  If the recommendation engine fails, the e-commerce
     site should still show products without recommendations — not return a 500 error. Feature flags enable instant degradation
     without redeployment.
-  applies_to: *id007
-  companion_resources: *id008
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  companion_resources:
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    description: 'Private endpoint for App Configuration (groupId: configurationStores)'
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    description: Private DNS zone privatelink.azconfig.io for App Configuration private endpoint
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    description: Diagnostic settings for App Configuration audit and request logs
   targets:
-    services:
+  - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
       # === Azure App Configuration for Feature Flags ===
@@ -4614,7 +4908,11 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id009
+    prohibitions:
+    - NEVER return 500 errors when a non-critical dependency fails — serve degraded content or cached responses
+    - NEVER hardcode feature flags in application code — use Azure App Configuration for centralized management
+    - NEVER deploy App Configuration without disableLocalAuth and managed identity — use RBAC for authentication
+    - NEVER couple critical path operations to non-critical dependencies — use async processing for non-essential features
 - id: WAF-REL-FT-004
   severity: recommended
   description: Implement graceful degradation patterns so that partial failures do not cause total service unavailability.  Use
@@ -4624,10 +4922,20 @@ rules:
   rationale: Users prefer a degraded experience over a complete outage.  If the recommendation engine fails, the e-commerce
     site should still show products without recommendations — not return a 500 error. Feature flags enable instant degradation
     without redeployment.
-  applies_to: *id007
-  companion_resources: *id008
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  companion_resources:
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    description: 'Private endpoint for App Configuration (groupId: configurationStores)'
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    description: Private DNS zone privatelink.azconfig.io for App Configuration private endpoint
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    description: Diagnostic settings for App Configuration audit and request logs
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |
       # === Azure App Configuration for Feature Flags ===
@@ -4759,7 +5067,11 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id009
+    prohibitions:
+    - NEVER return 500 errors when a non-critical dependency fails — serve degraded content or cached responses
+    - NEVER hardcode feature flags in application code — use Azure App Configuration for centralized management
+    - NEVER deploy App Configuration without disableLocalAuth and managed identity — use RBAC for authentication
+    - NEVER couple critical path operations to non-critical dependencies — use async processing for non-essential features
 - id: WAF-REL-FT-004
   severity: recommended
   description: Implement graceful degradation patterns so that partial failures do not cause total service unavailability.  Use
@@ -4769,10 +5081,20 @@ rules:
   rationale: Users prefer a degraded experience over a complete outage.  If the recommendation engine fails, the e-commerce
     site should still show products without recommendations — not return a 500 error. Feature flags enable instant degradation
     without redeployment.
-  applies_to: *id007
-  companion_resources: *id008
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  companion_resources:
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    description: 'Private endpoint for App Configuration (groupId: configurationStores)'
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    description: Private DNS zone privatelink.azconfig.io for App Configuration private endpoint
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    description: Diagnostic settings for App Configuration audit and request logs
   targets:
-    services:
+  - services:
     - Microsoft.ServiceBus/namespaces
     terraform_pattern: |
       # === Azure App Configuration for Feature Flags ===
@@ -4904,7 +5226,11 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id009
+    prohibitions:
+    - NEVER return 500 errors when a non-critical dependency fails — serve degraded content or cached responses
+    - NEVER hardcode feature flags in application code — use Azure App Configuration for centralized management
+    - NEVER deploy App Configuration without disableLocalAuth and managed identity — use RBAC for authentication
+    - NEVER couple critical path operations to non-critical dependencies — use async processing for non-essential features
 - id: WAF-REL-FT-004
   severity: recommended
   description: Implement graceful degradation patterns so that partial failures do not cause total service unavailability.  Use
@@ -4914,10 +5240,20 @@ rules:
   rationale: Users prefer a degraded experience over a complete outage.  If the recommendation engine fails, the e-commerce
     site should still show products without recommendations — not return a 500 error. Feature flags enable instant degradation
     without redeployment.
-  applies_to: *id007
-  companion_resources: *id008
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  companion_resources:
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    description: 'Private endpoint for App Configuration (groupId: configurationStores)'
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    description: Private DNS zone privatelink.azconfig.io for App Configuration private endpoint
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    description: Diagnostic settings for App Configuration audit and request logs
   targets:
-    services:
+  - services:
     - Microsoft.EventHub/namespaces
     terraform_pattern: |
       # === Azure App Configuration for Feature Flags ===
@@ -5049,7 +5385,11 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id009
+    prohibitions:
+    - NEVER return 500 errors when a non-critical dependency fails — serve degraded content or cached responses
+    - NEVER hardcode feature flags in application code — use Azure App Configuration for centralized management
+    - NEVER deploy App Configuration without disableLocalAuth and managed identity — use RBAC for authentication
+    - NEVER couple critical path operations to non-critical dependencies — use async processing for non-essential features
 - id: WAF-REL-FT-004
   severity: recommended
   description: Implement graceful degradation patterns so that partial failures do not cause total service unavailability.  Use
@@ -5059,10 +5399,20 @@ rules:
   rationale: Users prefer a degraded experience over a complete outage.  If the recommendation engine fails, the e-commerce
     site should still show products without recommendations — not return a 500 error. Feature flags enable instant degradation
     without redeployment.
-  applies_to: *id007
-  companion_resources: *id008
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  companion_resources:
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    description: 'Private endpoint for App Configuration (groupId: configurationStores)'
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    description: Private DNS zone privatelink.azconfig.io for App Configuration private endpoint
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    description: Diagnostic settings for App Configuration audit and request logs
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # === Azure App Configuration for Feature Flags ===
@@ -5194,7 +5544,11 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id009
+    prohibitions:
+    - NEVER return 500 errors when a non-critical dependency fails — serve degraded content or cached responses
+    - NEVER hardcode feature flags in application code — use Azure App Configuration for centralized management
+    - NEVER deploy App Configuration without disableLocalAuth and managed identity — use RBAC for authentication
+    - NEVER couple critical path operations to non-critical dependencies — use async processing for non-essential features
 - id: WAF-REL-FT-004
   severity: recommended
   description: Implement graceful degradation patterns so that partial failures do not cause total service unavailability.  Use
@@ -5204,10 +5558,20 @@ rules:
   rationale: Users prefer a degraded experience over a complete outage.  If the recommendation engine fails, the e-commerce
     site should still show products without recommendations — not return a 500 error. Feature flags enable instant degradation
     without redeployment.
-  applies_to: *id007
-  companion_resources: *id008
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  companion_resources:
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    description: 'Private endpoint for App Configuration (groupId: configurationStores)'
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    description: Private DNS zone privatelink.azconfig.io for App Configuration private endpoint
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    description: Diagnostic settings for App Configuration audit and request logs
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # === Azure App Configuration for Feature Flags ===
@@ -5339,7 +5703,11 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id009
+    prohibitions:
+    - NEVER return 500 errors when a non-critical dependency fails — serve degraded content or cached responses
+    - NEVER hardcode feature flags in application code — use Azure App Configuration for centralized management
+    - NEVER deploy App Configuration without disableLocalAuth and managed identity — use RBAC for authentication
+    - NEVER couple critical path operations to non-critical dependencies — use async processing for non-essential features
 - id: WAF-REL-FT-004
   severity: recommended
   description: Implement graceful degradation patterns so that partial failures do not cause total service unavailability.  Use
@@ -5349,10 +5717,20 @@ rules:
   rationale: Users prefer a degraded experience over a complete outage.  If the recommendation engine fails, the e-commerce
     site should still show products without recommendations — not return a 500 error. Feature flags enable instant degradation
     without redeployment.
-  applies_to: *id007
-  companion_resources: *id008
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  companion_resources:
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    description: 'Private endpoint for App Configuration (groupId: configurationStores)'
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    description: Private DNS zone privatelink.azconfig.io for App Configuration private endpoint
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    description: Diagnostic settings for App Configuration audit and request logs
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       # === Azure App Configuration for Feature Flags ===
@@ -5484,7 +5862,11 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id009
+    prohibitions:
+    - NEVER return 500 errors when a non-critical dependency fails — serve degraded content or cached responses
+    - NEVER hardcode feature flags in application code — use Azure App Configuration for centralized management
+    - NEVER deploy App Configuration without disableLocalAuth and managed identity — use RBAC for authentication
+    - NEVER couple critical path operations to non-critical dependencies — use async processing for non-essential features
 - id: WAF-REL-FT-004
   severity: recommended
   description: Implement graceful degradation patterns so that partial failures do not cause total service unavailability.  Use
@@ -5494,10 +5876,20 @@ rules:
   rationale: Users prefer a degraded experience over a complete outage.  If the recommendation engine fails, the e-commerce
     site should still show products without recommendations — not return a 500 error. Feature flags enable instant degradation
     without redeployment.
-  applies_to: *id007
-  companion_resources: *id008
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  companion_resources:
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    description: 'Private endpoint for App Configuration (groupId: configurationStores)'
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    description: Private DNS zone privatelink.azconfig.io for App Configuration private endpoint
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    description: Diagnostic settings for App Configuration audit and request logs
   targets:
-    services:
+  - services:
     - Microsoft.Network/loadBalancers
     terraform_pattern: |
       # === Azure App Configuration for Feature Flags ===
@@ -5629,7 +6021,11 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id009
+    prohibitions:
+    - NEVER return 500 errors when a non-critical dependency fails — serve degraded content or cached responses
+    - NEVER hardcode feature flags in application code — use Azure App Configuration for centralized management
+    - NEVER deploy App Configuration without disableLocalAuth and managed identity — use RBAC for authentication
+    - NEVER couple critical path operations to non-critical dependencies — use async processing for non-essential features
 - id: WAF-REL-FT-004
   severity: recommended
   description: Implement graceful degradation patterns so that partial failures do not cause total service unavailability.  Use
@@ -5639,10 +6035,20 @@ rules:
   rationale: Users prefer a degraded experience over a complete outage.  If the recommendation engine fails, the e-commerce
     site should still show products without recommendations — not return a 500 error. Feature flags enable instant degradation
     without redeployment.
-  applies_to: *id007
-  companion_resources: *id008
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  companion_resources:
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    description: 'Private endpoint for App Configuration (groupId: configurationStores)'
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    description: Private DNS zone privatelink.azconfig.io for App Configuration private endpoint
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    description: Diagnostic settings for App Configuration audit and request logs
   targets:
-    services:
+  - services:
     - Microsoft.Network/applicationGateways
     terraform_pattern: |
       # === Azure App Configuration for Feature Flags ===
@@ -5774,7 +6180,11 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id009
+    prohibitions:
+    - NEVER return 500 errors when a non-critical dependency fails — serve degraded content or cached responses
+    - NEVER hardcode feature flags in application code — use Azure App Configuration for centralized management
+    - NEVER deploy App Configuration without disableLocalAuth and managed identity — use RBAC for authentication
+    - NEVER couple critical path operations to non-critical dependencies — use async processing for non-essential features
 - id: WAF-REL-FT-005
   severity: required
   description: Use queue-based load leveling for all workloads with variable or bursty traffic patterns.  Place Service Bus
@@ -5784,12 +6194,12 @@ rules:
   rationale: Synchronous processing of bursty traffic causes cascading failures when arrival rate exceeds processing capacity.  Queues
     absorb spikes, enable independent scaling of producers and consumers, and provide at-least-once delivery guarantees.  Without
     queues, every traffic spike risks service overload and data loss.
-  applies_to: &id010
+  applies_to:
   - terraform-agent
   - bicep-agent
   - cloud-architect
   - app-developer
-  companion_resources: &id011
+  companion_resources:
   - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
     description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
   - type: Microsoft.Network/privateEndpoints@2023-11-01
@@ -5797,7 +6207,7 @@ rules:
   - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
     description: Diagnostic settings for queue depth, dead-letter count, and throughput metrics
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
     terraform_pattern: |
       # === Service Bus Queue for Load Leveling ===
@@ -5996,7 +6406,7 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: &id012
+    prohibitions:
     - NEVER process high-volume or bursty workloads synchronously without a queue buffer — overload causes cascading failures
     - NEVER use Service Bus connection strings — use managed identity with disableLocalAuth = true
     - NEVER deploy Service Bus Standard tier for production — Premium tier is required for zone redundancy and large messages
@@ -6012,10 +6422,20 @@ rules:
   rationale: Synchronous processing of bursty traffic causes cascading failures when arrival rate exceeds processing capacity.  Queues
     absorb spikes, enable independent scaling of producers and consumers, and provide at-least-once delivery guarantees.  Without
     queues, every traffic spike risks service overload and data loss.
-  applies_to: *id010
-  companion_resources: *id011
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  companion_resources:
+  - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
+    description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    description: Private endpoint for Service Bus / Event Hub namespace
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    description: Diagnostic settings for queue depth, dead-letter count, and throughput metrics
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # === Service Bus Queue for Load Leveling ===
@@ -6214,7 +6634,13 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id012
+    prohibitions:
+    - NEVER process high-volume or bursty workloads synchronously without a queue buffer — overload causes cascading failures
+    - NEVER use Service Bus connection strings — use managed identity with disableLocalAuth = true
+    - NEVER deploy Service Bus Standard tier for production — Premium tier is required for zone redundancy and large messages
+    - NEVER set maxDeliveryCount above 20 — poison messages must reach dead-letter queue quickly
+    - NEVER ignore dead-letter queues — monitor and alert on dead-letter queue depth
+    - NEVER set lockDuration below 1 minute — short locks cause duplicate processing when consumers are slow
 - id: WAF-REL-FT-005
   severity: required
   description: Use queue-based load leveling for all workloads with variable or bursty traffic patterns.  Place Service Bus
@@ -6224,10 +6650,20 @@ rules:
   rationale: Synchronous processing of bursty traffic causes cascading failures when arrival rate exceeds processing capacity.  Queues
     absorb spikes, enable independent scaling of producers and consumers, and provide at-least-once delivery guarantees.  Without
     queues, every traffic spike risks service overload and data loss.
-  applies_to: *id010
-  companion_resources: *id011
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  companion_resources:
+  - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
+    description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    description: Private endpoint for Service Bus / Event Hub namespace
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    description: Diagnostic settings for queue depth, dead-letter count, and throughput metrics
   targets:
-    services:
+  - services:
     - Microsoft.ContainerService/managedClusters
     terraform_pattern: |
       # === Service Bus Queue for Load Leveling ===
@@ -6426,7 +6862,13 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id012
+    prohibitions:
+    - NEVER process high-volume or bursty workloads synchronously without a queue buffer — overload causes cascading failures
+    - NEVER use Service Bus connection strings — use managed identity with disableLocalAuth = true
+    - NEVER deploy Service Bus Standard tier for production — Premium tier is required for zone redundancy and large messages
+    - NEVER set maxDeliveryCount above 20 — poison messages must reach dead-letter queue quickly
+    - NEVER ignore dead-letter queues — monitor and alert on dead-letter queue depth
+    - NEVER set lockDuration below 1 minute — short locks cause duplicate processing when consumers are slow
 - id: WAF-REL-FT-005
   severity: required
   description: Use queue-based load leveling for all workloads with variable or bursty traffic patterns.  Place Service Bus
@@ -6436,10 +6878,20 @@ rules:
   rationale: Synchronous processing of bursty traffic causes cascading failures when arrival rate exceeds processing capacity.  Queues
     absorb spikes, enable independent scaling of producers and consumers, and provide at-least-once delivery guarantees.  Without
     queues, every traffic spike risks service overload and data loss.
-  applies_to: *id010
-  companion_resources: *id011
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  companion_resources:
+  - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
+    description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    description: Private endpoint for Service Bus / Event Hub namespace
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    description: Diagnostic settings for queue depth, dead-letter count, and throughput metrics
   targets:
-    services:
+  - services:
     - Microsoft.ApiManagement/service
     terraform_pattern: |
       # === Service Bus Queue for Load Leveling ===
@@ -6638,7 +7090,13 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id012
+    prohibitions:
+    - NEVER process high-volume or bursty workloads synchronously without a queue buffer — overload causes cascading failures
+    - NEVER use Service Bus connection strings — use managed identity with disableLocalAuth = true
+    - NEVER deploy Service Bus Standard tier for production — Premium tier is required for zone redundancy and large messages
+    - NEVER set maxDeliveryCount above 20 — poison messages must reach dead-letter queue quickly
+    - NEVER ignore dead-letter queues — monitor and alert on dead-letter queue depth
+    - NEVER set lockDuration below 1 minute — short locks cause duplicate processing when consumers are slow
 - id: WAF-REL-FT-005
   severity: required
   description: Use queue-based load leveling for all workloads with variable or bursty traffic patterns.  Place Service Bus
@@ -6648,10 +7106,20 @@ rules:
   rationale: Synchronous processing of bursty traffic causes cascading failures when arrival rate exceeds processing capacity.  Queues
     absorb spikes, enable independent scaling of producers and consumers, and provide at-least-once delivery guarantees.  Without
     queues, every traffic spike risks service overload and data loss.
-  applies_to: *id010
-  companion_resources: *id011
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  companion_resources:
+  - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
+    description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    description: Private endpoint for Service Bus / Event Hub namespace
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    description: Diagnostic settings for queue depth, dead-letter count, and throughput metrics
   targets:
-    services:
+  - services:
     - Microsoft.ServiceBus/namespaces
     terraform_pattern: |
       # === Service Bus Queue for Load Leveling ===
@@ -6850,7 +7318,13 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id012
+    prohibitions:
+    - NEVER process high-volume or bursty workloads synchronously without a queue buffer — overload causes cascading failures
+    - NEVER use Service Bus connection strings — use managed identity with disableLocalAuth = true
+    - NEVER deploy Service Bus Standard tier for production — Premium tier is required for zone redundancy and large messages
+    - NEVER set maxDeliveryCount above 20 — poison messages must reach dead-letter queue quickly
+    - NEVER ignore dead-letter queues — monitor and alert on dead-letter queue depth
+    - NEVER set lockDuration below 1 minute — short locks cause duplicate processing when consumers are slow
 - id: WAF-REL-FT-005
   severity: required
   description: Use queue-based load leveling for all workloads with variable or bursty traffic patterns.  Place Service Bus
@@ -6860,10 +7334,20 @@ rules:
   rationale: Synchronous processing of bursty traffic causes cascading failures when arrival rate exceeds processing capacity.  Queues
     absorb spikes, enable independent scaling of producers and consumers, and provide at-least-once delivery guarantees.  Without
     queues, every traffic spike risks service overload and data loss.
-  applies_to: *id010
-  companion_resources: *id011
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  companion_resources:
+  - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
+    description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    description: Private endpoint for Service Bus / Event Hub namespace
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    description: Diagnostic settings for queue depth, dead-letter count, and throughput metrics
   targets:
-    services:
+  - services:
     - Microsoft.EventHub/namespaces
     terraform_pattern: |
       # === Service Bus Queue for Load Leveling ===
@@ -7062,7 +7546,13 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id012
+    prohibitions:
+    - NEVER process high-volume or bursty workloads synchronously without a queue buffer — overload causes cascading failures
+    - NEVER use Service Bus connection strings — use managed identity with disableLocalAuth = true
+    - NEVER deploy Service Bus Standard tier for production — Premium tier is required for zone redundancy and large messages
+    - NEVER set maxDeliveryCount above 20 — poison messages must reach dead-letter queue quickly
+    - NEVER ignore dead-letter queues — monitor and alert on dead-letter queue depth
+    - NEVER set lockDuration below 1 minute — short locks cause duplicate processing when consumers are slow
 - id: WAF-REL-FT-005
   severity: required
   description: Use queue-based load leveling for all workloads with variable or bursty traffic patterns.  Place Service Bus
@@ -7072,10 +7562,20 @@ rules:
   rationale: Synchronous processing of bursty traffic causes cascading failures when arrival rate exceeds processing capacity.  Queues
     absorb spikes, enable independent scaling of producers and consumers, and provide at-least-once delivery guarantees.  Without
     queues, every traffic spike risks service overload and data loss.
-  applies_to: *id010
-  companion_resources: *id011
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  companion_resources:
+  - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
+    description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    description: Private endpoint for Service Bus / Event Hub namespace
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    description: Diagnostic settings for queue depth, dead-letter count, and throughput metrics
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # === Service Bus Queue for Load Leveling ===
@@ -7274,7 +7774,13 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id012
+    prohibitions:
+    - NEVER process high-volume or bursty workloads synchronously without a queue buffer — overload causes cascading failures
+    - NEVER use Service Bus connection strings — use managed identity with disableLocalAuth = true
+    - NEVER deploy Service Bus Standard tier for production — Premium tier is required for zone redundancy and large messages
+    - NEVER set maxDeliveryCount above 20 — poison messages must reach dead-letter queue quickly
+    - NEVER ignore dead-letter queues — monitor and alert on dead-letter queue depth
+    - NEVER set lockDuration below 1 minute — short locks cause duplicate processing when consumers are slow
 - id: WAF-REL-FT-005
   severity: required
   description: Use queue-based load leveling for all workloads with variable or bursty traffic patterns.  Place Service Bus
@@ -7284,10 +7790,20 @@ rules:
   rationale: Synchronous processing of bursty traffic causes cascading failures when arrival rate exceeds processing capacity.  Queues
     absorb spikes, enable independent scaling of producers and consumers, and provide at-least-once delivery guarantees.  Without
     queues, every traffic spike risks service overload and data loss.
-  applies_to: *id010
-  companion_resources: *id011
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  companion_resources:
+  - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
+    description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    description: Private endpoint for Service Bus / Event Hub namespace
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    description: Diagnostic settings for queue depth, dead-letter count, and throughput metrics
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
       # === Service Bus Queue for Load Leveling ===
@@ -7486,7 +8002,13 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id012
+    prohibitions:
+    - NEVER process high-volume or bursty workloads synchronously without a queue buffer — overload causes cascading failures
+    - NEVER use Service Bus connection strings — use managed identity with disableLocalAuth = true
+    - NEVER deploy Service Bus Standard tier for production — Premium tier is required for zone redundancy and large messages
+    - NEVER set maxDeliveryCount above 20 — poison messages must reach dead-letter queue quickly
+    - NEVER ignore dead-letter queues — monitor and alert on dead-letter queue depth
+    - NEVER set lockDuration below 1 minute — short locks cause duplicate processing when consumers are slow
 - id: WAF-REL-FT-005
   severity: required
   description: Use queue-based load leveling for all workloads with variable or bursty traffic patterns.  Place Service Bus
@@ -7496,10 +8018,20 @@ rules:
   rationale: Synchronous processing of bursty traffic causes cascading failures when arrival rate exceeds processing capacity.  Queues
     absorb spikes, enable independent scaling of producers and consumers, and provide at-least-once delivery guarantees.  Without
     queues, every traffic spike risks service overload and data loss.
-  applies_to: *id010
-  companion_resources: *id011
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  companion_resources:
+  - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
+    description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    description: Private endpoint for Service Bus / Event Hub namespace
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    description: Diagnostic settings for queue depth, dead-letter count, and throughput metrics
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
     terraform_pattern: |
       # === Service Bus Queue for Load Leveling ===
@@ -7698,7 +8230,13 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id012
+    prohibitions:
+    - NEVER process high-volume or bursty workloads synchronously without a queue buffer — overload causes cascading failures
+    - NEVER use Service Bus connection strings — use managed identity with disableLocalAuth = true
+    - NEVER deploy Service Bus Standard tier for production — Premium tier is required for zone redundancy and large messages
+    - NEVER set maxDeliveryCount above 20 — poison messages must reach dead-letter queue quickly
+    - NEVER ignore dead-letter queues — monitor and alert on dead-letter queue depth
+    - NEVER set lockDuration below 1 minute — short locks cause duplicate processing when consumers are slow
 - id: WAF-REL-FT-005
   severity: required
   description: Use queue-based load leveling for all workloads with variable or bursty traffic patterns.  Place Service Bus
@@ -7708,10 +8246,20 @@ rules:
   rationale: Synchronous processing of bursty traffic causes cascading failures when arrival rate exceeds processing capacity.  Queues
     absorb spikes, enable independent scaling of producers and consumers, and provide at-least-once delivery guarantees.  Without
     queues, every traffic spike risks service overload and data loss.
-  applies_to: *id010
-  companion_resources: *id011
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  companion_resources:
+  - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
+    description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    description: Private endpoint for Service Bus / Event Hub namespace
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    description: Diagnostic settings for queue depth, dead-letter count, and throughput metrics
   targets:
-    services:
+  - services:
     - Microsoft.Network/loadBalancers
     terraform_pattern: |
       # === Service Bus Queue for Load Leveling ===
@@ -7910,7 +8458,13 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id012
+    prohibitions:
+    - NEVER process high-volume or bursty workloads synchronously without a queue buffer — overload causes cascading failures
+    - NEVER use Service Bus connection strings — use managed identity with disableLocalAuth = true
+    - NEVER deploy Service Bus Standard tier for production — Premium tier is required for zone redundancy and large messages
+    - NEVER set maxDeliveryCount above 20 — poison messages must reach dead-letter queue quickly
+    - NEVER ignore dead-letter queues — monitor and alert on dead-letter queue depth
+    - NEVER set lockDuration below 1 minute — short locks cause duplicate processing when consumers are slow
 - id: WAF-REL-FT-005
   severity: required
   description: Use queue-based load leveling for all workloads with variable or bursty traffic patterns.  Place Service Bus
@@ -7920,10 +8474,20 @@ rules:
   rationale: Synchronous processing of bursty traffic causes cascading failures when arrival rate exceeds processing capacity.  Queues
     absorb spikes, enable independent scaling of producers and consumers, and provide at-least-once delivery guarantees.  Without
     queues, every traffic spike risks service overload and data loss.
-  applies_to: *id010
-  companion_resources: *id011
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  companion_resources:
+  - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
+    description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    description: Private endpoint for Service Bus / Event Hub namespace
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    description: Diagnostic settings for queue depth, dead-letter count, and throughput metrics
   targets:
-    services:
+  - services:
     - Microsoft.Network/applicationGateways
     terraform_pattern: |
       # === Service Bus Queue for Load Leveling ===
@@ -8122,7 +8686,13 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id012
+    prohibitions:
+    - NEVER process high-volume or bursty workloads synchronously without a queue buffer — overload causes cascading failures
+    - NEVER use Service Bus connection strings — use managed identity with disableLocalAuth = true
+    - NEVER deploy Service Bus Standard tier for production — Premium tier is required for zone redundancy and large messages
+    - NEVER set maxDeliveryCount above 20 — poison messages must reach dead-letter queue quickly
+    - NEVER ignore dead-letter queues — monitor and alert on dead-letter queue depth
+    - NEVER set lockDuration below 1 minute — short locks cause duplicate processing when consumers are slow
 patterns:
 - name: Circuit breaker with retry composition
   description: 'Compose circuit breaker and retry policies correctly: retry wraps the circuit breaker, so transient failures

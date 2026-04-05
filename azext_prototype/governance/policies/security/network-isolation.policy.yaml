@@ -10,12 +10,12 @@ rules:
     = true or publicNetworkAccess = Enabled.
   rationale: Eliminates public internet exposure for data plane.  Both disabling public access AND adding private endpoints
     are required — private endpoints alone do not block public access.
-  applies_to: &id001
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
   - biz-analyst
-  template_check: &id002
+  template_check:
     scope:
     - key-vault
     - sql-database
@@ -25,7 +25,7 @@ rules:
     - private_endpoint
     error_message: 'Service ''{service_name}'' ({service_type}) missing private_endpoint: true'
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
 - id: WAF-SEC-NET-001
   severity: required
@@ -34,119 +34,214 @@ rules:
     = true or publicNetworkAccess = Enabled.
   rationale: Eliminates public internet exposure for data plane.  Both disabling public access AND adding private endpoints
     are required — private endpoints alone do not block public access.
-  applies_to: *id001
-  template_check: *id002
-  targets:
-    services:
-    - Microsoft.Web/sites
-- id: WAF-SEC-NET-001
-  severity: required
-  description: Disable public network access AND use private endpoints for all PaaS data services.  Set publicNetworkAccess
-    to Disabled (or public_network_access_enabled to false) on every PaaS resource. NEVER generate public_network_access_enabled
-    = true or publicNetworkAccess = Enabled.
-  rationale: Eliminates public internet exposure for data plane.  Both disabling public access AND adding private endpoints
-    are required — private endpoints alone do not block public access.
-  applies_to: *id001
-  template_check: *id002
-  targets:
-    services:
-    - Microsoft.KeyVault/vaults
-- id: WAF-SEC-NET-001
-  severity: required
-  description: Disable public network access AND use private endpoints for all PaaS data services.  Set publicNetworkAccess
-    to Disabled (or public_network_access_enabled to false) on every PaaS resource. NEVER generate public_network_access_enabled
-    = true or publicNetworkAccess = Enabled.
-  rationale: Eliminates public internet exposure for data plane.  Both disabling public access AND adding private endpoints
-    are required — private endpoints alone do not block public access.
-  applies_to: *id001
-  template_check: *id002
-  targets:
-    services:
-    - Microsoft.Sql/servers/databases
-- id: WAF-SEC-NET-001
-  severity: required
-  description: Disable public network access AND use private endpoints for all PaaS data services.  Set publicNetworkAccess
-    to Disabled (or public_network_access_enabled to false) on every PaaS resource. NEVER generate public_network_access_enabled
-    = true or publicNetworkAccess = Enabled.
-  rationale: Eliminates public internet exposure for data plane.  Both disabling public access AND adding private endpoints
-    are required — private endpoints alone do not block public access.
-  applies_to: *id001
-  template_check: *id002
-  targets:
-    services:
-    - Microsoft.DocumentDB/databaseAccounts
-- id: WAF-SEC-NET-001
-  severity: required
-  description: Disable public network access AND use private endpoints for all PaaS data services.  Set publicNetworkAccess
-    to Disabled (or public_network_access_enabled to false) on every PaaS resource. NEVER generate public_network_access_enabled
-    = true or publicNetworkAccess = Enabled.
-  rationale: Eliminates public internet exposure for data plane.  Both disabling public access AND adding private endpoints
-    are required — private endpoints alone do not block public access.
-  applies_to: *id001
-  template_check: *id002
-  targets:
-    services:
-    - TODO:storage
-- id: WAF-SEC-NET-002
-  severity: required
-  description: Deploy workloads in a dedicated subnet within the landing zone VNET
-  rationale: Network segmentation enables NSG and route table controls
-  applies_to: &id003
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
   - biz-analyst
-  template_check: &id004
+  template_check:
+    scope:
+    - key-vault
+    - sql-database
+    - cosmos-db
+    - storage
+    require_config:
+    - private_endpoint
+    error_message: 'Service ''{service_name}'' ({service_type}) missing private_endpoint: true'
+  targets:
+  - services:
+    - Microsoft.Web/sites
+- id: WAF-SEC-NET-001
+  severity: required
+  description: Disable public network access AND use private endpoints for all PaaS data services.  Set publicNetworkAccess
+    to Disabled (or public_network_access_enabled to false) on every PaaS resource. NEVER generate public_network_access_enabled
+    = true or publicNetworkAccess = Enabled.
+  rationale: Eliminates public internet exposure for data plane.  Both disabling public access AND adding private endpoints
+    are required — private endpoints alone do not block public access.
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - biz-analyst
+  template_check:
+    scope:
+    - key-vault
+    - sql-database
+    - cosmos-db
+    - storage
+    require_config:
+    - private_endpoint
+    error_message: 'Service ''{service_name}'' ({service_type}) missing private_endpoint: true'
+  targets:
+  - services:
+    - Microsoft.KeyVault/vaults
+- id: WAF-SEC-NET-001
+  severity: required
+  description: Disable public network access AND use private endpoints for all PaaS data services.  Set publicNetworkAccess
+    to Disabled (or public_network_access_enabled to false) on every PaaS resource. NEVER generate public_network_access_enabled
+    = true or publicNetworkAccess = Enabled.
+  rationale: Eliminates public internet exposure for data plane.  Both disabling public access AND adding private endpoints
+    are required — private endpoints alone do not block public access.
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - biz-analyst
+  template_check:
+    scope:
+    - key-vault
+    - sql-database
+    - cosmos-db
+    - storage
+    require_config:
+    - private_endpoint
+    error_message: 'Service ''{service_name}'' ({service_type}) missing private_endpoint: true'
+  targets:
+  - services:
+    - Microsoft.Sql/servers/databases
+- id: WAF-SEC-NET-001
+  severity: required
+  description: Disable public network access AND use private endpoints for all PaaS data services.  Set publicNetworkAccess
+    to Disabled (or public_network_access_enabled to false) on every PaaS resource. NEVER generate public_network_access_enabled
+    = true or publicNetworkAccess = Enabled.
+  rationale: Eliminates public internet exposure for data plane.  Both disabling public access AND adding private endpoints
+    are required — private endpoints alone do not block public access.
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - biz-analyst
+  template_check:
+    scope:
+    - key-vault
+    - sql-database
+    - cosmos-db
+    - storage
+    require_config:
+    - private_endpoint
+    error_message: 'Service ''{service_name}'' ({service_type}) missing private_endpoint: true'
+  targets:
+  - services:
+    - Microsoft.DocumentDB/databaseAccounts
+- id: WAF-SEC-NET-001
+  severity: required
+  description: Disable public network access AND use private endpoints for all PaaS data services.  Set publicNetworkAccess
+    to Disabled (or public_network_access_enabled to false) on every PaaS resource. NEVER generate public_network_access_enabled
+    = true or publicNetworkAccess = Enabled.
+  rationale: Eliminates public internet exposure for data plane.  Both disabling public access AND adding private endpoints
+    are required — private endpoints alone do not block public access.
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - biz-analyst
+  template_check:
+    scope:
+    - key-vault
+    - sql-database
+    - cosmos-db
+    - storage
+    require_config:
+    - private_endpoint
+    error_message: 'Service ''{service_name}'' ({service_type}) missing private_endpoint: true'
+  targets:
+  - services:
+    - TODO:storage
+- id: WAF-SEC-NET-002
+  severity: required
+  description: Deploy workloads in a dedicated subnet within the landing zone VNET
+  rationale: Network segmentation enables NSG and route table controls
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - biz-analyst
+  template_check:
     require_service:
     - virtual-network
     error_message: Template missing a virtual-network service for network isolation
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
 - id: WAF-SEC-NET-002
   severity: required
   description: Deploy workloads in a dedicated subnet within the landing zone VNET
   rationale: Network segmentation enables NSG and route table controls
-  applies_to: *id003
-  template_check: *id004
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - biz-analyst
+  template_check:
+    require_service:
+    - virtual-network
+    error_message: Template missing a virtual-network service for network isolation
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
 - id: WAF-SEC-NET-002
   severity: required
   description: Deploy workloads in a dedicated subnet within the landing zone VNET
   rationale: Network segmentation enables NSG and route table controls
-  applies_to: *id003
-  template_check: *id004
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - biz-analyst
+  template_check:
+    require_service:
+    - virtual-network
+    error_message: Template missing a virtual-network service for network isolation
   targets:
-    services:
+  - services:
     - Microsoft.KeyVault/vaults
 - id: WAF-SEC-NET-002
   severity: required
   description: Deploy workloads in a dedicated subnet within the landing zone VNET
   rationale: Network segmentation enables NSG and route table controls
-  applies_to: *id003
-  template_check: *id004
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - biz-analyst
+  template_check:
+    require_service:
+    - virtual-network
+    error_message: Template missing a virtual-network service for network isolation
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
 - id: WAF-SEC-NET-002
   severity: required
   description: Deploy workloads in a dedicated subnet within the landing zone VNET
   rationale: Network segmentation enables NSG and route table controls
-  applies_to: *id003
-  template_check: *id004
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - biz-analyst
+  template_check:
+    require_service:
+    - virtual-network
+    error_message: Template missing a virtual-network service for network isolation
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
 - id: WAF-SEC-NET-002
   severity: required
   description: Deploy workloads in a dedicated subnet within the landing zone VNET
   rationale: Network segmentation enables NSG and route table controls
-  applies_to: *id003
-  template_check: *id004
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - biz-analyst
+  template_check:
+    require_service:
+    - virtual-network
+    error_message: Template missing a virtual-network service for network isolation
   targets:
-    services:
+  - services:
     - TODO:storage
 - id: WAF-SEC-NET-005
   severity: required
@@ -156,11 +251,11 @@ rules:
     azapi_resource body blocks, set publicNetworkAccess = "Disabled". In Bicep, set properties.publicNetworkAccess = 'Disabled'.
   rationale: Azure PaaS services default to public access enabled.  Omitting the property results in a public endpoint.  This
     rule applies to POC, development, AND production — there are no security exemptions for non-production environments.
-  applies_to: &id005
+  applies_to:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
 - id: WAF-SEC-NET-005
   severity: required
@@ -170,9 +265,11 @@ rules:
     azapi_resource body blocks, set publicNetworkAccess = "Disabled". In Bicep, set properties.publicNetworkAccess = 'Disabled'.
   rationale: Azure PaaS services default to public access enabled.  Omitting the property results in a public endpoint.  This
     rule applies to POC, development, AND production — there are no security exemptions for non-production environments.
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
 - id: WAF-SEC-NET-005
   severity: required
@@ -182,9 +279,11 @@ rules:
     azapi_resource body blocks, set publicNetworkAccess = "Disabled". In Bicep, set properties.publicNetworkAccess = 'Disabled'.
   rationale: Azure PaaS services default to public access enabled.  Omitting the property results in a public endpoint.  This
     rule applies to POC, development, AND production — there are no security exemptions for non-production environments.
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.KeyVault/vaults
 - id: WAF-SEC-NET-005
   severity: required
@@ -194,9 +293,11 @@ rules:
     azapi_resource body blocks, set publicNetworkAccess = "Disabled". In Bicep, set properties.publicNetworkAccess = 'Disabled'.
   rationale: Azure PaaS services default to public access enabled.  Omitting the property results in a public endpoint.  This
     rule applies to POC, development, AND production — there are no security exemptions for non-production environments.
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
 - id: WAF-SEC-NET-005
   severity: required
@@ -206,9 +307,11 @@ rules:
     azapi_resource body blocks, set publicNetworkAccess = "Disabled". In Bicep, set properties.publicNetworkAccess = 'Disabled'.
   rationale: Azure PaaS services default to public access enabled.  Omitting the property results in a public endpoint.  This
     rule applies to POC, development, AND production — there are no security exemptions for non-production environments.
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
 - id: WAF-SEC-NET-005
   severity: required
@@ -218,111 +321,143 @@ rules:
     azapi_resource body blocks, set publicNetworkAccess = "Disabled". In Bicep, set properties.publicNetworkAccess = 'Disabled'.
   rationale: Azure PaaS services default to public access enabled.  Omitting the property results in a public endpoint.  This
     rule applies to POC, development, AND production — there are no security exemptions for non-production environments.
-  applies_to: *id005
+  applies_to:
+  - terraform-agent
+  - bicep-agent
   targets:
-    services:
+  - services:
     - TODO:storage
 - id: WAF-SEC-NET-003
   severity: recommended
   description: Use NSGs to restrict traffic between subnets to only required ports
   rationale: Defence in depth beyond private endpoints
-  applies_to: &id006
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
 - id: WAF-SEC-NET-003
   severity: recommended
   description: Use NSGs to restrict traffic between subnets to only required ports
   rationale: Defence in depth beyond private endpoints
-  applies_to: *id006
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
 - id: WAF-SEC-NET-003
   severity: recommended
   description: Use NSGs to restrict traffic between subnets to only required ports
   rationale: Defence in depth beyond private endpoints
-  applies_to: *id006
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.KeyVault/vaults
 - id: WAF-SEC-NET-003
   severity: recommended
   description: Use NSGs to restrict traffic between subnets to only required ports
   rationale: Defence in depth beyond private endpoints
-  applies_to: *id006
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
 - id: WAF-SEC-NET-003
   severity: recommended
   description: Use NSGs to restrict traffic between subnets to only required ports
   rationale: Defence in depth beyond private endpoints
-  applies_to: *id006
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
 - id: WAF-SEC-NET-003
   severity: recommended
   description: Use NSGs to restrict traffic between subnets to only required ports
   rationale: Defence in depth beyond private endpoints
-  applies_to: *id006
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
   targets:
-    services:
+  - services:
     - TODO:storage
 - id: WAF-SEC-NET-004
   severity: recommended
   description: Enable diagnostic logging on NSGs for traffic auditing
   rationale: Required for incident investigation and compliance
-  applies_to: &id007
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.App/containerApps
 - id: WAF-SEC-NET-004
   severity: recommended
   description: Enable diagnostic logging on NSGs for traffic auditing
   rationale: Required for incident investigation and compliance
-  applies_to: *id007
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
 - id: WAF-SEC-NET-004
   severity: recommended
   description: Enable diagnostic logging on NSGs for traffic auditing
   rationale: Required for incident investigation and compliance
-  applies_to: *id007
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.KeyVault/vaults
 - id: WAF-SEC-NET-004
   severity: recommended
   description: Enable diagnostic logging on NSGs for traffic auditing
   rationale: Required for incident investigation and compliance
-  applies_to: *id007
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers/databases
 - id: WAF-SEC-NET-004
   severity: recommended
   description: Enable diagnostic logging on NSGs for traffic auditing
   rationale: Required for incident investigation and compliance
-  applies_to: *id007
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.DocumentDB/databaseAccounts
 - id: WAF-SEC-NET-004
   severity: recommended
   description: Enable diagnostic logging on NSGs for traffic auditing
   rationale: Required for incident investigation and compliance
-  applies_to: *id007
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
   targets:
-    services:
+  - services:
     - TODO:storage
 patterns:
 - name: Private endpoint for Key Vault

@@ -17,7 +17,7 @@ rules:
   - Microsoft.Network/loadBalancers/outboundRules (explicit outbound if disableOutboundSnat is true)
   - Microsoft.Insights/diagnosticSettings (route metrics to Log Analytics)
   targets:
-    services:
+  - services:
     - Microsoft.Network/loadBalancers
     terraform_pattern: |
       resource "azapi_resource" "load_balancer" {
@@ -162,7 +162,7 @@ rules:
   - cloud-architect
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.Network/loadBalancers
     terraform_pattern: |
       # Set enableTcpReset = true in loadBalancingRules properties
@@ -184,7 +184,7 @@ rules:
   - Microsoft.Network/publicIPAddresses (dedicated outbound public IP)
   - Microsoft.Network/natGateways (alternative — use NAT Gateway instead of outbound rules)
   targets:
-    services:
+  - services:
     - Microsoft.Network/loadBalancers
     terraform_pattern: |
       resource "azapi_resource" "lb_outbound_rule" {
@@ -251,7 +251,7 @@ rules:
   companion_resources:
   - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
   targets:
-    services:
+  - services:
     - Microsoft.Network/loadBalancers
     terraform_pattern: |
       resource "azapi_resource" "lb_diagnostics" {

@@ -171,7 +171,7 @@ rules:
     - public_access_disabled
     error_message: 'Service ''{service_name}'' ({service_type}) missing {config_key}: true'
   targets:
-    services:
+  - services:
     - TODO:storage
     terraform_pattern: |
       resource "azapi_resource" "storage_account" {
@@ -236,7 +236,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - TODO:storage
     terraform_pattern: |
       resource "azapi_resource" "storage_blob_service" {
@@ -331,7 +331,7 @@ rules:
         }
       }
   targets:
-    services:
+  - services:
     - TODO:storage
 - id: AZ-ST-004
   severity: recommended
@@ -343,7 +343,7 @@ rules:
   - bicep-agent
   - cost-analyst
   targets:
-    services:
+  - services:
     - TODO:storage
 - id: AZ-ST-005
   severity: recommended
@@ -355,7 +355,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - TODO:storage
     terraform_pattern: |
       # In ST-001, change the sku.name to the appropriate redundancy level:
@@ -377,7 +377,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - TODO:storage
     terraform_pattern: |
       resource "azapi_resource" "storage_blob_service_restore" {
@@ -430,7 +430,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - TODO:storage
     terraform_pattern: |
       resource "azapi_resource" "storage_lock" {
@@ -465,7 +465,7 @@ rules:
   - bicep-agent
   - security-reviewer
   targets:
-    services:
+  - services:
     - TODO:storage
 patterns:
 - name: Storage account with security baseline

@@ -4,10 +4,13 @@ description: Storage account, Cosmos DB, and data service configuration detectio
 last_updated: '2026-04-04'
 patterns:
 - id: ANTI-STOR-001
-  warning_message: Account-level key access detected — use Microsoft Entra RBAC with managed identity instead.
   description: Detects shared key access enabled on storage accounts instead of Entra ID authentication
   rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  warning_message: Account-level key access detected — use Microsoft Entra RBAC with managed identity instead.
+  applies_to: []
   targets:
+  - services:
+    - Microsoft.Storage/storageAccounts
     search_patterns:
     - account-level keys
     - account_key_enabled
@@ -19,12 +22,14 @@ patterns:
     - shared_access_key_enabled = false
     - allowSharedKeyAccess = false
     - '# Use Microsoft Entra RBAC with managed identity'
-  applies_to: []
 - id: ANTI-STOR-002
-  warning_message: Public blob access enabled — disable public access and use SAS tokens or managed identity.
   description: Detects blob public access enabled on storage containers
   rationale: Public network access exposes services to internet-based attacks.
+  warning_message: Public blob access enabled — disable public access and use SAS tokens or managed identity.
+  applies_to: []
   targets:
+  - services:
+    - Microsoft.Storage/storageAccounts
     search_patterns:
     - allow_blob_public_access = true
     - public_access = "blob"
@@ -34,4 +39,3 @@ patterns:
     - allow_blob_public_access = false
     - allowBlobPublicAccess = false
     - public_access = "none"
-  applies_to: []

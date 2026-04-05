@@ -7,12 +7,12 @@ rules:
   severity: required
   description: Configure Data Factory linked services to SQL Database and Storage using managed identity — never stored credentials
   rationale: Managed identity eliminates credential rotation burden and prevents secret sprawl across linked services
-  applies_to: &id001
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
   - app-developer
-  companion_resources: &id002
+  companion_resources:
   - type: Microsoft.DataFactory/factories/managedVirtualNetworks@2018-06-01
     name: default
     description: Managed VNet for ADF to enable managed private endpoints
@@ -31,7 +31,7 @@ rules:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: adf-kv-secrets-user
     description: Key Vault Secrets User role (4633458b) for ADF managed identity
-  template_check: &id003
+  template_check:
     when_services_present:
     - data-factory
     - azure-sql
@@ -40,7 +40,7 @@ rules:
     severity: warning
     error_message: Data Factory + SQL template must include Key Vault for secret management in linked services
   targets:
-    services:
+  - services:
     - Microsoft.DataFactory/factories
     terraform_pattern: |
       # Data Factory with managed identity (see ADF-001 for full factory config)
@@ -212,7 +212,7 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: &id004
+    prohibitions:
     - NEVER store credentials (passwords, connection strings, SAS tokens) in ADF linked service definitions — use managed
       identity or Key Vault references
     - NEVER use the default Azure IR without managed VNet — data flows over public internet
@@ -222,11 +222,40 @@ rules:
   severity: required
   description: Configure Data Factory linked services to SQL Database and Storage using managed identity — never stored credentials
   rationale: Managed identity eliminates credential rotation burden and prevents secret sprawl across linked services
-  applies_to: *id001
-  companion_resources: *id002
-  template_check: *id003
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.DataFactory/factories/managedVirtualNetworks@2018-06-01
+    name: default
+    description: Managed VNet for ADF to enable managed private endpoints
+  - type: Microsoft.DataFactory/factories/integrationRuntimes@2018-06-01
+    name: ManagedVNetIR
+    description: Managed VNet integration runtime — all data movement stays on Azure backbone
+  - type: Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints@2018-06-01
+    name: mpe-sql
+    description: Managed private endpoint from ADF to SQL Database
+  - type: Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints@2018-06-01
+    name: mpe-storage
+    description: Managed private endpoint from ADF to Storage Account
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: adf-storage-contributor
+    description: Storage Blob Data Contributor role for ADF managed identity
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: adf-kv-secrets-user
+    description: Key Vault Secrets User role (4633458b) for ADF managed identity
+  template_check:
+    when_services_present:
+    - data-factory
+    - azure-sql
+    require_service:
+    - key-vault
+    severity: warning
+    error_message: Data Factory + SQL template must include Key Vault for secret management in linked services
   targets:
-    services:
+  - services:
     - Microsoft.Synapse/workspaces
     terraform_pattern: |
       # Data Factory with managed identity (see ADF-001 for full factory config)
@@ -398,16 +427,50 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER store credentials (passwords, connection strings, SAS tokens) in ADF linked service definitions — use managed
+      identity or Key Vault references
+    - NEVER use the default Azure IR without managed VNet — data flows over public internet
+    - NEVER grant Key Vault Administrator to ADF — use least-privilege Secrets User role (4633458b)
+    - NEVER use self-hosted IR when managed VNet IR with managed private endpoints is sufficient
 - id: CC-INT-DP-001
   severity: required
   description: Configure Data Factory linked services to SQL Database and Storage using managed identity — never stored credentials
   rationale: Managed identity eliminates credential rotation burden and prevents secret sprawl across linked services
-  applies_to: *id001
-  companion_resources: *id002
-  template_check: *id003
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.DataFactory/factories/managedVirtualNetworks@2018-06-01
+    name: default
+    description: Managed VNet for ADF to enable managed private endpoints
+  - type: Microsoft.DataFactory/factories/integrationRuntimes@2018-06-01
+    name: ManagedVNetIR
+    description: Managed VNet integration runtime — all data movement stays on Azure backbone
+  - type: Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints@2018-06-01
+    name: mpe-sql
+    description: Managed private endpoint from ADF to SQL Database
+  - type: Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints@2018-06-01
+    name: mpe-storage
+    description: Managed private endpoint from ADF to Storage Account
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: adf-storage-contributor
+    description: Storage Blob Data Contributor role for ADF managed identity
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: adf-kv-secrets-user
+    description: Key Vault Secrets User role (4633458b) for ADF managed identity
+  template_check:
+    when_services_present:
+    - data-factory
+    - azure-sql
+    require_service:
+    - key-vault
+    severity: warning
+    error_message: Data Factory + SQL template must include Key Vault for secret management in linked services
   targets:
-    services:
+  - services:
     - Microsoft.Databricks/workspaces
     terraform_pattern: |
       # Data Factory with managed identity (see ADF-001 for full factory config)
@@ -579,16 +642,50 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER store credentials (passwords, connection strings, SAS tokens) in ADF linked service definitions — use managed
+      identity or Key Vault references
+    - NEVER use the default Azure IR without managed VNet — data flows over public internet
+    - NEVER grant Key Vault Administrator to ADF — use least-privilege Secrets User role (4633458b)
+    - NEVER use self-hosted IR when managed VNet IR with managed private endpoints is sufficient
 - id: CC-INT-DP-001
   severity: required
   description: Configure Data Factory linked services to SQL Database and Storage using managed identity — never stored credentials
   rationale: Managed identity eliminates credential rotation burden and prevents secret sprawl across linked services
-  applies_to: *id001
-  companion_resources: *id002
-  template_check: *id003
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.DataFactory/factories/managedVirtualNetworks@2018-06-01
+    name: default
+    description: Managed VNet for ADF to enable managed private endpoints
+  - type: Microsoft.DataFactory/factories/integrationRuntimes@2018-06-01
+    name: ManagedVNetIR
+    description: Managed VNet integration runtime — all data movement stays on Azure backbone
+  - type: Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints@2018-06-01
+    name: mpe-sql
+    description: Managed private endpoint from ADF to SQL Database
+  - type: Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints@2018-06-01
+    name: mpe-storage
+    description: Managed private endpoint from ADF to Storage Account
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: adf-storage-contributor
+    description: Storage Blob Data Contributor role for ADF managed identity
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: adf-kv-secrets-user
+    description: Key Vault Secrets User role (4633458b) for ADF managed identity
+  template_check:
+    when_services_present:
+    - data-factory
+    - azure-sql
+    require_service:
+    - key-vault
+    severity: warning
+    error_message: Data Factory + SQL template must include Key Vault for secret management in linked services
   targets:
-    services:
+  - services:
     - Microsoft.Storage/storageAccounts
     terraform_pattern: |
       # Data Factory with managed identity (see ADF-001 for full factory config)
@@ -760,16 +857,50 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER store credentials (passwords, connection strings, SAS tokens) in ADF linked service definitions — use managed
+      identity or Key Vault references
+    - NEVER use the default Azure IR without managed VNet — data flows over public internet
+    - NEVER grant Key Vault Administrator to ADF — use least-privilege Secrets User role (4633458b)
+    - NEVER use self-hosted IR when managed VNet IR with managed private endpoints is sufficient
 - id: CC-INT-DP-001
   severity: required
   description: Configure Data Factory linked services to SQL Database and Storage using managed identity — never stored credentials
   rationale: Managed identity eliminates credential rotation burden and prevents secret sprawl across linked services
-  applies_to: *id001
-  companion_resources: *id002
-  template_check: *id003
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.DataFactory/factories/managedVirtualNetworks@2018-06-01
+    name: default
+    description: Managed VNet for ADF to enable managed private endpoints
+  - type: Microsoft.DataFactory/factories/integrationRuntimes@2018-06-01
+    name: ManagedVNetIR
+    description: Managed VNet integration runtime — all data movement stays on Azure backbone
+  - type: Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints@2018-06-01
+    name: mpe-sql
+    description: Managed private endpoint from ADF to SQL Database
+  - type: Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints@2018-06-01
+    name: mpe-storage
+    description: Managed private endpoint from ADF to Storage Account
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: adf-storage-contributor
+    description: Storage Blob Data Contributor role for ADF managed identity
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: adf-kv-secrets-user
+    description: Key Vault Secrets User role (4633458b) for ADF managed identity
+  template_check:
+    when_services_present:
+    - data-factory
+    - azure-sql
+    require_service:
+    - key-vault
+    severity: warning
+    error_message: Data Factory + SQL template must include Key Vault for secret management in linked services
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers
     terraform_pattern: |
       # Data Factory with managed identity (see ADF-001 for full factory config)
@@ -941,17 +1072,22 @@ rules:
           principalType: 'ServicePrincipal'
         }
       }
-    prohibitions: *id004
+    prohibitions:
+    - NEVER store credentials (passwords, connection strings, SAS tokens) in ADF linked service definitions — use managed
+      identity or Key Vault references
+    - NEVER use the default Azure IR without managed VNet — data flows over public internet
+    - NEVER grant Key Vault Administrator to ADF — use least-privilege Secrets User role (4633458b)
+    - NEVER use self-hosted IR when managed VNet IR with managed private endpoints is sufficient
 - id: CC-INT-DP-002
   severity: required
   description: Configure Synapse Workspace with ADLS Gen2 default data lake using managed identity and managed private endpoints
   rationale: Synapse requires a default data lake for workspace artifacts; managed identity eliminates storage account keys
     in configuration
-  applies_to: &id005
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
-  companion_resources: &id006
+  companion_resources:
   - type: Microsoft.Storage/storageAccounts@2023-05-01
     name: synapse-data-lake
     description: 'ADLS Gen2 storage account (isHnsEnabled: true) for Synapse default data lake'
@@ -964,7 +1100,7 @@ rules:
   - type: Microsoft.Synapse/workspaces/managedVirtualNetworks/managedPrivateEndpoints@2021-06-01
     name: mpe-datalake-blob
     description: Managed private endpoint for Synapse to access data lake Blob endpoint
-  template_check: &id007
+  template_check:
     when_services_present:
     - synapse-workspace
     require_service:
@@ -972,7 +1108,7 @@ rules:
     severity: error
     error_message: Synapse workspace requires a storage account with ADLS Gen2 (isHnsEnabled) as default data lake
   targets:
-    services:
+  - services:
     - Microsoft.DataFactory/factories
     terraform_pattern: |
       # ADLS Gen2 storage account for Synapse default data lake
@@ -1118,7 +1254,7 @@ rules:
           fqdns: ['${synapseStorageName}.blob.core.windows.net']
         }
       }
-    prohibitions: &id008
+    prohibitions:
     - NEVER use storage account keys for Synapse data lake access — use managed identity with Storage Blob Data Contributor
     - NEVER use a storage account without isHnsEnabled for Synapse default data lake — it requires ADLS Gen2
     - NEVER skip managed private endpoints for data lake access when Synapse managed VNet is enabled
@@ -1128,11 +1264,32 @@ rules:
   description: Configure Synapse Workspace with ADLS Gen2 default data lake using managed identity and managed private endpoints
   rationale: Synapse requires a default data lake for workspace artifacts; managed identity eliminates storage account keys
     in configuration
-  applies_to: *id005
-  companion_resources: *id006
-  template_check: *id007
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  companion_resources:
+  - type: Microsoft.Storage/storageAccounts@2023-05-01
+    name: synapse-data-lake
+    description: 'ADLS Gen2 storage account (isHnsEnabled: true) for Synapse default data lake'
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: synapse-storage-contributor
+    description: Storage Blob Data Contributor role for Synapse managed identity on data lake
+  - type: Microsoft.Synapse/workspaces/managedVirtualNetworks/managedPrivateEndpoints@2021-06-01
+    name: mpe-datalake-dfs
+    description: Managed private endpoint for Synapse to access data lake DFS endpoint
+  - type: Microsoft.Synapse/workspaces/managedVirtualNetworks/managedPrivateEndpoints@2021-06-01
+    name: mpe-datalake-blob
+    description: Managed private endpoint for Synapse to access data lake Blob endpoint
+  template_check:
+    when_services_present:
+    - synapse-workspace
+    require_service:
+    - storage-account
+    severity: error
+    error_message: Synapse workspace requires a storage account with ADLS Gen2 (isHnsEnabled) as default data lake
   targets:
-    services:
+  - services:
     - Microsoft.Synapse/workspaces
     terraform_pattern: |
       # ADLS Gen2 storage account for Synapse default data lake
@@ -1278,17 +1435,42 @@ rules:
           fqdns: ['${synapseStorageName}.blob.core.windows.net']
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER use storage account keys for Synapse data lake access — use managed identity with Storage Blob Data Contributor
+    - NEVER use a storage account without isHnsEnabled for Synapse default data lake — it requires ADLS Gen2
+    - NEVER skip managed private endpoints for data lake access when Synapse managed VNet is enabled
+    - NEVER use public endpoints for data movement between Synapse and storage
 - id: CC-INT-DP-002
   severity: required
   description: Configure Synapse Workspace with ADLS Gen2 default data lake using managed identity and managed private endpoints
   rationale: Synapse requires a default data lake for workspace artifacts; managed identity eliminates storage account keys
     in configuration
-  applies_to: *id005
-  companion_resources: *id006
-  template_check: *id007
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  companion_resources:
+  - type: Microsoft.Storage/storageAccounts@2023-05-01
+    name: synapse-data-lake
+    description: 'ADLS Gen2 storage account (isHnsEnabled: true) for Synapse default data lake'
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: synapse-storage-contributor
+    description: Storage Blob Data Contributor role for Synapse managed identity on data lake
+  - type: Microsoft.Synapse/workspaces/managedVirtualNetworks/managedPrivateEndpoints@2021-06-01
+    name: mpe-datalake-dfs
+    description: Managed private endpoint for Synapse to access data lake DFS endpoint
+  - type: Microsoft.Synapse/workspaces/managedVirtualNetworks/managedPrivateEndpoints@2021-06-01
+    name: mpe-datalake-blob
+    description: Managed private endpoint for Synapse to access data lake Blob endpoint
+  template_check:
+    when_services_present:
+    - synapse-workspace
+    require_service:
+    - storage-account
+    severity: error
+    error_message: Synapse workspace requires a storage account with ADLS Gen2 (isHnsEnabled) as default data lake
   targets:
-    services:
+  - services:
     - Microsoft.Databricks/workspaces
     terraform_pattern: |
       # ADLS Gen2 storage account for Synapse default data lake
@@ -1434,17 +1616,42 @@ rules:
           fqdns: ['${synapseStorageName}.blob.core.windows.net']
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER use storage account keys for Synapse data lake access — use managed identity with Storage Blob Data Contributor
+    - NEVER use a storage account without isHnsEnabled for Synapse default data lake — it requires ADLS Gen2
+    - NEVER skip managed private endpoints for data lake access when Synapse managed VNet is enabled
+    - NEVER use public endpoints for data movement between Synapse and storage
 - id: CC-INT-DP-002
   severity: required
   description: Configure Synapse Workspace with ADLS Gen2 default data lake using managed identity and managed private endpoints
   rationale: Synapse requires a default data lake for workspace artifacts; managed identity eliminates storage account keys
     in configuration
-  applies_to: *id005
-  companion_resources: *id006
-  template_check: *id007
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  companion_resources:
+  - type: Microsoft.Storage/storageAccounts@2023-05-01
+    name: synapse-data-lake
+    description: 'ADLS Gen2 storage account (isHnsEnabled: true) for Synapse default data lake'
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: synapse-storage-contributor
+    description: Storage Blob Data Contributor role for Synapse managed identity on data lake
+  - type: Microsoft.Synapse/workspaces/managedVirtualNetworks/managedPrivateEndpoints@2021-06-01
+    name: mpe-datalake-dfs
+    description: Managed private endpoint for Synapse to access data lake DFS endpoint
+  - type: Microsoft.Synapse/workspaces/managedVirtualNetworks/managedPrivateEndpoints@2021-06-01
+    name: mpe-datalake-blob
+    description: Managed private endpoint for Synapse to access data lake Blob endpoint
+  template_check:
+    when_services_present:
+    - synapse-workspace
+    require_service:
+    - storage-account
+    severity: error
+    error_message: Synapse workspace requires a storage account with ADLS Gen2 (isHnsEnabled) as default data lake
   targets:
-    services:
+  - services:
     - Microsoft.Storage/storageAccounts
     terraform_pattern: |
       # ADLS Gen2 storage account for Synapse default data lake
@@ -1590,17 +1797,42 @@ rules:
           fqdns: ['${synapseStorageName}.blob.core.windows.net']
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER use storage account keys for Synapse data lake access — use managed identity with Storage Blob Data Contributor
+    - NEVER use a storage account without isHnsEnabled for Synapse default data lake — it requires ADLS Gen2
+    - NEVER skip managed private endpoints for data lake access when Synapse managed VNet is enabled
+    - NEVER use public endpoints for data movement between Synapse and storage
 - id: CC-INT-DP-002
   severity: required
   description: Configure Synapse Workspace with ADLS Gen2 default data lake using managed identity and managed private endpoints
   rationale: Synapse requires a default data lake for workspace artifacts; managed identity eliminates storage account keys
     in configuration
-  applies_to: *id005
-  companion_resources: *id006
-  template_check: *id007
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  companion_resources:
+  - type: Microsoft.Storage/storageAccounts@2023-05-01
+    name: synapse-data-lake
+    description: 'ADLS Gen2 storage account (isHnsEnabled: true) for Synapse default data lake'
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: synapse-storage-contributor
+    description: Storage Blob Data Contributor role for Synapse managed identity on data lake
+  - type: Microsoft.Synapse/workspaces/managedVirtualNetworks/managedPrivateEndpoints@2021-06-01
+    name: mpe-datalake-dfs
+    description: Managed private endpoint for Synapse to access data lake DFS endpoint
+  - type: Microsoft.Synapse/workspaces/managedVirtualNetworks/managedPrivateEndpoints@2021-06-01
+    name: mpe-datalake-blob
+    description: Managed private endpoint for Synapse to access data lake Blob endpoint
+  template_check:
+    when_services_present:
+    - synapse-workspace
+    require_service:
+    - storage-account
+    severity: error
+    error_message: Synapse workspace requires a storage account with ADLS Gen2 (isHnsEnabled) as default data lake
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers
     terraform_pattern: |
       # ADLS Gen2 storage account for Synapse default data lake
@@ -1746,18 +1978,22 @@ rules:
           fqdns: ['${synapseStorageName}.blob.core.windows.net']
         }
       }
-    prohibitions: *id008
+    prohibitions:
+    - NEVER use storage account keys for Synapse data lake access — use managed identity with Storage Blob Data Contributor
+    - NEVER use a storage account without isHnsEnabled for Synapse default data lake — it requires ADLS Gen2
+    - NEVER skip managed private endpoints for data lake access when Synapse managed VNet is enabled
+    - NEVER use public endpoints for data movement between Synapse and storage
 - id: CC-INT-DP-003
   severity: required
   description: Configure Databricks workspace with Key Vault-backed secret scope for secure credential access
   rationale: Databricks secret scopes backed by Key Vault centralize secret management; Azure-managed scopes lack audit trail
     and rotation
-  applies_to: &id009
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
   - app-developer
-  companion_resources: &id010
+  companion_resources:
   - type: Microsoft.KeyVault/vaults@2023-07-01
     name: dbr-key-vault
     description: Key Vault with RBAC authorization for Databricks secret scope backing store
@@ -1767,7 +2003,7 @@ rules:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: dbr-kv-secrets-user
     description: Key Vault Secrets User role (4633458b) for Databricks workspace identity
-  template_check: &id011
+  template_check:
     when_services_present:
     - databricks
     require_service:
@@ -1775,7 +2011,7 @@ rules:
     severity: warning
     error_message: Databricks template must include Key Vault for Key Vault-backed secret scopes
   targets:
-    services:
+  - services:
     - Microsoft.DataFactory/factories
     terraform_pattern: |
       # Key Vault for Databricks secret scope
@@ -1920,7 +2156,7 @@ rules:
       //     "dns_name": "https://<key-vault-name>.vault.azure.net/"
       //   }
       // }
-    prohibitions: &id012
+    prohibitions:
     - NEVER use Databricks-managed secret scopes for production — they lack Key Vault audit trail and centralized rotation
     - NEVER store secrets in Databricks notebooks or cluster init scripts
     - NEVER grant Key Vault Administrator role to Databricks — use Secrets User (read-only)
@@ -1930,11 +2166,30 @@ rules:
   description: Configure Databricks workspace with Key Vault-backed secret scope for secure credential access
   rationale: Databricks secret scopes backed by Key Vault centralize secret management; Azure-managed scopes lack audit trail
     and rotation
-  applies_to: *id009
-  companion_resources: *id010
-  template_check: *id011
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.KeyVault/vaults@2023-07-01
+    name: dbr-key-vault
+    description: Key Vault with RBAC authorization for Databricks secret scope backing store
+  - type: Microsoft.Network/privateEndpoints@2024-01-01
+    name: pe-dbr-kv
+    description: Private endpoint for Key Vault access from Databricks VNet
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: dbr-kv-secrets-user
+    description: Key Vault Secrets User role (4633458b) for Databricks workspace identity
+  template_check:
+    when_services_present:
+    - databricks
+    require_service:
+    - key-vault
+    severity: warning
+    error_message: Databricks template must include Key Vault for Key Vault-backed secret scopes
   targets:
-    services:
+  - services:
     - Microsoft.Synapse/workspaces
     terraform_pattern: |
       # Key Vault for Databricks secret scope
@@ -2079,17 +2334,40 @@ rules:
       //     "dns_name": "https://<key-vault-name>.vault.azure.net/"
       //   }
       // }
-    prohibitions: *id012
+    prohibitions:
+    - NEVER use Databricks-managed secret scopes for production — they lack Key Vault audit trail and centralized rotation
+    - NEVER store secrets in Databricks notebooks or cluster init scripts
+    - NEVER grant Key Vault Administrator role to Databricks — use Secrets User (read-only)
+    - NEVER use access policy-based Key Vault for Databricks secret scopes — use RBAC authorization
 - id: CC-INT-DP-003
   severity: required
   description: Configure Databricks workspace with Key Vault-backed secret scope for secure credential access
   rationale: Databricks secret scopes backed by Key Vault centralize secret management; Azure-managed scopes lack audit trail
     and rotation
-  applies_to: *id009
-  companion_resources: *id010
-  template_check: *id011
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.KeyVault/vaults@2023-07-01
+    name: dbr-key-vault
+    description: Key Vault with RBAC authorization for Databricks secret scope backing store
+  - type: Microsoft.Network/privateEndpoints@2024-01-01
+    name: pe-dbr-kv
+    description: Private endpoint for Key Vault access from Databricks VNet
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: dbr-kv-secrets-user
+    description: Key Vault Secrets User role (4633458b) for Databricks workspace identity
+  template_check:
+    when_services_present:
+    - databricks
+    require_service:
+    - key-vault
+    severity: warning
+    error_message: Databricks template must include Key Vault for Key Vault-backed secret scopes
   targets:
-    services:
+  - services:
     - Microsoft.Databricks/workspaces
     terraform_pattern: |
       # Key Vault for Databricks secret scope
@@ -2234,17 +2512,40 @@ rules:
       //     "dns_name": "https://<key-vault-name>.vault.azure.net/"
       //   }
       // }
-    prohibitions: *id012
+    prohibitions:
+    - NEVER use Databricks-managed secret scopes for production — they lack Key Vault audit trail and centralized rotation
+    - NEVER store secrets in Databricks notebooks or cluster init scripts
+    - NEVER grant Key Vault Administrator role to Databricks — use Secrets User (read-only)
+    - NEVER use access policy-based Key Vault for Databricks secret scopes — use RBAC authorization
 - id: CC-INT-DP-003
   severity: required
   description: Configure Databricks workspace with Key Vault-backed secret scope for secure credential access
   rationale: Databricks secret scopes backed by Key Vault centralize secret management; Azure-managed scopes lack audit trail
     and rotation
-  applies_to: *id009
-  companion_resources: *id010
-  template_check: *id011
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.KeyVault/vaults@2023-07-01
+    name: dbr-key-vault
+    description: Key Vault with RBAC authorization for Databricks secret scope backing store
+  - type: Microsoft.Network/privateEndpoints@2024-01-01
+    name: pe-dbr-kv
+    description: Private endpoint for Key Vault access from Databricks VNet
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: dbr-kv-secrets-user
+    description: Key Vault Secrets User role (4633458b) for Databricks workspace identity
+  template_check:
+    when_services_present:
+    - databricks
+    require_service:
+    - key-vault
+    severity: warning
+    error_message: Databricks template must include Key Vault for Key Vault-backed secret scopes
   targets:
-    services:
+  - services:
     - Microsoft.Storage/storageAccounts
     terraform_pattern: |
       # Key Vault for Databricks secret scope
@@ -2389,17 +2690,40 @@ rules:
       //     "dns_name": "https://<key-vault-name>.vault.azure.net/"
       //   }
       // }
-    prohibitions: *id012
+    prohibitions:
+    - NEVER use Databricks-managed secret scopes for production — they lack Key Vault audit trail and centralized rotation
+    - NEVER store secrets in Databricks notebooks or cluster init scripts
+    - NEVER grant Key Vault Administrator role to Databricks — use Secrets User (read-only)
+    - NEVER use access policy-based Key Vault for Databricks secret scopes — use RBAC authorization
 - id: CC-INT-DP-003
   severity: required
   description: Configure Databricks workspace with Key Vault-backed secret scope for secure credential access
   rationale: Databricks secret scopes backed by Key Vault centralize secret management; Azure-managed scopes lack audit trail
     and rotation
-  applies_to: *id009
-  companion_resources: *id010
-  template_check: *id011
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  companion_resources:
+  - type: Microsoft.KeyVault/vaults@2023-07-01
+    name: dbr-key-vault
+    description: Key Vault with RBAC authorization for Databricks secret scope backing store
+  - type: Microsoft.Network/privateEndpoints@2024-01-01
+    name: pe-dbr-kv
+    description: Private endpoint for Key Vault access from Databricks VNet
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: dbr-kv-secrets-user
+    description: Key Vault Secrets User role (4633458b) for Databricks workspace identity
+  template_check:
+    when_services_present:
+    - databricks
+    require_service:
+    - key-vault
+    severity: warning
+    error_message: Databricks template must include Key Vault for Key Vault-backed secret scopes
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers
     terraform_pattern: |
       # Key Vault for Databricks secret scope
@@ -2544,17 +2868,21 @@ rules:
       //     "dns_name": "https://<key-vault-name>.vault.azure.net/"
       //   }
       // }
-    prohibitions: *id012
+    prohibitions:
+    - NEVER use Databricks-managed secret scopes for production — they lack Key Vault audit trail and centralized rotation
+    - NEVER store secrets in Databricks notebooks or cluster init scripts
+    - NEVER grant Key Vault Administrator role to Databricks — use Secrets User (read-only)
+    - NEVER use access policy-based Key Vault for Databricks secret scopes — use RBAC authorization
 - id: CC-INT-DP-004
   severity: required
   description: Enforce encryption in transit for all cross-service data movement using private endpoints and TLS 1.2+
   rationale: Data in transit between services must be encrypted and routed privately to prevent interception and exfiltration
-  applies_to: &id013
+  applies_to:
   - cloud-architect
   - terraform-agent
   - bicep-agent
   - security-reviewer
-  companion_resources: &id014
+  companion_resources:
   - type: Microsoft.Network/privateEndpoints@2024-01-01
     name: pe-sql
     description: Private endpoint for SQL Server with groupId 'sqlServer'
@@ -2568,7 +2896,7 @@ rules:
     name: privatelink.blob.core.windows.net
     description: Private DNS zone for Storage Account blob private endpoint resolution
   targets:
-    services:
+  - services:
     - Microsoft.DataFactory/factories
     terraform_pattern: |
       # Storage Account: enforce HTTPS and TLS 1.2
@@ -2747,7 +3075,7 @@ rules:
           ]
         }
       }
-    prohibitions: &id015
+    prohibitions:
     - NEVER use public endpoints for data movement between pipeline services — use private endpoints or managed private endpoints
     - NEVER allow TLS versions below 1.2 on any service in the data pipeline
     - NEVER set supportsHttpsTrafficOnly to false on storage accounts — HTTP allows unencrypted data transfer
@@ -2757,10 +3085,26 @@ rules:
   severity: required
   description: Enforce encryption in transit for all cross-service data movement using private endpoints and TLS 1.2+
   rationale: Data in transit between services must be encrypted and routed privately to prevent interception and exfiltration
-  applies_to: *id013
-  companion_resources: *id014
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - security-reviewer
+  companion_resources:
+  - type: Microsoft.Network/privateEndpoints@2024-01-01
+    name: pe-sql
+    description: Private endpoint for SQL Server with groupId 'sqlServer'
+  - type: Microsoft.Network/privateEndpoints@2024-01-01
+    name: pe-storage
+    description: Private endpoint for Storage Account with groupId 'blob'
+  - type: Microsoft.Network/privateDnsZones@2024-06-01
+    name: privatelink.database.windows.net
+    description: Private DNS zone for SQL Server private endpoint resolution
+  - type: Microsoft.Network/privateDnsZones@2024-06-01
+    name: privatelink.blob.core.windows.net
+    description: Private DNS zone for Storage Account blob private endpoint resolution
   targets:
-    services:
+  - services:
     - Microsoft.Synapse/workspaces
     terraform_pattern: |
       # Storage Account: enforce HTTPS and TLS 1.2
@@ -2939,15 +3283,36 @@ rules:
           ]
         }
       }
-    prohibitions: *id015
+    prohibitions:
+    - NEVER use public endpoints for data movement between pipeline services — use private endpoints or managed private endpoints
+    - NEVER allow TLS versions below 1.2 on any service in the data pipeline
+    - NEVER set supportsHttpsTrafficOnly to false on storage accounts — HTTP allows unencrypted data transfer
+    - NEVER use SQL authentication (passwords) for pipeline connections — use Entra-only authentication
+    - NEVER set publicNetworkAccess to Enabled on data pipeline services
 - id: CC-INT-DP-004
   severity: required
   description: Enforce encryption in transit for all cross-service data movement using private endpoints and TLS 1.2+
   rationale: Data in transit between services must be encrypted and routed privately to prevent interception and exfiltration
-  applies_to: *id013
-  companion_resources: *id014
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - security-reviewer
+  companion_resources:
+  - type: Microsoft.Network/privateEndpoints@2024-01-01
+    name: pe-sql
+    description: Private endpoint for SQL Server with groupId 'sqlServer'
+  - type: Microsoft.Network/privateEndpoints@2024-01-01
+    name: pe-storage
+    description: Private endpoint for Storage Account with groupId 'blob'
+  - type: Microsoft.Network/privateDnsZones@2024-06-01
+    name: privatelink.database.windows.net
+    description: Private DNS zone for SQL Server private endpoint resolution
+  - type: Microsoft.Network/privateDnsZones@2024-06-01
+    name: privatelink.blob.core.windows.net
+    description: Private DNS zone for Storage Account blob private endpoint resolution
   targets:
-    services:
+  - services:
     - Microsoft.Databricks/workspaces
     terraform_pattern: |
       # Storage Account: enforce HTTPS and TLS 1.2
@@ -3126,15 +3491,36 @@ rules:
           ]
         }
       }
-    prohibitions: *id015
+    prohibitions:
+    - NEVER use public endpoints for data movement between pipeline services — use private endpoints or managed private endpoints
+    - NEVER allow TLS versions below 1.2 on any service in the data pipeline
+    - NEVER set supportsHttpsTrafficOnly to false on storage accounts — HTTP allows unencrypted data transfer
+    - NEVER use SQL authentication (passwords) for pipeline connections — use Entra-only authentication
+    - NEVER set publicNetworkAccess to Enabled on data pipeline services
 - id: CC-INT-DP-004
   severity: required
   description: Enforce encryption in transit for all cross-service data movement using private endpoints and TLS 1.2+
   rationale: Data in transit between services must be encrypted and routed privately to prevent interception and exfiltration
-  applies_to: *id013
-  companion_resources: *id014
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - security-reviewer
+  companion_resources:
+  - type: Microsoft.Network/privateEndpoints@2024-01-01
+    name: pe-sql
+    description: Private endpoint for SQL Server with groupId 'sqlServer'
+  - type: Microsoft.Network/privateEndpoints@2024-01-01
+    name: pe-storage
+    description: Private endpoint for Storage Account with groupId 'blob'
+  - type: Microsoft.Network/privateDnsZones@2024-06-01
+    name: privatelink.database.windows.net
+    description: Private DNS zone for SQL Server private endpoint resolution
+  - type: Microsoft.Network/privateDnsZones@2024-06-01
+    name: privatelink.blob.core.windows.net
+    description: Private DNS zone for Storage Account blob private endpoint resolution
   targets:
-    services:
+  - services:
     - Microsoft.Storage/storageAccounts
     terraform_pattern: |
       # Storage Account: enforce HTTPS and TLS 1.2
@@ -3313,15 +3699,36 @@ rules:
           ]
         }
       }
-    prohibitions: *id015
+    prohibitions:
+    - NEVER use public endpoints for data movement between pipeline services — use private endpoints or managed private endpoints
+    - NEVER allow TLS versions below 1.2 on any service in the data pipeline
+    - NEVER set supportsHttpsTrafficOnly to false on storage accounts — HTTP allows unencrypted data transfer
+    - NEVER use SQL authentication (passwords) for pipeline connections — use Entra-only authentication
+    - NEVER set publicNetworkAccess to Enabled on data pipeline services
 - id: CC-INT-DP-004
   severity: required
   description: Enforce encryption in transit for all cross-service data movement using private endpoints and TLS 1.2+
   rationale: Data in transit between services must be encrypted and routed privately to prevent interception and exfiltration
-  applies_to: *id013
-  companion_resources: *id014
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - security-reviewer
+  companion_resources:
+  - type: Microsoft.Network/privateEndpoints@2024-01-01
+    name: pe-sql
+    description: Private endpoint for SQL Server with groupId 'sqlServer'
+  - type: Microsoft.Network/privateEndpoints@2024-01-01
+    name: pe-storage
+    description: Private endpoint for Storage Account with groupId 'blob'
+  - type: Microsoft.Network/privateDnsZones@2024-06-01
+    name: privatelink.database.windows.net
+    description: Private DNS zone for SQL Server private endpoint resolution
+  - type: Microsoft.Network/privateDnsZones@2024-06-01
+    name: privatelink.blob.core.windows.net
+    description: Private DNS zone for Storage Account blob private endpoint resolution
   targets:
-    services:
+  - services:
     - Microsoft.Sql/servers
     terraform_pattern: |
       # Storage Account: enforce HTTPS and TLS 1.2
@@ -3500,7 +3907,12 @@ rules:
           ]
         }
       }
-    prohibitions: *id015
+    prohibitions:
+    - NEVER use public endpoints for data movement between pipeline services — use private endpoints or managed private endpoints
+    - NEVER allow TLS versions below 1.2 on any service in the data pipeline
+    - NEVER set supportsHttpsTrafficOnly to false on storage accounts — HTTP allows unencrypted data transfer
+    - NEVER use SQL authentication (passwords) for pipeline connections — use Entra-only authentication
+    - NEVER set publicNetworkAccess to Enabled on data pipeline services
 patterns:
 - name: Data Factory to SQL and Storage with managed identity
   description: ADF with managed VNet IR, managed private endpoints to SQL and Storage, Key Vault for secrets

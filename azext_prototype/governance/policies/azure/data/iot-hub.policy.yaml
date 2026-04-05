@@ -17,7 +17,7 @@ rules:
   - Microsoft.Devices/provisioningServices (DPS for device provisioning)
   - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
   targets:
-    services:
+  - services:
     - Microsoft.Devices/IotHubs
     terraform_pattern: |
       resource "azapi_resource" "iot_hub" {
@@ -106,7 +106,7 @@ rules:
   - Microsoft.Devices/IotHubs (parent IoT Hub)
   - Microsoft.KeyVault/vaults (store X.509 CA certificates)
   targets:
-    services:
+  - services:
     - Microsoft.Devices/IotHubs
     terraform_pattern: |
       # Device authentication is configured at the device level, not in the IoT Hub resource
@@ -169,7 +169,7 @@ rules:
   companion_resources:
   - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
   targets:
-    services:
+  - services:
     - Microsoft.Devices/IotHubs
     terraform_pattern: |
       resource "azapi_resource" "iot_diagnostics" {

@@ -56,9 +56,9 @@ class PolicyRule:
     rationale: str = ""
     warning_message: str = ""
     applies_to: list[str] = field(default_factory=list)
-    targets: dict = field(
-        default_factory=dict
-    )  # {"services": [...], "terraform_pattern": "...", "prohibitions": [...]}
+    targets: list = field(
+        default_factory=list
+    )  # [{"services": [...], "terraform_pattern": "...", "prohibitions": [...]}]
     companion_resources: list[CompanionResource] = field(default_factory=list)
 
 
@@ -159,8 +159,13 @@ def validate_policy_file(path: Path) -> list[ValidationError]:
                 errors.append(ValidationError(filename, f"{prefix} missing required key: '{key}'"))
 
         rid = rule.get("id", "")
-        targets = rule.get("targets", {})
-        target_svcs = tuple(sorted(targets.get("services", []))) if isinstance(targets, dict) else ()
+        targets = rule.get("targets", [])
+        if isinstance(targets, dict):
+            targets = [targets]
+        all_svcs = []
+        for t in targets if isinstance(targets, list) else []:
+            all_svcs.extend(t.get("services", []) if isinstance(t, dict) else [])
+        target_svcs = tuple(sorted(all_svcs))
         key = (rid, target_svcs)
         if rid:
             if key in rule_id_targets:
@@ -399,8 +404,10 @@ class PolicyEngine:
             policy_svcs = {s.lower() for s in p.services}
             overlap = policy_svcs & svc_set
             if not overlap:
-                # Also try per-rule targets.services
-                rule_targets = {t.lower() for r in p.rules for t in r.targets.get("services", [])}
+                # Also try per-rule targets[].services
+                rule_targets = {
+                    s.lower() for r in p.rules for t in r.targets if isinstance(t, dict) for s in t.get("services", [])
+                }
                 overlap = rule_targets & svc_set
             if not overlap:
                 continue
@@ -430,10 +437,20 @@ class PolicyEngine:
                 if rule.rationale:
                     sections.append(f"Rationale: {rule.rationale}")
 
-                # Patterns are inside targets
-                pattern = rule.targets.get(pattern_key, "") or ""
-                if isinstance(pattern, str) and pattern.strip():
-                    sections.append(f"```\n{pattern.strip()}\n```")
+                # Find matching target entry for the requested services
+                for target in rule.targets:
+                    if not isinstance(target, dict):
+                        continue
+                    target_svcs = {s.lower() for s in target.get("services", [])}
+                    if target_svcs and not (target_svcs & svc_set):
+                        continue  # This target entry is for a different service
+                    pattern = target.get(pattern_key, "") or ""
+                    if isinstance(pattern, str) and pattern.strip():
+                        sections.append(f"```\n{pattern.strip()}\n```")
+                    prohibitions = target.get("prohibitions", [])
+                    if prohibitions:
+                        for p in prohibitions:
+                            sections.append(f"- NEVER: {p}")
 
                 for cr in rule.companion_resources:
                     sections.append(f"\nCOMPANION RESOURCE: {cr.description}")
@@ -441,7 +458,7 @@ class PolicyEngine:
                     if cr_pattern.strip():
                         sections.append(f"```\n{cr_pattern.strip()}\n```")
 
-                prohibitions = rule.targets.get("prohibitions", [])
+                prohibitions = []  # already handled per-target above
                 if prohibitions:
                     for p in prohibitions:
                         sections.append(f"- NEVER: {p}")
@@ -507,12 +524,16 @@ class PolicyEngine:
                             bicep_pattern=str(cr.get("bicep_pattern", "")),
                         )
                     )
-            # Extract per-rule targets (matches schema: targets.services)
-            targets = r.get("targets", {})
-            if not isinstance(targets, dict):
-                targets = {}
-            target_svcs = targets.get("services", [])
-            all_target_services.update(target_svcs)
+            # targets is a list of target blocks
+            targets_raw = r.get("targets", [])
+            if isinstance(targets_raw, dict):
+                # Normalize single dict to list
+                targets_raw = [targets_raw]
+            if not isinstance(targets_raw, list):
+                targets_raw = []
+            for t in targets_raw:
+                if isinstance(t, dict):
+                    all_target_services.update(t.get("services", []))
 
             rules.append(
                 PolicyRule(
@@ -522,7 +543,7 @@ class PolicyEngine:
                     rationale=str(r.get("rationale", "")),
                     warning_message=str(r.get("warning_message", "")),
                     applies_to=r.get("applies_to", []),
-                    targets=targets,
+                    targets=targets_raw,
                     companion_resources=companions,
                 )
             )

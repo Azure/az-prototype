@@ -79,7 +79,7 @@ rules:
     name: Microsoft Sentinel Responder / Reader
     description: RBAC role assignments for SOC analysts and security responders
   targets:
-    services:
+  - services:
     - Microsoft.SecurityInsights/settings
     terraform_pattern: |
       resource "azapi_resource" "log_analytics" {
@@ -150,7 +150,7 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.SecurityInsights/settings
 - id: AZ-SNTL-003
   severity: required
@@ -162,7 +162,7 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.SecurityInsights/settings
 - id: AZ-SNTL-004
   severity: recommended
@@ -174,7 +174,7 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.SecurityInsights/settings
 - id: AZ-SNTL-005
   severity: recommended
@@ -184,7 +184,7 @@ rules:
   - cloud-architect
   - security-reviewer
   targets:
-    services:
+  - services:
     - Microsoft.SecurityInsights/settings
 patterns:
 - name: Sentinel with core data connectors and Fusion

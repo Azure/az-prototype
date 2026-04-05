@@ -17,7 +17,7 @@ rules:
   - Microsoft.EventGrid/topics/eventSubscriptions (event subscriptions)
   - Microsoft.Insights/diagnosticSettings (route logs to Log Analytics)
   targets:
-    services:
+  - services:
     - Microsoft.EventGrid/topics
     terraform_pattern: |
       resource "azapi_resource" "event_grid_topic" {
@@ -69,7 +69,7 @@ rules:
   companion_resources:
   - Microsoft.Storage/storageAccounts (storage account for dead-letter container)
   targets:
-    services:
+  - services:
     - Microsoft.EventGrid/topics
     terraform_pattern: |
       resource "azapi_resource" "eg_subscription" {
@@ -147,7 +147,7 @@ rules:
   companion_resources:
   - Microsoft.Authorization/roleAssignments (Data Sender role on destination resource)
   targets:
-    services:
+  - services:
     - Microsoft.EventGrid/topics
     terraform_pattern: |
       # For Azure destinations (Event Hubs, Service Bus, Storage Queue), use deliveryWithResourceIdentity
@@ -236,7 +236,7 @@ rules:
   companion_resources:
   - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
   targets:
-    services:
+  - services:
     - Microsoft.EventGrid/topics
     terraform_pattern: |
       resource "azapi_resource" "eg_diagnostics" {

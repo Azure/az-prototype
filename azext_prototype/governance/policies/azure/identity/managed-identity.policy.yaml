@@ -12,7 +12,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.ManagedIdentity/userAssignedIdentities
     terraform_pattern: |
       resource "azapi_resource" "user_assigned_identity" {
@@ -56,7 +56,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.ManagedIdentity/userAssignedIdentities
     terraform_pattern: |
       # Use uuidv5 for deterministic RBAC role assignment names
@@ -99,7 +99,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.ManagedIdentity/userAssignedIdentities
 - id: AZ-MI-004
   severity: recommended
@@ -108,7 +108,7 @@ rules:
   applies_to:
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.ManagedIdentity/userAssignedIdentities
 patterns:
 - name: User-Assigned Managed Identity with RBAC

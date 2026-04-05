@@ -61,7 +61,7 @@ class AntiPatternCheck:
     description: str = ""
     rationale: str = ""
     applies_to: list[str] = field(default_factory=list)  # agent names
-    targets: dict = field(default_factory=dict)  # {"services": ["Microsoft.Sql/servers", ...]}
+    targets: list = field(default_factory=list)  # [{"services": [...], "search_patterns": [...], ...}]
 
 
 def load(directory: Path | None = None) -> list[AntiPatternCheck]:
@@ -101,14 +101,21 @@ def load(directory: Path | None = None) -> list[AntiPatternCheck]:
             if not isinstance(check_applies_to, list):
                 check_applies_to = []
 
-            targets = entry.get("targets", {})
-            if not isinstance(targets, dict):
-                targets = {}
+            targets_raw = entry.get("targets", [])
+            if isinstance(targets_raw, dict):
+                targets_raw = [targets_raw]
+            if not isinstance(targets_raw, list):
+                targets_raw = []
 
-            # search/safe/correct patterns live inside targets
-            search = targets.get("search_patterns", [])
-            safe = targets.get("safe_patterns", [])
-            correct = targets.get("correct_patterns", [])
+            # Aggregate search/safe/correct across all target entries
+            search: list[str] = []
+            safe: list[str] = []
+            correct: list[str] = []
+            for t in targets_raw:
+                if isinstance(t, dict):
+                    search.extend(t.get("search_patterns", []))
+                    safe.extend(t.get("safe_patterns", []))
+                    correct.extend(t.get("correct_patterns", []))
 
             if not search or not message:
                 continue
@@ -124,7 +131,7 @@ def load(directory: Path | None = None) -> list[AntiPatternCheck]:
                     description=str(entry.get("description", "")),
                     rationale=str(entry.get("rationale", "")),
                     applies_to=check_applies_to,
-                    targets=targets,
+                    targets=targets_raw,
                 )
             )
 

@@ -4,10 +4,12 @@ description: Oversized SKUs, missing autoscale, and cost-inefficient configurati
 last_updated: '2026-04-04'
 patterns:
 - id: ANTI-COST-001
-  warning_message: Premium SKU detected — consider Standard or Basic tier for POC workloads to reduce cost.
   description: Detects Premium or Enterprise SKU tiers that may be excessive for POC workloads
   rationale: Non-optimal SKU or tier selection increases costs without proportional benefit for POC workloads.
+  warning_message: Premium SKU detected — consider Standard or Basic tier for POC workloads to reduce cost.
+  applies_to: []
   targets:
+  - services: []
     search_patterns:
     - sku_name = "p1v3"
     - sku_name = "p2v3"
@@ -23,12 +25,13 @@ patterns:
     - name = "Standard"
     - tier = "Basic"
     - tier = "Standard"
-  applies_to: []
 - id: ANTI-COST-002
-  warning_message: Minimum instances set to 1 — consider 0 for dev/test to avoid idle costs.
   description: Detects fixed high-scale configurations (replica counts, DTU) without autoscale
   rationale: Non-optimal SKU or tier selection increases costs without proportional benefit for POC workloads.
+  warning_message: Minimum instances set to 1 — consider 0 for dev/test to avoid idle costs.
+  applies_to: []
   targets:
+  - services: []
     search_patterns:
     - min_replicas = 1
     - minimum_instance_count = 1
@@ -39,12 +42,13 @@ patterns:
     - min_replicas = 0
     - minimum_instance_count = 0
     - minReplicas = 0
-  applies_to: []
 - id: ANTI-COST-003
-  warning_message: Reserved capacity in POC — reserved instances lock in commitment; use pay-as-you-go for prototypes.
   description: Detects zone-redundant configurations that add cost without POC benefit
   rationale: Following established patterns ensures consistency and reduces deployment failures.
+  warning_message: Reserved capacity in POC — reserved instances lock in commitment; use pay-as-you-go for prototypes.
+  applies_to: []
   targets:
+  - services: []
     search_patterns:
     - reserved_capacity
     - reserved_instance
@@ -54,4 +58,3 @@ patterns:
     correct_patterns:
     - '# Use pay-as-you-go pricing for POC workloads'
     - capacityReservationLevel = 0
-  applies_to: []

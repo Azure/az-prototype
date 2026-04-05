@@ -20,7 +20,7 @@ rules:
     - identity
     error_message: 'Service ''{service_name}'' ({service_type}) missing {config_key}: true'
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       resource "azapi_resource" "function_app_plan" {
@@ -162,7 +162,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     prohibitions:
     - NEVER use FUNCTIONS_WORKER_RUNTIME=dotnet (in-process) — use FUNCTIONS_WORKER_RUNTIME=dotnet-isolated
@@ -175,7 +175,7 @@ rules:
   - cloud-architect
   - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
 - id: AZ-FN-004
   severity: recommended
@@ -188,7 +188,7 @@ rules:
   - monitoring-agent
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
 - id: AZ-FN-005
   severity: recommended
@@ -198,7 +198,7 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
 - id: AZ-FN-006
   severity: recommended
@@ -210,7 +210,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     prohibitions:
     - NEVER use Consumption plan when VNet integration or private endpoints are required
@@ -224,7 +224,7 @@ rules:
   - terraform-agent
   - bicep-agent
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
     terraform_pattern: |
       # For zone-redundant App Service Plan, set zoneRedundant in AS-001:
@@ -247,7 +247,7 @@ rules:
   - cloud-architect
   - app-developer
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
 - id: AZ-FN-009
   severity: recommended
@@ -306,7 +306,7 @@ rules:
         }
       }
   targets:
-    services:
+  - services:
     - Microsoft.Web/sites
 patterns:
 - name: Function App with managed identity and Key Vault references

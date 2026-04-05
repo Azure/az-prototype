@@ -33,7 +33,7 @@ rules:
         }
       }
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       resource "azapi_resource" "redis_cache" {
@@ -115,7 +115,7 @@ rules:
   - security-reviewer
   companion_resources: []
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # Set enableNonSslPort = false and minimumTlsVersion = "1.2"
@@ -138,7 +138,7 @@ rules:
   companion_resources:
   - Microsoft.Cache/redis/accessPolicyAssignments@2024-03-01 (Data Owner or Data Contributor access policy — NOT Microsoft.Authorization/roleAssignments)
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       # Entra auth is configured via redisConfiguration and RBAC
@@ -207,7 +207,7 @@ rules:
   companion_resources:
   - Microsoft.OperationalInsights/workspaces (Log Analytics workspace)
   targets:
-    services:
+  - services:
     - Microsoft.Cache/redis
     terraform_pattern: |
       resource "azapi_resource" "redis_diagnostics" {

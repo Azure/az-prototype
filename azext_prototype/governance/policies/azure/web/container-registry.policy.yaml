@@ -193,7 +193,7 @@ rules:
         }
       }
   targets:
-    services:
+  - services:
     - Microsoft.ContainerRegistry/registries
     terraform_pattern: |
       resource "azapi_resource" "container_registry" {
@@ -258,7 +258,7 @@ rules:
   - bicep-agent
   - cloud-architect
   targets:
-    services:
+  - services:
     - Microsoft.ContainerRegistry/registries
 - id: AZ-ACR-003
   severity: recommended
@@ -270,7 +270,7 @@ rules:
   - cloud-architect
   - cost-analyst
   targets:
-    services:
+  - services:
     - Microsoft.ContainerRegistry/registries
 - id: AZ-ACR-004
   severity: recommended
@@ -329,7 +329,7 @@ rules:
         }
       }
   targets:
-    services:
+  - services:
     - Microsoft.ContainerRegistry/registries
 patterns:
 - name: Container Registry with private endpoint and RBAC
