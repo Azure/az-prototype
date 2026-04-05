@@ -24,7 +24,7 @@ class CloudArchitectAgent(BaseAgent):
     _temperature = 0.3
     _max_tokens = 32768
     _enable_web_search = True
-    _knowledge_role = "architect"
+    _knowledge_role = "cloud-architect"
     _keywords = [
         "architect",
         "design",

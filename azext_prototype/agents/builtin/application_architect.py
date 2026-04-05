@@ -24,7 +24,7 @@ class ApplicationArchitectAgent(BaseAgent):
     _temperature = 0.3
     _max_tokens = 32768
     _enable_web_search = True
-    _knowledge_role = "developer"
+    _knowledge_role = "application-architect"
     _keywords = [
         "application",
         "app",

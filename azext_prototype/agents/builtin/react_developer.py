@@ -22,7 +22,7 @@ class ReactDeveloperAgent(BaseAgent):
     _max_tokens = 102400
     _enable_web_search = True
     _knowledge_role = "developer"
-    _knowledge_languages: list[str] | None = ["nodejs"]
+    _knowledge_languages: list[str] | None = ["react"]
     _keywords = [
         "react",
         "typescript",
