@@ -1,56 +1,64 @@
 kind: anti-pattern
 category: encryption
 description: TLS enforcement, encryption at rest, and transport security detection
-last_updated: '2026-04-04'
+last_updated: "2026-04-04"
 patterns:
-- id: ANTI-ENC-001
-  description: Detects TLS version below 1.2 or missing minimum TLS configuration
-  rationale: TLS versions below 1.2 have known vulnerabilities (BEAST, POODLE) and are deprecated by most compliance frameworks.
-  warning_message: Outdated TLS version detected — enforce minimum TLS 1.2 for all connections.
-  applies_to: []
-  targets:
-  - services: []
-    search_patterns:
-    - min_tls_version = "1.0"
-    - min_tls_version = "1.1"
-    - minimum_tls_version = "1.0"
-    - minimum_tls_version = "1.1"
-    - tls1_0
-    - tls1_1
-    safe_patterns: []
-    correct_patterns:
-    - min_tls_version = "1.2"
-    - minimum_tls_version = "1.2"
-    - minimalTlsVersion = "1.2"
-    - minimumTlsVersion = "TLS1_2"
-- id: ANTI-ENC-002
-  description: Detects HTTP-only endpoints without HTTPS enforcement
-  rationale: HTTP transmits data in plaintext, exposing credentials and data to network interception.
-  warning_message: HTTPS enforcement disabled — set https_only = true to redirect all HTTP to HTTPS.
-  applies_to: []
-  targets:
-  - services: []
-    search_patterns:
-    - https_only = false
-    - https_required = false
-    safe_patterns: []
-    correct_patterns:
-    - https_only = true
-    - httpsOnly = true
-- id: ANTI-ENC-003
-  description: Detects disabled encryption at rest using deprecated InstrumentationKey instead of ConnectionString
-  rationale: InstrumentationKey is deprecated; ConnectionString is the supported integration point for Application Insights.
-  warning_message: SSL enforcement disabled — enable SSL enforcement with TLS 1.2 minimum.
-  applies_to: []
-  targets:
-  - services:
-    - Microsoft.Insights/components
-    search_patterns:
-    - ssl_enforcement_enabled = false
-    - ssl_minimal_tls_version_enforced = "tldisabled"
-    safe_patterns: []
-    correct_patterns:
-    - ssl_enforcement_enabled = true
-    - sslEnforcement = "Enabled"
-    - ssl_minimal_tls_version_enforced = "TLS1_2"
-    - minimalTlsVersion = "TLS1_2"
+  - id: ANTI-ENC-001
+    description: Detects TLS version below 1.2 which has known vulnerabilities
+    rationale: TLS 1.0 and 1.1 have known vulnerabilities (BEAST, POODLE) and are deprecated by compliance frameworks.
+    warning_message: "TLS version below 1.2 detected — set minimum TLS version to 1.2."
+    applies_to: [terraform-agent, bicep-agent]
+    targets:
+      - services:
+          - Microsoft.Storage/storageAccounts
+          - Microsoft.Sql/servers
+          - Microsoft.Cache/redis
+          - Microsoft.Web/sites
+          - Microsoft.KeyVault/vaults
+          - Microsoft.ServiceBus/namespaces
+          - Microsoft.DocumentDB/databaseAccounts
+        search_patterns:
+          - 'min_tls_version = "1.0"'
+          - 'min_tls_version = "1.1"'
+          - 'minimum_tls_version = "1.0"'
+          - 'minimum_tls_version = "1.1"'
+          - "tls1_0"
+          - "tls1_1"
+        correct_patterns:
+          - 'min_tls_version = "1.2"'
+          - 'minimum_tls_version = "1.2"'
+          - 'minimalTlsVersion = "1.2"'
+          - 'minimumTlsVersion = "TLS1_2"'
+
+  - id: ANTI-ENC-002
+    description: Detects HTTPS disabled on App Service or Function Apps
+    rationale: HTTP transmits data in plaintext, exposing credentials and data to network interception.
+    warning_message: "HTTPS not enforced — set https_only = true."
+    applies_to: [terraform-agent, bicep-agent]
+    targets:
+      - services:
+          - Microsoft.Web/sites
+        search_patterns:
+          - "https_only = false"
+          - "https_required = false"
+        correct_patterns:
+          - "https_only = true"
+          - "httpsOnly = true"
+
+  - id: ANTI-ENC-003
+    description: Detects SSL enforcement disabled on database servers
+    rationale: Disabled SSL allows unencrypted database connections, exposing query data and credentials in transit.
+    warning_message: "SSL enforcement disabled — enable SSL and set minimum TLS 1.2."
+    applies_to: [terraform-agent, bicep-agent]
+    targets:
+      - services:
+          - Microsoft.DBforMySQL/flexibleServers
+          - Microsoft.DBforPostgreSQL/flexibleServers
+        search_patterns:
+          - "ssl_enforcement_enabled = false"
+          - 'ssl_minimal_tls_version_enforced = "tldisabled"'
+        correct_patterns:
+          - "ssl_enforcement_enabled = true"
+          - 'sslEnforcement = "Enabled"'
+          - 'ssl_minimal_tls_version_enforced = "TLS1_2"'
+          - 'minimalTlsVersion = "TLS1_2"'

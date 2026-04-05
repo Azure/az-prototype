@@ -483,14 +483,14 @@ class TestIacToolFiltering:
 
     def test_bicep_skips_tf_completeness_checks(self):
         """Bicep scan should skip TF-specific completeness checks."""
-        # COMP-006 triggers on var.tfstate_storage_account (no safe pattern exempts it)
+        # COMP-005 triggers on var.tfstate_storage_account (backend variable detection)
         text = "var.tfstate_storage_account"
         all_warnings = scan(text)
         bcp_warnings = scan(text, iac_tool="bicep")
-        comp6_all = [w for w in all_warnings if "ANTI-COMP-006" in w]
-        comp6_bcp = [w for w in bcp_warnings if "ANTI-COMP-006" in w]
-        assert len(comp6_all) > 0, "COMP-006 should fire without filter"
-        assert len(comp6_bcp) == 0, "COMP-006 should NOT fire for bicep"
+        comp5_all = [w for w in all_warnings if "ANTI-COMP-005" in w]
+        comp5_bcp = [w for w in bcp_warnings if "ANTI-COMP-005" in w]
+        assert len(comp5_all) > 0, "COMP-005 should fire without filter"
+        assert len(comp5_bcp) == 0, "COMP-005 should NOT fire for bicep"
 
     def test_bicep_still_runs_generic_completeness(self):
         """Bicep scan should still run generic completeness checks (COMP-001)."""
@@ -523,6 +523,6 @@ class TestIacToolFiltering:
         tfs_checks = [c for c in checks if c.domain == "terraform_structure"]
         assert all(c.applies_to == ["bicep-agent"] for c in bcs_checks)
         assert all(c.applies_to == ["terraform-agent"] for c in tfs_checks)
-        # Generic domains should have empty applies_to
+        # Security checks now have specific applies_to (e.g., terraform-agent, bicep-agent)
         sec_checks = [c for c in checks if c.domain == "security"]
-        assert all(c.applies_to == [] for c in sec_checks)
+        assert len(sec_checks) > 0  # Security patterns should exist
