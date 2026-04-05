@@ -15,10 +15,10 @@ rules:
   - type: Microsoft.Storage/storageAccounts@2023-01-01
     name: st-asa-checkpoint
     description: Storage account for Stream Analytics job checkpointing and state storage
-  - type: Microsoft.StreamAnalytics/streamingjobs/inputs@2021-10-01-preview
+  - type: Microsoft.StreamAnalytics/streamingJobs/inputs@2021-10-01-preview
     name: asa-input
     description: Input binding connecting the job to its event source (Event Hub, IoT Hub, etc.)
-  - type: Microsoft.StreamAnalytics/streamingjobs/outputs@2021-10-01-preview
+  - type: Microsoft.StreamAnalytics/streamingJobs/outputs@2021-10-01-preview
     name: asa-output
     description: Output binding connecting the job to its destination (Cosmos DB, SQL, Blob, etc.)
   - type: Microsoft.StreamAnalytics/clusters@2020-03-01
@@ -29,10 +29,10 @@ rules:
     description: Diagnostic settings routing execution and authoring logs to Log Analytics
   targets:
   - services:
-    - Microsoft.StreamAnalytics/streamingjobs
+    - Microsoft.StreamAnalytics/streamingJobs
     terraform_pattern: |
       resource "azapi_resource" "stream_analytics_job" {
-        type      = "Microsoft.StreamAnalytics/streamingjobs@2021-10-01-preview"
+        type      = "Microsoft.StreamAnalytics/streamingJobs@2021-10-01-preview"
         name      = var.asa_name
         location  = var.location
         parent_id = var.resource_group_id
@@ -63,7 +63,7 @@ rules:
         }
       }
     bicep_pattern: |
-      resource streamAnalyticsJob 'Microsoft.StreamAnalytics/streamingjobs@2021-10-01-preview' = {
+      resource streamAnalyticsJob 'Microsoft.StreamAnalytics/streamingJobs@2021-10-01-preview' = {
         name: asaName
         location: location
         identity: {
@@ -108,10 +108,10 @@ rules:
     description: Data reader/sender roles granting ASA managed identity access to input/output resources
   targets:
   - services:
-    - Microsoft.StreamAnalytics/streamingjobs
+    - Microsoft.StreamAnalytics/streamingJobs
     terraform_pattern: |
       resource "azapi_resource" "asa_input" {
-        type      = "Microsoft.StreamAnalytics/streamingjobs/inputs@2021-10-01-preview"
+        type      = "Microsoft.StreamAnalytics/streamingJobs/inputs@2021-10-01-preview"
         name      = var.input_name
         parent_id = azapi_resource.stream_analytics_job.id
         body = {
@@ -136,7 +136,7 @@ rules:
         }
       }
     bicep_pattern: |
-      resource asaInput 'Microsoft.StreamAnalytics/streamingjobs/inputs@2021-10-01-preview' = {
+      resource asaInput 'Microsoft.StreamAnalytics/streamingJobs/inputs@2021-10-01-preview' = {
         parent: streamAnalyticsJob
         name: inputName
         properties: {
@@ -175,7 +175,7 @@ rules:
     description: Private endpoints connecting the ASA cluster to input and output resources
   targets:
   - services:
-    - Microsoft.StreamAnalytics/streamingjobs
+    - Microsoft.StreamAnalytics/streamingJobs
     terraform_pattern: |
       resource "azapi_resource" "asa_cluster" {
         type      = "Microsoft.StreamAnalytics/clusters@2020-03-01"
@@ -217,7 +217,7 @@ rules:
     description: Log Analytics workspace as destination for Stream Analytics diagnostic data
   targets:
   - services:
-    - Microsoft.StreamAnalytics/streamingjobs
+    - Microsoft.StreamAnalytics/streamingJobs
     terraform_pattern: |
       resource "azapi_resource" "asa_diagnostics" {
         type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"

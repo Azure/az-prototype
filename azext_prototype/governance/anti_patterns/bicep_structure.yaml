@@ -1,120 +1,124 @@
 kind: anti-pattern
 domain: bicep_structure
 description: Bicep file structure, module conventions, and deployment script patterns
-last_updated: "2026-04-04"
+last_updated: '2026-04-04'
 patterns:
-  - id: ANTI-BCS-001
-    description: Detects inline resource definitions instead of Bicep module references
-    rationale: Inline resources in main.bicep create monolithic templates that are hard to test, reuse, and review.
-    warning_message: "Inline resource detected — use module references (module <name> './modules/<service>.bicep') for all resources."
-    applies_to: [bicep-agent]
-    targets:
-      - services: []
-        search_patterns:
-          - "resource "
-        safe_patterns:
-          - "module "
-          - "modules/"
-          - "existing"
-        correct_patterns:
-          - "module identity './modules/identity.bicep'"
-          - "module monitoring './modules/monitoring.bicep'"
-
-  - id: ANTI-BCS-002
-    description: Detects listKeys() or listSas() calls which expose secrets in deployment history
-    rationale: listKeys() exposes secrets in ARM deployment outputs and template history; managed identity with RBAC avoids secret exposure entirely.
-    warning_message: "listKeys()/listSas() detected — use managed identity with RBAC role assignments instead."
-    applies_to: [bicep-agent]
-    targets:
-      - services: []
-        search_patterns:
-          - "listKeys("
-          - "listAccountSas("
-          - "listServiceSas("
-        safe_patterns:
-          - "Microsoft.ManagedIdentity/userAssignedIdentities"
-          - "managedIdentity"
-          - "identity: {"
-        correct_patterns:
-          - "Microsoft.ManagedIdentity/userAssignedIdentities"
-          - "identity: { type: 'UserAssigned' }"
-
-  - id: ANTI-BCS-003
-    description: Detects hardcoded resource names in Bicep instead of parameterized naming
-    rationale: Hardcoded resource names prevent reuse across environments and violate naming convention standards.
-    warning_message: "Hardcoded resource name detected — use variables or parameters for resource naming."
-    applies_to: [bicep-agent]
-    targets:
-      - services: []
-        search_patterns:
-          - "name: '"
-        safe_patterns:
-          - "name: '${"
-          - "name: resourceName"
-          - "name: storageAccountName"
-          - "var resourceName ="
-        correct_patterns:
-          - "var storageAccountName = '${prefix}-st-${suffix}'"
-          - "name: storageAccountName"
-
-  - id: ANTI-BCS-004
-    description: Detects Bicep parameters missing @description decorator
-    rationale: Missing parameter descriptions make templates harder to use and prevent proper validation during deployment review.
-    warning_message: "Bicep parameter missing @description decorator — add @description() to all parameters."
-    applies_to: [bicep-agent]
-    targets:
-      - services: []
-        search_patterns:
-          - "param "
-        safe_patterns:
-          - "@description("
-          - "@Description("
-        correct_patterns:
-          - "@description('The Azure region for all resources')"
-          - "param location string"
-
-  - id: ANTI-BCS-005
-    description: Detects Bicep modules without output declarations for downstream consumers
-    rationale: Missing outputs prevent downstream modules from referencing this module's resources, breaking the deployment chain.
-    warning_message: "Bicep module missing output declarations — add outputs for resources consumed by downstream modules."
-    applies_to: [bicep-agent]
-    targets:
-      - services: []
-        search_patterns:
-          - "module "
-        safe_patterns:
-          - "output "
-        correct_patterns:
-          - "output storageAccountId string = storage.outputs.id"
-          - "output identityPrincipalId string = identity.outputs.principalId"
-
-  - id: ANTI-BCS-006
-    description: Detects Bicep deployment scripts without error handling (set -euo pipefail)
-    rationale: Deployment scripts without error handling silently continue after failures, leading to partial and inconsistent deployments.
-    warning_message: "Deployment script missing error handling — add set -euo pipefail."
-    applies_to: [bicep-agent]
-    targets:
-      - services: []
-        search_patterns:
-          - "az deployment group create"
-        safe_patterns:
-          - "set -euo pipefail"
-          - "set -e"
-        correct_patterns:
-          - "set -euo pipefail"
-          - "#!/bin/bash"
-
-  - id: ANTI-BCS-007
-    description: Detects outdated Bicep API versions (pre-2023) that may lack features or have breaking changes
-    rationale: Old API versions miss security features, property changes, and may be deprecated by Azure.
-    warning_message: "Outdated API version detected — use 2023 or 2024 API versions."
-    applies_to: [bicep-agent]
-    targets:
-      - services: []
-        search_patterns:
-          - "@2021-"
-          - "@2020-"
-          - "@2019-"
-        correct_patterns:
-          - "@2023-"
-          - "@2024-"
+- id: ANTI-BCS-001
+  description: Detects inline resource definitions instead of Bicep module references
+  rationale: Inline resources in main.bicep create monolithic templates that are hard to test, reuse, and review.
+  warning_message: Inline resource detected — use module references (module <name> './modules/<service>.bicep') for all resources.
+  applies_to:
+  - bicep-agent
+  targets:
+  - services: []
+    search_patterns:
+    - 'resource '
+    safe_patterns:
+    - 'module '
+    - modules/
+    - existing
+    correct_patterns:
+    - module identity './modules/identity.bicep'
+    - module monitoring './modules/monitoring.bicep'
+- id: ANTI-BCS-002
+  description: Detects listKeys() or listSas() calls which expose secrets in deployment history
+  rationale: listKeys() exposes secrets in ARM deployment outputs and template history; managed identity with RBAC avoids
+    secret exposure entirely.
+  warning_message: listKeys()/listSas() detected — use managed identity with RBAC role assignments instead.
+  applies_to:
+  - bicep-agent
+  targets:
+  - services: []
+    search_patterns:
+    - listKeys(
+    - listAccountSas(
+    - listServiceSas(
+    safe_patterns:
+    - Microsoft.ManagedIdentity/userAssignedIdentities
+    - managedIdentity
+    - 'identity: {'
+    correct_patterns:
+    - Microsoft.ManagedIdentity/userAssignedIdentities
+    - 'identity: { type: ''UserAssigned'' }'
+- id: ANTI-BCS-003
+  description: Detects hardcoded resource names in Bicep instead of parameterized naming
+  rationale: Hardcoded resource names prevent reuse across environments and violate naming convention standards.
+  warning_message: Hardcoded resource name detected — use variables or parameters for resource naming.
+  applies_to:
+  - bicep-agent
+  targets:
+  - services: []
+    search_patterns:
+    - 'name: '''
+    safe_patterns:
+    - 'name: ''${'
+    - 'name: resourceName'
+    - 'name: storageAccountName'
+    - var resourceName =
+    correct_patterns:
+    - var storageAccountName = '${prefix}-st-${suffix}'
+    - 'name: storageAccountName'
+- id: ANTI-BCS-004
+  description: Detects Bicep parameters missing @description decorator
+  rationale: Missing parameter descriptions make templates harder to use and prevent proper validation during deployment review.
+  warning_message: Bicep parameter missing @description decorator — add @description() to all parameters.
+  applies_to:
+  - bicep-agent
+  targets:
+  - services: []
+    search_patterns:
+    - 'param '
+    safe_patterns:
+    - '@description('
+    - '@Description('
+    correct_patterns:
+    - '@description(''The Azure region for all resources'')'
+    - param location string
+- id: ANTI-BCS-005
+  description: Detects Bicep modules without output declarations for downstream consumers
+  rationale: Missing outputs prevent downstream modules from referencing this module's resources, breaking the deployment
+    chain.
+  warning_message: Bicep module missing output declarations — add outputs for resources consumed by downstream modules.
+  applies_to:
+  - bicep-agent
+  targets:
+  - services: []
+    search_patterns:
+    - 'module '
+    safe_patterns:
+    - 'output '
+    correct_patterns:
+    - output storageAccountId string = storage.outputs.id
+    - output identityPrincipalId string = identity.outputs.principalId
+- id: ANTI-BCS-006
+  description: Detects Bicep deployment scripts without error handling (set -euo pipefail)
+  rationale: Deployment scripts without error handling silently continue after failures, leading to partial and inconsistent
+    deployments.
+  warning_message: Deployment script missing error handling — add set -euo pipefail.
+  applies_to:
+  - bicep-agent
+  targets:
+  - services: []
+    search_patterns:
+    - az deployment group create
+    safe_patterns:
+    - set -euo pipefail
+    - set -e
+    correct_patterns:
+    - set -euo pipefail
+    - '#!/bin/bash'
+- id: ANTI-BCS-007
+  description: Detects outdated Bicep API versions (pre-2023) that may lack features or have breaking changes
+  rationale: Old API versions miss security features, property changes, and may be deprecated by Azure.
+  warning_message: Outdated API version detected — use 2023 or 2024 API versions.
+  applies_to:
+  - bicep-agent
+  targets:
+  - services: []
+    search_patterns:
+    - '@2021-'
+    - '@2020-'
+    - '@2019-'
+    correct_patterns:
+    - '@2023-'
+    - '@2024-'

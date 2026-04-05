@@ -1,60 +1,68 @@
 kind: anti-pattern
 domain: monitoring
 description: Logging, diagnostics, and observability gap detection
-last_updated: "2026-04-04"
+last_updated: '2026-04-04'
 patterns:
-  - id: ANTI-MON-001
-    description: Detects zero retention period for diagnostic logs or metrics
-    rationale: Zero retention means logs are immediately discarded, making incident investigation impossible.
-    warning_message: "Log retention set to 0 days — set retention_in_days to at least 30 for POC."
-    applies_to: [terraform-agent, bicep-agent]
-    targets:
-      - services:
-          - Microsoft.Insights/diagnosticSettings
-          - Microsoft.OperationalInsights/workspaces
-        search_patterns:
-          - "retention_in_days = 0"
-          - "retention_days = 0"
-        correct_patterns:
-          - "retention_in_days = 30"
-          - "retentionInDays = 30"
-
-  - id: ANTI-MON-002
-    description: Detects disabled logging or metrics in diagnostic settings
-    rationale: Disabled log or metric collection creates blind spots where failures and security events go undetected.
-    warning_message: "Logging or metrics disabled in diagnostic settings — enable both for observability."
-    applies_to: [terraform-agent, bicep-agent]
-    targets:
-      - services:
-          - Microsoft.Insights/diagnosticSettings
-        search_patterns:
-          - "enabled_log_category = []"
-          - "logs_enabled = false"
-          - "metrics_enabled = false"
-        correct_patterns:
-          - "logs_enabled = true"
-          - "metrics_enabled = true"
-          - "# Enable diagnostic settings for all PaaS resources"
-
-  - id: ANTI-MON-003
-    description: Detects deprecated InstrumentationKey usage instead of ConnectionString for Application Insights
-    rationale: InstrumentationKey is deprecated by Microsoft. ConnectionString is the supported integration point and includes region routing.
-    warning_message: "InstrumentationKey detected — use ConnectionString (APPLICATIONINSIGHTS_CONNECTION_STRING) instead."
-    applies_to: [terraform-agent, bicep-agent, csharp-developer, python-developer]
-    targets:
-      - services:
-          - Microsoft.Insights/components
-          - Microsoft.App/containerApps
-          - Microsoft.Web/sites
-        search_patterns:
-          - "instrumentation_key"
-          - "instrumentationkey"
-        safe_patterns:
-          - "# deprecated"
-          - "use connection_string"
-          - "do not use instrumentationkey"
-          - "connectionstring"
-        correct_patterns:
-          - "connection_string"
-          - "APPLICATIONINSIGHTS_CONNECTION_STRING"
-          - "# Use connection_string instead of InstrumentationKey"
+- id: ANTI-MON-001
+  description: Detects zero retention period for diagnostic logs or metrics
+  rationale: Zero retention means logs are immediately discarded, making incident investigation impossible.
+  warning_message: Log retention set to 0 days — set retention_in_days to at least 30 for POC.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.Insights/diagnosticSettings
+    - Microsoft.OperationalInsights/workspaces
+    search_patterns:
+    - retention_in_days = 0
+    - retention_days = 0
+    correct_patterns:
+    - retention_in_days = 30
+    - retentionInDays = 30
+- id: ANTI-MON-002
+  description: Detects disabled logging or metrics in diagnostic settings
+  rationale: Disabled log or metric collection creates blind spots where failures and security events go undetected.
+  warning_message: Logging or metrics disabled in diagnostic settings — enable both for observability.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.Insights/diagnosticSettings
+    search_patterns:
+    - enabled_log_category = []
+    - logs_enabled = false
+    - metrics_enabled = false
+    correct_patterns:
+    - logs_enabled = true
+    - metrics_enabled = true
+    - '# Enable diagnostic settings for all PaaS resources'
+- id: ANTI-MON-003
+  description: Detects deprecated InstrumentationKey usage instead of ConnectionString for Application Insights
+  rationale: InstrumentationKey is deprecated by Microsoft. ConnectionString is the supported integration point and includes
+    region routing.
+  warning_message: InstrumentationKey detected — use ConnectionString (APPLICATIONINSIGHTS_CONNECTION_STRING) instead.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services:
+    - Microsoft.Insights/components
+    - Microsoft.App/containerApps
+    - Microsoft.Web/sites
+    search_patterns:
+    - instrumentation_key
+    - instrumentationkey
+    safe_patterns:
+    - '# deprecated'
+    - use connection_string
+    - do not use instrumentationkey
+    - connectionstring
+    correct_patterns:
+    - connection_string
+    - APPLICATIONINSIGHTS_CONNECTION_STRING
+    - '# Use connection_string instead of InstrumentationKey'

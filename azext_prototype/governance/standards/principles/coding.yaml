@@ -12,6 +12,7 @@ principles:
   - app-developer
   - csharp-developer
   - python-developer
+  - react-developer
   examples:
   - Use 'storage_account' not 'sa'; 'container_registry' not 'cr'
   - Use 'get_user_by_email()' not 'get_u()'
@@ -23,6 +24,7 @@ principles:
   - app-developer
   - csharp-developer
   - python-developer
+  - react-developer
   examples:
   - Split 'process_order()' into 'validate_order()', 'calculate_total()', 'save_order()'
   rationale: The isolated worker model provides better dependency isolation and .NET version flexibility.
@@ -33,6 +35,7 @@ principles:
   - app-developer
   - csharp-developer
   - python-developer
+  - react-developer
   examples:
   - Validate API request payloads at the controller layer, not in every function
   - Wrap external HTTP calls in try/except, not internal method calls
@@ -56,6 +59,7 @@ principles:
   - app-developer
   - csharp-developer
   - python-developer
+  - react-developer
   examples:
   - 'Terraform: use var.location not ''eastus'' in resource blocks'
   - 'Bicep: use param location string not ''eastus'''

@@ -1,207 +1,228 @@
 kind: anti-pattern
 domain: networking
 description: Network isolation, firewall rules, and public exposure detection
-last_updated: "2026-04-04"
+last_updated: '2026-04-04'
 patterns:
-  - id: ANTI-NET-001
-    description: Detects public network access enabled on PaaS services that should be private-only
-    rationale: Public network access exposes service data planes to internet-based attacks; all PaaS services should disable public access and use private endpoints.
-    warning_message: Public network access is enabled — disable public access and use private endpoints. This applies to ALL environments including POC.
-    applies_to: [terraform-agent, bicep-agent]
-    targets:
-      - services:
-          - Microsoft.Storage/storageAccounts
-          - Microsoft.Sql/servers
-          - Microsoft.DocumentDB/databaseAccounts
-          - Microsoft.KeyVault/vaults
-          - Microsoft.Cache/redis
-          - Microsoft.ServiceBus/namespaces
-          - Microsoft.EventHub/namespaces
-          - Microsoft.Search/searchServices
-          - Microsoft.CognitiveServices/accounts
-          - Microsoft.ContainerRegistry/registries
-          - Microsoft.OperationalInsights/workspaces
-          - Microsoft.Insights/components
-        search_patterns:
-          - "public_network_access_enabled = true"
-          - 'public_network_access = "enabled"'
-          - 'publicnetworkaccess = "enabled"'
-          - 'publicnetworkaccessforingestion = "enabled"'
-          - 'publicnetworkaccessforquery = "enabled"'
-        safe_patterns:
-          - "public_network_access_enabled = false"
-          - 'publicnetworkaccess = "disabled"'
-          - 'publicnetworkaccessforingestion = "disabled"'
-          - 'publicnetworkaccessforquery = "disabled"'
-          - "public_network_access_enabled = var."
-        correct_patterns:
-          - 'publicNetworkAccess = "Disabled"'
-          - "public_network_access_enabled = false"
-          - 'publicNetworkAccessForIngestion = "Disabled"'
-          - 'publicNetworkAccessForQuery = "Disabled"'
-
-  - id: ANTI-NET-002
-    description: Detects overly permissive network rules using 0.0.0.0/0 CIDR (allow all internet traffic)
-    rationale: Allowing all internet traffic (0.0.0.0/0) in NSG or firewall rules defeats network segmentation and exposes resources to attack.
-    warning_message: "Overly permissive network rule detected (0.0.0.0/0) — use specific IP ranges or service tags instead."
-    applies_to: [terraform-agent, bicep-agent]
-    targets:
-      - services:
-          - Microsoft.Network/networkSecurityGroups
-          - Microsoft.Network/azureFirewalls
-        search_patterns:
-          - "0.0.0.0/0"
-          - "0.0.0.0-255.255.255.255"
-        safe_patterns:
-          - "do not allow 0.0.0.0"
-          - "avoid 0.0.0.0"
-          - "# outbound to internet"
-          - "destinationAddressPrefix = \"Internet\""
-
-  - id: ANTI-NET-003
-    description: Detects Container Apps or App Services with direct external ingress without an API gateway
-    rationale: Direct external ingress bypasses WAF, rate limiting, and centralized authentication that API Management or Front Door provides.
-    warning_message: "Direct external ingress detected — consider using API Management or Front Door as a gateway for production."
-    applies_to: [terraform-agent, bicep-agent]
-    targets:
-      - services:
-          - Microsoft.App/containerApps
-          - Microsoft.Web/sites
-        search_patterns:
-          - 'ingress_type = "external"'
-          - "external_enabled = true"
-          - 'external = true'
-        safe_patterns:
-          - "apim"
-          - "api management"
-          - "front door"
-          - "application gateway"
-
-  - id: ANTI-NET-004
-    description: Detects VNet integration disabled or missing on compute resources that need private backend connectivity
-    rationale: Without VNet integration, compute resources cannot access private endpoints or backend services on private networks.
-    warning_message: "VNet integration disabled or missing — enable VNet integration for backend connectivity to private resources."
-    applies_to: [terraform-agent, bicep-agent]
-    targets:
-      - services:
-          - Microsoft.Web/sites
-          - Microsoft.App/managedEnvironments
-        search_patterns:
-          - "vnet_route_all_enabled = false"
-          - "virtual_network_subnet_id = null"
-        safe_patterns:
-          - "virtual_network_subnet_id = var."
-          - "subnetId ="
-
-  - id: ANTI-NET-005
-    description: Detects empty IP restriction lists on App Service or Function Apps, allowing unrestricted access
-    rationale: Empty IP restrictions allow all internet traffic to reach the app directly, bypassing network controls.
-    warning_message: "Empty IP restrictions — configure IP restrictions or use VNet integration to limit access."
-    applies_to: [terraform-agent, bicep-agent]
-    targets:
-      - services:
-          - Microsoft.Web/sites
-        search_patterns:
-          - "ip_restriction = []"
-          - "scm_ip_restriction = []"
-        safe_patterns:
-          - "ip_restriction = var."
-
-  - id: ANTI-NET-006
-    description: Detects private endpoint referencing a VNet as its privateLinkServiceId — VNets are not valid Private Link targets
-    rationale: Private endpoints connect to specific Azure PaaS services, not VNets. ARM will reject this with HTTP 400.
-    warning_message: "Private endpoint references a VNet as its privateLinkServiceId — VNets are not valid Private Link targets. ARM will reject this with HTTP 400."
-    applies_to: [terraform-agent, bicep-agent]
-    targets:
-      - services:
-          - Microsoft.Network/privateEndpoints
-        search_patterns:
-          - "privateLinkServiceId = azapi_resource.vnet"
-          - "privateLinkServiceId = azapi_resource.virtual_network"
-          - "private_link_service_id = azurerm_virtual_network"
-        correct_patterns:
-          - "# Private endpoints target specific PaaS services (e.g., Microsoft.Sql/servers), not VNets"
-
-  - id: ANTI-NET-007
-    description: Detects diagnostic settings on VNets or NSGs using log categories — these resources only support AllMetrics
-    rationale: VNets and NSGs do not support log category groups. Using categoryGroup = "allLogs" causes ARM HTTP 400 validation errors.
-    warning_message: 'VNet/NSG diagnostic settings must use category = "AllMetrics" only — log categories are not supported and cause ARM errors.'
-    applies_to: [terraform-agent, bicep-agent]
-    targets:
-      - services:
-          - Microsoft.Network/virtualNetworks
-          - Microsoft.Network/networkSecurityGroups
-        search_patterns:
-          - "diag_vnet"
-          - "diag_nsg"
-          - "diagnostics_vnet"
-          - "diagnostics_nsg"
-        safe_patterns:
-          - 'category = "AllMetrics"'
-        correct_patterns:
-          - 'category = "AllMetrics"'
-          - "# VNets and NSGs only support AllMetrics, not log categories"
-
-  - id: ANTI-NET-008
-    description: Detects diagnostic settings created for NSG resources — NSGs do not support any diagnostic categories
-    rationale: NSGs do not support diagnostic settings at all (no logs, no metrics). The ARM API will reject with HTTP 400.
-    warning_message: "NSGs do NOT support diagnostic settings — remove the diagnostic settings resource entirely."
-    applies_to: [terraform-agent, bicep-agent]
-    targets:
-      - services:
-          - Microsoft.Network/networkSecurityGroups
-        search_patterns:
-          - "nsg_pe_diag"
-          - "nsg_aca_diag"
-          - "nsg_diag"
-        safe_patterns:
-          - "# NSGs do not support diagnostic settings"
-        correct_patterns:
-          - "# NSGs do NOT support diagnostic settings — no log or metric categories"
-
-  - id: ANTI-NET-009
-    description: Detects oversized VNet or subnet CIDR blocks (/8 or /16) inappropriate for POC workloads
-    rationale: A /16 allocates 65,536 IPs and a /8 allocates 16 million — wildly excessive for POC workloads that typically need fewer than 1,000 addresses.
-    warning_message: "Oversized address space detected — use /22 to /24 for POC subnets, /20 to /22 for VNets."
-    applies_to: [terraform-agent, bicep-agent]
-    targets:
-      - services:
-          - Microsoft.Network/virtualNetworks
-        search_patterns:
-          - "/8\""
-          - "/16\""
-          - "10.0.0.0/8"
-          - "10.0.0.0/16"
-          - "172.16.0.0/12"
-        safe_patterns:
-          - "/20"
-          - "/21"
-          - "/22"
-          - "/23"
-          - "/24"
-          - "/27"
-        correct_patterns:
-          - "addressPrefix = \"10.0.0.0/22\""
-          - "# Use /22-/24 for subnets, /20-/22 for VNets in POC"
-
-  - id: ANTI-NET-010
-    description: Detects wildcard (*) source or destination in NSG security rules allowing unrestricted traffic
-    rationale: Wildcard rules negate the purpose of NSGs and allow any traffic through, creating an open network.
-    warning_message: "NSG rule uses wildcard (*) for source or destination — use specific IP ranges, CIDR blocks, or service tags."
-    applies_to: [terraform-agent, bicep-agent]
-    targets:
-      - services:
-          - Microsoft.Network/networkSecurityGroups
-        search_patterns:
-          - 'sourceAddressPrefix = "*"'
-          - 'destinationAddressPrefix = "*"'
-          - 'source_address_prefix = "*"'
-          - 'destination_address_prefix = "*"'
-        safe_patterns:
-          - "DenyAllInbound"
-          - "DenyAllOutbound"
-          - "priority = 4096"
-        correct_patterns:
-          - 'sourceAddressPrefix = "10.0.0.0/22"'
-          - 'sourceAddressPrefix = "VirtualNetwork"'
-          - "# Use CIDR blocks or service tags instead of wildcards"
+- id: ANTI-NET-001
+  description: Detects public network access enabled on PaaS services that should be private-only
+  rationale: Public network access exposes service data planes to internet-based attacks; all PaaS services should disable
+    public access and use private endpoints.
+  warning_message: Public network access is enabled — disable public access and use private endpoints. This applies to ALL
+    environments including POC.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.Storage/storageAccounts
+    - Microsoft.Sql/servers
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.KeyVault/vaults
+    - Microsoft.Cache/redis
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.Search/searchServices
+    - Microsoft.CognitiveServices/accounts
+    - Microsoft.ContainerRegistry/registries
+    - Microsoft.OperationalInsights/workspaces
+    - Microsoft.Insights/components
+    search_patterns:
+    - public_network_access_enabled = true
+    - public_network_access = "enabled"
+    - publicnetworkaccess = "enabled"
+    - publicnetworkaccessforingestion = "enabled"
+    - publicnetworkaccessforquery = "enabled"
+    safe_patterns:
+    - public_network_access_enabled = false
+    - publicnetworkaccess = "disabled"
+    - publicnetworkaccessforingestion = "disabled"
+    - publicnetworkaccessforquery = "disabled"
+    - public_network_access_enabled = var.
+    correct_patterns:
+    - publicNetworkAccess = "Disabled"
+    - public_network_access_enabled = false
+    - publicNetworkAccessForIngestion = "Disabled"
+    - publicNetworkAccessForQuery = "Disabled"
+- id: ANTI-NET-002
+  description: Detects overly permissive network rules using 0.0.0.0/0 CIDR (allow all internet traffic)
+  rationale: Allowing all internet traffic (0.0.0.0/0) in NSG or firewall rules defeats network segmentation and exposes resources
+    to attack.
+  warning_message: Overly permissive network rule detected (0.0.0.0/0) — use specific IP ranges or service tags instead.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.Network/networkSecurityGroups
+    - Microsoft.Network/azureFirewalls
+    search_patterns:
+    - 0.0.0.0/0
+    - 0.0.0.0-255.255.255.255
+    safe_patterns:
+    - do not allow 0.0.0.0
+    - avoid 0.0.0.0
+    - '# outbound to internet'
+    - destinationAddressPrefix = "Internet"
+- id: ANTI-NET-003
+  description: Detects Container Apps or App Services with direct external ingress without an API gateway
+  rationale: Direct external ingress bypasses WAF, rate limiting, and centralized authentication that API Management or Front
+    Door provides.
+  warning_message: Direct external ingress detected — consider using API Management or Front Door as a gateway for production.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.App/containerApps
+    - Microsoft.Web/sites
+    search_patterns:
+    - ingress_type = "external"
+    - external_enabled = true
+    - external = true
+    safe_patterns:
+    - apim
+    - api management
+    - front door
+    - application gateway
+- id: ANTI-NET-004
+  description: Detects VNet integration disabled or missing on compute resources that need private backend connectivity
+  rationale: Without VNet integration, compute resources cannot access private endpoints or backend services on private networks.
+  warning_message: VNet integration disabled or missing — enable VNet integration for backend connectivity to private resources.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.Web/sites
+    - Microsoft.App/managedEnvironments
+    search_patterns:
+    - vnet_route_all_enabled = false
+    - virtual_network_subnet_id = null
+    safe_patterns:
+    - virtual_network_subnet_id = var.
+    - subnetId =
+- id: ANTI-NET-005
+  description: Detects empty IP restriction lists on App Service or Function Apps, allowing unrestricted access
+  rationale: Empty IP restrictions allow all internet traffic to reach the app directly, bypassing network controls.
+  warning_message: Empty IP restrictions — configure IP restrictions or use VNet integration to limit access.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.Web/sites
+    search_patterns:
+    - ip_restriction = []
+    - scm_ip_restriction = []
+    safe_patterns:
+    - ip_restriction = var.
+- id: ANTI-NET-006
+  description: Detects private endpoint referencing a VNet as its privateLinkServiceId — VNets are not valid Private Link
+    targets
+  rationale: Private endpoints connect to specific Azure PaaS services, not VNets. ARM will reject this with HTTP 400.
+  warning_message: Private endpoint references a VNet as its privateLinkServiceId — VNets are not valid Private Link targets.
+    ARM will reject this with HTTP 400.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.Network/privateEndpoints
+    search_patterns:
+    - privateLinkServiceId = azapi_resource.vnet
+    - privateLinkServiceId = azapi_resource.virtual_network
+    - private_link_service_id = azurerm_virtual_network
+    correct_patterns:
+    - '# Private endpoints target specific PaaS services (e.g., Microsoft.Sql/servers), not VNets'
+- id: ANTI-NET-007
+  description: Detects diagnostic settings on VNets or NSGs using log categories — these resources only support AllMetrics
+  rationale: VNets and NSGs do not support log category groups. Using categoryGroup = "allLogs" causes ARM HTTP 400 validation
+    errors.
+  warning_message: VNet/NSG diagnostic settings must use category = "AllMetrics" only — log categories are not supported and
+    cause ARM errors.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.Network/virtualNetworks
+    - Microsoft.Network/networkSecurityGroups
+    search_patterns:
+    - diag_vnet
+    - diag_nsg
+    - diagnostics_vnet
+    - diagnostics_nsg
+    safe_patterns:
+    - category = "AllMetrics"
+    correct_patterns:
+    - category = "AllMetrics"
+    - '# VNets and NSGs only support AllMetrics, not log categories'
+- id: ANTI-NET-008
+  description: Detects diagnostic settings created for NSG resources — NSGs do not support any diagnostic categories
+  rationale: NSGs do not support diagnostic settings at all (no logs, no metrics). The ARM API will reject with HTTP 400.
+  warning_message: NSGs do NOT support diagnostic settings — remove the diagnostic settings resource entirely.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.Network/networkSecurityGroups
+    search_patterns:
+    - nsg_pe_diag
+    - nsg_aca_diag
+    - nsg_diag
+    safe_patterns:
+    - '# NSGs do not support diagnostic settings'
+    correct_patterns:
+    - '# NSGs do NOT support diagnostic settings — no log or metric categories'
+- id: ANTI-NET-009
+  description: Detects oversized VNet or subnet CIDR blocks (/8 or /16) inappropriate for POC workloads
+  rationale: A /16 allocates 65,536 IPs and a /8 allocates 16 million — wildly excessive for POC workloads that typically
+    need fewer than 1,000 addresses.
+  warning_message: Oversized address space detected — use /22 to /24 for POC subnets, /20 to /22 for VNets.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.Network/virtualNetworks
+    search_patterns:
+    - /8"
+    - /16"
+    - 10.0.0.0/8
+    - 10.0.0.0/16
+    - 172.16.0.0/12
+    safe_patterns:
+    - /20
+    - /21
+    - /22
+    - /23
+    - /24
+    - /27
+    correct_patterns:
+    - addressPrefix = "10.0.0.0/22"
+    - '# Use /22-/24 for subnets, /20-/22 for VNets in POC'
+- id: ANTI-NET-010
+  description: Detects wildcard (*) source or destination in NSG security rules allowing unrestricted traffic
+  rationale: Wildcard rules negate the purpose of NSGs and allow any traffic through, creating an open network.
+  warning_message: NSG rule uses wildcard (*) for source or destination — use specific IP ranges, CIDR blocks, or service
+    tags.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.Network/networkSecurityGroups
+    search_patterns:
+    - sourceAddressPrefix = "*"
+    - destinationAddressPrefix = "*"
+    - source_address_prefix = "*"
+    - destination_address_prefix = "*"
+    safe_patterns:
+    - DenyAllInbound
+    - DenyAllOutbound
+    - priority = 4096
+    correct_patterns:
+    - sourceAddressPrefix = "10.0.0.0/22"
+    - sourceAddressPrefix = "VirtualNetwork"
+    - '# Use CIDR blocks or service tags instead of wildcards'

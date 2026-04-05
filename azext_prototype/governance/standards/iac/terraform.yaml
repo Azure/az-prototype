@@ -35,7 +35,7 @@ principles:
   - terraform-agent
   examples:
   - locals { rg_name = "rg-${var.project}-${var.environment}" }
-  - resource "azurerm_resource_group" "main" { name = local.rg_name }
+  - resource "azapi_resource" "resource_group" { type = "Microsoft.Resources/resourceGroups@2024-03-01"; name = local.rg_name }
   rationale: Consistent naming conventions prevent resource conflicts and improve discoverability.
 - id: STAN-TF-004
   description: 'One Resource Type Per File for Complex Modules: When a module manages more than 5 resources, split logically
@@ -54,8 +54,8 @@ principles:
   applies_to:
   - terraform-agent
   examples:
-  - data "azurerm_client_config" "current" {} for tenant/subscription IDs
-  - data "azurerm_resource_group" "existing" { name = var.rg_name }
+  - data "azapi_client_config" "current" {} for tenant/subscription IDs
+  - data "azapi_resource" "existing_rg" { type = "Microsoft.Resources/resourceGroups@2024-03-01"; name = var.rg_name }
   rationale: Parameterized configurations allow reuse across environments and prevent hardcoded values.
 - id: STAN-TF-006
   description: 'Cross-Stage Dependencies via Remote State: Multi-stage deployments MUST use terraform_remote_state data sources
@@ -66,7 +66,7 @@ principles:
   - cloud-architect
   examples:
   - data "terraform_remote_state" "stage1" { backend = "azurerm"; config = { key = "stage1.tfstate" } }
-  - data "azurerm_resource_group" "main" { name = data.terraform_remote_state.stage1.outputs.resource_group_name }
+  - data "azapi_resource" "resource_group" { type = "Microsoft.Resources/resourceGroups@2024-03-01"; name = data.terraform_remote_state.stage1.outputs.resource_group_name }
   rationale: Proper state management prevents cross-stage conflicts and ensures reliable deployments.
 - id: STAN-TF-007
   description: 'Consistent Backend Configuration: Backend configuration must be consistent across all stages.  For POC deployments,
@@ -90,8 +90,8 @@ principles:
   applies_to:
   - terraform-agent
   examples:
-  - output "resource_group_name" { value = azurerm_resource_group.main.name }
-  - output "managed_identity_client_id" { value = azurerm_user_assigned_identity.app.client_id }
+  - output "resource_group_name" { value = azapi_resource.resource_group.name }
+  - output "managed_identity_client_id" { value = azapi_resource.managed_identity.output.properties.clientId }
   - '# Do NOT output primary_key when local auth is disabled'
   rationale: Complete outputs enable downstream stages to reference resources without hardcoding.
 - id: STAN-TF-009
@@ -113,7 +113,7 @@ principles:
   - terraform-agent
   - cloud-architect
   examples:
-  - resource "azurerm_user_assigned_identity" "app" { ... }
-  - resource "azurerm_cosmosdb_sql_role_assignment" "app" { principal_id = azurerm_user_assigned_identity.app.principal_id
-    }
+  - resource "azapi_resource" "managed_identity" { type = "Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31"; ... }
+  - resource "azapi_resource" "cosmosdb_role_assignment" { type = "Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-05-15";
+    body = { properties = { principalId = azapi_resource.managed_identity.output.properties.principalId } } }
   rationale: Complete outputs enable downstream stages to reference resources without hardcoding.

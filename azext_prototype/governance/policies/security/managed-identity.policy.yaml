@@ -25,16 +25,20 @@ rules:
   targets:
   - services:
     - Microsoft.App/containerApps
-  - services:
     - Microsoft.Web/sites
-  - services:
     - Microsoft.KeyVault/vaults
-  - services:
     - Microsoft.Sql/servers/databases
-  - services:
     - Microsoft.DocumentDB/databaseAccounts
-  - services:
-    - TODO:storage
+    - Microsoft.Storage/storageAccounts
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.ContainerRegistry/registries
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.Cache/redis
+    - Microsoft.CognitiveServices/accounts
+    - Microsoft.Search/searchServices
+    - Microsoft.DBforPostgreSQL/flexibleServers
+    - Microsoft.DBforMySQL/flexibleServers
 - id: WAF-SEC-MI-002
   severity: required
   description: Use user-assigned managed identity when identity is shared across resources
@@ -46,16 +50,20 @@ rules:
   targets:
   - services:
     - Microsoft.App/containerApps
-  - services:
     - Microsoft.Web/sites
-  - services:
     - Microsoft.KeyVault/vaults
-  - services:
     - Microsoft.Sql/servers/databases
-  - services:
     - Microsoft.DocumentDB/databaseAccounts
-  - services:
-    - TODO:storage
+    - Microsoft.Storage/storageAccounts
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.ContainerRegistry/registries
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.Cache/redis
+    - Microsoft.CognitiveServices/accounts
+    - Microsoft.Search/searchServices
+    - Microsoft.DBforPostgreSQL/flexibleServers
+    - Microsoft.DBforMySQL/flexibleServers
 - id: WAF-SEC-MI-003
   severity: required
   description: Never use service principal client secrets for service-to-service auth
@@ -71,16 +79,20 @@ rules:
   targets:
   - services:
     - Microsoft.App/containerApps
-  - services:
     - Microsoft.Web/sites
-  - services:
     - Microsoft.KeyVault/vaults
-  - services:
     - Microsoft.Sql/servers/databases
-  - services:
     - Microsoft.DocumentDB/databaseAccounts
-  - services:
-    - TODO:storage
+    - Microsoft.Storage/storageAccounts
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.ContainerRegistry/registries
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.Cache/redis
+    - Microsoft.CognitiveServices/accounts
+    - Microsoft.Search/searchServices
+    - Microsoft.DBforPostgreSQL/flexibleServers
+    - Microsoft.DBforMySQL/flexibleServers
 - id: WAF-SEC-MI-004
   severity: recommended
   description: Assign least-privilege RBAC roles, never Owner or Contributor at resource group scope
@@ -93,29 +105,46 @@ rules:
   targets:
   - services:
     - Microsoft.App/containerApps
-  - services:
     - Microsoft.Web/sites
-  - services:
     - Microsoft.KeyVault/vaults
-  - services:
     - Microsoft.Sql/servers/databases
-  - services:
     - Microsoft.DocumentDB/databaseAccounts
-  - services:
-    - TODO:storage
+    - Microsoft.Storage/storageAccounts
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.ContainerRegistry/registries
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.Cache/redis
+    - Microsoft.CognitiveServices/accounts
+    - Microsoft.Search/searchServices
+    - Microsoft.DBforPostgreSQL/flexibleServers
+    - Microsoft.DBforMySQL/flexibleServers
 patterns:
 - name: System-assigned identity with role
   description: Enable system identity and assign a specific role
   example: |
-    resource "azurerm_container_app" "app" {
-      identity {
-        type = "SystemAssigned"
+    resource "azapi_resource" "container_app" {
+      type      = "Microsoft.App/containerApps@2024-03-01"
+      parent_id = azapi_resource.resource_group.id
+      name      = "app"
+      body = {
+        properties = { ... }
+        identity = {
+          type = "SystemAssigned"
+        }
       }
     }
-    resource "azurerm_role_assignment" "kv_reader" {
-      principal_id = azurerm_container_app.app.identity[0].principal_id
-      role_definition_name = "Key Vault Secrets User"
-      scope = azurerm_key_vault.main.id
+    resource "azapi_resource" "kv_reader" {
+      type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+      parent_id = azapi_resource.key_vault.id
+      name      = uuidv5("oid", "${azapi_resource.container_app.output.identity.principalId}-Key Vault Secrets User")
+      body = {
+        properties = {
+          principalId      = azapi_resource.container_app.output.identity.principalId
+          roleDefinitionId = "/subscriptions/${data.azapi_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/4633458b-17de-408a-b874-0445c86b69e6"
+          principalType    = "ServicePrincipal"
+        }
+      }
     }
 anti_patterns:
 - description: Do not store client secrets or certificates in application config

@@ -246,7 +246,7 @@ rules:
   - cloud-architect
   targets:
   - services:
-    - TODO:azure-firewall
+    - Microsoft.Network/azureFirewalls
 - id: AZ-FW-003
   severity: required
   description: Enable DNS proxy on the firewall policy for FQDN-based network rules
@@ -257,7 +257,7 @@ rules:
   - cloud-architect
   targets:
   - services:
-    - TODO:azure-firewall
+    - Microsoft.Network/azureFirewalls
 - id: AZ-FW-004
   severity: recommended
   description: Organize rules into rule collection groups by function (infra, app, network)
@@ -268,7 +268,7 @@ rules:
   - cloud-architect
   targets:
   - services:
-    - TODO:azure-firewall
+    - Microsoft.Network/azureFirewalls
 - id: AZ-FW-005
   severity: recommended
   description: Use structured firewall log format and send to Log Analytics
@@ -281,7 +281,7 @@ rules:
   - monitoring-agent
   targets:
   - services:
-    - TODO:azure-firewall
+    - Microsoft.Network/azureFirewalls
     prohibitions:
     - Do not enable both structured and legacy diagnostic log formats simultaneously
 - id: AZ-FW-006
@@ -293,7 +293,7 @@ rules:
   - monitoring-agent
   targets:
   - services:
-    - TODO:azure-firewall
+    - Microsoft.Network/azureFirewalls
 - id: AZ-FW-007
   severity: recommended
   description: Configure at least 5 public IP addresses for deployments susceptible to SNAT port exhaustion
@@ -305,7 +305,7 @@ rules:
   - bicep-agent
   targets:
   - services:
-    - TODO:azure-firewall
+    - Microsoft.Network/azureFirewalls
 - id: AZ-FW-008
   severity: recommended
   description: Use policy analytics dashboard to identify and optimize firewall policies
@@ -316,7 +316,7 @@ rules:
   - security-reviewer
   targets:
   - services:
-    - TODO:azure-firewall
+    - Microsoft.Network/azureFirewalls
 - id: AZ-FW-009
   severity: recommended
   description: Place frequently used rules early in rule collection groups to optimize latency
@@ -328,7 +328,7 @@ rules:
   - bicep-agent
   targets:
   - services:
-    - TODO:azure-firewall
+    - Microsoft.Network/azureFirewalls
 patterns:
 - name: Azure Firewall Premium with IDPS and TLS inspection
   description: Hub firewall with Premium policy, threat intelligence in Deny mode, and zone-redundant deployment

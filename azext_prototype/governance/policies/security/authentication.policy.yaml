@@ -18,14 +18,21 @@ rules:
   targets:
   - services:
     - Microsoft.App/containerApps
-  - services:
     - Microsoft.Web/sites
-  - services:
     - Microsoft.ApiManagement/service
-  - services:
     - Microsoft.Sql/servers/databases
-  - services:
     - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Storage/storageAccounts
+    - Microsoft.KeyVault/vaults
+    - Microsoft.Cache/redis
+    - Microsoft.DBforPostgreSQL/flexibleServers
+    - Microsoft.DBforMySQL/flexibleServers
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.CognitiveServices/accounts
+    - Microsoft.Search/searchServices
+    - Microsoft.ContainerRegistry/registries
+    - Microsoft.ContainerService/managedClusters
 - id: WAF-SEC-AUTH-002
   severity: recommended
   description: Assign least-privilege RBAC roles for all service principals and user accounts
@@ -38,14 +45,21 @@ rules:
   targets:
   - services:
     - Microsoft.App/containerApps
-  - services:
     - Microsoft.Web/sites
-  - services:
     - Microsoft.ApiManagement/service
-  - services:
     - Microsoft.Sql/servers/databases
-  - services:
     - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Storage/storageAccounts
+    - Microsoft.KeyVault/vaults
+    - Microsoft.Cache/redis
+    - Microsoft.DBforPostgreSQL/flexibleServers
+    - Microsoft.DBforMySQL/flexibleServers
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.CognitiveServices/accounts
+    - Microsoft.Search/searchServices
+    - Microsoft.ContainerRegistry/registries
+    - Microsoft.ContainerService/managedClusters
 - id: WAF-SEC-AUTH-003
   severity: recommended
   description: Prefer app registrations with scoped permissions over shared API keys for client authentication
@@ -59,27 +73,36 @@ rules:
   targets:
   - services:
     - Microsoft.App/containerApps
-  - services:
     - Microsoft.Web/sites
-  - services:
     - Microsoft.ApiManagement/service
-  - services:
     - Microsoft.Sql/servers/databases
-  - services:
     - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Storage/storageAccounts
+    - Microsoft.KeyVault/vaults
+    - Microsoft.Cache/redis
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.CognitiveServices/accounts
+    - Microsoft.Search/searchServices
 patterns:
 - name: Managed identity for service-to-service
   description: Use managed identity to avoid storing credentials
-  example: |
-    from azure.identity import DefaultAzureCredential
+  example: 'from azure.identity import DefaultAzureCredential
+
     credential = DefaultAzureCredential()
+
     # Works with managed identity in Azure, developer credentials locally
+
+    '
 - name: Key Vault for external secrets
   description: Store third-party API keys or connection strings in Key Vault
-  example: |
-    from azure.keyvault.secrets import SecretClient
+  example: 'from azure.keyvault.secrets import SecretClient
+
     client = SecretClient(vault_url="https://myvault.vault.azure.net/", credential=credential)
+
     secret = client.get_secret("external-api-key")
+
+    '
 anti_patterns:
 - description: Do not embed API keys or passwords in application source code
   instead: Use managed identity for Azure services or Key Vault for external secrets

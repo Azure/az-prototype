@@ -148,7 +148,7 @@ rules:
       }
   targets:
   - services:
-    - Microsoft.Network/frontDoors
+    - Microsoft.Cdn/profiles
     terraform_pattern: |
       resource "azapi_resource" "front_door" {
         type      = "Microsoft.Cdn/profiles@2024-02-01"
@@ -199,7 +199,7 @@ rules:
   - cloud-architect
   targets:
   - services:
-    - Microsoft.Network/frontDoors
+    - Microsoft.Cdn/profiles
 - id: AZ-AFD-003
   severity: required
   description: Use private link origins for backend connectivity (Premium SKU)
@@ -210,7 +210,7 @@ rules:
   - cloud-architect
   targets:
   - services:
-    - Microsoft.Network/frontDoors
+    - Microsoft.Cdn/profiles
 - id: AZ-AFD-004
   severity: recommended
   description: Configure caching rules with appropriate TTLs per content type
@@ -221,7 +221,7 @@ rules:
   - cloud-architect
   targets:
   - services:
-    - Microsoft.Network/frontDoors
+    - Microsoft.Cdn/profiles
 patterns:
 - name: Front Door Premium with WAF and private link
   description: Global load balancer with WAF protection, private link origins, and HTTPS enforcement

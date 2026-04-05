@@ -256,7 +256,7 @@ rules:
   - monitoring-agent
   targets:
   - services:
-    - TODO:defender-for-cloud
+    - Microsoft.Security/pricings
 patterns:
 - name: Defender for Cloud with full coverage
   description: Enable Defender Standard tier on all resource types with auto-provisioning and alert routing

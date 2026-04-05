@@ -160,7 +160,7 @@ rules:
   - cloud-architect
   targets:
   - services:
-    - TODO:private-endpoint
+    - Microsoft.Network/privateEndpoints
     prohibitions:
     - NEVER use a custom DNS zone name — use the exact Azure-defined zone name for each service
     - NEVER create duplicate DNS zones for the same service — reuse existing zones across private endpoints
@@ -174,7 +174,7 @@ rules:
   - cloud-architect
   targets:
   - services:
-    - TODO:private-endpoint
+    - Microsoft.Network/privateEndpoints
 - id: AZ-PE-004
   severity: recommended
   description: Centralize Private DNS Zones in a shared resource group for multi-resource architectures
@@ -183,7 +183,7 @@ rules:
   - cloud-architect
   targets:
   - services:
-    - TODO:private-endpoint
+    - Microsoft.Network/privateEndpoints
 patterns:
 - name: Private Endpoint with DNS Zone and VNet Link
   description: 'Complete private endpoint deployment with all four required components: PE, DNS Zone, VNet Link, DNS Zone

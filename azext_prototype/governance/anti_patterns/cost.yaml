@@ -1,72 +1,78 @@
 kind: anti-pattern
 domain: cost
 description: Oversized SKUs, missing autoscale, and cost-inefficient configurations for POC
-last_updated: "2026-04-04"
+last_updated: '2026-04-04'
 patterns:
-  - id: ANTI-COST-001
-    description: Detects Premium or Enterprise tier SKUs that are excessive for POC workloads
-    rationale: Premium and Enterprise SKUs are 10-50x more expensive than Basic/Standard tiers and rarely needed for POC validation.
-    warning_message: "Premium/Enterprise SKU detected — use Basic or Standard tier for POC unless explicitly required."
-    applies_to: [terraform-agent, bicep-agent, cloud-architect]
-    targets:
-      - services:
-          - Microsoft.Web/sites
-          - Microsoft.Web/serverfarms
-        search_patterns:
-          - 'sku_name = "p1v3"'
-          - 'sku_name = "p2v3"'
-          - 'sku_name = "p3v3"'
-        safe_patterns:
-          - "sku_name = var."
-          - 'sku_name = "B1"'
-          - 'sku_name = "S1"'
-          - 'sku_name = "Y1"'
-        correct_patterns:
-          - 'sku_name = "B1"'
-          - 'sku_name = "S1"'
-          - 'sku_name = "Y1"'
-      - services:
-          - Microsoft.Cache/redis
-          - Microsoft.ServiceBus/namespaces
-        search_patterns:
-          - 'sku_name = "premium"'
-        safe_patterns:
-          - "premium is required for"
-          - "sku_name = var."
-        correct_patterns:
-          - 'name = "Basic"'
-          - 'name = "Standard"'
-
-  - id: ANTI-COST-002
-    description: Detects always-on minimum replicas for Container Apps in POC where scale-to-zero is preferred
-    rationale: Minimum replica count of 1+ means the app runs continuously even with no traffic, consuming resources unnecessarily.
-    warning_message: "min_replicas > 0 detected — use min_replicas = 0 for scale-to-zero in POC."
-    applies_to: [terraform-agent, bicep-agent]
-    targets:
-      - services:
-          - Microsoft.App/containerApps
-        search_patterns:
-          - "min_replicas = 1"
-          - "minimum_instance_count = 1"
-        safe_patterns:
-          - "min_replicas = var."
-          - "# always-on required"
-        correct_patterns:
-          - "min_replicas = 0"
-          - "minReplicas = 0"
-
-  - id: ANTI-COST-003
-    description: Detects reserved capacity or reserved instance commitments inappropriate for POC
-    rationale: Reserved capacity requires 1-3 year commitments — POC workloads should use pay-as-you-go pricing.
-    warning_message: "Reserved capacity/instance detected — use pay-as-you-go pricing for POC workloads."
-    applies_to: [terraform-agent, bicep-agent, cloud-architect]
-    targets:
-      - services: []
-        search_patterns:
-          - "reserved_capacity"
-          - "reserved_instance"
-        safe_patterns:
-          - "# reserved capacity justified"
-          - "reserved_capacity = var."
-        correct_patterns:
-          - "# Use pay-as-you-go pricing for POC workloads"
+- id: ANTI-COST-001
+  description: Detects Premium or Enterprise tier SKUs that are excessive for POC workloads
+  rationale: Premium and Enterprise SKUs are 10-50x more expensive than Basic/Standard tiers and rarely needed for POC validation.
+  warning_message: Premium/Enterprise SKU detected — use Basic or Standard tier for POC unless explicitly required.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  targets:
+  - services:
+    - Microsoft.Web/sites
+    - Microsoft.Web/serverfarms
+    search_patterns:
+    - sku_name = "p1v3"
+    - sku_name = "p2v3"
+    - sku_name = "p3v3"
+    safe_patterns:
+    - sku_name = var.
+    - sku_name = "B1"
+    - sku_name = "S1"
+    - sku_name = "Y1"
+    correct_patterns:
+    - sku_name = "B1"
+    - sku_name = "S1"
+    - sku_name = "Y1"
+  - services:
+    - Microsoft.Cache/redis
+    - Microsoft.ServiceBus/namespaces
+    search_patterns:
+    - sku_name = "premium"
+    safe_patterns:
+    - premium is required for
+    - sku_name = var.
+    correct_patterns:
+    - name = "Basic"
+    - name = "Standard"
+- id: ANTI-COST-002
+  description: Detects always-on minimum replicas for Container Apps in POC where scale-to-zero is preferred
+  rationale: Minimum replica count of 1+ means the app runs continuously even with no traffic, consuming resources unnecessarily.
+  warning_message: min_replicas > 0 detected — use min_replicas = 0 for scale-to-zero in POC.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.App/containerApps
+    search_patterns:
+    - min_replicas = 1
+    - minimum_instance_count = 1
+    safe_patterns:
+    - min_replicas = var.
+    - '# always-on required'
+    correct_patterns:
+    - min_replicas = 0
+    - minReplicas = 0
+- id: ANTI-COST-003
+  description: Detects reserved capacity or reserved instance commitments inappropriate for POC
+  rationale: Reserved capacity requires 1-3 year commitments — POC workloads should use pay-as-you-go pricing.
+  warning_message: Reserved capacity/instance detected — use pay-as-you-go pricing for POC workloads.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  targets:
+  - services: []
+    search_patterns:
+    - reserved_capacity
+    - reserved_instance
+    safe_patterns:
+    - '# reserved capacity justified'
+    - reserved_capacity = var.
+    correct_patterns:
+    - '# Use pay-as-you-go pricing for POC workloads'

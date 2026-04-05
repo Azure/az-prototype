@@ -15,12 +15,16 @@ rules:
   targets:
   - services:
     - Microsoft.Sql/servers/databases
-  - services:
     - Microsoft.DocumentDB/databaseAccounts
-  - services:
-    - TODO:storage
-  - services:
+    - Microsoft.Storage/storageAccounts
     - Microsoft.KeyVault/vaults
+    - Microsoft.Cache/redis
+    - Microsoft.DBforPostgreSQL/flexibleServers
+    - Microsoft.DBforMySQL/flexibleServers
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.Search/searchServices
+    - Microsoft.CognitiveServices/accounts
 - id: WAF-SEC-DP-002
   severity: required
   description: Enforce TLS 1.2+ for all data-in-transit connections
@@ -32,12 +36,19 @@ rules:
   targets:
   - services:
     - Microsoft.Sql/servers/databases
-  - services:
     - Microsoft.DocumentDB/databaseAccounts
-  - services:
-    - TODO:storage
-  - services:
+    - Microsoft.Storage/storageAccounts
     - Microsoft.KeyVault/vaults
+    - Microsoft.App/containerApps
+    - Microsoft.Web/sites
+    - Microsoft.Cache/redis
+    - Microsoft.DBforPostgreSQL/flexibleServers
+    - Microsoft.DBforMySQL/flexibleServers
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.Search/searchServices
+    - Microsoft.CognitiveServices/accounts
+    - Microsoft.ContainerRegistry/registries
 - id: WAF-SEC-DP-003
   severity: recommended
   description: Store application secrets and connection configuration in Azure Key Vault, not in code or environment variables
@@ -51,12 +62,17 @@ rules:
   targets:
   - services:
     - Microsoft.Sql/servers/databases
-  - services:
     - Microsoft.DocumentDB/databaseAccounts
-  - services:
-    - TODO:storage
-  - services:
+    - Microsoft.Storage/storageAccounts
     - Microsoft.KeyVault/vaults
+    - Microsoft.App/containerApps
+    - Microsoft.Web/sites
+    - Microsoft.Cache/redis
+    - Microsoft.DBforPostgreSQL/flexibleServers
+    - Microsoft.DBforMySQL/flexibleServers
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.CognitiveServices/accounts
 - id: WAF-SEC-DP-004
   severity: recommended
   description: Use Azure Key Vault references in App Service and Container Apps configuration instead of plaintext secrets
@@ -70,30 +86,44 @@ rules:
   - python-developer
   targets:
   - services:
-    - Microsoft.Sql/servers/databases
-  - services:
-    - Microsoft.DocumentDB/databaseAccounts
-  - services:
-    - TODO:storage
-  - services:
+    - Microsoft.App/containerApps
+    - Microsoft.Web/sites
     - Microsoft.KeyVault/vaults
+    - Microsoft.Sql/servers/databases
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Storage/storageAccounts
+    - Microsoft.Cache/redis
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.CognitiveServices/accounts
 patterns:
 - name: Key Vault reference in Container Apps
   description: Reference a Key Vault secret from Container App environment variable
   example: |
-    resource "azurerm_container_app" "api" {
-      template {
-        container {
-          env {
-            name        = "DB_CONNECTION"
-            secret_name = "db-conn"
+    resource "azapi_resource" "container_app_api" {
+      type      = "Microsoft.App/containerApps@2024-03-01"
+      parent_id = azapi_resource.resource_group.id
+      name      = "api"
+      body = {
+        properties = {
+          configuration = {
+            secrets = [{
+              name                = "db-conn"
+              keyVaultUrl         = azapi_resource.key_vault_secret_db_conn.output.properties.secretUriWithVersion
+              identity            = "System"
+            }]
+          }
+          template = {
+            containers = [{
+              name  = "api"
+              image = "app:latest"
+              env   = [{
+                name      = "DB_CONNECTION"
+                secretRef = "db-conn"
+              }]
+            }]
           }
         }
-      }
-      secret {
-        name                = "db-conn"
-        key_vault_secret_id = azurerm_key_vault_secret.db_conn.versionless_id
-        identity            = "System"
       }
     }
 anti_patterns:

@@ -13,6 +13,7 @@ principles:
   - app-developer
   - csharp-developer
   - python-developer
+  - react-developer
   - cloud-architect
   examples:
   - 'Terraform: one resource per module when the resource has complex configuration'
@@ -28,6 +29,7 @@ principles:
   - app-developer
   - csharp-developer
   - python-developer
+  - react-developer
   examples:
   - 'Terraform: use locals and variables instead of repeating values'
   - 'Application: extract common HTTP client setup into a shared utility'
@@ -42,6 +44,7 @@ principles:
   - app-developer
   - csharp-developer
   - python-developer
+  - react-developer
   examples:
   - 'Terraform: use variable maps for optional features instead of hard-coded conditionals'
   - 'Application: use dependency injection instead of hard-coded implementations'
@@ -53,7 +56,7 @@ principles:
   - terraform-agent
   - bicep-agent
   - cloud-architect
-  - security-reviewer
+  - security-architect
   examples:
   - Use 'Storage Blob Data Reader' instead of 'Contributor' for read-only access
   - Scope role assignments to the specific resource, not the resource group
@@ -67,6 +70,7 @@ principles:
   - app-developer
   - csharp-developer
   - python-developer
+  - react-developer
   examples:
   - 'Terraform: always set explicit depends_on when resource ordering matters'
   - 'Bicep: declare parameter defaults explicitly'

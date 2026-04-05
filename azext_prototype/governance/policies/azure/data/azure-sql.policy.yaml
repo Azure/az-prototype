@@ -19,7 +19,7 @@ rules:
     error_message: 'Service ''{service_name}'' ({service_type}) missing entra_auth_only: true'
   targets:
   - services:
-    - Microsoft.Sql/servers/databases
+    - Microsoft.Sql/servers
     terraform_pattern: |
       resource "azapi_resource" "sql_server" {
         type      = "Microsoft.Sql/servers@2023-08-01-preview"
@@ -206,7 +206,7 @@ rules:
     error_message: 'Service ''{service_name}'' ({service_type}) missing threat_protection: true'
   targets:
   - services:
-    - Microsoft.Sql/servers/databases
+    - Microsoft.Sql/servers
     terraform_pattern: |
       resource "azapi_resource" "sql_threat_protection" {
         type      = "Microsoft.Sql/servers/advancedThreatProtectionSettings@2023-08-01-preview"
@@ -363,7 +363,7 @@ rules:
       }
   targets:
   - services:
-    - Microsoft.Sql/servers/databases
+    - Microsoft.Sql/servers
     prohibitions:
     - NEVER set publicNetworkAccess to Enabled
     - NEVER create firewall rules allowing 0.0.0.0-255.255.255.255
@@ -452,7 +452,7 @@ rules:
   - security-reviewer
   targets:
   - services:
-    - Microsoft.Sql/servers/databases
+    - Microsoft.Sql/servers
     terraform_pattern: |
       resource "azapi_resource" "sql_server_auditing" {
         type      = "Microsoft.Sql/servers/auditingSettings@2023-08-01-preview"
@@ -489,7 +489,7 @@ rules:
   - security-reviewer
   targets:
   - services:
-    - Microsoft.Sql/servers/databases
+    - Microsoft.Sql/servers
     terraform_pattern: |
       resource "azapi_resource" "sql_vulnerability_assessment" {
         type      = "Microsoft.Sql/servers/sqlVulnerabilityAssessments@2023-08-01-preview"
@@ -535,7 +535,7 @@ rules:
   - bicep-agent
   targets:
   - services:
-    - Microsoft.Sql/servers/databases
+    - Microsoft.Sql/servers
     terraform_pattern: |
       resource "azapi_resource" "sql_failover_group" {
         type      = "Microsoft.Sql/servers/failoverGroups@2023-08-01-preview"

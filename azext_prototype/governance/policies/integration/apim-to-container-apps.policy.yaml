@@ -88,12 +88,16 @@ patterns:
 - name: APIM backend with managed identity
   description: Configure APIM backend pointing to internal Container App
   example: |
-    resource "azurerm_api_management_backend" "container_app" {
-      name                = "container-app-backend"
-      resource_group_name = azurerm_resource_group.main.name
-      api_management_name = azurerm_api_management.main.name
-      protocol            = "http"
-      url                 = "https://${azurerm_container_app.api.latest_revision_fqdn}"
+    resource "azapi_resource" "apim_backend_container_app" {
+      type      = "Microsoft.ApiManagement/service/backends@2023-09-01-preview"
+      parent_id = azapi_resource.api_management.id
+      name      = "container-app-backend"
+      body = {
+        properties = {
+          protocol = "http"
+          url      = "https://${azapi_resource.container_app_api.output.properties.latestRevisionFqdn}"
+        }
+      }
     }
 anti_patterns:
 - description: Do not expose Container App endpoints directly to the internet

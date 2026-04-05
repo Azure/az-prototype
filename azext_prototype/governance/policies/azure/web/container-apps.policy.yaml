@@ -19,7 +19,7 @@ rules:
     error_message: Template with container-apps must include a virtual-network service for VNet integration
   targets:
   - services:
-    - Microsoft.App/containerApps
+    - Microsoft.App/managedEnvironments
     terraform_pattern: |
       resource "azapi_resource" "container_app_env" {
         type      = "Microsoft.App/managedEnvironments@2024-03-01"
@@ -276,7 +276,7 @@ rules:
   - monitoring-agent
   targets:
   - services:
-    - Microsoft.App/containerApps
+    - Microsoft.App/managedEnvironments
 patterns:
 - name: Container App with Key Vault references
   description: Use Key Vault references for secrets instead of environment variables

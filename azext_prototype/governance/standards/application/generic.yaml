@@ -12,6 +12,7 @@ principles:
   - app-developer
   - csharp-developer
   - python-developer
+  - react-developer
   examples:
   - Use the official Azure Identity library for your language
   - Initialize a DefaultAzureCredential instance at application startup
@@ -26,6 +27,7 @@ principles:
   - app-developer
   - csharp-developer
   - python-developer
+  - react-developer
   examples:
   - Dependency manifest with all required packages and pinned versions
   - Entry point file with service initialization and configuration
@@ -40,6 +42,7 @@ principles:
   - app-developer
   - csharp-developer
   - python-developer
+  - react-developer
   examples:
   - Read configuration from environment variables at startup
   - Use a configuration library appropriate for your language
@@ -54,6 +57,7 @@ principles:
   - app-developer
   - csharp-developer
   - python-developer
+  - react-developer
   examples:
   - GET /healthz returning 200 OK with {"status":"healthy"}
   - Optionally check downstream dependencies in the health response
@@ -67,6 +71,7 @@ principles:
   - app-developer
   - csharp-developer
   - python-developer
+  - react-developer
   examples:
   - Use the platform-standard logging framework (not print/console.log)
   - Include correlation IDs in log entries for distributed tracing
