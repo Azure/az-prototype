@@ -70,14 +70,88 @@ class KnowledgeLoader:
     # ------------------------------------------------------------------
 
     def load_service(self, service_name: str) -> str:
-        """Load a service knowledge file (e.g. ``cosmos-db``).
+        """Load a service knowledge file by name or ARM namespace.
 
-        Resolves computed deployment plan names (e.g., ``cosmos-account``,
-        ``container-app-api``) to canonical knowledge file names
-        (``cosmos-db``, ``container-apps``) via fuzzy matching.
+        Resolution order:
+        1. ARM namespace match via frontmatter (e.g., ``Microsoft.Sql/servers``)
+        2. Friendly name from service registry
+        3. Exact filename match
+        4. Static mapping table (legacy deployment plan names)
+        5. Suffix stripping heuristic
         """
+        # 1. Try ARM namespace resolution via frontmatter index
+        namespace_index = self._build_namespace_index()
+        if service_name in namespace_index:
+            return self._read_md("services", namespace_index[service_name])
+
+        # 2. Try friendly_name from service registry
+        friendly_index = self._build_friendly_index()
+        if service_name in friendly_index:
+            return self._read_md("services", friendly_index[service_name])
+
+        # 3-5. Legacy resolution
         resolved = self._resolve_service_file(service_name)
         return self._read_md("services", f"{resolved}.md")
+
+    def _build_namespace_index(self) -> dict[str, str]:
+        """Build a mapping of ARM namespace → filename from frontmatter.
+
+        Cached after first call.
+        """
+        if hasattr(self, "_ns_index"):
+            return self._ns_index
+
+        index: dict[str, str] = {}
+        services_dir = self._dir / "services"
+        if not services_dir.is_dir():
+            self._ns_index = index
+            return index
+
+        for md_file in services_dir.glob("*.md"):
+            try:
+                content = md_file.read_text(encoding="utf-8")
+                if not content.startswith("---\n"):
+                    continue
+                # Parse frontmatter
+                end = content.index("---", 4)
+                frontmatter = content[4:end]
+                for line in frontmatter.splitlines():
+                    if line.startswith("service_namespace:"):
+                        ns = line.split(":", 1)[1].strip()
+                        index[ns] = md_file.name
+                        break
+            except (ValueError, OSError):
+                continue
+
+        self._ns_index = index
+        return index
+
+    def _build_friendly_index(self) -> dict[str, str]:
+        """Build a mapping of friendly_name → filename from service registry.
+
+        Cached after first call.
+        """
+        if hasattr(self, "_fn_index"):
+            return self._fn_index
+
+        index: dict[str, str] = {}
+        try:
+            registry = self.load_service_registry()
+            if isinstance(registry, dict):
+                services = registry.get("services", registry)
+                for ns_key, svc in services.items():
+                    if isinstance(svc, dict):
+                        fn = svc.get("friendly_name", "")
+                        if fn:
+                            # Find the knowledge file for this namespace
+                            ns_index = self._build_namespace_index()
+                            if ns_key in ns_index:
+                                index[fn] = ns_index[ns_key]
+        except Exception:
+            pass
+
+        self._fn_index = index
+        return index
 
     def load_tool(self, tool_name: str) -> str:
         """Load a tool pattern file (e.g. ``terraform``)."""
