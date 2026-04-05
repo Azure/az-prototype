@@ -416,29 +416,33 @@ def _generate_sidebar(
     lines.append("### Governance")
     lines.append("")
 
-    # Policies by section
-    lines.append("**Policies**")
-    lines.append("")
+    # Policies — one <details> per category
     for section_title, pages in sorted(policy_pages.items()):
-        lines.append(f"  *{section_title}*")
+        lines.append(f"<details><summary>Policies — {section_title}</summary>")
+        lines.append("")
         for display, filename in pages:
-            lines.append(f"  - [{display}]({filename})")
+            lines.append(f"- [{display}]({filename})")
+        lines.append("")
+        lines.append("</details>")
         lines.append("")
 
-    # Anti-patterns
-    lines.append("**Anti-Patterns**")
+    # Anti-patterns — single <details>
+    lines.append("<details><summary>Anti-Patterns</summary>")
     lines.append("")
     for display, filename in ap_pages:
-        lines.append(f"  - [{display}]({filename})")
+        lines.append(f"- [{display}]({filename})")
+    lines.append("")
+    lines.append("</details>")
     lines.append("")
 
-    # Standards by section
-    lines.append("**Standards**")
-    lines.append("")
+    # Standards — one <details> per section
     for section_title, pages in sorted(std_pages.items()):
-        lines.append(f"  *{section_title}*")
+        lines.append(f"<details><summary>Standards — {section_title}</summary>")
+        lines.append("")
         for display, filename in pages:
-            lines.append(f"  - [{display}]({filename})")
+            lines.append(f"- [{display}]({filename})")
+        lines.append("")
+        lines.append("</details>")
         lines.append("")
 
     lines.append(marker_end)
