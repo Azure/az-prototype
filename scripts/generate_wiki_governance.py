@@ -63,16 +63,24 @@ _ABBREVIATIONS: dict[str, str] = {
 
 
 def _title_case(name: str) -> str:
-    """Title-case a name, respecting known abbreviations."""
+    """Title-case a name, respecting known abbreviations and preserving ``&``."""
     words = name.replace("-", " ").replace("_", " ").split()
     result = []
     for w in words:
+        if w == "&":
+            result.append("&")
+            continue
         lower = w.lower()
         if lower in _ABBREVIATIONS:
             result.append(_ABBREVIATIONS[lower])
         else:
             result.append(w.capitalize())
     return " ".join(result)
+
+
+def _wiki_safe(name: str) -> str:
+    """Sanitize a name for use in wiki filenames (no ``&`` or special chars)."""
+    return name.replace("&", "And").replace(" ", "-")
 
 
 def _strip_api_version(resource_type: str) -> str:
@@ -417,13 +425,13 @@ def _generate_sidebar(
     lines.append("")
 
     # Split policies into Azure vs non-Azure groups
-    azure_policies = {k: v for k, v in sorted(policy_pages.items()) if k.startswith("Azure")}
-    other_policies = {k: v for k, v in sorted(policy_pages.items()) if not k.startswith("Azure")}
+    azure_policies = {k: v for k, v in policy_pages.items() if k.startswith("Azure")}
+    other_policies = {k: v for k, v in policy_pages.items() if not k.startswith("Azure")}
 
     # Policies — Azure: single collapsible with bold category headers inside
     lines.append("<details><summary>Policies — Azure</summary>")
     lines.append("")
-    for section_title, pages in sorted(azure_policies.items()):
+    for section_title, pages in azure_policies.items():
         # Strip "Azure " prefix for cleaner headers
         short_title = section_title.removeprefix("Azure ")
         lines.append(f"**{short_title}**")
@@ -437,7 +445,7 @@ def _generate_sidebar(
     if other_policies:
         lines.append("<details><summary>Policies — Well-Architected</summary>")
         lines.append("")
-        for section_title, pages in sorted(other_policies.items()):
+        for section_title, pages in other_policies.items():
             lines.append(f"**{section_title}**")
             for display, filename in pages:
                 lines.append(f"- [{display}]({filename})")
@@ -503,13 +511,14 @@ _AZURE_SECTIONS = {
 }
 
 # Non-Azure policy subdirectories
-_OTHER_SECTIONS = {
-    "cost": "Cost Optimization",
-    "integration": "Integration",
-    "performance": "Performance",
-    "reliability": "Reliability",
-    "security": "Security Principles",
-}
+# Ordered per Microsoft Well-Architected Framework pillar order
+_OTHER_SECTIONS: dict[str, str] = {}
+_OTHER_SECTIONS["reliability"] = "Reliability"
+_OTHER_SECTIONS["security"] = "Security Principles"
+_OTHER_SECTIONS["cost"] = "Cost Optimization"
+_OTHER_SECTIONS["operational-excellence"] = "Operational Excellence"
+_OTHER_SECTIONS["performance"] = "Performance Efficiency"
+_OTHER_SECTIONS["integration"] = "Integration"
 
 # Standards subdirectories
 _STANDARDS_SECTIONS = {
@@ -538,7 +547,7 @@ def main() -> None:
         for yf in sorted(cat_path.glob("*.policy.yaml")):
             raw_name = yf.stem.replace(".policy", "")
             display_name = _title_case(raw_name)
-            wiki_filename = f"Governance-Policies-Azure-{_title_case(subdir).replace(' ', '-')}-{display_name.replace(' ', '-')}"
+            wiki_filename = f"Governance-Policies-Azure-{_wiki_safe(_title_case(subdir))}-{_wiki_safe(display_name)}"
             content = _render_policy_page(yf)
             out_path = WIKI_DIR / f"{wiki_filename}.md"
             out_path.write_text(content, encoding="utf-8")
@@ -556,7 +565,7 @@ def main() -> None:
         for yf in sorted(cat_path.glob("*.policy.yaml")):
             raw_name = yf.stem.replace(".policy", "")
             display_name = _title_case(raw_name)
-            wiki_filename = f"Governance-Policies-{_title_case(subdir).replace(' ', '-')}-{display_name.replace(' ', '-')}"
+            wiki_filename = f"Governance-Policies-{_wiki_safe(_title_case(subdir))}-{_wiki_safe(display_name)}"
             content = _render_policy_page(yf)
             out_path = WIKI_DIR / f"{wiki_filename}.md"
             out_path.write_text(content, encoding="utf-8")
@@ -572,7 +581,7 @@ def main() -> None:
         data = _load_yaml(yf)
         domain = data.get("domain", yf.stem)
         display_name = _title_case(domain)
-        wiki_filename = f"Governance-Anti-Patterns-{display_name.replace(' ', '-')}"
+        wiki_filename = f"Governance-Anti-Patterns-{_wiki_safe(display_name)}"
         content = _render_anti_pattern_page(yf)
         out_path = WIKI_DIR / f"{wiki_filename}.md"
         out_path.write_text(content, encoding="utf-8")
@@ -589,7 +598,7 @@ def main() -> None:
         section_pages = []
         for yf in sorted(section_path.glob("*.yaml")):
             display_name = _title_case(yf.stem)
-            wiki_filename = f"Governance-Standards-{_title_case(section_subdir)}-{display_name.replace(' ', '-')}"
+            wiki_filename = f"Governance-Standards-{_wiki_safe(_title_case(section_subdir))}-{_wiki_safe(display_name)}"
             content = _render_standard_page(yf)
             out_path = WIKI_DIR / f"{wiki_filename}.md"
             out_path.write_text(content, encoding="utf-8")
