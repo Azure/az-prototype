@@ -1,5 +1,5 @@
 kind: anti-pattern
-category: authentication
+domain: authentication
 description: Authentication method detection — ensures managed identity and Entra ID are used
 last_updated: "2026-04-04"
 patterns:

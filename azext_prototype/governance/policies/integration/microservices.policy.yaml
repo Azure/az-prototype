@@ -1,5 +1,5 @@
 kind: policy
-category: integration
+domain: integration
 description: Governance policies for Microservices
 last_updated: '2026-03-27'
 rules:
@@ -12,6 +12,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31
     name: id-svc-*
@@ -233,6 +235,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31
     name: id-svc-*
@@ -454,6 +458,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31
     name: id-svc-*
@@ -675,6 +681,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.App/managedEnvironments/daprComponents@2024-03-01
     name: pubsub-servicebus
@@ -898,6 +906,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.App/managedEnvironments/daprComponents@2024-03-01
     name: pubsub-servicebus
@@ -1121,6 +1131,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.App/managedEnvironments/daprComponents@2024-03-01
     name: pubsub-servicebus
@@ -1345,6 +1357,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   - monitoring-agent
   companion_resources:
   - type: Microsoft.Insights/components@2020-02-02
@@ -1590,6 +1604,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   - monitoring-agent
   companion_resources:
   - type: Microsoft.Insights/components@2020-02-02
@@ -1835,6 +1851,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   - monitoring-agent
   companion_resources:
   - type: Microsoft.Insights/components@2020-02-02
@@ -2079,6 +2097,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.App/containerApps
@@ -2271,6 +2291,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites
@@ -2463,6 +2485,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Insights/components
@@ -2655,6 +2679,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.App/containerApps
@@ -2764,6 +2790,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites
@@ -2873,6 +2901,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Insights/components

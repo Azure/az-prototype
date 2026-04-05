@@ -20,7 +20,7 @@
           "type": "string",
           "description": "Brief description of what the template provides."
         },
-        "category": {
+        "domain": {
           "type": "string",
           "description": "Template category.",
           "enum": ["web-app", "data-pipeline", "ai-app", "microservices", "serverless"]
@@ -31,7 +31,7 @@
           "description": "Searchable tags."
         }
       },
-      "required": ["name", "display_name", "description", "category"],
+      "required": ["name", "display_name", "description", "domain"],
       "additionalProperties": false
     },
     "services": {

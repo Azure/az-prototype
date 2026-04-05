@@ -1,5 +1,5 @@
 kind: policy
-category: azure-networking
+domain: azure-networking
 description: Governance policies for Ddos Protection
 last_updated: '2026-03-27'
 rules:

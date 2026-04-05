@@ -28,7 +28,7 @@ def _make_rule(
     description: str = "Use managed identity",
     rationale: str = "Security best practice",
     source_name: str = "identity-policy",
-    category: str = "security",
+    domain: str = "security",
     services: list[str] | None = None,
     applies_to: list[str] | None = None,
     kind: str = "policy",
@@ -40,7 +40,7 @@ def _make_rule(
         description=description,
         rationale=rationale,
         source_name=source_name,
-        category=category,
+        domain=domain,
         services=services or [],
         applies_to=applies_to or [],
     )
@@ -48,14 +48,14 @@ def _make_rule(
 
 def _make_policy(
     name: str = "test-policy",
-    category: str = "security",
+    domain: str = "security",
     services: list[str] | None = None,
     rules: list | None = None,
 ) -> MagicMock:
     """Create a mock Policy object matching the PolicyEngine schema."""
     policy = MagicMock()
     policy.name = name
-    policy.category = category
+    policy.domain = domain
     policy.services = services or []
     if rules is None:
         rule = MagicMock()
@@ -462,7 +462,7 @@ class TestGovernanceIndexPrecomputed:
                     "description": "Use managed identity",
                     "rationale": "Security",
                     "policy_name": "auth",
-                    "category": "security",
+                    "domain": "security",
                     "services": [],
                     "applies_to": [],
                     "vector": [0.5, 0.3, 0.2],

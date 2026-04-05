@@ -1,5 +1,5 @@
 kind: policy
-category: integration
+domain: integration
 description: Governance policies for Event Driven
 last_updated: '2026-03-27'
 rules:
@@ -14,6 +14,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.EventGrid/systemTopics@2024-06-01-preview
     name: system-topic
@@ -272,6 +274,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.EventGrid/systemTopics@2024-06-01-preview
     name: system-topic
@@ -530,6 +534,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.EventGrid/systemTopics@2024-06-01-preview
     name: system-topic
@@ -788,6 +794,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.EventGrid/systemTopics@2024-06-01-preview
     name: system-topic
@@ -1046,6 +1054,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.EventGrid/systemTopics@2024-06-01-preview
     name: system-topic
@@ -1304,6 +1314,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.EventGrid/systemTopics@2024-06-01-preview
     name: system-topic
@@ -1561,6 +1573,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: fn-sb-data-receiver
@@ -1684,6 +1698,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: fn-sb-data-receiver
@@ -1807,6 +1823,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: fn-sb-data-receiver
@@ -1930,6 +1948,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: fn-sb-data-receiver
@@ -2053,6 +2073,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: fn-sb-data-receiver
@@ -2176,6 +2198,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Authorization/roleAssignments@2022-04-01
     name: fn-sb-data-receiver
@@ -2299,6 +2323,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.EventHub/namespaces/eventhubs/consumergroups@2024-01-01
     name: asa-consumer-group
@@ -2533,6 +2559,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.EventHub/namespaces/eventhubs/consumergroups@2024-01-01
     name: asa-consumer-group
@@ -2767,6 +2795,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.EventHub/namespaces/eventhubs/consumergroups@2024-01-01
     name: asa-consumer-group
@@ -3001,6 +3031,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.EventHub/namespaces/eventhubs/consumergroups@2024-01-01
     name: asa-consumer-group
@@ -3235,6 +3267,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.EventHub/namespaces/eventhubs/consumergroups@2024-01-01
     name: asa-consumer-group
@@ -3469,6 +3503,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.EventHub/namespaces/eventhubs/consumergroups@2024-01-01
     name: asa-consumer-group
@@ -3702,6 +3738,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.EventGrid/topics
@@ -3803,6 +3841,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ServiceBus/namespaces
@@ -3904,6 +3944,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.EventHub/namespaces
@@ -4005,6 +4047,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites
@@ -4106,6 +4150,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.App/containerApps
@@ -4207,6 +4253,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.StreamAnalytics/streamingjobs
@@ -4306,6 +4354,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   companion_resources:
@@ -4403,6 +4453,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   companion_resources:
@@ -4500,6 +4552,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   companion_resources:
@@ -4597,6 +4651,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   companion_resources:
@@ -4694,6 +4750,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   companion_resources:
@@ -4791,6 +4849,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   companion_resources:

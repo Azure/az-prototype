@@ -160,11 +160,11 @@ class DeployState(BaseState):
         Unlike :meth:`load_from_build_state` (which overwrites), this method:
 
         - **Matches** existing deploy stages to build stages by ``build_stage_id``
-        - **Updates** build-sourced fields (name, category, services, deploy_mode)
+        - **Updates** build-sourced fields (name, capability, services, deploy_mode)
           while preserving deploy state (status, timestamps, substage structure)
         - **Creates** new deploy stages for new build stages
         - **Orphans** deploy stages whose build stage was removed (sets ``removed``)
-        - Falls back to name+category matching for legacy stages
+        - Falls back to name+capability matching for legacy stages
 
         Returns a :class:`SyncResult` summarising the changes.
         """
@@ -215,7 +215,7 @@ class DeployState(BaseState):
 
                     # Update build-sourced fields
                     ds["name"] = bs.get("name", ds["name"])
-                    ds["category"] = bs.get("category", ds.get("category", "infra"))
+                    ds["capability"] = bs.get("capability", ds.get("capability", "infra"))
                     ds["services"] = bs.get("services", ds.get("services", []))
                     ds["deploy_mode"] = bs.get("deploy_mode", ds.get("deploy_mode", "auto"))
                     ds["manual_instructions"] = bs.get("manual_instructions", ds.get("manual_instructions"))
@@ -229,13 +229,13 @@ class DeployState(BaseState):
 
                 result.matched += 1
             else:
-                # Legacy fallback: match by name+category
+                # Legacy fallback: match by name+capability
                 legacy_match = None
                 for ds in existing:
                     if (
                         not ds.get("build_stage_id")
                         and ds.get("name") == bs.get("name")
-                        and ds.get("category") == bs.get("category")
+                        and ds.get("capability") == bs.get("capability")
                     ):
                         legacy_match = ds
                         break
@@ -483,7 +483,7 @@ class DeployState(BaseState):
         # Find insertion point — before the docs stage
         insert_idx = len(existing)
         for i, s in enumerate(existing):
-            if s.get("category") == "docs":
+            if s.get("capability") == "docs":
                 insert_idx = i
                 break
 
@@ -744,9 +744,9 @@ class DeployState(BaseState):
             deploy_mode = stage.get("deploy_mode", "auto")
 
             if status in ("removed", "destroyed"):
-                line = f"  {icon} Stage {display_id}: ~~{stage['name']}~~ ({stage.get('category', '?')}) (Removed)"
+                line = f"  {icon} Stage {display_id}: ~~{stage['name']}~~ ({stage.get('capability', '?')}) (Removed)"
             else:
-                line = f"  {icon} Stage {display_id}: {stage['name']} ({stage.get('category', '?')})"
+                line = f"  {icon} Stage {display_id}: {stage['name']} ({stage.get('capability', '?')})"
                 if deploy_mode == "manual":
                     line += " [Manual]"
                 if svc_count:

@@ -1,5 +1,5 @@
 kind: policy
-category: performance
+domain: performance
 description: Governance policies for Compute Optimization
 last_updated: '2026-03-27'
 rules:
@@ -14,6 +14,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.App/containerApps
@@ -181,6 +183,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ContainerService/managedClusters
@@ -348,6 +352,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites
@@ -515,6 +521,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Compute/virtualMachines
@@ -1086,6 +1094,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.App/containerApps
@@ -1210,6 +1220,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ContainerService/managedClusters
@@ -1334,6 +1346,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites
@@ -1458,6 +1472,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Compute/virtualMachines
@@ -1581,6 +1597,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.App/containerApps
@@ -1716,6 +1734,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ContainerService/managedClusters
@@ -1851,6 +1871,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites
@@ -1986,6 +2008,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Compute/virtualMachines
@@ -2119,6 +2143,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   targets:
@@ -2230,6 +2256,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   targets:
@@ -2341,6 +2369,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   targets:
@@ -2452,6 +2482,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   targets:

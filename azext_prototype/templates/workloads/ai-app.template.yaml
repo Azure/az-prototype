@@ -11,7 +11,7 @@ metadata:
     An AI-powered application with Azure OpenAI for inference,
     Container Apps for the API layer, Cosmos DB for conversation
     history, and APIM for rate limiting and auth.
-  category: ai-app
+  domain: ai-app
   tags: [container-apps, openai, cosmos-db, apim, ai]
 
 services:

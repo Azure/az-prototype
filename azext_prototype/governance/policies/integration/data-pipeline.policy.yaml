@@ -1,5 +1,5 @@
 kind: policy
-category: integration
+domain: integration
 description: Governance policies for Data Pipeline
 last_updated: '2026-03-27'
 rules:
@@ -12,6 +12,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.DataFactory/factories/managedVirtualNetworks@2018-06-01
     name: default
@@ -227,6 +229,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.DataFactory/factories/managedVirtualNetworks@2018-06-01
     name: default
@@ -442,6 +446,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.DataFactory/factories/managedVirtualNetworks@2018-06-01
     name: default
@@ -657,6 +663,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.DataFactory/factories/managedVirtualNetworks@2018-06-01
     name: default
@@ -872,6 +880,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.DataFactory/factories/managedVirtualNetworks@2018-06-01
     name: default
@@ -1993,6 +2003,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.KeyVault/vaults@2023-07-01
     name: dbr-key-vault
@@ -2171,6 +2183,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.KeyVault/vaults@2023-07-01
     name: dbr-key-vault
@@ -2349,6 +2363,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.KeyVault/vaults@2023-07-01
     name: dbr-key-vault
@@ -2527,6 +2543,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.KeyVault/vaults@2023-07-01
     name: dbr-key-vault
@@ -2705,6 +2723,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.KeyVault/vaults@2023-07-01
     name: dbr-key-vault

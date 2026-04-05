@@ -464,7 +464,7 @@ class BuildSession(SessionMixin):
         for stage in stages_to_process:
             stage_num = stage["stage"]
             stage_name = stage["name"]
-            category = stage.get("category", "infra")
+            capability = stage.get("capability", "infra")
             services = stage.get("services", [])
 
             svc_names = [s.get("computed_name") or s.get("name", "") for s in services]
@@ -481,7 +481,7 @@ class BuildSession(SessionMixin):
             # Handle re-entry: "validating" stages need QA re-run only
             if stage_status == "validating":
                 _print(f"[{generated_count}/{total_stages}] Stage {stage_num}: {stage_name} (re-validating)")
-                if category in ("infra", "data", "integration", "app"):
+                if capability in ("infra", "data", "integration", "app"):
                     qa_passed = self._run_stage_qa(stage, architecture, templates, use_styled, _print)
                     if qa_passed:
                         self._build_state.mark_stage_generated(stage_num, stage.get("files", []), "user-fix")
@@ -520,7 +520,7 @@ class BuildSession(SessionMixin):
             else:
                 agent = self._select_agent(stage)
             if not agent:
-                _print(f"       Skipped (no agent for category '{stage.get('category', '')}')")
+                _print(f"       Skipped (no agent for capability '{stage.get('capability', '')}')")
                 continue
 
             with self._agent_build_context(agent, stage):
@@ -549,7 +549,7 @@ class BuildSession(SessionMixin):
                 try:
                     with self._maybe_spinner(f"Building Stage {stage_num}: {stage_name}...", use_styled):
                         response = self._execute_with_retry(
-                            agent, task, stage_num, stage_name, _print, stage_category=category
+                            agent, task, stage_num, stage_name, _print, stage_capability=capability
                         )
                     if response is None:
                         # All retry attempts exhausted — stop build
@@ -587,7 +587,7 @@ class BuildSession(SessionMixin):
             # Debug: scan response for anti-pattern violations before policy resolver
             # Skip scanning for docs and app stages — docs describe the architecture
             # and app stages generate source code, not IaC. Both trigger false positives.
-            if content and category not in ("docs", "app"):
+            if content and capability not in ("docs", "app"):
                 try:
                     from azext_prototype.governance.anti_patterns import (
                         scan as _ap_scan,
@@ -673,7 +673,7 @@ class BuildSession(SessionMixin):
                                 stage_num,
                                 stage_name,
                                 _print,
-                                stage_category=category,
+                                stage_capability=capability,
                             )
                         if response is None:
                             build_stopped = True
@@ -702,7 +702,7 @@ class BuildSession(SessionMixin):
 
             # Per-stage QA validation — runs on ALL stage categories
             qa_passed = True
-            if category in ("infra", "data", "integration", "app", "docs"):
+            if capability in ("infra", "data", "integration", "app", "docs"):
                 qa_passed = self._run_stage_qa(stage, architecture, templates, use_styled, _print)
 
             if qa_passed:
@@ -990,33 +990,33 @@ class BuildSession(SessionMixin):
             "      identity, monitoring, networking, and data service endpoints/secrets\n"
             "   f. Integration (APIM, Event Grid, SignalR, etc.) — depends on the\n"
             "      services they integrate with\n"
-            "   g. Application code (layer 'app', category 'app') — depends on ALL infrastructure.\n"
+            "   g. Application code (layer 'app', capability 'app') — depends on ALL infrastructure.\n"
             "      Needs Container Registry (push images), compute environment (deploy\n"
             "      to), data service endpoints (connection config), Key Vault (secrets).\n"
             "      Place ALL 'app' stages after ALL 'infra' stages.\n"
-            "   h. Documentation (layer 'docs', category 'docs') — depends on all stages above;\n"
+            "   h. Documentation (layer 'docs', capability 'docs') — depends on all stages above;\n"
             "      must be last\n\n"
-            "7. The LAST stage MUST always be 'Documentation' with layer 'docs', category 'docs'.\n"
+            "7. The LAST stage MUST always be 'Documentation' with layer 'docs', capability 'docs'.\n"
             "   NEVER omit the Documentation stage.\n\n"
-            "8. CRITICAL: Each stage has BOTH a 'layer' and a 'category'.\n"
+            "8. CRITICAL: Each stage has BOTH a 'layer' and a 'capability'.\n"
             "   Layers determine which architect owns the stage:\n"
             "   - 'core'  — cloud-architect (identity, monitoring)\n"
             "   - 'infra' — infrastructure-architect → terraform/bicep agent\n"
             "   - 'data'  — data-architect → terraform/bicep agent\n"
             "   - 'app'   — application-architect → language-specific developer\n"
             "   - 'docs'  — doc-agent\n"
-            "   Categories sub-classify within layers (infra, data, app, docs).\n"
+            "   Capabilities sub-classify within layers (infra, data, app, docs).\n"
             "   Container Apps INFRASTRUCTURE (managed environment, container app resources)\n"
-            "   uses layer 'infra', category 'infra'. But the APPLICATION SOURCE CODE\n"
+            "   uses layer 'infra', capability 'infra'. But the APPLICATION SOURCE CODE\n"
             "   (APIs, workers, Dockerfiles, requirements.txt) that runs IN those\n"
-            "   containers MUST be a separate stage with layer 'app', category 'app'.\n\n"
+            "   containers MUST be a separate stage with layer 'app', capability 'app'.\n\n"
             "Response format — return ONLY valid JSON:\n"
             "```json\n"
             '{"stages": [\n'
-            '  {"stage": 1, "name": "...", "layer": "core", "category": "infra", "services": [...]},\n'
+            '  {"stage": 1, "name": "...", "layer": "core", "capability": "infra", "services": [...]},\n'
             "  ...\n"
-            '  {"stage": N, "name": "...", "layer": "app", "category": "app", "services": [...]},\n'
-            '  {"stage": N+1, "name": "Documentation", "layer": "docs", "category": "docs",\n'
+            '  {"stage": N, "name": "...", "layer": "app", "capability": "app", "services": [...]},\n'
+            '  {"stage": N+1, "name": "Documentation", "layer": "docs", "capability": "docs",\n'
             '   "services": ["architecture-doc", "deployment-guide"]}\n'
             "]}\n"
             "```\n"
@@ -1079,6 +1079,8 @@ class BuildSession(SessionMixin):
             "For each service in the map, add:\n"
             "- name: keep the service identifier from the map\n"
             "- computed_name: full resource name using the naming convention\n"
+            "- component: functional role within the capability (e.g., connectivity, "
+            "secrets-management, relational-db, message-broker, repositories)\n"
             "- resource_type: ARM resource type (e.g., Microsoft.KeyVault/vaults)\n"
             "- sku: tier/SKU — MUST comply with the governance policies above. "
             "If a policy requires a specific SKU (e.g., Premium for Container Registry), use that SKU.\n\n"
@@ -1094,10 +1096,11 @@ class BuildSession(SessionMixin):
             "Response format — return ONLY valid JSON:\n"
             "```json\n"
             '{"stages": [\n'
-            '  {"stage": 1, "name": "Managed Identity", "layer": "core", "category": "infra",\n'
+            '  {"stage": 1, "name": "Managed Identity", "layer": "core", "capability": "infra",\n'
             f'   "dir": "concept/infra/{self._iac_tool}/stage-1-managed-identity",\n'
             '   "services": [\n'
             '     {"name": "user-assigned-identity", "computed_name": "zd-id-worker-dev-eus",\n'
+            '      "component": "managed-identity",\n'
             '      "resource_type": "Microsoft.ManagedIdentity/userAssignedIdentities",\n'
             '      "sku": ""}\n'
             '   ], "status": "pending", "files": []}\n'
@@ -1138,13 +1141,13 @@ class BuildSession(SessionMixin):
             # Ensure Networking stage is present when services need private endpoints
             self._ensure_networking_in_map(stages)
             # Ensure Documentation stage is always present
-            if not any(s.get("category") == "docs" for s in stages):
+            if not any(s.get("capability") == "docs" for s in stages):
                 stages.append(
                     {
                         "stage": len(stages) + 1,
                         "name": "Documentation",
                         "layer": "docs",
-                        "category": "docs",
+                        "capability": "docs",
                         "services": ["architecture-doc", "deployment-guide"],
                     }
                 )
@@ -1188,7 +1191,7 @@ class BuildSession(SessionMixin):
                 "stage": insert_idx + 1,
                 "name": "Networking",
                 "layer": "infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": ["virtual-network", "private-endpoints", "private-dns-zones"],
             },
         )
@@ -1224,8 +1227,8 @@ class BuildSession(SessionMixin):
     # Known second-level directory components for concept/ output.
     _CONCEPT_SUBDIRS = {"infra", "apps", "db", "docs"}
 
-    # Layer ↔ category mapping.
-    _CATEGORY_TO_LAYER: dict[str, str] = {
+    # Layer ↔ capability mapping.
+    _CAPABILITY_TO_LAYER: dict[str, str] = {
         "infra": "infra",
         "data": "data",
         "integration": "infra",
@@ -1238,17 +1241,17 @@ class BuildSession(SessionMixin):
 
     @staticmethod
     def _infer_layer(stage: dict) -> str:
-        """Derive the ``layer`` field from ``category`` when not explicit."""
+        """Derive the ``layer`` field from ``capability`` when not explicit."""
         if stage.get("layer"):
             return stage["layer"]
-        cat = stage.get("category", "infra")
+        cat = stage.get("capability", "infra")
         # Identity and monitoring stages are Core layer
         name_lower = stage.get("name", "").lower()
         if any(kw in name_lower for kw in ("identity", "managed identity")):
             return "core"
         if any(kw in name_lower for kw in ("log analytics", "app insights", "application insights", "monitoring")):
             return "core"
-        return BuildSession._CATEGORY_TO_LAYER.get(cat, "infra")
+        return BuildSession._CAPABILITY_TO_LAYER.get(cat, "infra")
 
     def _normalize_stages(self, stages: list[dict]) -> list[dict]:
         """Ensure every stage has all required keys with sensible defaults."""
@@ -1256,14 +1259,19 @@ class BuildSession(SessionMixin):
         for s in stages:
             if not isinstance(s, dict):
                 continue
-            category = s.get("category", "infra")
+            capability = s.get("capability", "infra")
+            # Ensure each service item has a component field
+            services = s.get("services", [])
+            for svc in services:
+                if isinstance(svc, dict) and "component" not in svc:
+                    svc["component"] = ""
             entry = {
                 "stage": s.get("stage", len(normalized) + 1),
                 "name": s.get("name", f"Stage {len(normalized) + 1}"),
                 "layer": self._infer_layer(s),
-                "category": category,
+                "capability": capability,
                 "dir": self._enforce_concept_prefix(s.get("dir", "")),
-                "services": s.get("services", []),
+                "services": services,
                 "status": "pending",
                 "files": [],
                 "deploy_mode": s.get("deploy_mode", "auto"),
@@ -1305,12 +1313,13 @@ class BuildSession(SessionMixin):
                 "stage": stage_num,
                 "name": "Managed Identity",
                 "layer": "core",
-                "category": "infra",
+                "capability": "identity",
                 "dir": f"concept/infra/{self._iac_tool}/stage-{stage_num}-managed-identity",
                 "services": [
                     {
                         "name": "managed-identity",
                         "computed_name": self._naming.resolve("managed_identity", self._project_name),
+                        "component": "managed-identity",
                         "resource_type": "Microsoft.ManagedIdentity/userAssignedIdentities",
                         "sku": "",
                     },
@@ -1351,12 +1360,13 @@ class BuildSession(SessionMixin):
                         "stage": stage_num,
                         "name": svc["name"].replace("-", " ").title(),
                         "layer": "infra",
-                        "category": "infra",
+                        "capability": "infra",
                         "dir": f"concept/infra/{self._iac_tool}/stage-{stage_num}-{svc['name']}",
                         "services": [
                             {
                                 "name": svc["name"],
                                 "computed_name": self._naming.resolve(resource_type_key, svc["name"]),
+                                "component": "",
                                 "resource_type": "",
                                 "sku": svc["tier"],
                             }
@@ -1375,12 +1385,13 @@ class BuildSession(SessionMixin):
                         "stage": stage_num,
                         "name": svc["name"].replace("-", " ").title(),
                         "layer": "data",
-                        "category": "data",
+                        "capability": "data",
                         "dir": f"concept/infra/{self._iac_tool}/stage-{stage_num}-{svc['name']}",
                         "services": [
                             {
                                 "name": svc["name"],
                                 "computed_name": self._naming.resolve(resource_type_key, svc["name"]),
+                                "component": "",
                                 "resource_type": "",
                                 "sku": svc["tier"],
                             }
@@ -1398,12 +1409,13 @@ class BuildSession(SessionMixin):
                         "stage": stage_num,
                         "name": svc["name"].replace("-", " ").title(),
                         "layer": "app",
-                        "category": "app",
+                        "capability": "app",
                         "dir": f"concept/apps/stage-{stage_num}-{svc['name']}",
                         "services": [
                             {
                                 "name": svc["name"],
                                 "computed_name": "",
+                                "component": "",
                                 "resource_type": "",
                                 "sku": svc["tier"],
                             }
@@ -1420,7 +1432,7 @@ class BuildSession(SessionMixin):
                 "stage": stage_num,
                 "name": "Documentation",
                 "layer": "docs",
-                "category": "docs",
+                "capability": "docs",
                 "dir": "concept/docs",
                 "services": [],
                 "status": "pending",
@@ -1463,6 +1475,7 @@ class BuildSession(SessionMixin):
             {
                 "name": f"private-endpoint-{pe.service_name}",
                 "computed_name": "",
+                "component": "private-access",
                 "resource_type": "Microsoft.Network/privateEndpoints",
                 "sku": "",
             }
@@ -1473,6 +1486,7 @@ class BuildSession(SessionMixin):
             {
                 "name": "virtual-network",
                 "computed_name": self._naming.resolve("virtual_network", self._project_name),
+                "component": "connectivity",
                 "resource_type": "Microsoft.Network/virtualNetworks",
                 "sku": "",
             },
@@ -1482,7 +1496,7 @@ class BuildSession(SessionMixin):
             "stage": insert_idx + 1,
             "name": "Networking",
             "layer": "infra",
-            "category": "infra",
+            "capability": "infra",
             "dir": f"concept/infra/{self._iac_tool}/stage-{insert_idx + 1}-networking",
             "services": pe_stage_services,
             "status": "pending",
@@ -1506,7 +1520,7 @@ class BuildSession(SessionMixin):
 
     @staticmethod
     def _categorize_service(service_type: str) -> str:
-        """Categorize a template service type into a stage category."""
+        """Categorize a template service type into a stage capability."""
         _INFRA_TYPES = {
             "virtual-network",
             "key-vault",
@@ -1564,7 +1578,7 @@ class BuildSession(SessionMixin):
             f"## User Feedback\n{feedback}\n\n"
             f"## Architecture\n{architecture}\n\n"
             "Return the adjusted plan in the same JSON format.  Keep all "
-            "required keys (stage, name, layer, category, dir, services, status, files).\n"
+            "required keys (stage, name, layer, capability, dir, services, status, files).\n"
             '```json\n{"stages": [...]}\n```\n'
         )
 
@@ -1611,7 +1625,7 @@ class BuildSession(SessionMixin):
                     "stage": s["stage"],
                     "name": s["name"],
                     "layer": s.get("layer", ""),
-                    "category": s.get("category", "infra"),
+                    "capability": s.get("capability", "infra"),
                     "services": [svc.get("name", "") for svc in s.get("services", [])],
                 }
                 for s in existing_stages
@@ -1641,7 +1655,7 @@ class BuildSession(SessionMixin):
             '  "unchanged": [1, 2],\n'
             '  "modified": [3],\n'
             '  "removed": [4],\n'
-            '  "added": [{"name": "Redis Cache", "layer": "data", "category": "data", "services": '
+            '  "added": [{"name": "Redis Cache", "layer": "data", "capability": "data", "services": '
             '[{"name": "redis-cache", "computed_name": "", "resource_type": '
             '"Microsoft.Cache/redis", "sku": "Basic"}]}],\n'
             '  "plan_restructured": false,\n'
@@ -1704,7 +1718,7 @@ class BuildSession(SessionMixin):
                     {
                         "name": item["name"],
                         "layer": item.get("layer", self._infer_layer(item)),
-                        "category": item.get("category", "infra"),
+                        "capability": item.get("capability", "infra"),
                         "services": item.get("services", []),
                         "dir": item.get("dir", ""),
                     }
@@ -1763,8 +1777,8 @@ class BuildSession(SessionMixin):
         standards (already covered by the governance brief).  On exit the
         knowledge override is cleared and standards are restored.
         """
-        category = stage.get("category", "infra")
-        self._apply_governor_brief(agent, stage.get("name", ""), stage.get("services", []), category)
+        capability = stage.get("capability", "infra")
+        self._apply_governor_brief(agent, stage.get("name", ""), stage.get("services", []), capability)
         self._apply_stage_knowledge(agent, stage)
         saved_standards = agent._include_standards
         agent._include_standards = False
@@ -1781,9 +1795,9 @@ class BuildSession(SessionMixin):
         keeping the prompt focused instead of loading the full 38KB generic
         knowledge dump.  Docs stages skip knowledge loading entirely.
         """
-        category = stage.get("category", "infra")
+        capability = stage.get("capability", "infra")
         # Docs stages don't need service knowledge — they reference prior stage outputs
-        if category == "docs":
+        if capability == "docs":
             return
 
         try:
@@ -1795,7 +1809,7 @@ class BuildSession(SessionMixin):
                 for s in stage.get("services", [])
                 if s.get("resource_type") or s.get("name")
             ]
-            is_iac = category in ("infra", "data", "integration")
+            is_iac = capability in ("infra", "data", "integration")
             # Map stage layer to knowledge layer name
             stage_layer = stage.get("layer", "")
             knowledge_layer = {
@@ -1822,7 +1836,9 @@ class BuildSession(SessionMixin):
         except Exception:
             pass  # Never let knowledge errors block generation
 
-    def _apply_governor_brief(self, agent: Any, stage_name: str, services: list[dict], category: str = "infra") -> None:
+    def _apply_governor_brief(
+        self, agent: Any, stage_name: str, services: list[dict], capability: str = "infra"
+    ) -> None:
         """Set a governor policy brief on the agent before generation.
 
         Retrieves the most relevant policy rules for this stage's context
@@ -1833,9 +1849,9 @@ class BuildSession(SessionMixin):
             from azext_prototype.governance.governor import brief as governor_brief
 
             svc_names = [s.get("name", "") for s in services if s.get("name")]
-            if category in ("infra", "data", "integration"):
+            if capability in ("infra", "data", "integration"):
                 task_desc = f"Generate {self._iac_tool} code for {stage_name}: {', '.join(svc_names)}"
-            elif category == "app":
+            elif capability == "app":
                 task_desc = f"Generate application code for {stage_name}: {', '.join(svc_names)}"
             else:
                 task_desc = f"Generate documentation for {stage_name}: {', '.join(svc_names)}"
@@ -1874,7 +1890,7 @@ class BuildSession(SessionMixin):
         stage_list = ""
         for s in stages:
             svcs = [f"{sv.get('computed_name', '')} ({sv.get('resource_type', '')})" for sv in s.get("services", [])]
-            stage_list += f"- Stage {s['stage']}: {s['name']} ({s.get('category', '')}) — {', '.join(svcs)}\n"
+            stage_list += f"- Stage {s['stage']}: {s['name']} ({s.get('capability', '')}) — {', '.join(svcs)}\n"
 
         prompt = (
             "Given this architecture and deployment plan, produce a stage-indexed "
@@ -1935,13 +1951,13 @@ class BuildSession(SessionMixin):
 
         Routing priority:
         1. ``layer`` field (new architecture) → layer-owning architect
-        2. ``category`` field (fallback) → IaC agent or developer
+        2. ``capability`` field (fallback) → IaC agent or developer
 
         Layer architects delegate to IaC agents (terraform/bicep) or
         language-specific developers as needed.
         """
         layer = stage.get("layer", "")
-        category = stage.get("category", "infra")
+        capability = stage.get("capability", "infra")
 
         # Route by layer (preferred)
         if layer == "core":
@@ -1955,12 +1971,12 @@ class BuildSession(SessionMixin):
         elif layer == "docs":
             return self._doc_agent
 
-        # Fallback: route by category (backward compat with plans that don't have layer)
-        if category in ("infra", "data", "integration"):
+        # Fallback: route by capability
+        if capability in ("infra", "data", "integration"):
             return self._iac_agents.get(self._iac_tool)
-        elif category in ("app", "schema", "cicd", "external"):
+        elif capability in ("app", "schema", "cicd", "external"):
             return self._app_architect or self._dev_agent
-        elif category == "docs":
+        elif capability == "docs":
             return self._doc_agent
         else:
             return self._iac_agents.get(self._iac_tool) or self._dev_agent
@@ -2077,7 +2093,7 @@ class BuildSession(SessionMixin):
         Returns ``(agent, task_prompt)`` or ``(None, "")`` when no
         suitable agent is available.
         """
-        category = stage.get("category", "infra")
+        capability = stage.get("capability", "infra")
         stage_name = stage["name"]
         services = stage.get("services", [])
 
@@ -2088,7 +2104,9 @@ class BuildSession(SessionMixin):
         # Service list for the prompt
         svc_lines = "\n".join(
             f"- {s.get('computed_name') or s.get('name', '?')}: "
-            f"{s.get('resource_type', 'N/A')} (SKU: {s.get('sku') or 'n/a'})"
+            f"{s.get('resource_type', 'N/A')} "
+            f"[{s.get('component', '')}] "
+            f"(SKU: {s.get('sku') or 'n/a'})"
             for s in services
         )
 
@@ -2106,7 +2124,7 @@ class BuildSession(SessionMixin):
                             for k, v in s.config.items():
                                 template_context += f"    {k}: {v}\n"
 
-        is_iac = category in ("infra", "data", "integration")
+        is_iac = capability in ("infra", "data", "integration")
 
         # Cross-references to previously generated stages (with output key names)
         prev_stages = self._build_state.get_generated_stages()
@@ -2118,7 +2136,7 @@ class BuildSession(SessionMixin):
                     "Use terraform_remote_state (Terraform) or parameter inputs (Bicep) to "
                     "reference resources from these stages. NEVER hardcode their resource names.\n"
                 )
-            elif category == "app":
+            elif capability == "app":
                 prev_context += (
                     "These stages provide the infrastructure your application connects to.\n"
                     "Reference their outputs via environment variables injected at deploy time "
@@ -2159,7 +2177,7 @@ class BuildSession(SessionMixin):
             f"## This Stage\n"
             f"Name: {stage_name}\n"
             f"Layer: {layer}\n"
-            f"Category: {category}\n"
+            f"Capability: {capability}\n"
             f"Output directory: {stage_dir}/\n\n"
         )
 
@@ -2207,7 +2225,7 @@ class BuildSession(SessionMixin):
         # For documentation stages, inject actual generated stage context
         # (outputs, resource names, configurations) so docs reflect the
         # real build artifacts including any QA remediation changes.
-        if category == "docs":
+        if capability == "docs":
             docs_context = self._build_docs_context()
             if docs_context:
                 task += docs_context + "\n"
@@ -2241,7 +2259,7 @@ class BuildSession(SessionMixin):
                 "stage outputs, and post-deployment verification using az CLI commands. "
                 "Scripts under 100 lines WILL BE REJECTED as incomplete.\n"
             )
-        elif category == "app":
+        elif capability == "app":
             task += (
                 "- Use managed identity / DefaultAzureCredential (NO connection strings or access keys)\n"
                 "- Do NOT generate any IaC files (.tf, .bicep, .bicepparam, deploy.sh, outputs.tf)\n"
@@ -2253,7 +2271,7 @@ class BuildSession(SessionMixin):
                 "- Include .env.example listing all required environment variables\n"
                 "- No hardcoded secrets — use DefaultAzureCredential or Key Vault references\n"
             )
-        elif category == "docs":
+        elif capability == "docs":
             task += (
                 f"- All files should be relative to {stage_dir}/\n"
                 "- Generate EXACTLY two files: architecture.md and deployment-guide.md\n"
@@ -2335,7 +2353,7 @@ class BuildSession(SessionMixin):
                 "Use short filenames (main.tf, variables.tf, outputs.tf, etc.) — "
                 "do NOT include the directory path in the label.\n"
             )
-        elif category == "app":
+        elif capability == "app":
             task += (
                 "```main.py\n"
                 "# application code here\n"
@@ -2346,7 +2364,7 @@ class BuildSession(SessionMixin):
                 "Use short filenames — do NOT include the directory path in the label.\n"
                 "Do NOT generate any .tf, .bicep, or deploy.sh files.\n"
             )
-        elif category == "docs":
+        elif capability == "docs":
             task += (
                 "```architecture.md\n"
                 "# architecture documentation here\n"
@@ -2372,8 +2390,8 @@ class BuildSession(SessionMixin):
         The language/framework is detected from service names and stage
         directory — never hardcoded.
         """
-        category = stage.get("category", "infra")
-        if category not in ("app", "schema", "external"):
+        capability = stage.get("capability", "infra")
+        if capability not in ("app", "schema", "external"):
             return ""
 
         services = stage.get("services", [])
@@ -2525,7 +2543,7 @@ class BuildSession(SessionMixin):
     def _write_stage_files(self, stage: dict, content: str) -> list[str]:
         """Extract file blocks from AI response and write to disk.
 
-        Filtering strategy by category:
+        Filtering strategy by capability:
         - **docs**: allowlist — only ``architecture.md`` and
           ``deployment-guide.md`` are written.
         - **app**: block IaC files (``*.tf``, ``*.bicep``, ``deploy.sh``).
@@ -2541,7 +2559,7 @@ class BuildSession(SessionMixin):
         if not files:
             return []
 
-        category = stage.get("category", "infra")
+        capability = stage.get("capability", "infra")
         stage_dir = stage.get("dir", "concept")
         output_dir = Path(self._context.project_dir) / stage_dir
         blocked = self._BLOCKED_FILES.get(self._iac_tool, set())
@@ -2561,14 +2579,14 @@ class BuildSession(SessionMixin):
             normalized = normalized or filename
 
             # Docs stages: allowlist — only exact markdown files
-            if category == "docs":
+            if capability == "docs":
                 basename = Path(normalized).name
                 if basename not in self._DOCS_ALLOWED_FILES:
                     logger.info("Dropped non-docs file: %s (docs allowlist)", normalized)
                     continue
 
             # App stages: block all IaC files
-            elif category == "app":
+            elif capability == "app":
                 if any(normalized.endswith(ext) for ext in self._APP_BLOCKED_EXTENSIONS):
                     logger.info("Dropped IaC file from app stage: %s", normalized)
                     continue
@@ -2759,7 +2777,7 @@ class BuildSession(SessionMixin):
         _print("")
         _print(f"  Stage {stage_num}: {stage.get('name', '?')}")
         _print(f"  Layer:    {stage.get('layer', '?')}")
-        _print(f"  Category: {stage.get('category', '?')}")
+        _print(f"  Capability: {stage.get('capability', '?')}")
         _print(f"  Status:   {stage.get('status', 'pending')}")
         _print(f"  Dir:      {stage.get('dir', '?')}")
 
@@ -2792,9 +2810,9 @@ class BuildSession(SessionMixin):
     # QA task construction
     # ------------------------------------------------------------------ #
 
-    def _build_qa_context(self, services: list[dict], category: str = "infra") -> str:
+    def _build_qa_context(self, services: list[dict], capability: str = "infra") -> str:
         """Build context briefs (provider rules, policies, API versions) for QA."""
-        is_iac = category in ("infra", "data", "integration")
+        is_iac = capability in ("infra", "data", "integration")
         parts: list[str] = []
         # IaC-specific context — skip for app/docs stages
         if is_iac:
@@ -2977,7 +2995,7 @@ class BuildSession(SessionMixin):
         attempt: int,
         file_content: str,
         context: str,
-        category: str = "infra",
+        capability: str = "infra",
     ) -> str:
         """Build the QA task prompt for a given review attempt."""
         if attempt == 0:
@@ -2994,23 +3012,25 @@ class BuildSession(SessionMixin):
                 "Report ONLY remaining issues that were NOT fixed.\n\n"
             )
 
-        # Inject category-specific QA guidance
-        if category == "app":
+        # Inject capability-specific QA guidance
+        if capability == "app":
             header += (
-                "Stage category: **app** — Apply checklist section 13 (Application Code).\n"
+                "Stage capability: **app** — Apply checklist section 13 (Application Code).\n"
                 "This stage must NOT contain deploy.sh, .tf files, .bicep files, "
                 "or other IaC artifacts. Focus on application code quality, "
                 "dependency completeness, and security (no hardcoded secrets).\n\n"
             )
-        elif category == "docs":
+        elif capability == "docs":
             header += (
-                "Stage category: **docs** — Apply checklist section 14 (Documentation).\n"
+                "Stage capability: **docs** — Apply checklist section 14 (Documentation).\n"
                 "This stage must contain ONLY markdown documentation files "
                 "(architecture.md and deployment-guide.md). No code files, "
                 "scripts, or IaC artifacts.\n\n"
             )
         else:
-            header += f"Stage category: **{category}** — Apply checklist sections 1-12 " "(infrastructure checks).\n\n"
+            header += (
+                f"Stage capability: **{capability}** — Apply checklist sections 1-12 " "(infrastructure checks).\n\n"
+            )
 
         task = header
         if context:
@@ -3138,8 +3158,8 @@ class BuildSession(SessionMixin):
 
         # Build context briefs once for all QA attempts
         services = stage.get("services", [])
-        category = stage.get("category", "infra")
-        qa_context = self._build_qa_context(services, category)
+        capability = stage.get("capability", "infra")
+        qa_context = self._build_qa_context(services, capability)
 
         for attempt in range(_MAX_STAGE_REMEDIATION_ATTEMPTS + 1):
             # 1. Collect this stage's files
@@ -3148,7 +3168,7 @@ class BuildSession(SessionMixin):
                 return True  # No files to validate = pass
 
             # 2. Build QA task
-            qa_task = self._build_qa_task(stage_num, stage["name"], attempt, file_content, qa_context, category)
+            qa_task = self._build_qa_task(stage_num, stage["name"], attempt, file_content, qa_context, capability)
 
             # 3. Run QA (with timeout/rate-limit retry)
             from azext_prototype.ai.copilot_provider import (
@@ -3259,7 +3279,7 @@ class BuildSession(SessionMixin):
                         stage_num,
                         stage["name"],
                         _print,
-                        stage_category=stage.get("category", "infra"),
+                        stage_capability=stage.get("capability", "infra"),
                     )
 
             if response:
@@ -3278,12 +3298,12 @@ class BuildSession(SessionMixin):
         for stage in self._build_state.get_generated_stages():
             stage_num = stage["stage"]
             stage_name = stage["name"]
-            category = stage.get("category", "infra")
+            capability = stage.get("capability", "infra")
             files = stage.get("files", [])
             if not files:
                 continue
 
-            parts.append(f"### Stage {stage_num}: {stage_name} ({category})")
+            parts.append(f"### Stage {stage_num}: {stage_name} ({capability})")
 
             for filepath in files:
                 full_path = project_root / filepath
@@ -3317,10 +3337,10 @@ class BuildSession(SessionMixin):
 
         stage_num = stage["stage"]
         stage_name = stage["name"]
-        category = stage.get("category", "infra")
+        capability = stage.get("capability", "infra")
         files = stage.get("files", [])
 
-        if not files or category == "docs":
+        if not files or capability == "docs":
             return ""
 
         # Build file content for just this stage
@@ -3338,7 +3358,7 @@ class BuildSession(SessionMixin):
         file_content = "\n\n".join(parts)
 
         task = (
-            f"Review Stage {stage_num}: {stage_name} ({category}).\n"
+            f"Review Stage {stage_num}: {stage_name} ({capability}).\n"
             f"This stage has passed QA validation.\n\n"
             f"Provide advisory notes on trade-offs, limitations, and "
             f"production readiness considerations.\n\n"
@@ -3373,7 +3393,7 @@ class BuildSession(SessionMixin):
         stage_num: int,
         stage_name: str,
         _print: Callable,
-        stage_category: str = "",
+        stage_capability: str = "",
     ) -> Any | None:
         """Execute agent with timeout retry and exponential backoff.
 
@@ -3391,7 +3411,7 @@ class BuildSession(SessionMixin):
         for attempt in range(max_attempts):
             try:
                 return self._execute_with_continuation(
-                    agent, task, stage_num=stage_num, stage_name=stage_name, stage_category=stage_category
+                    agent, task, stage_num=stage_num, stage_name=stage_name, stage_capability=stage_capability
                 )
             except CopilotRateLimitError as exc:
                 wait = exc.retry_after or self._TIMEOUT_BACKOFFS[min(attempt, len(self._TIMEOUT_BACKOFFS) - 1)]
@@ -3419,7 +3439,7 @@ class BuildSession(SessionMixin):
         max_continuations: int = 3,
         stage_num: int = 0,
         stage_name: str = "",
-        stage_category: str = "",
+        stage_capability: str = "",
     ) -> Any:
         """Execute an agent task, automatically continuing if truncated.
 
@@ -3451,7 +3471,7 @@ class BuildSession(SessionMixin):
             if stage_num and stage_name:
                 stage_hint = (
                     f" You are generating Stage {stage_num}: {stage_name} "
-                    f"(category: {stage_category}). "
+                    f"(capability: {stage_capability}). "
                     "Stay within this stage's scope — do not generate content "
                     "for any other stage."
                 )

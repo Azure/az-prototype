@@ -61,12 +61,12 @@ class TestStandardsLoader:
 
     def test_design_principles_loaded(self):
         loaded = load()
-        categories = {s.category for s in loaded}
+        categories = {s.domain for s in loaded}
         assert "principles" in categories
 
     def test_coding_standards_loaded(self):
         loaded = load()
-        categories = {s.category for s in loaded}
+        categories = {s.domain for s in loaded}
         assert "principles" in categories
 
     def test_load_is_cached(self):
@@ -91,7 +91,7 @@ class TestStandardsLoader:
     def test_load_from_custom_directory(self, tmp_path):
         yaml_content = (
             "kind: standard\n"
-            "category: test\n"
+            "domain: test\n"
             "description: Custom test standard\n"
             "last_updated: '2026-04-04'\n"
             "principles:\n"
@@ -102,7 +102,7 @@ class TestStandardsLoader:
         reset_cache()
         loaded = load(directory=tmp_path)
         assert len(loaded) == 1
-        assert loaded[0].category == "test"
+        assert loaded[0].domain == "test"
         assert loaded[0].principles[0].id == "TST-001"
 
 
@@ -133,11 +133,11 @@ class TestFormatForPrompt:
         assert "DRY" in text
 
     def test_format_by_category(self):
-        text = format_for_prompt(category="principles")
+        text = format_for_prompt(domain="principles")
         assert "Design Standards" in text
 
     def test_format_by_unknown_category_returns_empty(self):
-        text = format_for_prompt(category="nonexistent")
+        text = format_for_prompt(domain="nonexistent")
         assert text == ""
 
     def test_format_includes_examples(self):
@@ -178,22 +178,22 @@ class TestPrincipleContent:
 
     def test_terraform_standards_loaded(self):
         loaded = load()
-        categories = {s.category for s in loaded}
+        categories = {s.domain for s in loaded}
         assert "terraform" in categories
 
     def test_bicep_standards_loaded(self):
         loaded = load()
-        categories = {s.category for s in loaded}
+        categories = {s.domain for s in loaded}
         assert "bicep" in categories
 
     def test_python_standards_loaded(self):
         loaded = load()
-        categories = {s.category for s in loaded}
+        categories = {s.domain for s in loaded}
         assert "application" in categories
 
     def test_terraform_has_file_layout(self):
         loaded = load()
-        tf_standards = [s for s in loaded if s.category == "terraform"]
+        tf_standards = [s for s in loaded if s.domain == "terraform"]
         assert len(tf_standards) == 1
         ids = {p.id for p in tf_standards[0].principles}
         assert "STAN-TF-001" in ids
@@ -201,7 +201,7 @@ class TestPrincipleContent:
 
     def test_bicep_has_module_composition(self):
         loaded = load()
-        bcp_standards = [s for s in loaded if s.category == "bicep"]
+        bcp_standards = [s for s in loaded if s.domain == "bicep"]
         assert len(bcp_standards) == 1
         ids = {p.id for p in bcp_standards[0].principles}
         assert "STAN-BCP-001" in ids
@@ -209,19 +209,19 @@ class TestPrincipleContent:
 
     def test_python_has_default_credential(self):
         loaded = load()
-        py_standards = [s for s in loaded if s.category == "application" and "Python" in s.description]
+        py_standards = [s for s in loaded if s.domain == "application" and "Python" in s.description]
         assert len(py_standards) == 1
         ids = {p.id for p in py_standards[0].principles}
         assert "STAN-PY-001" in ids
 
     def test_format_terraform_category(self):
-        text = format_for_prompt(category="terraform")
+        text = format_for_prompt(domain="terraform")
         assert "STAN-TF-001" in text or "Terraform" in text
 
     def test_format_bicep_category(self):
-        text = format_for_prompt(category="bicep")
+        text = format_for_prompt(domain="bicep")
         assert "STAN-BCP-001" in text or "Bicep" in text
 
     def test_format_application_category(self):
-        text = format_for_prompt(category="application")
+        text = format_for_prompt(domain="application")
         assert "STAN-PY-001" in text or "Python" in text

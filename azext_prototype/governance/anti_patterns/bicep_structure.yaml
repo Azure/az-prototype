@@ -1,5 +1,5 @@
 kind: anti-pattern
-category: bicep_structure
+domain: bicep_structure
 description: Bicep file structure, module conventions, and deployment script patterns
 last_updated: "2026-04-04"
 patterns:

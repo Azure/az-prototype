@@ -1,5 +1,5 @@
 kind: policy
-category: performance
+domain: performance
 description: Governance policies for Monitoring Observability
 last_updated: '2026-03-27'
 rules:
@@ -14,6 +14,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - monitoring-agent
   targets:
   - services:
@@ -237,6 +239,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - monitoring-agent
   targets:
   - services:
@@ -460,6 +464,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - monitoring-agent
   targets:
   - services:
@@ -683,6 +689,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - monitoring-agent
   targets:
   - services:
@@ -906,6 +914,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - monitoring-agent
   targets:
   - services:
@@ -1129,6 +1139,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - monitoring-agent
   targets:
   - services:
@@ -2962,6 +2974,8 @@ rules:
     multiple systems manually. W3C traceparent header provides automatic correlation
   applies_to:
   - app-developer
+  - csharp-developer
+  - python-developer
   - cloud-architect
   - monitoring-agent
   targets:
@@ -3065,6 +3079,8 @@ rules:
     multiple systems manually. W3C traceparent header provides automatic correlation
   applies_to:
   - app-developer
+  - csharp-developer
+  - python-developer
   - cloud-architect
   - monitoring-agent
   targets:
@@ -3168,6 +3184,8 @@ rules:
     multiple systems manually. W3C traceparent header provides automatic correlation
   applies_to:
   - app-developer
+  - csharp-developer
+  - python-developer
   - cloud-architect
   - monitoring-agent
   targets:
@@ -3271,6 +3289,8 @@ rules:
     multiple systems manually. W3C traceparent header provides automatic correlation
   applies_to:
   - app-developer
+  - csharp-developer
+  - python-developer
   - cloud-architect
   - monitoring-agent
   targets:
@@ -3374,6 +3394,8 @@ rules:
     multiple systems manually. W3C traceparent header provides automatic correlation
   applies_to:
   - app-developer
+  - csharp-developer
+  - python-developer
   - cloud-architect
   - monitoring-agent
   targets:
@@ -3477,6 +3499,8 @@ rules:
     multiple systems manually. W3C traceparent header provides automatic correlation
   applies_to:
   - app-developer
+  - csharp-developer
+  - python-developer
   - cloud-architect
   - monitoring-agent
   targets:

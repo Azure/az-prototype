@@ -1,5 +1,5 @@
 kind: policy
-category: azure-data
+domain: azure-data
 description: Governance policies for Redis Cache
 last_updated: '2026-03-27'
 rules:
@@ -135,6 +135,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - Microsoft.Cache/redis/accessPolicyAssignments@2024-03-01 (Data Owner or Data Contributor access policy — NOT Microsoft.Authorization/roleAssignments)
   targets:

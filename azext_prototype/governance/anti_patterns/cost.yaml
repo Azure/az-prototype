@@ -1,5 +1,5 @@
 kind: anti-pattern
-category: cost
+domain: cost
 description: Oversized SKUs, missing autoscale, and cost-inefficient configurations for POC
 last_updated: "2026-04-04"
 patterns:

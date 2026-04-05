@@ -1,5 +1,5 @@
 kind: policy
-category: performance
+domain: performance
 description: Governance policies for Networking Optimization
 last_updated: '2026-03-27'
 rules:
@@ -14,6 +14,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/frontDoors
@@ -291,6 +293,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Cdn/profiles
@@ -568,6 +572,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites
@@ -845,6 +851,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ApiManagement/service
@@ -1122,6 +1130,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/trafficManagerProfiles
@@ -1399,6 +1409,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Compute/virtualMachines
@@ -1676,6 +1688,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/loadBalancers
@@ -1953,6 +1967,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/virtualNetworks
@@ -2230,6 +2246,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/virtualNetworkGateways
@@ -2507,6 +2525,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/expressRouteCircuits
@@ -2783,6 +2803,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/frontDoors
@@ -2858,6 +2880,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Cdn/profiles
@@ -2933,6 +2957,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites
@@ -3008,6 +3034,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ApiManagement/service
@@ -3083,6 +3111,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/trafficManagerProfiles
@@ -3158,6 +3188,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Compute/virtualMachines
@@ -3233,6 +3265,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/loadBalancers
@@ -3308,6 +3342,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/virtualNetworks
@@ -3383,6 +3419,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/virtualNetworkGateways
@@ -3458,6 +3496,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/expressRouteCircuits

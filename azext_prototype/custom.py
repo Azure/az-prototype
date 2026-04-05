@@ -2574,7 +2574,7 @@ def _load_speckit_context(project_dir: str) -> str:
                     )
                     rows.append(
                         f"| {st.get('stage', '?')} | {st.get('name', '?')} "
-                        f"| {st.get('category', '?')} | {st.get('status', '?')} "
+                        f"| {st.get('capability', '?')} | {st.get('status', '?')} "
                         f"| {svcs} |"
                     )
                 sections.append("## Build Stages\n" + "\n".join(rows))

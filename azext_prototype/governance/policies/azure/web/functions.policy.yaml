@@ -1,5 +1,5 @@
 kind: policy
-category: azure-web
+domain: azure-web
 description: Governance policies for Functions
 last_updated: '2026-03-27'
 rules:
@@ -159,6 +159,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   targets:
@@ -187,6 +189,8 @@ rules:
   - bicep-agent
   - monitoring-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites
@@ -197,6 +201,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites
@@ -246,6 +252,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites

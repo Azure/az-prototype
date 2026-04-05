@@ -1,5 +1,5 @@
 kind: standard
-category: bicep
+domain: bicep
 description: Standards for Bicep template layout, parameter naming, and resource organization that all bicep-agent output
   must follow.
 last_updated: '2026-04-04'

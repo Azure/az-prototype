@@ -1,5 +1,5 @@
 kind: policy
-category: azure-data
+domain: azure-data
 description: Governance policies for Iot Hub
 last_updated: '2026-03-27'
 rules:
@@ -102,6 +102,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - Microsoft.Devices/IotHubs (parent IoT Hub)
   - Microsoft.KeyVault/vaults (store X.509 CA certificates)

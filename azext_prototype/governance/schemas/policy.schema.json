@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Governance Policy",
-  "description": "Schema for .policy.yaml governance files. All policies share the unified top-level metadata (kind, category, description, last_updated) and contain a rules array.",
+  "description": "Schema for .policy.yaml governance files. All policies share the unified top-level metadata (kind, domain, description, last_updated) and contain a rules array.",
   "type": "object",
   "properties": {
     "kind": {
@@ -9,9 +9,9 @@
       "enum": ["policy"],
       "description": "Governance kind. Must be 'policy'."
     },
-    "category": {
+    "domain": {
       "type": "string",
-      "description": "Policy category (e.g. 'azure-data', 'security', 'cost')."
+      "description": "Policy domain (e.g. 'azure-data', 'security', 'cost')."
     },
     "description": {
       "type": "string",
@@ -197,6 +197,6 @@
       }
     }
   },
-  "required": ["kind", "category", "description", "last_updated", "rules"],
+  "required": ["kind", "domain", "description", "last_updated", "rules"],
   "additionalProperties": false
 }

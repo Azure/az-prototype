@@ -1,5 +1,5 @@
 kind: policy
-category: azure-ai
+domain: azure-ai
 description: Governance policies for Bot Service
 last_updated: '2026-03-27'
 rules:
@@ -145,6 +145,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.BotService/botServices

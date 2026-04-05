@@ -1,5 +1,5 @@
 kind: policy
-category: performance
+domain: performance
 description: Governance policies for Database Optimization
 last_updated: '2026-03-27'
 rules:
@@ -13,6 +13,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Sql/servers/databases
@@ -126,6 +128,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
@@ -239,6 +243,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.DBforPostgreSQL/flexibleServers
@@ -352,6 +358,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Cache/redis
@@ -464,6 +472,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   targets:
@@ -596,6 +606,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   targets:
@@ -728,6 +740,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   targets:
@@ -860,6 +874,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   targets:
@@ -991,6 +1007,8 @@ rules:
     under load
   applies_to:
   - app-developer
+  - csharp-developer
+  - python-developer
   - cloud-architect
   - terraform-agent
   - bicep-agent
@@ -1120,6 +1138,8 @@ rules:
     under load
   applies_to:
   - app-developer
+  - csharp-developer
+  - python-developer
   - cloud-architect
   - terraform-agent
   - bicep-agent
@@ -1249,6 +1269,8 @@ rules:
     under load
   applies_to:
   - app-developer
+  - csharp-developer
+  - python-developer
   - cloud-architect
   - terraform-agent
   - bicep-agent
@@ -1378,6 +1400,8 @@ rules:
     under load
   applies_to:
   - app-developer
+  - csharp-developer
+  - python-developer
   - cloud-architect
   - terraform-agent
   - bicep-agent

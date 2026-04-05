@@ -10,7 +10,7 @@ metadata:
     A microservices architecture with multiple Container Apps
     communicating via Azure Service Bus, fronted by API Management.
     Uses user-assigned managed identity shared across services.
-  category: microservices
+  domain: microservices
   tags: [container-apps, service-bus, apim, microservices]
 
 services:

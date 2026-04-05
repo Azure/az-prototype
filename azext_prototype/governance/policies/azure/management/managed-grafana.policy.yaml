@@ -1,5 +1,5 @@
 kind: policy
-category: azure-management
+domain: azure-management
 description: Governance policies for Managed Grafana
 last_updated: '2026-03-27'
 rules:

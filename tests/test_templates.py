@@ -44,7 +44,7 @@ def _minimal_template(**overrides) -> dict:
             "name": "test-tmpl",
             "display_name": "Test Template",
             "description": "A test template.",
-            "category": "web-app",
+            "domain": "web-app",
             "tags": ["test"],
         },
         "services": [
@@ -115,7 +115,7 @@ class TestProjectTemplate:
             name="test",
             display_name="Test",
             description="desc",
-            category="web-app",
+            domain="web-app",
         )
         assert t.name == "test"
         assert t.services == []
@@ -128,7 +128,7 @@ class TestProjectTemplate:
             name="test",
             display_name="Test",
             description="desc",
-            category="web-app",
+            domain="web-app",
             services=[
                 TemplateService(name="api", type="container-apps"),
                 TemplateService(name="db", type="sql-database"),
@@ -141,7 +141,7 @@ class TestProjectTemplate:
             name="test",
             display_name="Test",
             description="desc",
-            category="web-app",
+            domain="web-app",
         )
         assert t.service_names() == []
 
@@ -151,7 +151,7 @@ class TestProjectTemplate:
             name="full",
             display_name="Full Template",
             description="A full template",
-            category="web-app",
+            domain="web-app",
             services=[svc],
             iac_defaults={"tags": {"env": "dev"}},
             requirements="Build something",
@@ -190,7 +190,7 @@ class TestRegistryLoading:
                         "name": n,
                         "display_name": n.title(),
                         "description": f"{n} template",
-                        "category": "web-app",
+                        "domain": "web-app",
                     }
                 ),
             )
@@ -250,7 +250,7 @@ class TestRegistryLoading:
                     "name": "a",
                     "display_name": "A",
                     "description": "A",
-                    "category": "web-app",
+                    "domain": "web-app",
                 }
             ),
         )
@@ -261,7 +261,7 @@ class TestRegistryLoading:
                     "name": "b",
                     "display_name": "B",
                     "description": "B",
-                    "category": "data-pipeline",
+                    "domain": "data-pipeline",
                 }
             ),
         )
@@ -284,7 +284,7 @@ class TestRegistryLoading:
                     "name": "same",
                     "display_name": "First",
                     "description": "First",
-                    "category": "web-app",
+                    "domain": "web-app",
                 }
             ),
         )
@@ -295,7 +295,7 @@ class TestRegistryLoading:
                     "name": "same",
                     "display_name": "Second",
                     "description": "Second",
-                    "category": "web-app",
+                    "domain": "web-app",
                 }
             ),
         )
@@ -499,7 +499,7 @@ class TestBuiltinTemplates:
         assert t.name == name
         assert t.display_name
         assert t.description
-        assert t.category
+        assert t.domain
         assert len(t.services) > 0
         assert t.requirements
 
@@ -574,7 +574,7 @@ class TestWebAppTemplate:
         reg.load([BUILTIN_DIR])
         t = reg.get("web-app")
         assert t is not None
-        assert t.category == "web-app"
+        assert t.domain == "web-app"
 
 
 class TestDataPipelineTemplate:

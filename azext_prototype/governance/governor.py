@@ -275,7 +275,7 @@ def review(
 
 def _format_policy_for_review(policy: Any) -> str:
     """Format a single policy for the review prompt."""
-    lines = [f"### {getattr(policy, 'name', 'unknown')} ({getattr(policy, 'category', '')})"]
+    lines = [f"### {getattr(policy, 'name', 'unknown')} ({getattr(policy, 'domain', '')})"]
     for rule in getattr(policy, "rules", []):
         severity = getattr(rule, "severity", "recommended")
         desc = getattr(rule, "description", "")

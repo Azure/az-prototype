@@ -36,7 +36,7 @@ def _minimal_policy(**overrides) -> dict:
     """Return a minimal valid policy dict (unified format), with optional overrides."""
     base = {
         "kind": "policy",
-        "category": "azure",
+        "domain": "azure",
         "description": "Test policy for container apps",
         "last_updated": "2025-01-01",
         "rules": [
@@ -96,7 +96,7 @@ class TestPolicy:
     """Policy dataclass."""
 
     def test_defaults(self) -> None:
-        policy = Policy(name="test", category="azure")
+        policy = Policy(name="test", domain="azure")
         assert policy.services == []
         assert policy.rules == []
         assert policy.patterns == []
@@ -138,12 +138,12 @@ class TestValidatePolicyFile:
         msgs = " ".join(e.message for e in errors)
         assert "'kind'" in msgs or "'category'" in msgs or "'description'" in msgs
 
-    def test_any_category_accepted(self, tmp_path: Path) -> None:
-        """Categories are open-ended (not restricted to a fixed enum)."""
-        data = _minimal_policy(category="azure-compute")
-        f = _write_policy(tmp_path / "custom-cat.policy.yaml", data)
+    def test_any_domain_accepted(self, tmp_path: Path) -> None:
+        """Domains are open-ended (not restricted to a fixed enum)."""
+        data = _minimal_policy(domain="azure-compute")
+        f = _write_policy(tmp_path / "custom-dom.policy.yaml", data)
         errors = validate_policy_file(f)
-        assert not any("category" in e.message for e in errors)
+        assert not any("domain" in e.message for e in errors)
 
     def test_unsupported_kind(self, tmp_path: Path) -> None:
         data = _minimal_policy(kind="something-else")
@@ -528,7 +528,7 @@ class TestPolicyEngine:
                 _minimal_policy(
                     metadata={
                         "name": f"policy-{i}",
-                        "category": "azure",
+                        "domain": "azure",
                         "services": ["storage"],
                     },
                     rules=[
@@ -554,7 +554,7 @@ class TestPolicyEngine:
             _minimal_policy(
                 metadata={
                     "name": "nested",
-                    "category": "azure",
+                    "domain": "azure",
                     "services": ["functions"],
                 },
                 rules=[
@@ -599,7 +599,7 @@ class TestPolicyLoader:
         _write_policy(
             proj_policies / "custom.policy.yaml",
             _minimal_policy(
-                metadata={"name": "custom", "category": "azure", "services": ["redis"]},
+                metadata={"name": "custom", "domain": "azure", "services": ["redis"]},
                 rules=[
                     {
                         "id": "C-001",

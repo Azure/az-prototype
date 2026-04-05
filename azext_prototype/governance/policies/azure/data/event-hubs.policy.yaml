@@ -1,5 +1,5 @@
 kind: policy
-category: azure-data
+domain: azure-data
 description: Governance policies for Event Hubs
 last_updated: '2026-03-27'
 rules:
@@ -120,6 +120,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources: []
   targets:
   - services:
@@ -227,6 +229,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.EventHub/namespaces

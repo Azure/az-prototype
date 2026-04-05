@@ -1,5 +1,5 @@
 kind: policy
-category: integration
+domain: integration
 description: Governance policies for Frontend Backend
 last_updated: '2026-03-27'
 rules:
@@ -12,6 +12,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Web/staticSites/linkedBackends@2023-12-01
     name: api-backend
@@ -182,6 +184,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Web/staticSites/linkedBackends@2023-12-01
     name: api-backend
@@ -352,6 +356,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Web/staticSites/linkedBackends@2023-12-01
     name: api-backend
@@ -522,6 +528,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Web/staticSites/linkedBackends@2023-12-01
     name: api-backend
@@ -692,6 +700,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/staticSites
@@ -838,6 +848,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites
@@ -984,6 +996,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.App/containerApps
@@ -1130,6 +1144,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/frontDoors
@@ -2517,6 +2533,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Web/sites/config@2023-12-01
     name: authsettingsV2
@@ -2706,6 +2724,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Web/sites/config@2023-12-01
     name: authsettingsV2
@@ -2895,6 +2915,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Web/sites/config@2023-12-01
     name: authsettingsV2
@@ -3084,6 +3106,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Web/sites/config@2023-12-01
     name: authsettingsV2

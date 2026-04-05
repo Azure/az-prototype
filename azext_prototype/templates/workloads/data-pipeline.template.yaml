@@ -10,7 +10,7 @@ metadata:
     An event-driven data pipeline using Azure Functions for processing,
     Cosmos DB for storage, and Event Grid for orchestration. All services
     use managed identity and private endpoints.
-  category: data-pipeline
+  domain: data-pipeline
   tags: [functions, cosmos-db, storage, event-grid, data]
 
 services:

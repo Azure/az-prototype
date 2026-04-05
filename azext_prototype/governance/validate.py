@@ -82,7 +82,7 @@ def validate_anti_patterns() -> list[ValidationError]:
     errors: list[ValidationError] = []
     all_ids: dict[str, str] = {}
 
-    required_top = {"kind", "category", "description", "last_updated", "patterns"}
+    required_top = {"kind", "domain", "description", "last_updated", "patterns"}
 
     for yaml_file in sorted(ap_dir.glob("*.yaml")):
         fname = yaml_file.name
@@ -152,7 +152,7 @@ def validate_standards() -> list[ValidationError]:
     errors: list[ValidationError] = []
     all_ids: dict[str, str] = {}
 
-    required_top = {"kind", "category", "description", "last_updated", "principles"}
+    required_top = {"kind", "domain", "description", "last_updated", "principles"}
 
     for yaml_file in sorted(std_dir.rglob("*.yaml")):
         fname = str(yaml_file.relative_to(std_dir))

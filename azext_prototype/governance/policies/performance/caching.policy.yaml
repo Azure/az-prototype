@@ -1,5 +1,5 @@
 kind: policy
-category: performance
+domain: performance
 description: Governance policies for Caching
 last_updated: '2026-03-27'
 rules:
@@ -14,6 +14,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Cache/redis
@@ -120,6 +122,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/frontDoors
@@ -226,6 +230,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Cdn/profiles
@@ -332,6 +338,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ApiManagement/service
@@ -438,6 +446,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
@@ -544,6 +554,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites
@@ -650,6 +662,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.App/containerApps
@@ -754,6 +768,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Cache/redis
@@ -1022,6 +1038,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/frontDoors
@@ -1290,6 +1308,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Cdn/profiles
@@ -1558,6 +1578,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ApiManagement/service
@@ -1826,6 +1848,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
@@ -2094,6 +2118,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites
@@ -2362,6 +2388,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.App/containerApps
@@ -2628,6 +2656,8 @@ rules:
     minimizes network round-trips
   applies_to:
   - app-developer
+  - csharp-developer
+  - python-developer
   - cloud-architect
   targets:
   - services:
@@ -2712,6 +2742,8 @@ rules:
     minimizes network round-trips
   applies_to:
   - app-developer
+  - csharp-developer
+  - python-developer
   - cloud-architect
   targets:
   - services:
@@ -2796,6 +2828,8 @@ rules:
     minimizes network round-trips
   applies_to:
   - app-developer
+  - csharp-developer
+  - python-developer
   - cloud-architect
   targets:
   - services:
@@ -2880,6 +2914,8 @@ rules:
     minimizes network round-trips
   applies_to:
   - app-developer
+  - csharp-developer
+  - python-developer
   - cloud-architect
   targets:
   - services:
@@ -2964,6 +3000,8 @@ rules:
     minimizes network round-trips
   applies_to:
   - app-developer
+  - csharp-developer
+  - python-developer
   - cloud-architect
   targets:
   - services:
@@ -3048,6 +3086,8 @@ rules:
     minimizes network round-trips
   applies_to:
   - app-developer
+  - csharp-developer
+  - python-developer
   - cloud-architect
   targets:
   - services:
@@ -3132,6 +3172,8 @@ rules:
     minimizes network round-trips
   applies_to:
   - app-developer
+  - csharp-developer
+  - python-developer
   - cloud-architect
   targets:
   - services:
@@ -3219,6 +3261,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Cache/redis
@@ -3301,6 +3345,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/frontDoors
@@ -3383,6 +3429,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Cdn/profiles
@@ -3465,6 +3513,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ApiManagement/service
@@ -3547,6 +3597,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
@@ -3629,6 +3681,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites
@@ -3711,6 +3765,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.App/containerApps
@@ -3793,6 +3849,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Cache/redis
@@ -3862,6 +3920,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/frontDoors
@@ -3931,6 +3991,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Cdn/profiles
@@ -4000,6 +4062,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ApiManagement/service
@@ -4069,6 +4133,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
@@ -4138,6 +4204,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites
@@ -4207,6 +4275,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.App/containerApps

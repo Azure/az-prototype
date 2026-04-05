@@ -1,5 +1,5 @@
 kind: policy
-category: reliability
+domain: reliability
 description: Governance policies for Fault Tolerance
 last_updated: '2026-03-27'
 rules:
@@ -17,6 +17,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.App/containerApps
@@ -159,6 +161,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites
@@ -301,6 +305,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ContainerService/managedClusters
@@ -443,6 +449,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ApiManagement/service
@@ -585,6 +593,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ServiceBus/namespaces
@@ -727,6 +737,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.EventHub/namespaces
@@ -869,6 +881,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Cache/redis
@@ -1011,6 +1025,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
@@ -1153,6 +1169,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Sql/servers/databases
@@ -1295,6 +1313,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/loadBalancers
@@ -1437,6 +1457,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/applicationGateways
@@ -1577,6 +1599,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.App/containerApps
@@ -1682,6 +1706,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites
@@ -1787,6 +1813,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ContainerService/managedClusters
@@ -1892,6 +1920,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ApiManagement/service
@@ -1997,6 +2027,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ServiceBus/namespaces
@@ -2102,6 +2134,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.EventHub/namespaces
@@ -2207,6 +2241,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Cache/redis
@@ -2312,6 +2348,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
@@ -2417,6 +2455,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Sql/servers/databases
@@ -2522,6 +2562,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/loadBalancers
@@ -2627,6 +2669,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/applicationGateways
@@ -2734,6 +2778,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.App/containerApps
@@ -2890,6 +2936,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites
@@ -3046,6 +3094,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ContainerService/managedClusters
@@ -3202,6 +3252,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ApiManagement/service
@@ -3358,6 +3410,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ServiceBus/namespaces
@@ -3514,6 +3568,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.EventHub/namespaces
@@ -3670,6 +3726,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Cache/redis
@@ -3826,6 +3884,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
@@ -3982,6 +4042,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Sql/servers/databases
@@ -4138,6 +4200,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/loadBalancers
@@ -4294,6 +4358,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Network/applicationGateways
@@ -4450,6 +4516,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2023-11-01
     description: 'Private endpoint for App Configuration (groupId: configurationStores)'
@@ -4609,6 +4677,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2023-11-01
     description: 'Private endpoint for App Configuration (groupId: configurationStores)'
@@ -4768,6 +4838,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2023-11-01
     description: 'Private endpoint for App Configuration (groupId: configurationStores)'
@@ -4927,6 +4999,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2023-11-01
     description: 'Private endpoint for App Configuration (groupId: configurationStores)'
@@ -5086,6 +5160,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2023-11-01
     description: 'Private endpoint for App Configuration (groupId: configurationStores)'
@@ -5245,6 +5321,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2023-11-01
     description: 'Private endpoint for App Configuration (groupId: configurationStores)'
@@ -5404,6 +5482,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2023-11-01
     description: 'Private endpoint for App Configuration (groupId: configurationStores)'
@@ -5563,6 +5643,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2023-11-01
     description: 'Private endpoint for App Configuration (groupId: configurationStores)'
@@ -5722,6 +5804,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2023-11-01
     description: 'Private endpoint for App Configuration (groupId: configurationStores)'
@@ -5881,6 +5965,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2023-11-01
     description: 'Private endpoint for App Configuration (groupId: configurationStores)'
@@ -6040,6 +6126,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.Network/privateEndpoints@2023-11-01
     description: 'Private endpoint for App Configuration (groupId: configurationStores)'
@@ -6199,6 +6287,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
     description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
@@ -6427,6 +6517,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
     description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
@@ -6655,6 +6747,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
     description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
@@ -6883,6 +6977,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
     description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
@@ -7111,6 +7207,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
     description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
@@ -7339,6 +7437,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
     description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
@@ -7567,6 +7667,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
     description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
@@ -7795,6 +7897,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
     description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
@@ -8023,6 +8127,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
     description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
@@ -8251,6 +8357,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
     description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
@@ -8479,6 +8587,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
     description: Dead-letter queue (automatic sub-queue) — monitor for poison messages

@@ -11,7 +11,7 @@ metadata:
     A containerised web app with SQL backend, Key Vault for secrets,
     and API Management as the public gateway. Follows all security and
     network-isolation policies by default.
-  category: web-app
+  domain: web-app
   tags: [container-apps, sql, key-vault, apim, web]
 
 services:

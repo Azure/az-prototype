@@ -1,5 +1,5 @@
 kind: standard
-category: principles
+domain: principles
 description: Code quality standards for generated application and infrastructure code.
 last_updated: '2026-04-04'
 principles:
@@ -10,6 +10,8 @@ principles:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   examples:
   - Use 'storage_account' not 'sa'; 'container_registry' not 'cr'
   - Use 'get_user_by_email()' not 'get_u()'
@@ -19,6 +21,8 @@ principles:
     does too much and should be split.'
   applies_to:
   - app-developer
+  - csharp-developer
+  - python-developer
   examples:
   - Split 'process_order()' into 'validate_order()', 'calculate_total()', 'save_order()'
   rationale: The isolated worker model provides better dependency isolation and .NET version flexibility.
@@ -27,6 +31,8 @@ principles:
     code should trust its contracts.'
   applies_to:
   - app-developer
+  - csharp-developer
+  - python-developer
   examples:
   - Validate API request payloads at the controller layer, not in every function
   - Wrap external HTTP calls in try/except, not internal method calls
@@ -48,6 +54,8 @@ principles:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   examples:
   - 'Terraform: use var.location not ''eastus'' in resource blocks'
   - 'Bicep: use param location string not ''eastus'''

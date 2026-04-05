@@ -1,5 +1,5 @@
 kind: policy
-category: azure-data
+domain: azure-data
 description: Governance policies for Cosmos Db
 last_updated: '2026-03-27'
 rules:
@@ -314,6 +314,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   template_check:
     scope:
     - cosmos-db
@@ -416,6 +418,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   targets:

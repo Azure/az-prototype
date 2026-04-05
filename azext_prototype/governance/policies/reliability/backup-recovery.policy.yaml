@@ -1,5 +1,5 @@
 kind: policy
-category: reliability
+domain: reliability
 description: Governance policies for Backup Recovery
 last_updated: '2026-03-27'
 rules:

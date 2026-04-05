@@ -1,5 +1,5 @@
 kind: policy
-category: azure-management
+domain: azure-management
 description: Governance policies for Automation
 last_updated: '2026-03-27'
 rules:
@@ -171,6 +171,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Automation/automationAccounts
@@ -195,6 +197,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Automation/automationAccounts

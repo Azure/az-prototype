@@ -1,5 +1,5 @@
 kind: policy
-category: azure-data
+domain: azure-data
 description: Governance policies for Stream Analytics
 last_updated: '2026-03-27'
 rules:
@@ -90,6 +90,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - Microsoft.Authorization/roleAssignments (appropriate data reader/sender roles for ASA identity)
   targets:

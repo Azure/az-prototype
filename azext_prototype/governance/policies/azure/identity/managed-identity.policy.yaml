@@ -1,5 +1,5 @@
 kind: policy
-category: azure-identity
+domain: azure-identity
 description: Governance policies for Managed Identity
 last_updated: '2026-03-27'
 rules:

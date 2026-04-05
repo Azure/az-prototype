@@ -1,5 +1,5 @@
 kind: anti-pattern
-category: security
+domain: security
 description: Credentials, secrets, and insecure configuration detection
 last_updated: "2026-04-04"
 patterns:

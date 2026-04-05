@@ -1,5 +1,5 @@
 kind: policy
-category: cost
+domain: cost
 description: Governance policies for Sku Selection
 last_updated: '2026-03-27'
 rules:

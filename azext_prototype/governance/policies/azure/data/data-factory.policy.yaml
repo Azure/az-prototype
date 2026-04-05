@@ -1,5 +1,5 @@
 kind: policy
-category: azure-data
+domain: azure-data
 description: Governance policies for Data Factory
 last_updated: '2026-03-27'
 rules:
@@ -131,6 +131,8 @@ rules:
   - bicep-agent
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - Microsoft.KeyVault/vaults (Key Vault with secrets)
   targets:

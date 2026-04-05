@@ -1,5 +1,5 @@
 kind: policy
-category: azure-ai
+domain: azure-ai
 description: Governance policies for Cognitive Services
 last_updated: '2026-03-27'
 rules:

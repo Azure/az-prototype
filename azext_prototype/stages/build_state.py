@@ -116,7 +116,7 @@ class BuildState(BaseState):
             {
                 "stage": 1,
                 "name": "Foundation",
-                "category": "infra",
+                "capability": "infra",
                 "services": [
                     {
                         "name": "key-vault",
@@ -364,7 +364,7 @@ class BuildState(BaseState):
         # Find insertion point — before the docs stage
         insert_idx = len(existing)
         for i, s in enumerate(existing):
-            if s.get("category") == "docs":
+            if s.get("capability") == "docs":
                 insert_idx = i
                 break
 
@@ -574,7 +574,7 @@ class BuildState(BaseState):
             icon = {"pending": "  ", "generated": "++ ", "accepted": "v "}.get(status, "  ")
             svc_count = len(stage.get("services", []))
             file_count = len(stage.get("files", []))
-            line = f"  {icon}Stage {stage['stage']}: {stage['name']} ({stage.get('category', '?')})"
+            line = f"  {icon}Stage {stage['stage']}: {stage['name']} ({stage.get('capability', '?')})"
             if file_count:
                 line += f" - {file_count} file(s)"
             elif svc_count:

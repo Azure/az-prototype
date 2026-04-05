@@ -1,5 +1,5 @@
 kind: standard
-category: terraform
+domain: terraform
 description: Standards for Terraform module layout, variable naming, and resource organization that all terraform-agent output
   must follow.
 last_updated: '2026-04-04'

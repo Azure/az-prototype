@@ -376,34 +376,39 @@ When a POC takes an acceptable shortcut, agents must:
 
 ---
 
-## 10. Layer Architecture
+## 10. Taxonomy: Layer → Capability → Component → Resource
 
-All services and stages are assigned to one of four layers. Each layer has a designated owner agent, defined boundaries, and a deployment order. Layer definition files in `knowledge/layers/` are the authoritative source for what belongs where.
+All services and stages follow a four-level hierarchy. The canonical source of truth is `knowledge/taxonomy.yaml`. Layer definition files in `knowledge/layers/` document boundaries and ownership.
 
-| Layer | Owner | Deploys | Contains |
-|-------|-------|---------|----------|
-| **Core** | `cloud-architect` | First | Managed identity, Log Analytics, App Insights |
-| **Infrastructure** | `infrastructure-architect` | After Core | Networking, compute (Container Apps, AKS, App Service), supporting services (APIM, AI, Event Grid) |
-| **Data** | `data-architect` | After Core + Networking | Key Vault, databases (SQL, Cosmos, PostgreSQL), storage, messaging (Service Bus, Event Hubs) |
-| **Application** | `application-architect` | After all infra/data | Source code: APIs, workers, frontends, Dockerfiles, deploy scripts |
+### Four-Level Hierarchy
+
+| Level | Stage Field | Service Field | Purpose |
+|-------|------------|---------------|---------|
+| **Layer** | `stage.layer` | — | Top-level architectural boundary |
+| **Capability** | `stage.capability` | — | Sub-classification within a layer |
+| **Component** | — | `service.component` | Functional role within a capability |
+| **Resource** | — | `service.resource_type` | Azure resource type or code artifact |
+
+### Layers and Capabilities
+
+| Layer | Owner | Capabilities |
+|-------|-------|-------------|
+| **Core** | `cloud-architect` | `identity`, `observability` |
+| **Infrastructure** | `infrastructure-architect` | `core-networking`, `compute`, `security`, `ai-services`, `supporting` |
+| **Data** | `data-architect` | `data-services`, `storage-services`, `messaging` |
+| **Application** | `application-architect` | `presentation`, `domain`, `data-access`, `background` |
+| **Docs** | `doc-agent` | `documentation` |
 
 ### Service Placement Rules
 
 - **Infrastructure provisions, Application consumes.** Infrastructure layer creates the Azure resource (e.g., Service Bus namespace via IaC). Application layer creates the code that uses it (e.g., `IMessageSender` interface). Data layer owns the data model (schemas, indexes, partition keys).
-- **Networking is centralized.** All private endpoints, DNS zones, and VNet resources belong in a single Networking stage within the Infrastructure layer.
+- **Networking is centralized.** All private endpoints, DNS zones, and VNet resources belong in a single Networking stage (capability: `core-networking`) within the Infrastructure layer.
 - **Core deploys first.** Identity and observability must exist before any other layer can configure RBAC or diagnostics.
 - **Data deploys before Application.** Application code depends on data service endpoints being available.
-- **Each stage declares both `layer` and `category`.** Layer determines the owning architect; category sub-classifies within the layer.
-
-### Layer-Specific Categories
-
-| Layer | Valid Categories |
-|-------|-----------------|
-| Core | `infra` |
-| Infrastructure | `infra`, `integration` |
-| Data | `data` |
-| Application | `app` |
-| (cross-cutting) | `docs` |
+- **1:1 stage-to-capability.** Each stage has exactly one capability. Multiple stages can share the same capability.
+- **Key Vault is Infrastructure/Security.** Not Data layer — it's `infra` / `security` / `secrets-management`.
+- **APIM is Infrastructure/Core Networking.** It's an API-level ingress controller — `infra` / `core-networking` / `api-gateway`.
+- **IoT Hub and Event Grid are Data/Messaging.** Data ingestion and event routing — `data` / `messaging`.
 
 ---
 

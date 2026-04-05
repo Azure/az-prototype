@@ -1,0 +1,130 @@
+# Canonical taxonomy: Layer → Capability → Component → Resource
+#
+# This file is the single source of truth for the four-level hierarchy.
+# `az prototype validate` checks stage `capability` and service `component`
+# values against this file.
+#
+# - Layer:      Top-level architectural boundary (stage.layer)
+# - Capability: Sub-classification within a layer (stage.capability)
+# - Component:  Functional role within a capability (service.component)
+# - Resource:   Azure resource type or code artifact (service.resource_type)
+
+layers:
+  core:
+    display_name: Core
+    description: Cross-cutting foundations — identity and observability
+    capabilities:
+      identity:
+        display_name: Identity
+        components:
+          - managed-identity
+      observability:
+        display_name: Observability
+        components:
+          - log-analytics
+          - application-insights
+          - monitoring
+
+  infra:
+    display_name: Infrastructure
+    description: Azure resource provisioning via IaC
+    capabilities:
+      core-networking:
+        display_name: Core Networking
+        components:
+          - connectivity        # VNet, subnets, peering, gateways
+          - load-balancing      # Load Balancer, App Gateway, Front Door
+          - private-access      # Private Endpoints, Private DNS Zones
+          - dns                 # DNS Zones, DNS records
+          - api-gateway         # API Management
+      compute:
+        display_name: Compute
+        components:
+          - container-hosting   # Container Apps, AKS
+          - web-hosting         # App Service
+          - serverless          # Azure Functions
+          - static-hosting      # Static Web Apps
+      security:
+        display_name: Security
+        components:
+          - secrets-management      # Key Vault
+          - threat-protection       # Azure Defender
+          - identity-protection     # Microsoft Sentinel
+      ai-services:
+        display_name: AI Services
+        components:
+          - cognitive            # Azure OpenAI, Cognitive Services
+          - search               # Azure AI Search
+          - ml                   # ML Workspace, AI Foundry
+      supporting:
+        display_name: Supporting
+        components:
+          - container-registry   # Azure Container Registry
+          - configuration        # Azure App Configuration
+          - communication        # Communication Services, Notification Hubs
+
+  data:
+    display_name: Data
+    description: Databases, storage, and messaging services
+    capabilities:
+      data-services:
+        display_name: Data Services
+        components:
+          - relational-db       # Azure SQL, PostgreSQL, MySQL
+          - nosql-db            # Cosmos DB
+          - caching             # Azure Cache for Redis
+          - analytics           # Databricks, Synapse, Data Factory
+      storage-services:
+        display_name: Storage Services
+        components:
+          - blob-storage        # Blob containers
+          - file-storage        # Azure Files, Premium File Shares
+          - data-lake           # Data Lake Storage Gen2
+      messaging:
+        display_name: Messaging
+        components:
+          - message-broker      # Service Bus
+          - event-streaming     # Event Hubs
+          - event-routing       # Event Grid
+          - iot-ingestion       # IoT Hub
+
+  app:
+    display_name: Application
+    description: Application source code with distinct sub-layers
+    capabilities:
+      presentation:
+        display_name: Presentation
+        components:
+          - controllers         # API controllers (Blazor/MVC server-side)
+          - views               # UI pages, Razor views, React components
+          - components          # Reusable UI components
+          - routing             # Client-side routing, navigation
+      domain:
+        display_name: Domain (Business Logic)
+        components:
+          - services            # Business logic service classes
+          - entities            # Domain models, value objects
+          - validation          # Business rule validation
+          - workflows           # Workflow orchestration, sagas
+      data-access:
+        display_name: Data Access
+        components:
+          - repositories        # Repository pattern implementations
+          - orm-adapters        # Entity Framework Core, SQLAlchemy, Prisma
+          - query-builders      # Custom query builders, specifications
+      background:
+        display_name: Background
+        components:
+          - workers             # Background hosted services
+          - message-handlers    # Service Bus / Event Hub consumers
+          - scheduled-tasks     # Timer-triggered functions, cron jobs
+
+  docs:
+    display_name: Documentation
+    description: Architecture and deployment documentation
+    capabilities:
+      documentation:
+        display_name: Documentation
+        components:
+          - architecture-doc
+          - deployment-guide

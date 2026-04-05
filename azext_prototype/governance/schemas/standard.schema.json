@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Governance Standard",
-  "description": "Schema for standards YAML governance files. All standards share the unified top-level metadata (kind, category, description, last_updated) and contain a principles array.",
+  "description": "Schema for standards YAML governance files. All standards share the unified top-level metadata (kind, domain, description, last_updated) and contain a principles array.",
   "type": "object",
   "properties": {
     "kind": {
@@ -9,9 +9,9 @@
       "enum": ["standard"],
       "description": "Governance kind. Must be 'standard'."
     },
-    "category": {
+    "domain": {
       "type": "string",
-      "description": "Standard category (e.g. 'terraform', 'python', 'coding', 'design')."
+      "description": "Standard domain (e.g. 'terraform', 'python', 'coding', 'design')."
     },
     "description": {
       "type": "string",
@@ -56,6 +56,6 @@
       }
     }
   },
-  "required": ["kind", "category", "description", "last_updated", "principles"],
+  "required": ["kind", "domain", "description", "last_updated", "principles"],
   "additionalProperties": false
 }

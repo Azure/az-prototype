@@ -1,5 +1,5 @@
 kind: anti-pattern
-category: terraform_structure
+domain: terraform_structure
 description: Provider hygiene, version consistency, tag placement, and azapi conventions
 last_updated: "2026-04-04"
 patterns:

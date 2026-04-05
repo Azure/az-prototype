@@ -10,7 +10,7 @@ metadata:
     A serverless REST API using Azure Functions with SQL Database
     backend, Key Vault for secrets, and API Management for external
     access. Optimised for low-cost dev/test with auto-pause.
-  category: serverless
+  domain: serverless
   tags: [functions, sql, key-vault, apim, serverless]
 
 services:

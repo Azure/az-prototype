@@ -1,5 +1,5 @@
 kind: policy
-category: azure-ai
+domain: azure-ai
 description: Governance policies for Azure Openai
 last_updated: '2026-03-27'
 rules:
@@ -244,6 +244,8 @@ rules:
   rationale: Azure OpenAI enforces TPM and RPM limits; clients must handle 429 responses gracefully
   applies_to:
   - app-developer
+  - csharp-developer
+  - python-developer
   - cloud-architect
   targets:
   - services:

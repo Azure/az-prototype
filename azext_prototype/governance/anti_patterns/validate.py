@@ -22,7 +22,7 @@ import yaml
 
 _AP_DIR = Path(__file__).resolve().parent
 
-_REQUIRED_TOP_KEYS = {"kind", "category", "description", "last_updated", "patterns"}
+_REQUIRED_TOP_KEYS = {"kind", "domain", "description", "last_updated", "patterns"}
 
 
 @dataclass

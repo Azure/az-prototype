@@ -51,7 +51,7 @@ def _compliant_template(**overrides) -> dict:
             "name": "test-tmpl",
             "display_name": "Test",
             "description": "Test template",
-            "category": "web-app",
+            "domain": "web-app",
             "tags": ["test"],
         },
         "services": [
@@ -120,7 +120,7 @@ def _custom_policy(rule_id: str, **tc_overrides) -> dict:
         "kind": "policy",
         "metadata": {
             "name": "custom-test",
-            "category": "general",
+            "domain": "general",
             "services": ["test-service"],
         },
         "rules": [
@@ -1013,7 +1013,7 @@ class TestCustomPolicyDirs:
         """Rules lacking template_check are guidance-only."""
         pol_dir = tmp_path / "policies"
         policy = {
-            "metadata": {"name": "guidance", "category": "general", "services": ["any"]},
+            "metadata": {"name": "guidance", "domain": "general", "services": ["any"]},
             "rules": [
                 {
                     "id": "G-001",

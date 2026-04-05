@@ -1,5 +1,5 @@
 kind: standard
-category: principles
+domain: principles
 description: Universal design principles that all generated code and infrastructure must follow.  These are not suggestions
   — they are standards.
 last_updated: '2026-04-04'
@@ -11,6 +11,8 @@ principles:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   - cloud-architect
   examples:
   - 'Terraform: one resource per module when the resource has complex configuration'
@@ -24,6 +26,8 @@ principles:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   examples:
   - 'Terraform: use locals and variables instead of repeating values'
   - 'Application: extract common HTTP client setup into a shared utility'
@@ -36,6 +40,8 @@ principles:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   examples:
   - 'Terraform: use variable maps for optional features instead of hard-coded conditionals'
   - 'Application: use dependency injection instead of hard-coded implementations'
@@ -59,6 +65,8 @@ principles:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   examples:
   - 'Terraform: always set explicit depends_on when resource ordering matters'
   - 'Bicep: declare parameter defaults explicitly'

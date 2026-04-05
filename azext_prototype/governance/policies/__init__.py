@@ -27,7 +27,7 @@ SUPPORTED_KINDS = ("policy",)
 VALID_SEVERITIES = ("required", "recommended", "optional")
 
 # Required top-level keys (new unified format)
-_REQUIRED_TOP_KEYS = {"kind", "category", "description", "last_updated", "rules"}
+_REQUIRED_TOP_KEYS = {"kind", "domain", "description", "last_updated", "rules"}
 _REQUIRED_RULE_KEYS = {"id", "severity", "description"}
 
 # ------------------------------------------------------------------ #
@@ -76,7 +76,7 @@ class Policy:
     """A loaded policy document."""
 
     name: str
-    category: str
+    domain: str
     description: str = ""
     last_updated: str = ""
     services: list[str] = field(default_factory=list)  # backward compat aggregate
@@ -317,7 +317,7 @@ class PolicyEngine:
                 # Return a copy with only the relevant rules
                 filtered = Policy(
                     name=policy.name,
-                    category=policy.category,
+                    domain=policy.domain,
                     services=policy.services,
                     rules=relevant_rules,
                     patterns=policy.patterns,
@@ -503,7 +503,7 @@ class PolicyEngine:
             return None
 
         policy_name = path.stem.replace(".policy", "")
-        policy_category = str(data.get("category", "general"))
+        policy_domain = str(data.get("domain", "general"))
         policy_description = str(data.get("description", ""))
         policy_last_updated = str(data.get("last_updated", ""))
 
@@ -565,7 +565,7 @@ class PolicyEngine:
 
         return Policy(
             name=policy_name,
-            category=policy_category,
+            domain=policy_domain,
             description=policy_description,
             last_updated=policy_last_updated,
             services=aggregate_services,

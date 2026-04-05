@@ -1,5 +1,5 @@
 kind: anti-pattern
-category: storage
+domain: storage
 description: Storage account access and data exposure detection
 last_updated: "2026-04-04"
 patterns:

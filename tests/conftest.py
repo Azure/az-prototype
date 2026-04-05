@@ -105,7 +105,7 @@ def project_with_build(project_with_design):
             {
                 "stage": 1,
                 "name": "Foundation",
-                "category": "infra",
+                "capability": "infra",
                 "services": [
                     {
                         "name": "key-vault",
@@ -121,7 +121,7 @@ def project_with_build(project_with_design):
             {
                 "stage": 2,
                 "name": "Application",
-                "category": "app",
+                "capability": "app",
                 "services": [
                     {
                         "name": "web-app",

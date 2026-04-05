@@ -1,5 +1,5 @@
 kind: policy
-category: security
+domain: security
 description: Governance policies for Network Isolation
 last_updated: '2025-12-01'
 rules:

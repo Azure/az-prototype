@@ -45,8 +45,8 @@ class IndexedItem:
     severity: str  # "required" | "recommended" | "optional" | "" (standards)
     description: str
     rationale: str
-    source_name: str  # policy name, anti-pattern category, standard category
-    category: str
+    source_name: str  # policy name, anti-pattern domain, standard domain
+    domain: str
     services: list[str]  # ARM namespaces
     applies_to: list[str]  # agent names
 
@@ -54,7 +54,7 @@ class IndexedItem:
     def text_for_embedding(self) -> str:
         """Combine fields into a single text for embedding."""
         parts = [
-            f"[{self.kind}:{self.category}] {self.source_name}",
+            f"[{self.kind}:{self.domain}] {self.source_name}",
             f"{self.item_id}: {self.description}",
         ]
         if self.severity:
@@ -97,13 +97,7 @@ class GovernanceIndex:
         for kind, filename in _VECTOR_FILES.items():
             vectors_path = governance_dir / filename
             if not vectors_path.exists():
-                # Also try legacy location for policies
-                if kind == "policy":
-                    vectors_path = governance_dir / "policies" / "policy_vectors.json"
-                    if not vectors_path.exists():
-                        continue
-                else:
-                    continue
+                continue
             try:
                 data = json.loads(vectors_path.read_text(encoding="utf-8"))
                 for r in data.get("rules", data.get("items", [])):
@@ -115,7 +109,7 @@ class GovernanceIndex:
                             description=r.get("description", ""),
                             rationale=r.get("rationale", ""),
                             source_name=r.get("source_name", r.get("policy_name", "")),
-                            category=r.get("category", ""),
+                            domain=r.get("domain", ""),
                             services=r.get("services", []),
                             applies_to=r.get("applies_to", []),
                         )
@@ -146,7 +140,7 @@ class GovernanceIndex:
 
         # Index policies
         for policy in policies:
-            category = getattr(policy, "category", "")
+            policy_domain = getattr(policy, "domain", "")
             source_name = getattr(policy, "name", "")
             services = getattr(policy, "services", [])
             for rule in getattr(policy, "rules", []):
@@ -164,7 +158,7 @@ class GovernanceIndex:
                         description=getattr(rule, "description", ""),
                         rationale=getattr(rule, "rationale", ""),
                         source_name=source_name,
-                        category=category,
+                        domain=policy_domain,
                         services=rule_services,
                         applies_to=getattr(rule, "applies_to", []),
                     )
@@ -185,7 +179,7 @@ class GovernanceIndex:
                         description=check.description or check.warning_message,
                         rationale=check.rationale,
                         source_name=check.domain,
-                        category=check.domain,
+                        domain=check.domain,
                         services=[s for t in check.targets if isinstance(t, dict) for s in t.get("services", [])],
                         applies_to=check.applies_to,
                     )
@@ -206,8 +200,8 @@ class GovernanceIndex:
                             severity="",
                             description=principle.description,
                             rationale=principle.rationale,
-                            source_name=standard.category,
-                            category=standard.category,
+                            source_name=standard.domain,
+                            domain=standard.domain,
                             services=[],
                             applies_to=principle.applies_to,
                         )

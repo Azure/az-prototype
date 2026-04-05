@@ -1,5 +1,5 @@
 kind: policy
-category: integration
+domain: integration
 description: Governance policies for Apim To Container Apps
 last_updated: '2025-12-01'
 rules:
@@ -70,6 +70,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   template_check:
     scope:
     - api-management

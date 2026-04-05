@@ -48,8 +48,7 @@ class StandardPrinciple:
 class Standard:
     """A loaded standards document."""
 
-    domain: str  # maps to description in new format
-    category: str
+    domain: str
     description: str = ""
     last_updated: str = ""
     principles: list[StandardPrinciple] = field(default_factory=list)
@@ -92,8 +91,7 @@ def load(directory: Path | None = None) -> list[Standard]:
         if principles:
             standards.append(
                 Standard(
-                    domain=data.get("description", yaml_file.stem),
-                    category=data.get("category", str(yaml_file.parent.relative_to(target))),
+                    domain=data.get("domain", yaml_file.stem),
                     description=data.get("description", ""),
                     last_updated=data.get("last_updated", ""),
                     principles=principles,
@@ -104,15 +102,15 @@ def load(directory: Path | None = None) -> list[Standard]:
     return _cache
 
 
-def format_for_prompt(agent_name: str | None = None, category: str | None = None) -> str:
+def format_for_prompt(agent_name: str | None = None, domain: str | None = None) -> str:
     """Format standards as text for injection into agent system prompts."""
     standards = load()
     if not standards:
         return ""
 
     filtered = standards
-    if category:
-        filtered = [s for s in filtered if s.category == category]
+    if domain:
+        filtered = [s for s in filtered if s.domain == domain]
 
     if not filtered:
         return ""

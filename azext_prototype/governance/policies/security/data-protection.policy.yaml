@@ -1,5 +1,5 @@
 kind: policy
-category: security
+domain: security
 description: Governance policies for Data Protection
 last_updated: '2026-02-01'
 rules:
@@ -102,6 +102,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - biz-analyst
   targets:
   - services:
@@ -113,6 +115,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - biz-analyst
   targets:
   - services:
@@ -124,6 +128,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - biz-analyst
   targets:
   - services:
@@ -135,6 +141,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - biz-analyst
   targets:
   - services:
@@ -148,6 +156,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Sql/servers/databases
@@ -160,6 +170,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
@@ -172,6 +184,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - TODO:storage
@@ -184,6 +198,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.KeyVault/vaults

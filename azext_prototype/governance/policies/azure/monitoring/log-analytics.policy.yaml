@@ -1,5 +1,5 @@
 kind: policy
-category: azure-monitoring
+domain: azure-monitoring
 description: Governance policies for Log Analytics
 last_updated: '2026-03-27'
 rules:

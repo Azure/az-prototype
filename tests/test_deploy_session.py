@@ -34,7 +34,7 @@ def _build_yaml(stages: list[dict] | None = None, iac_tool: str = "terraform") -
             {
                 "stage": 1,
                 "name": "Foundation",
-                "category": "infra",
+                "capability": "infra",
                 "services": [
                     {
                         "name": "key-vault",
@@ -50,7 +50,7 @@ def _build_yaml(stages: list[dict] | None = None, iac_tool: str = "terraform") -
             {
                 "stage": 2,
                 "name": "Data Layer",
-                "category": "data",
+                "capability": "data",
                 "services": [
                     {
                         "name": "sql-db",
@@ -66,7 +66,7 @@ def _build_yaml(stages: list[dict] | None = None, iac_tool: str = "terraform") -
             {
                 "stage": 3,
                 "name": "Application",
-                "category": "app",
+                "capability": "app",
                 "services": [
                     {
                         "name": "web-app",
@@ -461,7 +461,7 @@ class TestPreflightChecks:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [
                     {"name": "ext", "resource_type": "External/something", "sku": ""},
                     {"name": "hashicorp", "resource_type": "hashicorp/random", "sku": ""},
@@ -490,7 +490,7 @@ class TestPreflightChecks:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [
                     {"name": "custom", "resource_type": "", "sku": ""},
                 ],
@@ -553,7 +553,7 @@ class TestExtractResourceProvidersFromFiles:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "dir": "stage-1",
                 "services": [],
                 "status": "generated",
@@ -581,7 +581,7 @@ class TestExtractResourceProvidersFromFiles:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "dir": "stage-1",
                 "services": [],
                 "status": "generated",
@@ -603,7 +603,7 @@ class TestExtractResourceProvidersFromFiles:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "dir": "stage-1",
                 "services": [],
                 "status": "generated",
@@ -619,7 +619,7 @@ class TestExtractResourceProvidersFromFiles:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "dir": "nonexistent-dir",
                 "services": [],
                 "status": "generated",
@@ -642,7 +642,7 @@ class TestExtractResourceProvidersFromFiles:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "dir": "stage-1",
                 "services": [
                     {"name": "kv", "resource_type": "Microsoft.KeyVault/vaults", "sku": ""},
@@ -667,7 +667,7 @@ class TestExtractResourceProvidersFromFiles:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "dir": "nonexistent-stage-dir",
                 "services": [
                     {"name": "kv", "resource_type": "Microsoft.KeyVault/vaults", "sku": ""},
@@ -754,7 +754,7 @@ class TestDeploySession:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -792,7 +792,7 @@ class TestDeploySession:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -860,7 +860,7 @@ class TestDeploySession:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -886,7 +886,7 @@ class TestDeploySession:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -895,7 +895,7 @@ class TestDeploySession:
             {
                 "stage": 2,
                 "name": "Data",
-                "category": "data",
+                "capability": "data",
                 "services": [],
                 "dir": "concept/infra/terraform/data",
                 "status": "generated",
@@ -931,7 +931,7 @@ class TestDeploySession:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -1026,7 +1026,7 @@ class TestDeploySession:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -1035,7 +1035,7 @@ class TestDeploySession:
             {
                 "stage": 2,
                 "name": "Data",
-                "category": "data",
+                "capability": "data",
                 "services": [],
                 "dir": "concept/infra/terraform/data",
                 "status": "generated",
@@ -1074,12 +1074,12 @@ class TestDeploySession:
         assert result.cancelled is True
 
     def test_docs_stage_auto_deployed(self, tmp_project):
-        """Test that docs-category stages are auto-marked as deployed."""
+        """Test that docs-capability stages are auto-marked as deployed."""
         stages = [
             {
                 "stage": 1,
                 "name": "Docs",
-                "category": "docs",
+                "capability": "docs",
                 "services": [],
                 "dir": "concept/docs",
                 "status": "generated",
@@ -1366,9 +1366,9 @@ class TestRollbackOrdering:
         from azext_prototype.stages.deploy_state import DeployState
 
         stages = [
-            {"stage": 1, "name": "A", "category": "infra", "services": [], "dir": "a", "files": []},
-            {"stage": 3, "name": "C", "category": "infra", "services": [], "dir": "c", "files": []},
-            {"stage": 5, "name": "E", "category": "app", "services": [], "dir": "e", "files": []},
+            {"stage": 1, "name": "A", "capability": "infra", "services": [], "dir": "a", "files": []},
+            {"stage": 3, "name": "C", "capability": "infra", "services": [], "dir": "c", "files": []},
+            {"stage": 5, "name": "E", "capability": "app", "services": [], "dir": "e", "files": []},
         ]
         build_path = _write_build_yaml(tmp_project, stages=stages)
         ds = DeployState(str(tmp_project))
@@ -1387,9 +1387,9 @@ class TestRollbackOrdering:
         from azext_prototype.stages.deploy_state import DeployState
 
         stages = [
-            {"stage": 1, "name": "A", "category": "infra", "services": [], "dir": "a", "files": []},
-            {"stage": 2, "name": "B", "category": "data", "services": [], "dir": "b", "files": []},
-            {"stage": 3, "name": "C", "category": "app", "services": [], "dir": "c", "files": []},
+            {"stage": 1, "name": "A", "capability": "infra", "services": [], "dir": "a", "files": []},
+            {"stage": 2, "name": "B", "capability": "data", "services": [], "dir": "b", "files": []},
+            {"stage": 3, "name": "C", "capability": "app", "services": [], "dir": "c", "files": []},
         ]
         build_path = _write_build_yaml(tmp_project, stages=stages)
         ds = DeployState(str(tmp_project))
@@ -1474,7 +1474,7 @@ class TestDeployNoAI:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -1512,7 +1512,7 @@ class TestDeployNoAI:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -2059,7 +2059,7 @@ class TestTerraformPreflightValidation:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -2086,7 +2086,7 @@ class TestTerraformPreflightValidation:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -2114,7 +2114,7 @@ class TestTerraformPreflightValidation:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -2138,7 +2138,7 @@ class TestTerraformPreflightValidation:
             {
                 "stage": 1,
                 "name": "App",
-                "category": "app",
+                "capability": "app",
                 "services": [],
                 "dir": "concept/apps/stage-1",
                 "status": "generated",
@@ -2155,7 +2155,7 @@ class TestTerraformPreflightValidation:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform/nonexistent",
                 "status": "generated",
@@ -2171,7 +2171,7 @@ class TestTerraformPreflightValidation:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -2193,7 +2193,7 @@ class TestTerraformPreflightValidation:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -2311,7 +2311,7 @@ class TestDeployEnv:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -2349,7 +2349,7 @@ class TestDeployEnv:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/bicep",
                 "status": "generated",
@@ -2379,7 +2379,7 @@ class TestDeployEnv:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -2589,7 +2589,7 @@ class TestRunPhasesCoverage:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -2619,7 +2619,7 @@ class TestRunPhasesCoverage:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -2643,7 +2643,7 @@ class TestRunPhasesCoverage:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -2694,7 +2694,7 @@ class TestRunPhasesCoverage:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -2718,7 +2718,7 @@ class TestRunPhasesCoverage:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -2743,7 +2743,7 @@ class TestRunPhasesCoverage:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -2767,7 +2767,7 @@ class TestRunPhasesCoverage:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -2799,7 +2799,7 @@ class TestRunPhasesCoverage:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -2831,7 +2831,7 @@ class TestRunPhasesCoverage:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -2897,7 +2897,7 @@ class TestSingleStageFailureRemediation:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -2927,7 +2927,7 @@ class TestSingleStageFailureRemediation:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -2989,7 +2989,7 @@ class TestDeployPendingStagesAwaitingManual:
             {
                 "stage": 1,
                 "name": "Manual DNS",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3023,7 +3023,7 @@ class TestDeployPendingStagesAwaitingManual:
             {
                 "stage": 1,
                 "name": "Manual DNS",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3054,7 +3054,7 @@ class TestDeployPendingStagesAwaitingManual:
             {
                 "stage": 1,
                 "name": "Manual Step",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3085,7 +3085,7 @@ class TestDeployPendingStagesAwaitingManual:
             {
                 "stage": 1,
                 "name": "Manual Step",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3146,7 +3146,7 @@ class TestRollbackAllCoverage:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3169,7 +3169,7 @@ class TestRollbackAllCoverage:
             {
                 "stage": 1,
                 "name": "A",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3178,7 +3178,7 @@ class TestRollbackAllCoverage:
             {
                 "stage": 2,
                 "name": "B",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-2",
                 "status": "generated",
@@ -3207,7 +3207,7 @@ class TestRollbackAllCoverage:
             {
                 "stage": 1,
                 "name": "A",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3216,7 +3216,7 @@ class TestRollbackAllCoverage:
             {
                 "stage": 2,
                 "name": "B",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-2",
                 "status": "generated",
@@ -3240,7 +3240,7 @@ class TestRollbackAllCoverage:
             {
                 "stage": 1,
                 "name": "A",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3299,7 +3299,7 @@ class TestSlashCommandPlan:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3318,7 +3318,7 @@ class TestSlashCommandPlan:
             {
                 "stage": 1,
                 "name": "Manual",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3341,7 +3341,7 @@ class TestSlashCommandPlan:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "nonexistent",
                 "status": "generated",
@@ -3364,7 +3364,7 @@ class TestSlashCommandPlan:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3391,7 +3391,7 @@ class TestSlashCommandPlan:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3419,7 +3419,7 @@ class TestSlashCommandPlan:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3442,7 +3442,7 @@ class TestSlashCommandPlan:
             {
                 "stage": 1,
                 "name": "App",
-                "category": "app",
+                "capability": "app",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3496,7 +3496,7 @@ class TestSlashCommandSplit:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3515,7 +3515,7 @@ class TestSlashCommandSplit:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3542,7 +3542,7 @@ class TestSlashCommandSplit:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3569,7 +3569,7 @@ class TestSlashCommandSplit:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3629,7 +3629,7 @@ class TestSlashCommandDestroy:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3649,7 +3649,7 @@ class TestSlashCommandDestroy:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3679,7 +3679,7 @@ class TestSlashCommandDestroy:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3706,7 +3706,7 @@ class TestSlashCommandDestroy:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3766,7 +3766,7 @@ class TestSlashCommandManual:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3785,7 +3785,7 @@ class TestSlashCommandManual:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3813,7 +3813,7 @@ class TestSlashCommandManual:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3841,7 +3841,7 @@ class TestSlashCommandManual:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3899,7 +3899,7 @@ class TestHandleDescribe:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3918,7 +3918,7 @@ class TestHandleDescribe:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3937,7 +3937,7 @@ class TestHandleDescribe:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -3956,7 +3956,7 @@ class TestHandleDescribe:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [
                     {
                         "name": "kv",
@@ -3994,7 +3994,7 @@ class TestHandleDescribe:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -4049,7 +4049,7 @@ class TestUnknownSlashCommand:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
                 "status": "generated",
@@ -4334,12 +4334,12 @@ class TestBuildFixTask:
         return DeploySession(context, registry)
 
     def test_infra_stage_selects_iac_agent(self, tmp_project):
-        """Lines 1242-1243: Infra category selects IaC agent."""
+        """Lines 1242-1243: Infra capability selects IaC agent."""
         session = self._make_session(tmp_project)
         stage = {
             "stage": 1,
             "name": "Infra",
-            "category": "infra",
+            "capability": "infra",
             "dir": "stage-1",
             "services": [],
         }
@@ -4348,12 +4348,12 @@ class TestBuildFixTask:
         assert "Fix deployment Stage 1" in task
 
     def test_app_stage_selects_dev_agent(self, tmp_project):
-        """Lines 1244-1245: App category selects dev agent."""
+        """Lines 1244-1245: App capability selects dev agent."""
         session = self._make_session(tmp_project)
         stage = {
             "stage": 1,
             "name": "App",
-            "category": "app",
+            "capability": "app",
             "dir": "stage-1",
             "services": [],
         }
@@ -4369,7 +4369,7 @@ class TestBuildFixTask:
         stage = {
             "stage": 1,
             "name": "Infra",
-            "category": "infra",
+            "capability": "infra",
             "dir": "stage-1",
             "services": [],
         }
@@ -4383,7 +4383,7 @@ class TestBuildFixTask:
         stage = {
             "stage": 1,
             "name": "Infra",
-            "category": "infra",
+            "capability": "infra",
             "dir": "stage-1",
             "services": [
                 {
@@ -4448,7 +4448,7 @@ class TestNaturalLanguageIntentDeploy:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -4545,7 +4545,7 @@ class TestDeployStateRemediation:
         ds.load_from_build_state(build_path)
 
         new_stages = [
-            {"stage": 0, "name": "Patch Fix", "category": "infra"},
+            {"stage": 0, "name": "Patch Fix", "capability": "infra"},
         ]
         ds.add_patch_stages(new_stages)
 
@@ -4561,14 +4561,14 @@ class TestDeployStateRemediation:
         from azext_prototype.stages.deploy_state import DeployState
 
         stages = [
-            {"stage": 1, "name": "Infra", "category": "infra", "services": [], "dir": "s1", "files": []},
-            {"stage": 2, "name": "Docs", "category": "docs", "services": [], "dir": "s2", "files": []},
+            {"stage": 1, "name": "Infra", "capability": "infra", "services": [], "dir": "s1", "files": []},
+            {"stage": 2, "name": "Docs", "capability": "docs", "services": [], "dir": "s2", "files": []},
         ]
         build_path = _write_build_yaml(tmp_project, stages=stages)
         ds = DeployState(str(tmp_project))
         ds.load_from_build_state(build_path)
 
-        ds.add_patch_stages([{"stage": 0, "name": "Patch", "category": "infra"}])
+        ds.add_patch_stages([{"stage": 0, "name": "Patch", "capability": "infra"}])
 
         stage_names = [s["name"] for s in ds.state["deployment_stages"]]
         # Patch should be before Docs
@@ -4663,7 +4663,7 @@ class TestDeployRemediation:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -4720,7 +4720,7 @@ class TestDeployRemediation:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -4773,7 +4773,7 @@ class TestDeployRemediation:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -4819,7 +4819,7 @@ class TestDeployRemediation:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -4854,7 +4854,7 @@ class TestDeployRemediation:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -4891,7 +4891,7 @@ class TestDeployRemediation:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -4931,7 +4931,7 @@ class TestDeployRemediation:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -4966,7 +4966,7 @@ class TestDeployRemediation:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -5000,7 +5000,7 @@ class TestDeployRemediation:
             {
                 "stage": 1,
                 "name": "Foundation",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform/stage-1",
                 "status": "generated",
@@ -5009,7 +5009,7 @@ class TestDeployRemediation:
             {
                 "stage": 2,
                 "name": "Data Layer",
-                "category": "data",
+                "capability": "data",
                 "services": [],
                 "dir": "concept/infra/terraform/stage-2",
                 "status": "generated",
@@ -5018,7 +5018,7 @@ class TestDeployRemediation:
             {
                 "stage": 3,
                 "name": "App",
-                "category": "app",
+                "capability": "app",
                 "services": [],
                 "dir": "concept/apps/stage-3",
                 "status": "generated",
@@ -5047,7 +5047,7 @@ class TestDeployRemediation:
             {
                 "stage": 1,
                 "name": "Foundation",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform/stage-1",
                 "status": "generated",
@@ -5056,7 +5056,7 @@ class TestDeployRemediation:
             {
                 "stage": 2,
                 "name": "Data Layer",
-                "category": "data",
+                "capability": "data",
                 "services": [],
                 "dir": "concept/infra/terraform/stage-2",
                 "status": "generated",
@@ -5093,7 +5093,7 @@ class TestDeployRemediation:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -5131,7 +5131,7 @@ class TestDeployRemediation:
             {
                 "stage": 1,
                 "name": "Infra",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
                 "status": "generated",
@@ -5166,7 +5166,7 @@ def _build_yaml_with_ids(stages=None, iac_tool="terraform"):
             {
                 "stage": 1,
                 "name": "Foundation",
-                "category": "infra",
+                "capability": "infra",
                 "id": "foundation",
                 "deploy_mode": "auto",
                 "manual_instructions": None,
@@ -5185,7 +5185,7 @@ def _build_yaml_with_ids(stages=None, iac_tool="terraform"):
             {
                 "stage": 2,
                 "name": "Data Layer",
-                "category": "data",
+                "capability": "data",
                 "id": "data-layer",
                 "deploy_mode": "auto",
                 "manual_instructions": None,
@@ -5199,7 +5199,7 @@ def _build_yaml_with_ids(stages=None, iac_tool="terraform"):
             {
                 "stage": 3,
                 "name": "Application",
-                "category": "app",
+                "capability": "app",
                 "id": "application",
                 "deploy_mode": "auto",
                 "manual_instructions": None,
@@ -5296,7 +5296,7 @@ class TestSyncFromBuildState:
             {
                 "stage": 4,
                 "name": "Monitoring",
-                "category": "infra",
+                "capability": "infra",
                 "id": "monitoring",
                 "deploy_mode": "auto",
                 "manual_instructions": None,
@@ -5552,7 +5552,7 @@ class TestManualStepDeploy:
             {
                 "stage": 1,
                 "name": "Upload Notebook",
-                "category": "external",
+                "capability": "external",
                 "id": "upload-notebook",
                 "deploy_mode": "manual",
                 "manual_instructions": "Upload the notebook to Fabric workspace.",
@@ -5579,7 +5579,7 @@ class TestManualStepDeploy:
             {
                 "stage": 1,
                 "name": "Foundation",
-                "category": "infra",
+                "capability": "infra",
                 "id": "foundation",
                 "deploy_mode": "auto",
                 "manual_instructions": None,
@@ -5591,7 +5591,7 @@ class TestManualStepDeploy:
             {
                 "stage": 2,
                 "name": "Manual Config",
-                "category": "external",
+                "capability": "external",
                 "id": "manual-config",
                 "deploy_mode": "manual",
                 "manual_instructions": "Configure the firewall rules manually.",
@@ -5774,7 +5774,7 @@ class TestDeployReportFormatting:
             {
                 "stage": 1,
                 "name": "Manual Step",
-                "category": "external",
+                "capability": "external",
                 "id": "manual",
                 "deploy_mode": "manual",
                 "manual_instructions": "Do the thing.",

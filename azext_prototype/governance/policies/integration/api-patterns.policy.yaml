@@ -1,5 +1,5 @@
 kind: policy
-category: integration
+domain: integration
 description: Governance policies for Api Patterns
 last_updated: '2026-03-27'
 rules:
@@ -13,6 +13,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.ApiManagement/service/apiVersionSets@2023-09-01-preview
     name: api-version-set
@@ -202,6 +204,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.ApiManagement/service/apiVersionSets@2023-09-01-preview
     name: api-version-set
@@ -391,6 +395,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.ApiManagement/service/apiVersionSets@2023-09-01-preview
     name: api-version-set
@@ -580,6 +586,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.ApiManagement/service/authorizationServers@2023-09-01-preview
     name: entra-id-oauth
@@ -746,6 +754,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.ApiManagement/service/authorizationServers@2023-09-01-preview
     name: entra-id-oauth
@@ -912,6 +922,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   companion_resources:
   - type: Microsoft.ApiManagement/service/authorizationServers@2023-09-01-preview
     name: entra-id-oauth
@@ -1078,6 +1090,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ApiManagement/service
@@ -1263,6 +1277,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites
@@ -1448,6 +1464,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.App/containerApps
@@ -1632,6 +1650,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.ApiManagement/service
@@ -1731,6 +1751,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.Web/sites
@@ -1830,6 +1852,8 @@ rules:
   - terraform-agent
   - bicep-agent
   - app-developer
+  - csharp-developer
+  - python-developer
   targets:
   - services:
     - Microsoft.App/containerApps

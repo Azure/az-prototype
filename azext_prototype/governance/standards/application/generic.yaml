@@ -1,0 +1,75 @@
+kind: standard
+domain: application
+description: Language-agnostic application standards for the generic app-developer agent, covering project structure,
+  Azure SDK patterns, configuration, and code quality applicable to any language not handled by a dedicated developer.
+last_updated: '2026-04-05'
+principles:
+- id: STAN-APP-001
+  description: 'Use Azure SDK with DefaultAzureCredential: Always use the platform-appropriate DefaultAzureCredential
+    for authenticating to Azure services. This works with managed identity in Azure and developer credentials locally.
+    Never pass connection strings or access keys when managed identity is available.'
+  applies_to:
+  - app-developer
+  - csharp-developer
+  - python-developer
+  examples:
+  - Use the official Azure Identity library for your language
+  - Initialize a DefaultAzureCredential instance at application startup
+  - Pass the credential to all Azure SDK clients
+  - Never embed secrets, keys, or connection strings in source code
+  rationale: DefaultAzureCredential provides seamless authentication across local dev and managed identity in production.
+- id: STAN-APP-002
+  description: 'Complete Project Structure: Every generated application must include a dependency manifest (package.json,
+    build.gradle, go.mod, Cargo.toml, etc.), an entry point file, and all model/DTO classes referenced by services.
+    No file may reference a type that is not defined in the generated output.'
+  applies_to:
+  - app-developer
+  - csharp-developer
+  - python-developer
+  examples:
+  - Dependency manifest with all required packages and pinned versions
+  - Entry point file with service initialization and configuration
+  - All referenced types must be defined in the generated output
+  - Include a Dockerfile for containerized deployment
+  rationale: Complete outputs enable downstream stages to build and deploy without missing dependencies.
+- id: STAN-APP-003
+  description: 'Configuration via Environment Variables: Use environment variables for all configuration. Never hardcode
+    service URLs, ports, connection strings, or feature flags. Include a .env.example file listing all required
+    environment variables with descriptions.'
+  applies_to:
+  - app-developer
+  - csharp-developer
+  - python-developer
+  examples:
+  - Read configuration from environment variables at startup
+  - Use a configuration library appropriate for your language
+  - Include .env.example documenting every required variable
+  - Never hardcode endpoints, ports, or service names
+  rationale: Externalized configuration supports environment-specific settings without code changes.
+- id: STAN-APP-004
+  description: 'Health Check Endpoints: All web applications and APIs must expose a /healthz endpoint that returns
+    HTTP 200 when the service is ready. Background workers should implement health monitoring appropriate
+    to their platform (e.g., liveness probes for Kubernetes).'
+  applies_to:
+  - app-developer
+  - csharp-developer
+  - python-developer
+  examples:
+  - GET /healthz returning 200 OK with {"status":"healthy"}
+  - Optionally check downstream dependencies in the health response
+  - Include readiness and liveness endpoints for container orchestrators
+  rationale: Health check endpoints enable load balancers and orchestrators to route traffic correctly.
+- id: STAN-APP-005
+  description: 'Structured Logging: Use structured logging with key-value pairs instead of string interpolation.
+    Log levels must be used consistently: ERROR for failures requiring attention, WARN for degraded conditions,
+    INFO for operational events, DEBUG for troubleshooting.'
+  applies_to:
+  - app-developer
+  - csharp-developer
+  - python-developer
+  examples:
+  - Use the platform-standard logging framework (not print/console.log)
+  - Include correlation IDs in log entries for distributed tracing
+  - Log at INFO level for request start/end, ERROR for unhandled exceptions
+  - Never log secrets, tokens, or personally identifiable information
+  rationale: Structured logging enables centralized log aggregation, querying, and alerting in Azure Monitor.

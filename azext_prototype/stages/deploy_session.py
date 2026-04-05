@@ -499,17 +499,17 @@ class DeploySession(SessionMixin):
 
         for stage in stages:
             stage_num = stage["stage"]
-            category = stage.get("category", "infra")
+            capability = stage.get("capability", "infra")
             stage_dir = Path(self._context.project_dir) / stage.get("dir", "")
 
-            _print(f"  Stage {stage_num}: {stage['name']} ({category})")
+            _print(f"  Stage {stage_num}: {stage['name']} ({capability})")
 
             if not stage_dir.is_dir():
                 _print(f"    Directory not found: {stage.get('dir', '?')}")
                 _print("")
                 continue
 
-            if category in ("infra", "data", "integration"):
+            if capability in ("infra", "data", "integration"):
                 dry_env = self._deploy_env
                 if self._iac_tool == "terraform":
                     generated = resolve_stage_secrets(stage_dir, self._config)
@@ -571,7 +571,7 @@ class DeploySession(SessionMixin):
             _print(f"  Stage {stage_num} deployed successfully.")
 
             # Capture outputs for infra stages
-            if stage.get("category") in ("infra", "data", "integration"):
+            if stage.get("capability") in ("infra", "data", "integration"):
                 self._capture_stage_outputs(stage)
         else:
             _print(f"  Stage {stage_num} failed: {result.get('error', 'unknown error')}")
@@ -782,7 +782,7 @@ class DeploySession(SessionMixin):
         """Validate Terraform syntax for all infrastructure stages before deployment."""
         results: list[dict[str, str]] = []
         for stage in self._deploy_state._state.get("deployment_stages", []):
-            if stage.get("category") not in ("infra", "data", "integration"):
+            if stage.get("capability") not in ("infra", "data", "integration"):
                 continue
             stage_dir = Path(self._context.project_dir) / stage.get("dir", "")
             if not stage_dir.is_dir():
@@ -856,7 +856,7 @@ class DeploySession(SessionMixin):
         for stage in pending:
             stage_num = stage["stage"]
             stage_name = stage["name"]
-            category = stage.get("category", "infra")
+            capability = stage.get("capability", "infra")
 
             deployed_count += 1
             services = stage.get("services", [])
@@ -876,7 +876,7 @@ class DeploySession(SessionMixin):
                 _print("         Deployed successfully.")
 
                 # Capture outputs after infra stages
-                if category in ("infra", "data", "integration"):
+                if capability in ("infra", "data", "integration"):
                     self._capture_stage_outputs(stage)
             elif result.get("status") == "awaiting_manual":
                 instructions = result.get("instructions", "No instructions provided.")
@@ -910,7 +910,7 @@ class DeploySession(SessionMixin):
     def _deploy_single_stage(self, stage: dict[str, Any]) -> dict[str, Any]:
         """Deploy one stage and update state."""
         stage_num = stage["stage"]
-        category = stage.get("category", "infra")
+        capability = stage.get("capability", "infra")
         deploy_mode = stage.get("deploy_mode", "auto")
 
         # Manual steps don't execute — they return a special status
@@ -928,7 +928,7 @@ class DeploySession(SessionMixin):
 
         # Snapshot before deploy
         build_stage_id = stage.get("build_stage_id")
-        self._rollback_mgr.snapshot_stage(stage_num, category, self._iac_tool, build_stage_id=build_stage_id)
+        self._rollback_mgr.snapshot_stage(stage_num, capability, self._iac_tool, build_stage_id=build_stage_id)
         self._deploy_state.mark_stage_deploying(stage_num)
 
         # Resolve generated secrets for Terraform stages (TF_VAR_* env vars)
@@ -939,21 +939,21 @@ class DeploySession(SessionMixin):
                 stage_env = dict(self._deploy_env) if self._deploy_env else {}
                 stage_env.update(generated)
 
-        # Dispatch by category
-        if category in ("infra", "data", "integration"):
+        # Dispatch by capability
+        if capability in ("infra", "data", "integration"):
             if self._iac_tool == "terraform":
                 result = deploy_terraform(stage_dir, self._subscription, env=stage_env)
             else:
                 result = deploy_bicep(stage_dir, self._subscription, self._resource_group, env=self._deploy_env)
-        elif category in ("app", "schema", "cicd", "external"):
+        elif capability in ("app", "schema", "cicd", "external"):
             result = deploy_app_stage(stage_dir, self._subscription, self._resource_group, env=self._deploy_env)
-        elif category == "docs":
+        elif capability == "docs":
             # Documentation stages don't deploy — mark as deployed
             self._deploy_state.mark_stage_deployed(stage_num)
             self._deploy_state.save()
             return {"status": "deployed"}
         else:
-            # Unknown category — try IaC
+            # Unknown capability — try IaC
             if self._iac_tool == "terraform":
                 result = deploy_terraform(stage_dir, self._subscription, env=stage_env)
             else:
@@ -1150,7 +1150,7 @@ class DeploySession(SessionMixin):
                 _print(f"  {stage_info} deployed successfully after remediation.")
 
                 # Capture outputs for infra stages
-                if stage.get("category") in ("infra", "data", "integration"):
+                if stage.get("capability") in ("infra", "data", "integration"):
                     self._capture_stage_outputs(stage)
 
                 # Regenerate downstream stages if needed
@@ -1226,12 +1226,12 @@ class DeploySession(SessionMixin):
         Returns ``(agent, task_prompt)`` or ``(None, "")`` when no suitable
         agent is available.
         """
-        category = stage.get("category", "infra")
+        capability = stage.get("capability", "infra")
 
-        # Select agent based on category (mirrors BuildSession._build_stage_task)
-        if category in ("infra", "data", "integration"):
+        # Select agent based on capability (mirrors BuildSession._build_stage_task)
+        if capability in ("infra", "data", "integration"):
             agent = self._iac_agents.get(self._iac_tool)
-        elif category in ("app", "schema", "cicd", "external"):
+        elif capability in ("app", "schema", "cicd", "external"):
             agent = self._dev_agent
         else:
             agent = self._iac_agents.get(self._iac_tool) or self._dev_agent
@@ -1373,7 +1373,7 @@ class DeploySession(SessionMixin):
             f"A deployment stage failed. Analyse the error and QA diagnosis, "
             f"then provide SPECIFIC code changes needed to fix it.\n\n"
             f"## Stage {stage['stage']}: {stage['name']}\n"
-            f"Category: {stage.get('category', 'infra')}\n\n"
+            f"Capability: {stage.get('capability', 'infra')}\n\n"
             f"## Deploy Error\n```\n{deploy_error[:2000]}\n```\n\n"
             f"## QA Diagnosis\n{qa_diagnosis[:1500]}\n\n"
         )
@@ -1424,7 +1424,7 @@ class DeploySession(SessionMixin):
                 {
                     "stage": s["stage"],
                     "name": s["name"],
-                    "category": s.get("category", ""),
+                    "capability": s.get("capability", ""),
                     "build_stage_id": s.get("build_stage_id", ""),
                     "services": [svc.get("name", "") for svc in s.get("services", [])],
                 }
@@ -1497,10 +1497,10 @@ class DeploySession(SessionMixin):
             if not stage:
                 continue
 
-            category = stage.get("category", "infra")
-            if category in ("infra", "data", "integration"):
+            capability = stage.get("capability", "infra")
+            if capability in ("infra", "data", "integration"):
                 agent = self._iac_agents.get(self._iac_tool)
-            elif category in ("app", "schema", "cicd", "external"):
+            elif capability in ("app", "schema", "cicd", "external"):
                 agent = self._dev_agent
             else:
                 agent = self._iac_agents.get(self._iac_tool) or self._dev_agent
@@ -1578,11 +1578,11 @@ class DeploySession(SessionMixin):
             return False
 
         stage_dir = Path(self._context.project_dir) / stage.get("dir", "")
-        category = stage.get("category", "infra")
+        capability = stage.get("capability", "infra")
 
         _print(f"  Rolling back Stage {stage_num}: {stage['name']}...")
 
-        if category in ("infra", "data", "integration"):
+        if capability in ("infra", "data", "integration"):
             if self._iac_tool == "terraform":
                 result = rollback_terraform(stage_dir, env=self._deploy_env)
             else:
@@ -1701,7 +1701,7 @@ class DeploySession(SessionMixin):
 
         if result.get("status") == "deployed":
             _print(f"  Stage {display_id} deployed successfully.")
-            if stage.get("category") in ("infra", "data", "integration"):
+            if stage.get("capability") in ("infra", "data", "integration"):
                 self._capture_stage_outputs(stage)
         elif result.get("status") == "awaiting_manual":
             instructions = result.get("instructions", "No instructions provided.")
@@ -1818,7 +1818,7 @@ class DeploySession(SessionMixin):
 
                     if result.get("status") == "deployed":
                         _print(f"  Stage {display_id} redeployed successfully.")
-                        if stage.get("category") in ("infra", "data", "integration"):
+                        if stage.get("capability") in ("infra", "data", "integration"):
                             self._capture_stage_outputs(stage)
                     elif result.get("status") == "awaiting_manual":
                         _print(f"  Stage {display_id} requires manual action:")
@@ -1840,7 +1840,7 @@ class DeploySession(SessionMixin):
                         _print(f"  Stage {arg} is a manual step — no plan preview.")
                     elif not stage_dir.is_dir():
                         _print(f"  Directory not found: {stage.get('dir', '?')}")
-                    elif stage.get("category") in ("infra", "data", "integration"):
+                    elif stage.get("capability") in ("infra", "data", "integration"):
                         with self._maybe_spinner(f"Running plan for Stage {arg}...", use_styled):
                             if self._iac_tool == "terraform":
                                 plan_env = self._deploy_env
@@ -2028,7 +2028,7 @@ class DeploySession(SessionMixin):
 
         _print("")
         _print(f"  Stage {stage_num}: {stage.get('name', '?')}")
-        _print(f"  Category:      {stage.get('category', '?')}")
+        _print(f"  Capability:    {stage.get('capability', '?')}")
         _print(f"  Deploy status: {stage.get('deploy_status', 'pending')}")
         _print(f"  Dir:           {stage.get('dir', '?')}")
 

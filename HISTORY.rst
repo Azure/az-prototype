@@ -6,10 +6,31 @@ Release History
 0.2.1b6
 +++++++
 
+Four-level taxonomy
+~~~~~~~~~~~~~~~~~~~~
+* **Layer → Capability → Component → Resource** — consistent four-level
+  hierarchy across all layers.  ``category`` renamed to ``capability`` on
+  stage dicts; ``component`` field added to service items.
+  ``knowledge/taxonomy.yaml`` is the canonical source of truth, validated
+  by ``az prototype validate``.
+* **Governance ``category`` → ``domain``** — all governance YAML files
+  (policies, anti-patterns, standards) and templates renamed ``category``
+  to ``domain`` for clarity.  JSON schemas, Python loaders, and tests
+  updated.  Governance ``domain`` classifies documents; stage ``capability``
+  classifies deployment stages.
+* **Developer ``applies_to`` expansion** — 340 governance rules updated
+  to include ``csharp-developer`` and ``python-developer`` alongside
+  ``app-developer``, ensuring language-specific developers receive relevant
+  policies.
+* **Generic application standards** — new ``generic.yaml`` with 5
+  STAN-APP principles for the generic ``app-developer`` agent, covering
+  Azure SDK auth, project structure, configuration, health checks, and
+  structured logging.
+
 Layer system
 ~~~~~~~~~~~~~
 * **Formal layer architecture** — deployment stages now carry both ``layer``
-  and ``category`` fields.  Four layers define service boundaries and agent
+  and ``capability`` fields.  Four layers define service boundaries and agent
   ownership: Core (cloud-architect — identity, observability), Infrastructure
   (infrastructure-architect — networking, compute, supporting services), Data
   (data-architect — databases, storage, messaging), and Application

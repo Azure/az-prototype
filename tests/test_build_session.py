@@ -75,7 +75,7 @@ class TestBuildState:
             {
                 "stage": 1,
                 "name": "Foundation",
-                "category": "infra",
+                "capability": "infra",
                 "services": [
                     {
                         "name": "key-vault",
@@ -106,7 +106,7 @@ class TestBuildState:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [],
                     "status": "pending",
                     "dir": "",
@@ -133,7 +133,7 @@ class TestBuildState:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [],
                     "status": "generated",
                     "dir": "",
@@ -162,7 +162,7 @@ class TestBuildState:
                 {
                     "stage": 1,
                     "name": "A",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [],
                     "status": "pending",
                     "dir": "",
@@ -171,7 +171,7 @@ class TestBuildState:
                 {
                     "stage": 2,
                     "name": "B",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [],
                     "status": "generated",
                     "dir": "",
@@ -180,7 +180,7 @@ class TestBuildState:
                 {
                     "stage": 3,
                     "name": "C",
-                    "category": "app",
+                    "capability": "app",
                     "services": [],
                     "status": "pending",
                     "dir": "",
@@ -203,7 +203,7 @@ class TestBuildState:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [
                         {
                             "name": "kv",
@@ -225,7 +225,7 @@ class TestBuildState:
                 {
                     "stage": 2,
                     "name": "Data",
-                    "category": "data",
+                    "capability": "data",
                     "services": [
                         {
                             "name": "sql",
@@ -257,7 +257,7 @@ class TestBuildState:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [
                         {
                             "name": "kv",
@@ -289,7 +289,7 @@ class TestBuildState:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [],
                     "status": "pending",
                     "dir": "",
@@ -298,7 +298,7 @@ class TestBuildState:
                 {
                     "stage": 2,
                     "name": "Data",
-                    "category": "data",
+                    "capability": "data",
                     "services": [],
                     "status": "generated",
                     "dir": "",
@@ -527,7 +527,7 @@ def mock_architect_agent_for_build():
             {
                 "stage": 1,
                 "name": "Foundation",
-                "category": "infra",
+                "capability": "infra",
                 "dir": "concept/infra/terraform/stage-1-foundation",
                 "services": [
                     {
@@ -543,7 +543,7 @@ def mock_architect_agent_for_build():
             {
                 "stage": 2,
                 "name": "Documentation",
-                "category": "docs",
+                "capability": "docs",
                 "dir": "concept/docs",
                 "services": [],
                 "status": "pending",
@@ -662,7 +662,7 @@ class TestBuildSession:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "dir": "concept/infra/terraform/stage-1-foundation",
                     "services": [
                         {
@@ -678,7 +678,7 @@ class TestBuildSession:
                 {
                     "stage": 2,
                     "name": "Apps",
-                    "category": "app",
+                    "capability": "app",
                     "dir": "concept/apps/stage-2-api",
                     "services": [],
                     "status": "pending",
@@ -692,7 +692,7 @@ class TestBuildSession:
         assert len(stages) == 2
         assert stages[0]["name"] == "Foundation"
         assert stages[0]["services"][0]["computed_name"] == "zd-kv-dev"
-        assert stages[1]["category"] == "app"
+        assert stages[1]["capability"] == "app"
 
     def test_fallback_deployment_plan(self, build_context, build_registry):
         from azext_prototype.stages.build_session import BuildSession
@@ -747,7 +747,7 @@ class TestBuildSession:
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
-        content = '```json\n{"stages": [{"stage": 1, "name": "Test", "category": "infra"}]}\n```'
+        content = '```json\n{"stages": [{"stage": 1, "name": "Test", "capability": "infra"}]}\n```'
         stages = session._parse_deployment_plan(content)
         assert len(stages) == 1
         assert stages[0]["name"] == "Test"
@@ -777,7 +777,7 @@ class TestBuildSession:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [],
                     "status": "generated",
                     "dir": "",
@@ -786,7 +786,7 @@ class TestBuildSession:
                 {
                     "stage": 2,
                     "name": "Data",
-                    "category": "data",
+                    "capability": "data",
                     "services": [],
                     "status": "generated",
                     "dir": "",
@@ -807,7 +807,7 @@ class TestBuildSession:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [],
                     "status": "generated",
                     "dir": "",
@@ -816,7 +816,7 @@ class TestBuildSession:
                 {
                     "stage": 2,
                     "name": "Data",
-                    "category": "data",
+                    "capability": "data",
                     "services": [{"name": "sql-server", "computed_name": "sql-1", "resource_type": "", "sku": ""}],
                     "status": "generated",
                     "dir": "",
@@ -837,7 +837,7 @@ class TestBuildSession:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [],
                     "status": "generated",
                     "dir": "",
@@ -897,14 +897,14 @@ class TestBuildSession:
 
         session = BuildSession(build_context, build_registry)
         raw = [
-            {"stage": 1, "name": "Test", "category": "infra"},
+            {"stage": 1, "name": "Test", "capability": "infra"},
             {"name": "No Stage Num"},
         ]
         normalized = session._normalize_stages(raw)
         assert len(normalized) == 2
         assert normalized[0]["status"] == "pending"
         assert normalized[0]["files"] == []
-        assert normalized[0]["layer"] == "infra"  # Inferred from category
+        assert normalized[0]["layer"] == "infra"  # Inferred from capability
         assert normalized[1]["stage"] == 2  # Auto-assigned
         assert normalized[1]["layer"] == "infra"  # Default
 
@@ -913,8 +913,8 @@ class TestBuildSession:
 
         session = BuildSession(build_context, build_registry)
         raw = [
-            {"stage": 1, "name": "Key Vault", "layer": "data", "category": "data"},
-            {"stage": 2, "name": "API", "layer": "app", "category": "app"},
+            {"stage": 1, "name": "Key Vault", "layer": "data", "capability": "data"},
+            {"stage": 2, "name": "API", "layer": "app", "capability": "app"},
         ]
         normalized = session._normalize_stages(raw)
         assert normalized[0]["layer"] == "data"
@@ -925,8 +925,8 @@ class TestBuildSession:
 
         session = BuildSession(build_context, build_registry)
         raw = [
-            {"stage": 1, "name": "Managed Identity", "category": "infra"},
-            {"stage": 2, "name": "Log Analytics", "category": "infra"},
+            {"stage": 1, "name": "Managed Identity", "capability": "infra"},
+            {"stage": 2, "name": "Log Analytics", "capability": "infra"},
         ]
         normalized = session._normalize_stages(raw)
         assert normalized[0]["layer"] == "core"
@@ -945,7 +945,7 @@ class TestBuildSession:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [],
                     "status": "generated",
                     "dir": "",
@@ -954,7 +954,7 @@ class TestBuildSession:
                 {
                     "stage": 2,
                     "name": "Documentation",
-                    "category": "docs",
+                    "capability": "docs",
                     "services": [],
                     "status": "pending",
                     "dir": "concept/docs",
@@ -1067,7 +1067,7 @@ class TestStageManipulation:
             {
                 "stage": 1,
                 "name": "Foundation",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "status": "generated",
                 "dir": "concept/infra/terraform/stage-1-foundation",
@@ -1076,7 +1076,7 @@ class TestStageManipulation:
             {
                 "stage": 2,
                 "name": "Data",
-                "category": "data",
+                "capability": "data",
                 "services": [
                     {"name": "sql", "computed_name": "sql-1", "resource_type": "Microsoft.Sql/servers", "sku": ""}
                 ],
@@ -1087,7 +1087,7 @@ class TestStageManipulation:
             {
                 "stage": 3,
                 "name": "App",
-                "category": "app",
+                "capability": "app",
                 "services": [],
                 "status": "generated",
                 "dir": "concept/apps/stage-3-api",
@@ -1096,7 +1096,7 @@ class TestStageManipulation:
             {
                 "stage": 4,
                 "name": "Documentation",
-                "category": "docs",
+                "capability": "docs",
                 "services": [],
                 "status": "generated",
                 "dir": "concept/docs",
@@ -1142,7 +1142,7 @@ class TestStageManipulation:
         new_stages = [
             {
                 "name": "Redis Cache",
-                "category": "data",
+                "capability": "data",
                 "services": [
                     {
                         "name": "redis",
@@ -1173,14 +1173,14 @@ class TestStageManipulation:
             {
                 "stage": 1,
                 "name": "A",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "status": "generated",
                 "dir": "",
                 "files": [],
             },
-            {"stage": 5, "name": "B", "category": "data", "services": [], "status": "pending", "dir": "", "files": []},
-            {"stage": 10, "name": "C", "category": "docs", "services": [], "status": "pending", "dir": "", "files": []},
+            {"stage": 5, "name": "B", "capability": "data", "services": [], "status": "pending", "dir": "", "files": []},
+            {"stage": 10, "name": "C", "capability": "docs", "services": [], "status": "pending", "dir": "", "files": []},
         ]
 
         bs.renumber_stages()
@@ -1202,7 +1202,7 @@ class TestArchitectureDiff:
             {
                 "stage": 1,
                 "name": "Foundation",
-                "category": "infra",
+                "capability": "infra",
                 "services": [{"name": "key-vault"}],
                 "status": "generated",
                 "dir": "",
@@ -1211,7 +1211,7 @@ class TestArchitectureDiff:
             {
                 "stage": 2,
                 "name": "Data",
-                "category": "data",
+                "capability": "data",
                 "services": [{"name": "sql"}],
                 "status": "generated",
                 "dir": "",
@@ -1224,7 +1224,7 @@ class TestArchitectureDiff:
                 "unchanged": [1],
                 "modified": [2],
                 "removed": [],
-                "added": [{"name": "Redis", "category": "data", "services": []}],
+                "added": [{"name": "Redis", "capability": "data", "services": []}],
                 "plan_restructured": False,
                 "summary": "Modified data stage; added Redis.",
             }
@@ -1251,7 +1251,7 @@ class TestArchitectureDiff:
             {
                 "stage": 1,
                 "name": "A",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "status": "generated",
                 "dir": "",
@@ -1260,7 +1260,7 @@ class TestArchitectureDiff:
             {
                 "stage": 2,
                 "name": "B",
-                "category": "data",
+                "capability": "data",
                 "services": [],
                 "status": "generated",
                 "dir": "",
@@ -1282,7 +1282,7 @@ class TestArchitectureDiff:
             {
                 "stage": 1,
                 "name": "A",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "status": "generated",
                 "dir": "",
@@ -1291,13 +1291,13 @@ class TestArchitectureDiff:
             {
                 "stage": 2,
                 "name": "B",
-                "category": "data",
+                "capability": "data",
                 "services": [],
                 "status": "generated",
                 "dir": "",
                 "files": [],
             },
-            {"stage": 3, "name": "C", "category": "app", "services": [], "status": "generated", "dir": "", "files": []},
+            {"stage": 3, "name": "C", "capability": "app", "services": [], "status": "generated", "dir": "", "files": []},
         ]
 
         # Only mention stage 2 as modified; 1 and 3 should default to unchanged
@@ -1334,7 +1334,7 @@ class TestIncrementalBuildSession:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [],
                     "status": "generated",
                     "dir": "",
@@ -1343,7 +1343,7 @@ class TestIncrementalBuildSession:
                 {
                     "stage": 2,
                     "name": "Docs",
-                    "category": "docs",
+                    "capability": "docs",
                     "services": [],
                     "status": "generated",
                     "dir": "concept/docs",
@@ -1383,7 +1383,7 @@ class TestIncrementalBuildSession:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [{"name": "key-vault"}],
                     "status": "generated",
                     "dir": "concept/infra/terraform/stage-1-foundation",
@@ -1392,7 +1392,7 @@ class TestIncrementalBuildSession:
                 {
                     "stage": 2,
                     "name": "Documentation",
-                    "category": "docs",
+                    "capability": "docs",
                     "services": [],
                     "status": "generated",
                     "dir": "concept/docs",
@@ -1411,7 +1411,7 @@ class TestIncrementalBuildSession:
                 "added": [
                     {
                         "name": "Redis Cache",
-                        "category": "data",
+                        "capability": "data",
                         "services": [
                             {
                                 "name": "redis-cache",
@@ -1466,7 +1466,7 @@ class TestIncrementalBuildSession:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [],
                     "status": "generated",
                     "dir": "",
@@ -1494,7 +1494,7 @@ class TestIncrementalBuildSession:
                 {
                     "stage": 1,
                     "name": "New Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "dir": "concept/infra/terraform/stage-1-new",
                     "services": [],
                     "status": "pending",
@@ -1503,7 +1503,7 @@ class TestIncrementalBuildSession:
                 {
                     "stage": 2,
                     "name": "Documentation",
-                    "category": "docs",
+                    "capability": "docs",
                     "dir": "concept/docs",
                     "services": [],
                     "status": "pending",
@@ -1684,7 +1684,7 @@ class TestBuildStageIntegration:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [],
                     "status": "generated",
                     "dir": "",
@@ -1881,8 +1881,8 @@ class TestCondenseArchitecture:
         session = BuildSession(build_context, build_registry)
 
         stages = [
-            {"stage": 1, "name": "Foundation", "category": "infra", "services": []},
-            {"stage": 2, "name": "Data", "category": "data", "services": []},
+            {"stage": 1, "name": "Foundation", "capability": "infra", "services": []},
+            {"stage": 2, "name": "Data", "capability": "data", "services": []},
         ]
 
         # Pre-populate cache in build_state
@@ -1908,7 +1908,7 @@ class TestCondenseArchitecture:
             ai_provider=None,
         )
 
-        stages = [{"stage": 1, "name": "Foundation", "category": "infra", "services": []}]
+        stages = [{"stage": 1, "name": "Foundation", "capability": "infra", "services": []}]
 
         result = session._condense_architecture("architecture", stages, use_styled=False)
 
@@ -1920,8 +1920,8 @@ class TestCondenseArchitecture:
         session = BuildSession(build_context, build_registry)
 
         stages = [
-            {"stage": 1, "name": "Foundation", "category": "infra", "services": []},
-            {"stage": 2, "name": "Data", "category": "data", "services": []},
+            {"stage": 1, "name": "Foundation", "capability": "infra", "services": []},
+            {"stage": 2, "name": "Data", "capability": "data", "services": []},
         ]
 
         ai_response = AIResponse(
@@ -1948,7 +1948,7 @@ class TestCondenseArchitecture:
 
         session = BuildSession(build_context, build_registry)
 
-        stages = [{"stage": 1, "name": "Foundation", "category": "infra", "services": []}]
+        stages = [{"stage": 1, "name": "Foundation", "capability": "infra", "services": []}]
 
         # AI returns empty content
         build_context.ai_provider.chat.return_value = AIResponse(
@@ -1966,7 +1966,7 @@ class TestCondenseArchitecture:
 
         session = BuildSession(build_context, build_registry)
 
-        stages = [{"stage": 1, "name": "Foundation", "category": "infra", "services": []}]
+        stages = [{"stage": 1, "name": "Foundation", "capability": "infra", "services": []}]
 
         # AI returns content without any "## Stage N" headers
         build_context.ai_provider.chat.return_value = AIResponse(
@@ -1985,7 +1985,7 @@ class TestCondenseArchitecture:
 
         session = BuildSession(build_context, build_registry)
 
-        stages = [{"stage": 1, "name": "Foundation", "category": "infra", "services": []}]
+        stages = [{"stage": 1, "name": "Foundation", "capability": "infra", "services": []}]
 
         build_context.ai_provider.chat.side_effect = Exception("API error")
 
@@ -1999,7 +1999,7 @@ class TestCondenseArchitecture:
         session = BuildSession(build_context, build_registry)
 
         stages = [
-            {"stage": 1, "name": "Foundation", "category": "infra", "services": []},
+            {"stage": 1, "name": "Foundation", "capability": "infra", "services": []},
         ]
 
         ai_response = AIResponse(
@@ -2023,78 +2023,78 @@ class TestCondenseArchitecture:
 
 
 class TestSelectAgent:
-    """Tests for _select_agent category-to-agent mapping."""
+    """Tests for _select_agent capability-to-agent mapping."""
 
     def test_select_agent_infra(self, build_context, build_registry, mock_tf_agent):
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
-        agent = session._select_agent({"category": "infra"})
+        agent = session._select_agent({"capability": "infra"})
         assert agent is mock_tf_agent
 
     def test_select_agent_data(self, build_context, build_registry, mock_tf_agent):
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
-        agent = session._select_agent({"category": "data"})
+        agent = session._select_agent({"capability": "data"})
         assert agent is mock_tf_agent
 
     def test_select_agent_integration(self, build_context, build_registry, mock_tf_agent):
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
-        agent = session._select_agent({"category": "integration"})
+        agent = session._select_agent({"capability": "integration"})
         assert agent is mock_tf_agent
 
     def test_select_agent_app(self, build_context, build_registry, mock_dev_agent):
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
-        agent = session._select_agent({"category": "app"})
+        agent = session._select_agent({"capability": "app"})
         assert agent is mock_dev_agent
 
     def test_select_agent_schema(self, build_context, build_registry, mock_dev_agent):
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
-        agent = session._select_agent({"category": "schema"})
+        agent = session._select_agent({"capability": "schema"})
         assert agent is mock_dev_agent
 
     def test_select_agent_cicd(self, build_context, build_registry, mock_dev_agent):
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
-        agent = session._select_agent({"category": "cicd"})
+        agent = session._select_agent({"capability": "cicd"})
         assert agent is mock_dev_agent
 
     def test_select_agent_external(self, build_context, build_registry, mock_dev_agent):
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
-        agent = session._select_agent({"category": "external"})
+        agent = session._select_agent({"capability": "external"})
         assert agent is mock_dev_agent
 
     def test_select_agent_docs(self, build_context, build_registry, mock_doc_agent):
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
-        agent = session._select_agent({"category": "docs"})
+        agent = session._select_agent({"capability": "docs"})
         assert agent is mock_doc_agent
 
     def test_select_agent_unknown_falls_back_to_iac(self, build_context, build_registry, mock_tf_agent):
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
-        agent = session._select_agent({"category": "unknown_category"})
+        agent = session._select_agent({"capability": "unknown_capability"})
         # Falls back to iac_agents[iac_tool] or dev_agent
         assert agent is mock_tf_agent
 
-    def test_select_agent_missing_category_defaults_to_infra(self, build_context, build_registry, mock_tf_agent):
+    def test_select_agent_missing_capability_defaults_to_infra(self, build_context, build_registry, mock_tf_agent):
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
         agent = session._select_agent({})
-        # category defaults to "infra"
+        # capability defaults to "infra"
         assert agent is mock_tf_agent
 
     def test_select_agent_no_agent_returns_none(self, build_context, build_registry):
@@ -2102,21 +2102,21 @@ class TestSelectAgent:
 
         session = BuildSession(build_context, build_registry)
         session._doc_agent = None
-        agent = session._select_agent({"category": "docs"})
+        agent = session._select_agent({"capability": "docs"})
         assert agent is None
 
     def test_select_agent_layer_core(self, build_context, build_registry, mock_architect_agent_for_build):
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
-        agent = session._select_agent({"layer": "core", "category": "infra"})
+        agent = session._select_agent({"layer": "core", "capability": "infra"})
         assert agent is mock_architect_agent_for_build
 
     def test_select_agent_layer_docs(self, build_context, build_registry, mock_doc_agent):
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
-        agent = session._select_agent({"layer": "docs", "category": "docs"})
+        agent = session._select_agent({"layer": "docs", "capability": "docs"})
         assert agent is mock_doc_agent
 
 
@@ -2131,48 +2131,48 @@ class TestInferLayer:
     def test_explicit_layer_preserved(self):
         from azext_prototype.stages.build_session import BuildSession
 
-        assert BuildSession._infer_layer({"layer": "data", "category": "infra"}) == "data"
+        assert BuildSession._infer_layer({"layer": "data", "capability": "infra"}) == "data"
 
     def test_identity_stage_maps_to_core(self):
         from azext_prototype.stages.build_session import BuildSession
 
-        assert BuildSession._infer_layer({"name": "Managed Identity", "category": "infra"}) == "core"
+        assert BuildSession._infer_layer({"name": "Managed Identity", "capability": "infra"}) == "core"
 
     def test_monitoring_stage_maps_to_core(self):
         from azext_prototype.stages.build_session import BuildSession
 
-        assert BuildSession._infer_layer({"name": "Log Analytics", "category": "infra"}) == "core"
-        assert BuildSession._infer_layer({"name": "Application Insights", "category": "infra"}) == "core"
+        assert BuildSession._infer_layer({"name": "Log Analytics", "capability": "infra"}) == "core"
+        assert BuildSession._infer_layer({"name": "Application Insights", "capability": "infra"}) == "core"
 
-    def test_infra_category_maps_to_infra(self):
+    def test_infra_capability_maps_to_infra(self):
         from azext_prototype.stages.build_session import BuildSession
 
-        assert BuildSession._infer_layer({"name": "Networking", "category": "infra"}) == "infra"
+        assert BuildSession._infer_layer({"name": "Networking", "capability": "infra"}) == "infra"
 
-    def test_data_category_maps_to_data(self):
+    def test_data_capability_maps_to_data(self):
         from azext_prototype.stages.build_session import BuildSession
 
-        assert BuildSession._infer_layer({"name": "Key Vault", "category": "data"}) == "data"
+        assert BuildSession._infer_layer({"name": "Key Vault", "capability": "data"}) == "data"
 
-    def test_app_category_maps_to_app(self):
+    def test_app_capability_maps_to_app(self):
         from azext_prototype.stages.build_session import BuildSession
 
-        assert BuildSession._infer_layer({"name": "API", "category": "app"}) == "app"
+        assert BuildSession._infer_layer({"name": "API", "capability": "app"}) == "app"
 
-    def test_docs_category_maps_to_docs(self):
+    def test_docs_capability_maps_to_docs(self):
         from azext_prototype.stages.build_session import BuildSession
 
-        assert BuildSession._infer_layer({"name": "Documentation", "category": "docs"}) == "docs"
+        assert BuildSession._infer_layer({"name": "Documentation", "capability": "docs"}) == "docs"
 
-    def test_integration_category_maps_to_infra(self):
+    def test_integration_capability_maps_to_infra(self):
         from azext_prototype.stages.build_session import BuildSession
 
-        assert BuildSession._infer_layer({"name": "APIM", "category": "integration"}) == "infra"
+        assert BuildSession._infer_layer({"name": "APIM", "capability": "integration"}) == "infra"
 
-    def test_unknown_category_defaults_to_infra(self):
+    def test_unknown_capability_defaults_to_infra(self):
         from azext_prototype.stages.build_session import BuildSession
 
-        assert BuildSession._infer_layer({"name": "Custom", "category": "xyz"}) == "infra"
+        assert BuildSession._infer_layer({"name": "Custom", "capability": "xyz"}) == "infra"
 
     def test_empty_stage_defaults_to_infra(self):
         from azext_prototype.stages.build_session import BuildSession
@@ -2332,7 +2332,7 @@ class TestBuildStageTaskGovernorBrief:
         stage = {
             "stage": 1,
             "name": "Foundation",
-            "category": "infra",
+            "capability": "infra",
             "services": [
                 {
                     "name": "key-vault",
@@ -2360,7 +2360,7 @@ class TestBuildStageTaskGovernorBrief:
         stage = {
             "stage": 1,
             "name": "Foundation",
-            "category": "infra",
+            "capability": "infra",
             "services": [],
             "dir": "concept/infra/terraform/stage-1-foundation",
         }
@@ -2378,7 +2378,7 @@ class TestBuildStageTaskGovernorBrief:
         stage = {
             "stage": 1,
             "name": "Docs",
-            "category": "docs",
+            "capability": "docs",
             "services": [],
             "dir": "concept/docs",
         }
@@ -2397,7 +2397,7 @@ class TestBuildStageTaskGovernorBrief:
         stage = {
             "stage": 1,
             "name": "Foundation",
-            "category": "infra",
+            "capability": "infra",
             "services": [
                 {
                     "name": "key-vault",
@@ -2430,7 +2430,7 @@ class TestBuildStageTaskGovernorBrief:
         stage = {
             "stage": 1,
             "name": "Foundation",
-            "category": "infra",
+            "capability": "infra",
             "services": [],
             "dir": "concept/infra/terraform/stage-1-foundation",
         }
@@ -2453,7 +2453,7 @@ class TestBuildStageTaskGovernorBrief:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [],
                     "status": "generated",
                     "dir": "",
@@ -2583,7 +2583,7 @@ class TestArchitectStageIdentification:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "dir": "",
                     "services": [{"name": "key-vault"}],
                     "status": "generated",
@@ -2592,7 +2592,7 @@ class TestArchitectStageIdentification:
                 {
                     "stage": 2,
                     "name": "Data Layer",
-                    "category": "data",
+                    "capability": "data",
                     "dir": "",
                     "services": [{"name": "sql-db"}],
                     "status": "generated",
@@ -2601,7 +2601,7 @@ class TestArchitectStageIdentification:
                 {
                     "stage": 3,
                     "name": "Application",
-                    "category": "app",
+                    "capability": "app",
                     "dir": "",
                     "services": [{"name": "web-app"}],
                     "status": "generated",
@@ -2676,7 +2676,7 @@ class TestArchitectStageIdentification:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "dir": "",
                     "services": [{"name": "key-vault"}],
                     "status": "generated",
@@ -2845,7 +2845,7 @@ class TestTerraformPromptReinforcement:
         stage = {
             "stage": 1,
             "name": "Foundation",
-            "category": "infra",
+            "capability": "infra",
             "dir": "concept/infra/terraform/stage-1",
             "services": [],
             "status": "pending",
@@ -2953,7 +2953,7 @@ class TestPerStageQA:
         stage = {
             "stage": 1,
             "name": "Foundation",
-            "category": "infra",
+            "capability": "infra",
             "dir": "concept/infra/terraform/stage-1",
             "files": ["concept/infra/terraform/stage-1/main.tf"],
             "status": "generated",
@@ -2983,7 +2983,7 @@ class TestPerStageQA:
         stage = {
             "stage": 1,
             "name": "Foundation",
-            "category": "infra",
+            "capability": "infra",
             "dir": "concept/infra/terraform/stage-1",
             "files": ["concept/infra/terraform/stage-1/main.tf"],
             "status": "generated",
@@ -3023,7 +3023,7 @@ class TestPerStageQA:
         stage = {
             "stage": 1,
             "name": "Foundation",
-            "category": "infra",
+            "capability": "infra",
             "dir": "concept/infra/terraform/stage-1",
             "files": ["concept/infra/terraform/stage-1/main.tf"],
             "status": "generated",
@@ -3042,19 +3042,19 @@ class TestPerStageQA:
         assert "issues remain" in output.lower()
 
     def test_per_stage_qa_skips_docs_stages(self, tmp_project):
-        """Docs category stages should not get QA review during Phase 3."""
+        """Docs capability stages should not get QA review during Phase 3."""
         # This tests the gating in the Phase 3 loop, not _run_stage_qa itself
         stage = {
             "stage": 5,
             "name": "Documentation",
-            "category": "docs",
+            "capability": "docs",
             "dir": "concept/docs",
             "files": [],
             "status": "generated",
             "services": [],
         }
-        # docs category is not in ("infra", "data", "integration", "app")
-        assert stage["category"] not in ("infra", "data", "integration", "app")
+        # docs capability is not in ("infra", "data", "integration", "app")
+        assert stage["capability"] not in ("infra", "data", "integration", "app")
 
     def test_collect_stage_file_content(self, tmp_project):
         session, _, _ = self._make_session(tmp_project)
@@ -3066,7 +3066,7 @@ class TestPerStageQA:
         stage = {
             "stage": 1,
             "name": "Foundation",
-            "category": "infra",
+            "capability": "infra",
             "files": ["concept/infra/terraform/stage-1/main.tf"],
         }
 
@@ -3160,7 +3160,7 @@ class TestAdvisoryQA:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "dir": "concept/infra/terraform/stage-1",
                     "services": [],
                     "status": "generated",
@@ -3209,7 +3209,7 @@ class TestAdvisoryQA:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "dir": "concept/infra/terraform/stage-1",
                     "services": [],
                     "status": "generated",
@@ -3254,7 +3254,7 @@ class TestAdvisoryQA:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "dir": "concept/infra/terraform/stage-1",
                     "services": [],
                     "status": "generated",
@@ -3297,8 +3297,8 @@ class TestStableIds:
 
         bs = BuildState(str(tmp_project))
         stages = [
-            {"stage": 1, "name": "Foundation", "category": "infra", "services": [], "status": "pending", "files": []},
-            {"stage": 2, "name": "Data Layer", "category": "data", "services": [], "status": "pending", "files": []},
+            {"stage": 1, "name": "Foundation", "capability": "infra", "services": [], "status": "pending", "files": []},
+            {"stage": 2, "name": "Data Layer", "capability": "data", "services": [], "status": "pending", "files": []},
         ]
         bs.set_deployment_plan(stages)
 
@@ -3313,8 +3313,8 @@ class TestStableIds:
 
         bs = BuildState(str(tmp_project))
         stages = [
-            {"stage": 1, "name": "Foundation", "category": "infra", "services": [], "status": "pending", "files": []},
-            {"stage": 2, "name": "Data Layer", "category": "data", "services": [], "status": "pending", "files": []},
+            {"stage": 1, "name": "Foundation", "capability": "infra", "services": [], "status": "pending", "files": []},
+            {"stage": 2, "name": "Data Layer", "capability": "data", "services": [], "status": "pending", "files": []},
         ]
         bs.set_deployment_plan(stages)
 
@@ -3328,8 +3328,8 @@ class TestStableIds:
 
         bs = BuildState(str(tmp_project))
         stages = [
-            {"stage": 1, "name": "Foundation", "category": "infra", "services": [], "status": "pending", "files": []},
-            {"stage": 2, "name": "Foundation", "category": "infra", "services": [], "status": "pending", "files": []},
+            {"stage": 1, "name": "Foundation", "capability": "infra", "services": [], "status": "pending", "files": []},
+            {"stage": 2, "name": "Foundation", "capability": "infra", "services": [], "status": "pending", "files": []},
         ]
         bs.set_deployment_plan(stages)
 
@@ -3349,7 +3349,7 @@ class TestStableIds:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [],
                     "status": "generated",
                     "files": [],
@@ -3372,8 +3372,8 @@ class TestStableIds:
 
         bs = BuildState(str(tmp_project))
         stages = [
-            {"stage": 1, "name": "Foundation", "category": "infra", "services": [], "status": "pending", "files": []},
-            {"stage": 2, "name": "Data Layer", "category": "data", "services": [], "status": "pending", "files": []},
+            {"stage": 1, "name": "Foundation", "capability": "infra", "services": [], "status": "pending", "files": []},
+            {"stage": 2, "name": "Data Layer", "capability": "data", "services": [], "status": "pending", "files": []},
         ]
         bs.set_deployment_plan(stages)
 
@@ -3390,7 +3390,7 @@ class TestStableIds:
             {
                 "stage": 1,
                 "name": "Manual Upload",
-                "category": "external",
+                "capability": "external",
                 "services": [],
                 "status": "pending",
                 "files": [],
@@ -3400,7 +3400,7 @@ class TestStableIds:
             {
                 "stage": 2,
                 "name": "Foundation",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "status": "pending",
                 "files": [],
@@ -3422,7 +3422,7 @@ class TestStableIds:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [],
                     "status": "pending",
                     "files": [],
@@ -3431,7 +3431,7 @@ class TestStableIds:
         )
         bs.add_stages(
             [
-                {"name": "API Layer", "category": "app"},
+                {"name": "API Layer", "capability": "app"},
             ]
         )
         ids = [s["id"] for s in bs.state["deployment_stages"]]
@@ -3446,29 +3446,29 @@ class TestStableIds:
 class TestGetAppScaffoldingRequirements:
     """Tests for _get_app_scaffolding_requirements static method."""
 
-    def test_infra_category_returns_empty(self):
+    def test_infra_capability_returns_empty(self):
         from azext_prototype.stages.build_session import BuildSession
 
-        result = BuildSession._get_app_scaffolding_requirements({"category": "infra", "services": []})
+        result = BuildSession._get_app_scaffolding_requirements({"capability": "infra", "services": []})
         assert result == ""
 
-    def test_data_category_returns_empty(self):
+    def test_data_capability_returns_empty(self):
         from azext_prototype.stages.build_session import BuildSession
 
-        result = BuildSession._get_app_scaffolding_requirements({"category": "data", "services": []})
+        result = BuildSession._get_app_scaffolding_requirements({"capability": "data", "services": []})
         assert result == ""
 
-    def test_docs_category_returns_empty(self):
+    def test_docs_capability_returns_empty(self):
         from azext_prototype.stages.build_session import BuildSession
 
-        result = BuildSession._get_app_scaffolding_requirements({"category": "docs", "services": []})
+        result = BuildSession._get_app_scaffolding_requirements({"capability": "docs", "services": []})
         assert result == ""
 
     def test_functions_detected_by_resource_type(self):
         from azext_prototype.stages.build_session import BuildSession
 
         stage = {
-            "category": "app",
+            "capability": "app",
             "services": [{"name": "api", "resource_type": "Microsoft.Web/functionapps"}],
         }
         result = BuildSession._get_app_scaffolding_requirements(stage)
@@ -3479,7 +3479,7 @@ class TestGetAppScaffoldingRequirements:
         from azext_prototype.stages.build_session import BuildSession
 
         stage = {
-            "category": "app",
+            "capability": "app",
             "services": [{"name": "function-app", "resource_type": ""}],
         }
         result = BuildSession._get_app_scaffolding_requirements(stage)
@@ -3490,7 +3490,7 @@ class TestGetAppScaffoldingRequirements:
         from azext_prototype.stages.build_session import BuildSession
 
         stage = {
-            "category": "app",
+            "capability": "app",
             "services": [{"name": "api", "resource_type": "Microsoft.Web/sites"}],
         }
         result = BuildSession._get_app_scaffolding_requirements(stage)
@@ -3502,7 +3502,7 @@ class TestGetAppScaffoldingRequirements:
         from azext_prototype.stages.build_session import BuildSession
 
         stage = {
-            "category": "app",
+            "capability": "app",
             "services": [{"name": "api-fastapi", "resource_type": "Microsoft.App/containerApps"}],
         }
         result = BuildSession._get_app_scaffolding_requirements(stage)
@@ -3514,28 +3514,28 @@ class TestGetAppScaffoldingRequirements:
         from azext_prototype.stages.build_session import BuildSession
 
         stage = {
-            "category": "app",
+            "capability": "app",
             "services": [{"name": "worker", "resource_type": ""}],
         }
         result = BuildSession._get_app_scaffolding_requirements(stage)
         assert "Required Project Files" in result
         assert "Entry point" in result
 
-    def test_schema_category_triggers_scaffolding(self):
+    def test_schema_capability_triggers_scaffolding(self):
         from azext_prototype.stages.build_session import BuildSession
 
         stage = {
-            "category": "schema",
+            "capability": "schema",
             "services": [{"name": "db-migration", "resource_type": ""}],
         }
         result = BuildSession._get_app_scaffolding_requirements(stage)
         assert "Required Project Files" in result
 
-    def test_external_category_triggers_scaffolding(self):
+    def test_external_capability_triggers_scaffolding(self):
         from azext_prototype.stages.build_session import BuildSession
 
         stage = {
-            "category": "external",
+            "capability": "external",
             "services": [{"name": "stripe-integration", "resource_type": ""}],
         }
         result = BuildSession._get_app_scaffolding_requirements(stage)
@@ -3644,7 +3644,7 @@ class TestHandleDescribe:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [
                         {
                             "name": "key-vault",
@@ -3680,7 +3680,7 @@ class TestHandleDescribe:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [],
                     "status": "pending",
                     "dir": "",
@@ -3791,7 +3791,7 @@ class TestFixStageDirs:
                 "stage": 1,
                 "name": "A",
                 "dir": "concept/infra/terraform/stage-1-foundation",
-                "category": "infra",
+                "capability": "infra",
                 "services": [],
                 "status": "generated",
                 "files": [],
@@ -3800,7 +3800,7 @@ class TestFixStageDirs:
                 "stage": 2,
                 "name": "B",
                 "dir": "concept/infra/terraform/stage-4-data",
-                "category": "data",
+                "capability": "data",
                 "services": [],
                 "status": "pending",
                 "files": [],
@@ -3818,7 +3818,7 @@ class TestFixStageDirs:
 
         session = BuildSession(build_context, build_registry)
         session._build_state._state["deployment_stages"] = [
-            {"stage": 1, "name": "A", "dir": "", "category": "infra", "services": [], "status": "pending", "files": []},
+            {"stage": 1, "name": "A", "dir": "", "capability": "infra", "services": [], "status": "pending", "files": []},
         ]
 
         # Should not raise
@@ -3835,7 +3835,7 @@ class TestFixStageDirs:
 class TestBuildStageTaskBicep:
     """Tests for _build_stage_task with bicep IaC tool."""
 
-    def test_bicep_category_infra(self, build_context, build_registry):
+    def test_bicep_capability_infra(self, build_context, build_registry):
         from azext_prototype.stages.build_session import BuildSession
 
         # Create a registry that has a bicep agent
@@ -3868,7 +3868,7 @@ class TestBuildStageTaskBicep:
         stage = {
             "stage": 1,
             "name": "Foundation",
-            "category": "infra",
+            "capability": "infra",
             "services": [
                 {
                     "name": "key-vault",
@@ -3895,7 +3895,7 @@ class TestBuildStageTaskBicep:
         stage = {
             "stage": 2,
             "name": "API",
-            "category": "app",
+            "capability": "app",
             "services": [
                 {
                     "name": "container-app-api",
@@ -3996,7 +3996,7 @@ class TestCollectGeneratedFileContent:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [],
                     "status": "generated",
                     "dir": "concept/infra/terraform/stage-1",
@@ -4018,7 +4018,7 @@ class TestCollectGeneratedFileContent:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [],
                     "status": "pending",
                     "dir": "",
@@ -4113,7 +4113,7 @@ class TestIdentifyStagesRegex:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [{"name": "key-vault"}],
                     "status": "generated",
                     "dir": "",
@@ -4122,7 +4122,7 @@ class TestIdentifyStagesRegex:
                 {
                     "stage": 2,
                     "name": "Data",
-                    "category": "data",
+                    "capability": "data",
                     "services": [{"name": "cosmos-db"}],
                     "status": "generated",
                     "dir": "",
@@ -4131,7 +4131,7 @@ class TestIdentifyStagesRegex:
                 {
                     "stage": 3,
                     "name": "Pending",
-                    "category": "app",
+                    "capability": "app",
                     "services": [],
                     "status": "pending",
                     "dir": "",
@@ -4154,7 +4154,7 @@ class TestIdentifyStagesRegex:
                 {
                     "stage": 1,
                     "name": "Foundation",
-                    "category": "infra",
+                    "capability": "infra",
                     "services": [],
                     "status": "generated",
                     "dir": "",
@@ -4163,7 +4163,7 @@ class TestIdentifyStagesRegex:
                 {
                     "stage": 2,
                     "name": "Data",
-                    "category": "data",
+                    "capability": "data",
                     "services": [],
                     "status": "generated",
                     "dir": "",
@@ -4193,7 +4193,7 @@ class TestRunStageQAEdgeCases:
         stage = {
             "stage": 1,
             "name": "Foundation",
-            "category": "infra",
+            "capability": "infra",
             "services": [],
             "status": "generated",
             "dir": "",
@@ -4211,7 +4211,7 @@ class TestRunStageQAEdgeCases:
         stage = {
             "stage": 1,
             "name": "Foundation",
-            "category": "infra",
+            "capability": "infra",
             "services": [],
             "status": "generated",
             "dir": "",
@@ -4423,45 +4423,45 @@ class TestBuildSessionRefactored:
     # _select_agent
     # ------------------------------------------------------------------ #
 
-    def test_select_agent_infra_category(self, build_context, build_registry, mock_tf_agent):
-        """Infra category should resolve to the IaC (terraform) agent."""
+    def test_select_agent_infra_capability(self, build_context, build_registry, mock_tf_agent):
+        """Infra capability should resolve to the IaC (terraform) agent."""
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
-        agent = session._select_agent({"category": "infra"})
+        agent = session._select_agent({"capability": "infra"})
         assert agent is mock_tf_agent
 
-    def test_select_agent_app_category(self, build_context, build_registry, mock_dev_agent):
-        """App category should resolve to the developer agent."""
+    def test_select_agent_app_capability(self, build_context, build_registry, mock_dev_agent):
+        """App capability should resolve to the developer agent."""
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
-        agent = session._select_agent({"category": "app"})
+        agent = session._select_agent({"capability": "app"})
         assert agent is mock_dev_agent
 
-    def test_select_agent_docs_category(self, build_context, build_registry, mock_doc_agent):
-        """Docs category should resolve to the doc agent."""
+    def test_select_agent_docs_capability(self, build_context, build_registry, mock_doc_agent):
+        """Docs capability should resolve to the doc agent."""
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
-        agent = session._select_agent({"category": "docs"})
+        agent = session._select_agent({"capability": "docs"})
         assert agent is mock_doc_agent
 
     def test_select_agent_unknown_falls_back_to_iac(self, build_context, build_registry, mock_tf_agent):
-        """Unknown category falls back to IaC agent, then dev agent."""
+        """Unknown capability falls back to IaC agent, then dev agent."""
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
-        agent = session._select_agent({"category": "foobar"})
+        agent = session._select_agent({"capability": "foobar"})
         assert agent is mock_tf_agent
 
     def test_select_agent_unknown_falls_back_to_dev_when_no_iac(self, build_context, build_registry, mock_dev_agent):
-        """When no IaC agent exists, unknown category falls back to dev agent."""
+        """When no IaC agent exists, unknown capability falls back to dev agent."""
         from azext_prototype.stages.build_session import BuildSession
 
         session = BuildSession(build_context, build_registry)
         session._iac_agents = {}
-        agent = session._select_agent({"category": "foobar"})
+        agent = session._select_agent({"capability": "foobar"})
         assert agent is mock_dev_agent
 
     # ------------------------------------------------------------------ #
@@ -4515,8 +4515,8 @@ class TestBuildSessionRefactored:
         session = BuildSession(build_context, build_registry)
 
         stages = [
-            {"stage": 1, "name": "Foundation", "category": "infra", "services": []},
-            {"stage": 2, "name": "Data", "category": "data", "services": []},
+            {"stage": 1, "name": "Foundation", "capability": "infra", "services": []},
+            {"stage": 2, "name": "Data", "capability": "data", "services": []},
         ]
         session._build_state._state["stage_contexts"] = {
             "1": "## Stage 1: Foundation\nContext for stage 1",
@@ -4535,7 +4535,7 @@ class TestBuildSessionRefactored:
 
         session = BuildSession(build_context, build_registry)
         stages = [
-            {"stage": 1, "name": "Foundation", "category": "infra", "services": []},
+            {"stage": 1, "name": "Foundation", "capability": "infra", "services": []},
         ]
 
         build_context.ai_provider.chat.return_value = _make_response("")
@@ -4550,7 +4550,7 @@ class TestBuildSessionRefactored:
         build_context.ai_provider = None
         session = BuildSession(build_context, build_registry)
         stages = [
-            {"stage": 1, "name": "Foundation", "category": "infra", "services": []},
+            {"stage": 1, "name": "Foundation", "capability": "infra", "services": []},
         ]
 
         result = session._condense_architecture("arch", stages, use_styled=False)
@@ -4563,8 +4563,8 @@ class TestBuildSessionRefactored:
 
         session = BuildSession(build_context, build_registry)
         stages = [
-            {"stage": 1, "name": "Foundation", "category": "infra", "services": []},
-            {"stage": 2, "name": "Data", "category": "data", "services": []},
+            {"stage": 1, "name": "Foundation", "capability": "infra", "services": []},
+            {"stage": 2, "name": "Data", "capability": "data", "services": []},
         ]
 
         ai_content = (

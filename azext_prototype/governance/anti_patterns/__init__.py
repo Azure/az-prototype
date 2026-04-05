@@ -53,7 +53,7 @@ class AntiPatternCheck:
     """A single anti-pattern detection rule."""
 
     id: str
-    domain: str  # maps to 'category' in new format
+    domain: str
     search_patterns: list[str] = field(default_factory=list)
     safe_patterns: list[str] = field(default_factory=list)
     correct_patterns: list[str] = field(default_factory=list)
@@ -87,7 +87,7 @@ def load(directory: Path | None = None) -> list[AntiPatternCheck]:
         if not isinstance(data, dict):
             continue
 
-        domain = data.get("category", yaml_file.stem)
+        domain = data.get("domain", yaml_file.stem)
         patterns_list = data.get("patterns", [])
 
         for idx, entry in enumerate(patterns_list, 1):

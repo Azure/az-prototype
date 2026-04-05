@@ -1,5 +1,5 @@
 kind: anti-pattern
-category: containers
+domain: containers
 description: Container Apps, ACR, and container runtime configuration detection
 last_updated: "2026-04-04"
 patterns:

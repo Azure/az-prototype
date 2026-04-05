@@ -1,5 +1,5 @@
 kind: policy
-category: azure-messaging
+domain: azure-messaging
 description: Governance policies for Signalr
 last_updated: '2026-03-27'
 rules:

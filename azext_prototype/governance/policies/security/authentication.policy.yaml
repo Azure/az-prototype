@@ -1,5 +1,5 @@
 kind: policy
-category: security
+domain: security
 description: Governance policies for Authentication
 last_updated: '2026-02-01'
 rules:
@@ -10,6 +10,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   - biz-analyst
@@ -23,6 +25,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   - biz-analyst
@@ -36,6 +40,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   - biz-analyst
@@ -49,6 +55,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   - biz-analyst
@@ -62,6 +70,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - terraform-agent
   - bicep-agent
   - biz-analyst
@@ -135,6 +145,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - biz-analyst
   targets:
   - services:
@@ -146,6 +158,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - biz-analyst
   targets:
   - services:
@@ -157,6 +171,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - biz-analyst
   targets:
   - services:
@@ -168,6 +184,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - biz-analyst
   targets:
   - services:
@@ -179,6 +197,8 @@ rules:
   applies_to:
   - cloud-architect
   - app-developer
+  - csharp-developer
+  - python-developer
   - biz-analyst
   targets:
   - services:

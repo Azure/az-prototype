@@ -1,5 +1,5 @@
 kind: anti-pattern
-category: completeness
+domain: completeness
 description: Structural gaps, incomplete scripts, and missing companion resources
 last_updated: "2026-04-04"
 patterns:

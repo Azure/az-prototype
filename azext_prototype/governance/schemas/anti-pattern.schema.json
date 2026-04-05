@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Governance Anti-Pattern",
-  "description": "Schema for anti-pattern YAML governance files. All anti-patterns share the unified top-level metadata (kind, category, description, last_updated) and contain a patterns array.",
+  "description": "Schema for anti-pattern YAML governance files. All anti-patterns share the unified top-level metadata (kind, domain, description, last_updated) and contain a patterns array.",
   "type": "object",
   "properties": {
     "kind": {
@@ -9,9 +9,9 @@
       "enum": ["anti-pattern"],
       "description": "Governance kind. Must be 'anti-pattern'."
     },
-    "category": {
+    "domain": {
       "type": "string",
-      "description": "Anti-pattern category (e.g. 'security', 'networking', 'encryption')."
+      "description": "Anti-pattern domain (e.g. 'security', 'networking', 'encryption')."
     },
     "description": {
       "type": "string",
@@ -88,6 +88,6 @@
       }
     }
   },
-  "required": ["kind", "category", "description", "last_updated", "patterns"],
+  "required": ["kind", "domain", "description", "last_updated", "patterns"],
   "additionalProperties": false
 }

@@ -1,5 +1,5 @@
 kind: policy
-category: azure-security
+domain: azure-security
 description: Governance policies for Defender
 last_updated: '2026-03-27'
 rules:
