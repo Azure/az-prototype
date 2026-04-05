@@ -61,7 +61,7 @@ class TestFormatContributionBody:
         assert "## Knowledge Contribution" in body
         assert "**Type:** Pitfall" in body
         assert "**File:** `knowledge/services/cosmos-db.md`" in body
-        assert "**Section:** Terraform Patterns" in body
+        assert "**Section to update:** Terraform Patterns" in body
         assert "### Context" in body
         assert "RU throughput" in body
         assert "### Rationale" in body
