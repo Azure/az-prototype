@@ -607,7 +607,7 @@ class TestBuiltinAgentStandardsFlags:
             ("azext_prototype.agents.builtin.terraform_agent.TerraformAgent", True),
             ("azext_prototype.agents.builtin.bicep_agent.BicepAgent", True),
             ("azext_prototype.agents.builtin.app_developer.AppDeveloperAgent", True),
-            ("azext_prototype.agents.builtin.security_reviewer.SecurityReviewerAgent", True),
+            ("azext_prototype.agents.builtin.security_architect.SecurityArchitectAgent", True),
             ("azext_prototype.agents.builtin.monitoring_agent.MonitoringAgent", True),
             ("azext_prototype.agents.builtin.cost_analyst.CostAnalystAgent", False),
             ("azext_prototype.agents.builtin.qa_engineer.QAEngineerAgent", False),

@@ -1,13 +1,14 @@
-"""Application Developer built-in agent — generates application code."""
+"""Generic Application Developer — fallback for unsupported languages."""
 
 from azext_prototype.agents.base import AgentCapability, AgentContract, BaseAgent
 
 
 class AppDeveloperAgent(BaseAgent):
-    """Generates application source code for Azure services.
+    """Generic application code generator for languages without a dedicated developer agent.
 
-    Creates APIs, web apps, functions, and supporting code
-    that integrate with the designed Azure architecture.
+    This agent handles languages like Java, Go, Rust, Ruby, PHP, etc.
+    that don't have a language-specific developer agent. For C#, Python,
+    and React/TypeScript, use the dedicated agents instead.
     """
 
     _temperature = 0.3
@@ -22,15 +23,17 @@ class AppDeveloperAgent(BaseAgent):
         "function",
         "web",
         "backend",
-        "frontend",
         "container",
         "docker",
-        "python",
-        "node",
-        "dotnet",
+        "java",
+        "go",
+        "rust",
+        "ruby",
+        "php",
+        "kotlin",
         "develop",
     ]
-    _keyword_weight = 0.1
+    _keyword_weight = 0.05  # Lower weight so language-specific agents win keyword matching
     _contract = AgentContract(
         inputs=["architecture"],
         outputs=["app_code"],
@@ -40,86 +43,67 @@ class AppDeveloperAgent(BaseAgent):
     def __init__(self):
         super().__init__(
             name="app-developer",
-            description="Generate application code for Azure prototypes",
+            description="Generic application code generation for unsupported languages",
             capabilities=[AgentCapability.DEVELOP],
             constraints=[
-                "Use managed identity for all Azure service authentication (DefaultAzureCredential)",
+                "Use managed identity for all Azure service authentication",
                 "Include proper error handling and logging",
                 "Generate Dockerfiles for containerized apps",
                 "Include health check endpoints for web apps",
                 "Use environment variables for configuration (not hardcoded values)",
                 "This is a prototype — keep code simple and focused",
-                "Include a requirements.txt / package.json for dependencies",
+                "Include a dependency manifest (pom.xml, go.mod, Cargo.toml, Gemfile, etc.)",
             ],
             system_prompt=APP_DEVELOPER_PROMPT,
         )
 
 
-APP_DEVELOPER_PROMPT = """You are an expert application developer building Azure prototypes.
+APP_DEVELOPER_PROMPT = """You are a generic application developer building Azure prototypes.
+
+You handle languages that don't have a dedicated developer agent (Java, Go, Rust, Ruby,
+PHP, Kotlin, etc.). For C#, Python, and React/TypeScript, the dedicated language agents
+(csharp-developer, python-developer, react-developer) handle those.
 
 Generate clean, functional application code with this structure:
 ```
-apps/
-├── api/
-│   ├── main.py (or Program.cs, index.ts)
-│   ├── models/            # Data models and DTOs
-│   ├── services/          # Business logic (single responsibility per service)
-│   ├── config.py          # Configuration from environment variables
-│   ├── Dockerfile         # Multi-stage build
-│   ├── requirements.txt   # (Python) or package.json (Node) or *.csproj (.NET)
-│   └── .env.example       # Required environment variables
-└── worker/ (if applicable)
-    └── (same structure)
+apps/<app-name>/
+├── <entry-point>       # Main application file
+├── <dependency-file>   # pom.xml, go.mod, Cargo.toml, Gemfile, etc.
+├── Dockerfile          # Multi-stage build
+├── .env.example        # Required environment variables
+└── src/                # Application source code
+    ├── models/         # Data models and DTOs
+    ├── services/       # Business logic
+    └── config/         # Configuration from environment variables
 ```
 
-## Azure Service Connection Patterns (use DefaultAzureCredential)
+## Azure Service Authentication
+Use the Azure SDK for your target language with managed identity authentication:
+- Java: `DefaultAzureCredentialBuilder().build()` from `com.azure.identity`
+- Go: `azidentity.NewDefaultAzureCredential()` from `github.com/Azure/azure-sdk-for-go`
+- Rust: Use the azure_identity crate
+- Ruby: Azure SDK for Ruby with managed identity
+- PHP: Azure SDK for PHP
 
-```python
-# Cosmos DB
-from azure.cosmos import CosmosClient
-client = CosmosClient(os.environ["COSMOS_ENDPOINT"], DefaultAzureCredential())
-
-# Storage
-from azure.storage.blob import BlobServiceClient
-client = BlobServiceClient(os.environ["STORAGE_ENDPOINT"], DefaultAzureCredential())
-
-# Key Vault
-from azure.keyvault.secrets import SecretClient
-client = SecretClient(os.environ["KEY_VAULT_URI"], DefaultAzureCredential())
-
-# Service Bus
-from azure.servicebus import ServiceBusClient
-client = ServiceBusClient(os.environ["SERVICEBUS_FQDN"], DefaultAzureCredential())
-
-# SignalR (REST API)
-# Use the SignalR REST API with DefaultAzureCredential for server-side events
-```
-
-For Python: Use FastAPI for APIs, azure-identity for auth, include requirements.txt
-For Node.js: Use Express/Fastify, @azure/identity, include package.json
-For .NET: Use ASP.NET Core minimal APIs, Azure.Identity, include .csproj
+The `AZURE_CLIENT_ID` environment variable should be set to the managed identity's client ID
+for disambiguation when multiple identities are attached.
 
 ## CRITICAL: Application Code Quality
 - NEVER hardcode secrets, keys, or connection strings
-- ALWAYS use DefaultAzureCredential / ManagedIdentityCredential
-- Follow DRY and SOLID design principles (single responsibility per function/method)
+- ALWAYS use the language's Azure SDK with managed identity authentication
+- Follow the language's idiomatic patterns and conventions
 - Include health check endpoint (`/health` or `/healthz`)
 - Include proper error handling and structured logging
-- Use environment variables for ALL configuration (never hardcode URLs or names)
+- Use environment variables for ALL configuration
 - Include a `.env.example` listing all required environment variables
 
 ## CRITICAL: NO INFRASTRUCTURE OR DEPLOYMENT SCRIPTS
-- Do **NOT** generate `deploy.sh` or CI/CD pipeline files
-- Do **NOT** generate Terraform (`.tf`), Bicep (`.bicep`), or ARM template files
-- Do **NOT** generate `providers.tf`, `variables.tf`, `outputs.tf`, or any IaC files
-- Generate **application source code**, `Dockerfile`, and dependency manifests only
-- Deployment instructions are documented in the deployment guide (docs stage)
+- Do NOT generate deploy.sh, Terraform, Bicep, or ARM template files
+- Generate application source code, Dockerfile, and dependency manifests only
 
 ## DESIGN NOTES (REQUIRED at end of response)
-After all code blocks, include a `## Key Design Decisions` section.
-
-## OUTPUT FORMAT
-Use SHORT filenames in code block labels (e.g., `main.py`, NOT `apps/api/main.py`).
-
-When uncertain about Azure SDKs, emit [SEARCH: your query] (max 2 per response).
+After all code blocks, include a `## Key Design Decisions` section explaining:
+1. Why this language/framework was chosen
+2. Key architectural decisions
+3. How Azure services are accessed (which SDK, which credential)
 """

@@ -239,15 +239,21 @@ class TestBuiltinRegistry:
     def test_all_builtin_agents_registered(self, populated_registry):
         expected = [
             "cloud-architect",
+            "infrastructure-architect",
+            "data-architect",
+            "application-architect",
+            "security-architect",
             "terraform-agent",
             "bicep-agent",
+            "csharp-developer",
+            "python-developer",
+            "react-developer",
             "app-developer",
             "doc-agent",
             "qa-engineer",
             "biz-analyst",
             "cost-analyst",
             "project-manager",
-            "security-reviewer",
             "monitoring-agent",
         ]
         for name in expected:

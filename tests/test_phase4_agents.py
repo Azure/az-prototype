@@ -1,7 +1,7 @@
 """Tests for Phase 4: Agent Enhancements.
 
 Covers:
-- SecurityReviewerAgent (4.1)
+- SecurityArchitectAgent (4.1)
 - MonitoringAgent (4.2)
 - AgentContract / coordination (4.3)
 - Parallel execution (4.4)
@@ -61,80 +61,80 @@ def mock_context(mock_ai, tmp_path):
 
 
 # ======================================================================
-# 4.1 SecurityReviewerAgent
+# 4.1 SecurityArchitectAgent
 # ======================================================================
 
 
-class TestSecurityReviewerAgent:
-    """Test the security-reviewer built-in agent."""
+class TestSecurityArchitectAgent:
+    """Test the security-architect built-in agent."""
 
     def test_instantiation(self):
-        from azext_prototype.agents.builtin.security_reviewer import (
-            SecurityReviewerAgent,
+        from azext_prototype.agents.builtin.security_architect import (
+            SecurityArchitectAgent,
         )
 
-        agent = SecurityReviewerAgent()
-        assert agent.name == "security-reviewer"
+        agent = SecurityArchitectAgent()
+        assert agent.name == "security-architect"
         assert AgentCapability.SECURITY_REVIEW in agent.capabilities
         assert AgentCapability.ANALYZE in agent.capabilities
 
     def test_temperature(self):
-        from azext_prototype.agents.builtin.security_reviewer import (
-            SecurityReviewerAgent,
+        from azext_prototype.agents.builtin.security_architect import (
+            SecurityArchitectAgent,
         )
 
-        agent = SecurityReviewerAgent()
+        agent = SecurityArchitectAgent()
         assert agent._temperature == 0.1
 
     def test_knowledge_role(self):
-        from azext_prototype.agents.builtin.security_reviewer import (
-            SecurityReviewerAgent,
+        from azext_prototype.agents.builtin.security_architect import (
+            SecurityArchitectAgent,
         )
 
-        agent = SecurityReviewerAgent()
-        assert agent._knowledge_role == "security-reviewer"
+        agent = SecurityArchitectAgent()
+        assert agent._knowledge_role == "security-architect"
 
     def test_include_templates_false(self):
-        from azext_prototype.agents.builtin.security_reviewer import (
-            SecurityReviewerAgent,
+        from azext_prototype.agents.builtin.security_architect import (
+            SecurityArchitectAgent,
         )
 
-        agent = SecurityReviewerAgent()
+        agent = SecurityArchitectAgent()
         assert agent._include_templates is False
 
     def test_keywords_cover_security_topics(self):
-        from azext_prototype.agents.builtin.security_reviewer import (
-            SecurityReviewerAgent,
+        from azext_prototype.agents.builtin.security_architect import (
+            SecurityArchitectAgent,
         )
 
-        agent = SecurityReviewerAgent()
+        agent = SecurityArchitectAgent()
         for kw in ["security", "rbac", "encryption", "secret", "firewall"]:
             assert kw in agent._keywords
 
     def test_can_handle_security_task(self):
-        from azext_prototype.agents.builtin.security_reviewer import (
-            SecurityReviewerAgent,
+        from azext_prototype.agents.builtin.security_architect import (
+            SecurityArchitectAgent,
         )
 
-        agent = SecurityReviewerAgent()
+        agent = SecurityArchitectAgent()
         score = agent.can_handle("Review the security of the terraform code")
         assert score > 0.3
 
     def test_can_handle_unrelated_task(self):
-        from azext_prototype.agents.builtin.security_reviewer import (
-            SecurityReviewerAgent,
+        from azext_prototype.agents.builtin.security_architect import (
+            SecurityArchitectAgent,
         )
 
-        agent = SecurityReviewerAgent()
+        agent = SecurityArchitectAgent()
         score = agent.can_handle("Generate a backlog of user stories")
         assert score <= 0.5
 
     def test_execute_basic(self, mock_context):
-        from azext_prototype.agents.builtin.security_reviewer import (
-            SecurityReviewerAgent,
+        from azext_prototype.agents.builtin.security_architect import (
+            SecurityArchitectAgent,
         )
 
-        agent = SecurityReviewerAgent()
+        agent = SecurityArchitectAgent()
         with patch.object(agent, "_get_governance_text", return_value=""):
             with patch.object(agent, "_get_knowledge_text", return_value=""):
                 result = agent.execute(mock_context, "Review this terraform code")
@@ -143,16 +143,16 @@ class TestSecurityReviewerAgent:
         mock_context.ai_provider.chat.assert_called_once()
         messages = mock_context.ai_provider.chat.call_args[0][0]
         # Should include system prompt + constraints + project context + user task
-        assert any("security reviewer" in m.content.lower() for m in messages if isinstance(m.content, str))
+        assert any("security architect" in m.content.lower() for m in messages if isinstance(m.content, str))
         assert any("IaC Tool: terraform" in m.content for m in messages if isinstance(m.content, str))
 
     def test_execute_with_architecture_artifact(self, mock_context):
-        from azext_prototype.agents.builtin.security_reviewer import (
-            SecurityReviewerAgent,
+        from azext_prototype.agents.builtin.security_architect import (
+            SecurityArchitectAgent,
         )
 
         mock_context.add_artifact("architecture", "App Service + Cosmos DB + Key Vault")
-        agent = SecurityReviewerAgent()
+        agent = SecurityArchitectAgent()
         with patch.object(agent, "_get_governance_text", return_value=""):
             with patch.object(agent, "_get_knowledge_text", return_value=""):
                 agent.execute(mock_context, "Review security")
@@ -162,11 +162,11 @@ class TestSecurityReviewerAgent:
         assert len(arch_messages) == 1
 
     def test_contract(self):
-        from azext_prototype.agents.builtin.security_reviewer import (
-            SecurityReviewerAgent,
+        from azext_prototype.agents.builtin.security_architect import (
+            SecurityArchitectAgent,
         )
 
-        agent = SecurityReviewerAgent()
+        agent = SecurityArchitectAgent()
         contract = agent.get_contract()
         assert "architecture" in contract.inputs
         assert "iac_code" in contract.inputs
@@ -261,10 +261,10 @@ class TestMonitoringAgent:
 class TestNewAgentsInRegistry:
     """Test that new agents register and resolve correctly."""
 
-    def test_security_reviewer_registered(self, populated_registry):
-        assert "security-reviewer" in populated_registry
-        agent = populated_registry.get("security-reviewer")
-        assert agent.name == "security-reviewer"
+    def test_security_architect_registered(self, populated_registry):
+        assert "security-architect" in populated_registry
+        agent = populated_registry.get("security-architect")
+        assert agent.name == "security-architect"
 
     def test_monitoring_agent_registered(self, populated_registry):
         assert "monitoring-agent" in populated_registry
@@ -282,7 +282,7 @@ class TestNewAgentsInRegistry:
             "biz-analyst",
             "cost-analyst",
             "project-manager",
-            "security-reviewer",
+            "security-architect",
             "monitoring-agent",
         ]
         for name in expected:
@@ -294,7 +294,7 @@ class TestNewAgentsInRegistry:
     def test_security_review_capability(self, populated_registry):
         agents = populated_registry.find_by_capability(AgentCapability.SECURITY_REVIEW)
         assert len(agents) >= 1
-        assert agents[0].name == "security-reviewer"
+        assert agents[0].name == "security-architect"
 
     def test_monitoring_capability(self, populated_registry):
         agents = populated_registry.find_by_capability(AgentCapability.MONITORING)
@@ -306,7 +306,7 @@ class TestNewAgentsInRegistry:
             "Review the security of the generated terraform code for RBAC issues"
         )
         assert best is not None
-        assert best.name == "security-reviewer"
+        assert best.name == "security-architect"
 
     def test_find_best_for_monitoring_task(self, populated_registry):
         best = populated_registry.find_best_for_task(
@@ -744,11 +744,11 @@ class TestParallelExecution:
 class TestKnowledgeRoleTemplates:
     """Verify knowledge role templates for new agents exist and load."""
 
-    def test_security_reviewer_role_loads(self):
+    def test_security_architect_role_loads(self):
         from azext_prototype.knowledge import KnowledgeLoader
 
         loader = KnowledgeLoader()
-        content = loader.load_role("security-reviewer")
+        content = loader.load_role("security-architect")
         assert content
         assert "Security Reviewer" in content
 
@@ -760,11 +760,11 @@ class TestKnowledgeRoleTemplates:
         assert content
         assert "Monitoring" in content
 
-    def test_security_reviewer_compose_context(self):
+    def test_security_architect_compose_context(self):
         from azext_prototype.knowledge import KnowledgeLoader
 
         loader = KnowledgeLoader()
-        ctx = loader.compose_context(role="security-reviewer", include_constraints=True)
+        ctx = loader.compose_context(role="security-architect", include_constraints=True)
         assert ctx
         assert len(ctx) > 100
 

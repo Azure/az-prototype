@@ -190,20 +190,28 @@ class BuildSession(SessionMixin):
             if agents:
                 self._iac_agents[key] = agents[0]
 
+        # Layer-owning architects
+        def _first(cap: AgentCapability) -> Any | None:
+            found = registry.find_by_capability(cap)
+            return found[0] if found else None
+
+        self._architect_agent = _first(AgentCapability.ARCHITECT)  # cloud-architect (overall)
+        self._infra_architect = _first(AgentCapability.INFRASTRUCTURE_ARCHITECT)
+        self._data_architect = _first(AgentCapability.DATA_ARCHITECT)
+        self._app_architect = _first(AgentCapability.APPLICATION_ARCHITECT)
+        self._security_architect = _first(AgentCapability.SECURITY_ARCHITECT)
+
+        # Language-specific developers
+        self._csharp_dev = _first(AgentCapability.DEVELOP_CSHARP)
+        self._python_dev = _first(AgentCapability.DEVELOP_PYTHON)
+        self._react_dev = _first(AgentCapability.DEVELOP_REACT)
+        # Fallback: any developer
         dev_agents = registry.find_by_capability(AgentCapability.DEVELOP)
         self._dev_agent = dev_agents[0] if dev_agents else None
 
-        doc_agents = registry.find_by_capability(AgentCapability.DOCUMENT)
-        self._doc_agent = doc_agents[0] if doc_agents else None
-
-        architect_agents = registry.find_by_capability(AgentCapability.ARCHITECT)
-        self._architect_agent = architect_agents[0] if architect_agents else None
-
-        qa_agents = registry.find_by_capability(AgentCapability.QA)
-        self._qa_agent = qa_agents[0] if qa_agents else None
-
-        advisory_agents = registry.find_by_capability(AgentCapability.ADVISORY)
-        self._advisor_agent = advisory_agents[0] if advisory_agents else None
+        self._doc_agent = _first(AgentCapability.DOCUMENT)
+        self._qa_agent = _first(AgentCapability.QA)
+        self._advisor_agent = _first(AgentCapability.ADVISORY)
 
         self._setup_escalation_tracker(agent_context.project_dir)
         self._setup_token_tracker(status_fn=self._status_fn)
@@ -1860,12 +1868,35 @@ class BuildSession(SessionMixin):
     # ------------------------------------------------------------------ #
 
     def _select_agent(self, stage: dict) -> Any | None:
-        """Select the appropriate agent for a build stage category."""
+        """Select the appropriate agent for a build stage based on layer.
+
+        Routing priority:
+        1. ``layer`` field (new architecture) → layer-owning architect
+        2. ``category`` field (fallback) → IaC agent or developer
+
+        Layer architects delegate to IaC agents (terraform/bicep) or
+        language-specific developers as needed.
+        """
+        layer = stage.get("layer", "")
         category = stage.get("category", "infra")
+
+        # Route by layer (preferred)
+        if layer == "core":
+            return self._architect_agent  # cloud-architect owns core
+        elif layer == "infra":
+            return self._infra_architect or self._iac_agents.get(self._iac_tool)
+        elif layer == "data":
+            return self._data_architect or self._iac_agents.get(self._iac_tool)
+        elif layer == "app":
+            return self._app_architect or self._dev_agent
+        elif layer == "docs":
+            return self._doc_agent
+
+        # Fallback: route by category (backward compat with plans that don't have layer)
         if category in ("infra", "data", "integration"):
             return self._iac_agents.get(self._iac_tool)
         elif category in ("app", "schema", "cicd", "external"):
-            return self._dev_agent
+            return self._app_architect or self._dev_agent
         elif category == "docs":
             return self._doc_agent
         else:

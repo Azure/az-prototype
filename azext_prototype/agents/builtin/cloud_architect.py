@@ -43,7 +43,12 @@ class CloudArchitectAgent(BaseAgent):
     _contract = AgentContract(
         inputs=["requirements"],
         outputs=["architecture", "deployment_plan"],
-        delegates_to=["terraform-agent", "bicep-agent", "app-developer"],
+        delegates_to=[
+            "infrastructure-architect",
+            "data-architect",
+            "application-architect",
+            "security-architect",
+        ],
     )
 
     def __init__(self):
