@@ -132,9 +132,7 @@ def validate_anti_patterns() -> list[ValidationError]:
                 errors.append(ValidationError(fname, f"Pattern {idx} ({check_id}): missing or invalid 'targets'"))
             else:
                 # At least one target block must have search_patterns
-                has_search = any(
-                    isinstance(t, dict) and t.get("search_patterns") for t in targets
-                )
+                has_search = any(isinstance(t, dict) and t.get("search_patterns") for t in targets)
                 if not has_search:
                     errors.append(
                         ValidationError(fname, f"Pattern {idx} ({check_id}): no target block has 'search_patterns'")
