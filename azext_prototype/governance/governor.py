@@ -22,52 +22,52 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from azext_prototype.governance.embeddings import create_backend
-from azext_prototype.governance.policy_index import IndexedRule, PolicyIndex
+from azext_prototype.governance.governance_index import GovernanceIndex, IndexedItem
 
 logger = logging.getLogger(__name__)
 
 # Singleton index — built once per session
-_policy_index: PolicyIndex | None = None
+_governance_index: GovernanceIndex | None = None
 
 
-def _get_or_build_index(project_dir: str, status_fn: Any = None) -> PolicyIndex:
-    """Get or lazily build the policy index."""
-    global _policy_index
-    if _policy_index is not None and _policy_index.rule_count > 0:
-        return _policy_index
+def _get_or_build_index(project_dir: str, status_fn: Any = None) -> GovernanceIndex:
+    """Get or lazily build the governance index."""
+    global _governance_index
+    if _governance_index is not None and _governance_index.rule_count > 0:
+        return _governance_index
 
     from azext_prototype.debug_log import log_flow, log_timer
     from azext_prototype.governance.policies import PolicyEngine
 
     # 1. Try pre-computed embeddings shipped with the wheel (no deps, instant)
-    index = PolicyIndex(backend=create_backend(prefer_neural=True, status_fn=status_fn))
+    index = GovernanceIndex(backend=create_backend(prefer_neural=True, status_fn=status_fn))
     if index.load_precomputed():
         log_flow("governor._get_or_build_index", "Loaded pre-computed embeddings", rules=index.rule_count)
-        _policy_index = index
+        _governance_index = index
         return index
 
     # 2. Try project-level cache
     if index.load_cache(project_dir):
         log_flow("governor._get_or_build_index", "Loaded from project cache", rules=index.rule_count)
-        _policy_index = index
+        _governance_index = index
         return index
 
     # 3. Build from scratch (TF-IDF or neural if available)
-    with log_timer("governor._get_or_build_index", "Building policy index"):
+    with log_timer("governor._get_or_build_index", "Building governance index"):
         engine = PolicyEngine()
         engine.load()
         index.build(engine.list_policies())
         index.save_cache(project_dir)
 
     log_flow("governor._get_or_build_index", "Built fresh index", rules=index.rule_count)
-    _policy_index = index
+    _governance_index = index
     return index
 
 
 def reset_index() -> None:
-    """Clear the cached index (for tests or after policy changes)."""
-    global _policy_index
-    _policy_index = None
+    """Clear the cached index (for tests or after governance changes)."""
+    global _governance_index
+    _governance_index = None
 
 
 # ------------------------------------------------------------------ #
@@ -117,7 +117,7 @@ def brief(
     must_rules = [r for r in all_rules if r.severity == "required" and r not in rules]
     combined = list(rules)
     for r in must_rules:
-        if r.rule_id not in {existing.rule_id for existing in combined}:
+        if r.item_id not in {existing.item_id for existing in combined}:
             combined.append(r)
 
     log_flow("governor.brief", f"Retrieved {len(rules)} + {len(combined) - len(rules)} MUST rules", agent=agent_name)
@@ -128,7 +128,7 @@ def brief(
     return _format_brief(combined)
 
 
-def _format_brief(rules: list[IndexedRule]) -> str:
+def _format_brief(rules: list[IndexedItem]) -> str:
     """Format a fixed-size governance posture summary.
 
     Produces a concise summary (~800-1000 chars) regardless of how many

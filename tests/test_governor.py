@@ -15,7 +15,7 @@ from azext_prototype.governance.embeddings import (
     cosine_similarity,
     create_backend,
 )
-from azext_prototype.governance.policy_index import CACHE_FILE, IndexedRule, PolicyIndex
+from azext_prototype.governance.governance_index import CACHE_FILE, GovernanceIndex, IndexedItem
 
 # ======================================================================
 # Fixtures
@@ -23,21 +23,23 @@ from azext_prototype.governance.policy_index import CACHE_FILE, IndexedRule, Pol
 
 
 def _make_rule(
-    rule_id: str = "R-001",
+    item_id: str = "R-001",
     severity: str = "required",
     description: str = "Use managed identity",
     rationale: str = "Security best practice",
-    policy_name: str = "identity-policy",
+    source_name: str = "identity-policy",
     category: str = "security",
     services: list[str] | None = None,
     applies_to: list[str] | None = None,
-) -> IndexedRule:
-    return IndexedRule(
-        rule_id=rule_id,
+    kind: str = "policy",
+) -> IndexedItem:
+    return IndexedItem(
+        kind=kind,
+        item_id=item_id,
         severity=severity,
         description=description,
         rationale=rationale,
-        policy_name=policy_name,
+        source_name=source_name,
         category=category,
         services=services or [],
         applies_to=applies_to or [],
@@ -201,11 +203,11 @@ class TestCreateBackend:
 
 
 # ======================================================================
-# IndexedRule
+# IndexedItem
 # ======================================================================
 
 
-class TestIndexedRule:
+class TestIndexedItem:
     def test_text_for_embedding(self):
         rule = _make_rule()
         text = rule.text_for_embedding
@@ -226,35 +228,74 @@ class TestIndexedRule:
 
 
 # ======================================================================
-# PolicyIndex — build, retrieve, save/load
+# GovernanceIndex — build, retrieve, save/load
 # ======================================================================
 
 
-class TestPolicyIndex:
+class TestGovernanceIndex:
     def test_build_populates_rules_and_vectors(self):
         policies = [
             _make_policy("auth-policy", "security"),
             _make_policy("network-policy", "networking"),
         ]
-        index = PolicyIndex(backend=TFIDFBackend())
+        index = GovernanceIndex(backend=TFIDFBackend())
         index.build(policies)
 
-        assert index.rule_count == 2
+        # 2 policy rules + anti-patterns + standards loaded from built-in files
+        assert index.rule_count >= 2
         assert index._built
-        assert len(index._vectors) == 2
+        assert len(index._vectors) == index.rule_count
         assert len(index._vectors[0]) > 0
 
-    def test_build_with_empty_policies(self):
-        index = PolicyIndex(backend=TFIDFBackend())
+    def test_build_with_empty_policies_indexes_no_policy_items(self):
+        index = GovernanceIndex(backend=TFIDFBackend())
         index.build([])
-        assert index.rule_count == 0
         assert index._built
+        # No policy items should be indexed
+        policy_items = [i for i in index._items if i.kind == "policy"]
+        assert len(policy_items) == 0
+        # Anti-patterns and standards are still loaded from built-in files
+        ap_items = [i for i in index._items if i.kind == "anti-pattern"]
+        std_items = [i for i in index._items if i.kind == "standard"]
+        assert len(ap_items) > 0
+        assert len(std_items) > 0
 
-    def test_build_with_policy_no_rules(self):
+    def test_build_with_policy_no_rules_indexes_no_policy_items(self):
         policy = _make_policy(rules=[])
-        index = PolicyIndex(backend=TFIDFBackend())
+        index = GovernanceIndex(backend=TFIDFBackend())
         index.build([policy])
-        assert index.rule_count == 0
+        policy_items = [i for i in index._items if i.kind == "policy"]
+        assert len(policy_items) == 0
+
+    def test_build_indexes_correct_kind_counts(self):
+        """Each kind is indexed separately with correct counts."""
+        from azext_prototype.governance.policies import PolicyRule
+
+        rules = [
+            PolicyRule(
+                id="P-001",
+                severity="required",
+                description="test",
+                target_services=["Microsoft.Compute/virtualMachines"],
+            ),
+            PolicyRule(
+                id="P-002",
+                severity="required",
+                description="test2",
+                target_services=["Microsoft.Compute/virtualMachines"],
+            ),
+        ]
+        policies = [_make_policy("vm", "compute", rules=rules)]
+        index = GovernanceIndex(backend=TFIDFBackend())
+        index.build(policies)
+
+        policy_items = [i for i in index._items if i.kind == "policy"]
+        ap_items = [i for i in index._items if i.kind == "anti-pattern"]
+        std_items = [i for i in index._items if i.kind == "standard"]
+        assert len(policy_items) == 2  # exactly our 2 rules
+        assert len(ap_items) > 0  # loaded from built-in files
+        assert len(std_items) > 0  # loaded from built-in files
+        assert index.rule_count == len(policy_items) + len(ap_items) + len(std_items)
 
     def test_retrieve_returns_top_k_sorted(self):
         # Create policies with distinct content
@@ -285,22 +326,23 @@ class TestPolicyIndex:
             _make_policy("cost", "cost", rules=[rule3]),
         ]
 
-        index = PolicyIndex(backend=TFIDFBackend())
+        index = GovernanceIndex(backend=TFIDFBackend())
         index.build(policies)
 
         results = index.retrieve("managed identity authentication", top_k=2)
         assert len(results) <= 2
-        assert all(isinstance(r, IndexedRule) for r in results)
+        assert all(isinstance(r, IndexedItem) for r in results)
 
     def test_retrieve_empty_index_returns_empty(self):
-        index = PolicyIndex(backend=TFIDFBackend())
+        index = GovernanceIndex(backend=TFIDFBackend())
         # Not built
         assert index.retrieve("anything") == []
 
-    def test_retrieve_built_no_rules_returns_empty(self):
-        index = PolicyIndex(backend=TFIDFBackend())
+    def test_retrieve_built_returns_results(self):
+        index = GovernanceIndex(backend=TFIDFBackend())
         index.build([])
-        assert index.retrieve("anything") == []
+        # Anti-patterns and standards are always loaded, so retrieve returns results
+        assert len(index.retrieve("anything")) > 0
 
     def test_retrieve_for_agent_filters_by_applies_to(self):
         rule1 = MagicMock()
@@ -330,16 +372,17 @@ class TestPolicyIndex:
             _make_policy("p3", "security", rules=[rule3]),
         ]
 
-        index = PolicyIndex(backend=TFIDFBackend())
+        index = GovernanceIndex(backend=TFIDFBackend())
         index.build(policies)
 
-        results = index.retrieve_for_agent("security", "terraform-agent", top_k=10)
-        rule_ids = [r.rule_id for r in results]
+        results = index.retrieve_for_agent("managed identity security", "terraform-agent", top_k=50)
+        rule_ids = [r.item_id for r in results]
         # Should include terraform-agent specific and global rules
         assert "SEC-001" in rule_ids
         assert "SEC-003" in rule_ids
         # Should NOT include bicep-agent specific rule
-        assert "SEC-002" not in rule_ids
+        bicep_only = [r for r in results if r.item_id == "SEC-002"]
+        assert len(bicep_only) == 0
 
     def test_retrieve_for_agent_includes_global_rules(self):
         """Rules with empty applies_to should be returned for any agent."""
@@ -351,25 +394,28 @@ class TestPolicyIndex:
         rule.applies_to = []
 
         policies = [_make_policy("global", "security", rules=[rule])]
-        index = PolicyIndex(backend=TFIDFBackend())
+        index = GovernanceIndex(backend=TFIDFBackend())
         index.build(policies)
 
-        results = index.retrieve_for_agent("security", "any-agent", top_k=10)
-        assert len(results) == 1
-        assert results[0].rule_id == "GLOBAL-001"
+        results = index.retrieve_for_agent("global security rule", "any-agent", top_k=50)
+        global_results = [r for r in results if r.item_id == "GLOBAL-001"]
+        assert len(global_results) == 1
 
 
-class TestPolicyIndexCache:
+class TestGovernanceIndexCache:
     def test_save_and_load_cache_roundtrip(self, tmp_path):
-        rule = MagicMock()
-        rule.id = "R-001"
-        rule.severity = "required"
-        rule.description = "Use managed identity"
-        rule.rationale = "Best practice"
-        rule.applies_to = []
+        from azext_prototype.governance.policies import PolicyRule
 
+        rule = PolicyRule(
+            id="R-001",
+            severity="required",
+            description="Use managed identity",
+            rationale="Best practice",
+            applies_to=[],
+            target_services=["Microsoft.Compute/virtualMachines"],
+        )
         policies = [_make_policy("test", "security", rules=[rule])]
-        index = PolicyIndex(backend=TFIDFBackend())
+        index = GovernanceIndex(backend=TFIDFBackend())
         index.build(policies)
 
         # Save
@@ -378,14 +424,14 @@ class TestPolicyIndexCache:
         assert cache_path.exists()
 
         # Load into a fresh index
-        index2 = PolicyIndex(backend=TFIDFBackend())
+        index2 = GovernanceIndex(backend=TFIDFBackend())
         loaded = index2.load_cache(str(tmp_path))
         assert loaded is True
         assert index2.rule_count == index.rule_count
         assert index2._built
 
     def test_load_cache_missing_file_returns_false(self, tmp_path):
-        index = PolicyIndex(backend=TFIDFBackend())
+        index = GovernanceIndex(backend=TFIDFBackend())
         assert index.load_cache(str(tmp_path)) is False
 
     def test_load_cache_corrupt_json_returns_false(self, tmp_path):
@@ -393,18 +439,18 @@ class TestPolicyIndexCache:
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         cache_path.write_text("not valid json", encoding="utf-8")
 
-        index = PolicyIndex(backend=TFIDFBackend())
+        index = GovernanceIndex(backend=TFIDFBackend())
         assert index.load_cache(str(tmp_path)) is False
 
     def test_save_cache_not_built_is_noop(self, tmp_path):
-        index = PolicyIndex(backend=TFIDFBackend())
+        index = GovernanceIndex(backend=TFIDFBackend())
         index.save_cache(str(tmp_path))
 
         cache_path = tmp_path / CACHE_FILE
         assert not cache_path.exists()
 
 
-class TestPolicyIndexPrecomputed:
+class TestGovernanceIndexPrecomputed:
     def test_load_precomputed_when_file_exists(self, tmp_path):
         """Simulate loading pre-computed vectors from policy_vectors.json."""
         vectors_data = {
@@ -426,11 +472,11 @@ class TestPolicyIndexPrecomputed:
         vectors_path = tmp_path / "policy_vectors.json"
         vectors_path.write_text(json.dumps(vectors_data), encoding="utf-8")
 
-        index = PolicyIndex(backend=TFIDFBackend())
+        index = GovernanceIndex(backend=TFIDFBackend())
         with patch.object(Path, "__new__", return_value=vectors_path):
             # Instead, patch the actual path check
             with patch(
-                "azext_prototype.governance.policy_index.Path.__truediv__",
+                "azext_prototype.governance.governance_index.Path.__truediv__",
             ):
                 # Simpler approach: directly test via the file
                 pass
@@ -441,22 +487,22 @@ class TestPolicyIndexPrecomputed:
         cache_path.write_text(
             json.dumps(
                 {
-                    "rules": [asdict(_make_rule())],
+                    "items": [asdict(_make_rule())],
                     "vectors": [[0.5, 0.3, 0.2]],
                 }
             ),
             encoding="utf-8",
         )
 
-        index = PolicyIndex(backend=TFIDFBackend())
+        index = GovernanceIndex(backend=TFIDFBackend())
         assert index.load_cache(str(tmp_path)) is True
         assert index.rule_count == 1
 
     def test_load_precomputed_missing_file_returns_false(self):
         """When policy_vectors.json doesn't exist, returns False."""
-        index = PolicyIndex(backend=TFIDFBackend())
+        index = GovernanceIndex(backend=TFIDFBackend())
         with patch(
-            "azext_prototype.governance.policy_index.Path.exists",
+            "azext_prototype.governance.governance_index.Path.exists",
             return_value=False,
         ):
             assert index.load_precomputed() is False
@@ -528,21 +574,21 @@ class TestGovernorBrief:
 
         # First call builds the index
         governor.brief(str(tmp_path), "task 1")
-        assert governor._policy_index is not None
+        assert governor._governance_index is not None
 
         # Second call reuses the cached index
-        cached = governor._policy_index
+        cached = governor._governance_index
         governor.brief(str(tmp_path), "task 2")
-        assert governor._policy_index is cached
+        assert governor._governance_index is cached
 
     def test_reset_index_clears_cache(self, tmp_path):
         from azext_prototype.governance import governor
 
         governor.brief(str(tmp_path), "task")
-        assert governor._policy_index is not None
+        assert governor._governance_index is not None
 
         governor.reset_index()
-        assert governor._policy_index is None
+        assert governor._governance_index is None
 
 
 class TestFormatBrief:

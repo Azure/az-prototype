@@ -9,7 +9,7 @@ sdist/
 wheels/
 
 # --- Generated at build time ---
-azext_prototype/governance/policies/policy_vectors.json
+azext_prototype/governance/*.vectors.json
 
 # --- Python bytecode ---
 __pycache__/
