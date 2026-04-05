@@ -123,12 +123,22 @@ def validate_anti_patterns() -> list[ValidationError]:
             if not entry.get("warning_message"):
                 errors.append(ValidationError(fname, f"Pattern {idx} ({check_id}): missing 'warning_message'"))
 
-            # targets required with search_patterns inside
+            # targets: list of target blocks, each with services and search_patterns
             targets = entry.get("targets")
-            if not isinstance(targets, dict):
+            if isinstance(targets, dict):
+                # Single target block — normalize to list
+                targets = [targets]
+            if not isinstance(targets, list) or not targets:
                 errors.append(ValidationError(fname, f"Pattern {idx} ({check_id}): missing or invalid 'targets'"))
-            elif not targets.get("search_patterns"):
-                errors.append(ValidationError(fname, f"Pattern {idx} ({check_id}): missing 'targets.search_patterns'"))
+            else:
+                # At least one target block must have search_patterns
+                has_search = any(
+                    isinstance(t, dict) and t.get("search_patterns") for t in targets
+                )
+                if not has_search:
+                    errors.append(
+                        ValidationError(fname, f"Pattern {idx} ({check_id}): no target block has 'search_patterns'")
+                    )
 
             if check_id and check_id in all_ids:
                 errors.append(ValidationError(fname, f"Duplicate id '{check_id}' (also in {all_ids[check_id]})"))
