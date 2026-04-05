@@ -44,6 +44,7 @@ class CSharpDeveloperAgent(BaseAgent):
         inputs=["architecture", "application_design"],
         outputs=["csharp_code"],
         delegates_to=[],
+        sub_layers=["api", "business-logic", "data-access", "background", "presentation"],
     )
 
     def __init__(self):
@@ -133,30 +134,46 @@ Generate clean, production-quality C# code following .NET conventions and best p
 - **DI:** Built-in Microsoft.Extensions.DependencyInjection
 - **Testing:** xUnit + Moq
 
-## Project Structure
+## Project Structure (Sub-Layer Organization)
+
+Organize code into distinct sub-layers with clear boundaries:
+
 ```
 src/
 ├── MyApp.Api/
-│   ├── Program.cs                 # Minimal API or host builder
+│   ├── Program.cs                 # DI config, middleware, host builder
 │   ├── MyApp.Api.csproj           # Package references
-│   ├── Controllers/               # API controllers (if controller-based)
-│   ├── Endpoints/                 # Minimal API endpoint groups
-│   ├── Models/                    # Request/response DTOs
-│   ├── Services/                  # Business logic (interface + implementation)
-│   ├── Data/                      # DbContext, repositories
-│   ├── Middleware/                # Error handling, auth middleware
-│   ├── Extensions/               # Service registration extensions
+│   ├── Endpoints/                 # [API] Minimal API endpoint groups
+│   ├── Controllers/               # [API] Controllers (if controller-based)
+│   ├── Models/                    # [API] Request/response DTOs
+│   ├── Services/                  # [Business Logic] Interfaces + implementations
+│   ├── Domain/                    # [Business Logic] Domain models, validation
+│   ├── Data/                      # [Data Access] DbContext, repositories
+│   ├── Middleware/                # [Cross-Cutting] Error handling, auth
+│   ├── Extensions/               # [Cross-Cutting] Service registration
 │   ├── appsettings.json          # Non-secret configuration
 │   ├── Dockerfile                # Multi-stage build
 │   └── .env.example              # Required environment variables
-├── MyApp.Functions/
+├── MyApp.Worker/                  # [Background] Worker services
+│   ├── Program.cs
+│   ├── MyApp.Worker.csproj
+│   └── Consumers/                 # Message consumers
+├── MyApp.Functions/               # [Background] Azure Functions
 │   ├── Program.cs                 # Isolated worker host
 │   ├── MyApp.Functions.csproj
-│   └── Functions/                 # Function classes
+│   └── Functions/
 └── MyApp.Shared/
     ├── MyApp.Shared.csproj
-    └── Contracts/                 # Shared DTOs and interfaces
+    └── Contracts/                 # Shared interfaces and DTOs
 ```
+
+### Sub-Layer Rules
+- **API** endpoints depend on **Business Logic** services (via interfaces)
+- **Business Logic** depends on **Data Access** repositories (via interfaces)
+- **Data Access** implements repository interfaces; uses Entity Framework Core or Azure SDKs
+- **Background** workers share Business Logic and Data Access with the API
+- **Cross-Cutting** (DI, logging, middleware) is configured in Program.cs
+- Define interfaces BEFORE implementations — enables testability and DI
 
 ## Azure Service Patterns (DefaultAzureCredential)
 

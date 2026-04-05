@@ -2181,6 +2181,139 @@ class TestInferLayer:
 
 
 # ======================================================================
+# _resolve_developer_for_stage / _decompose_app_stage tests
+# ======================================================================
+
+
+class TestAppStageDelegation:
+    """Tests for app-layer architect → developer delegation."""
+
+    def test_resolve_developer_python_from_name(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_py = MagicMock()
+        mock_py.name = "python-developer"
+        session._python_dev = mock_py
+
+        stage = {"name": "Python API", "services": [], "dir": ""}
+        dev = session._resolve_developer_for_stage(stage, "")
+        assert dev is mock_py
+
+    def test_resolve_developer_react_from_name(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_react = MagicMock()
+        mock_react.name = "react-developer"
+        session._react_dev = mock_react
+
+        stage = {"name": "React Frontend", "services": [], "dir": ""}
+        dev = session._resolve_developer_for_stage(stage, "")
+        assert dev is mock_react
+
+    def test_resolve_developer_csharp_from_services(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_cs = MagicMock()
+        mock_cs.name = "csharp-developer"
+        session._csharp_dev = mock_cs
+
+        stage = {"name": "Backend API", "services": [{"name": "aspnet-api"}], "dir": ""}
+        dev = session._resolve_developer_for_stage(stage, "")
+        assert dev is mock_cs
+
+    def test_resolve_developer_from_architecture_context(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_py = MagicMock()
+        mock_py.name = "python-developer"
+        session._python_dev = mock_py
+
+        stage = {"name": "Worker Service", "services": [], "dir": ""}
+        arch = "Worker Service uses FastAPI for the async message consumer."
+        dev = session._resolve_developer_for_stage(stage, arch)
+        assert dev is mock_py
+
+    def test_resolve_developer_none_when_no_hints(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        stage = {"name": "Custom Logic", "services": [], "dir": ""}
+        dev = session._resolve_developer_for_stage(stage, "")
+        assert dev is None
+
+    def test_decompose_returns_developer_with_sub_layer_context(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_py = MagicMock()
+        mock_py.name = "python-developer"
+        session._python_dev = mock_py
+
+        stage = {"name": "FastAPI Backend", "layer": "app", "services": [], "dir": ""}
+        agent, ctx = session._decompose_app_stage(stage, "", lambda *a: None)
+        assert agent is mock_py
+        assert "Sub-Layer Structure" in ctx
+
+    def test_decompose_falls_back_to_app_architect(self, build_context, build_registry):
+        from azext_prototype.stages.build_session import BuildSession
+
+        session = BuildSession(build_context, build_registry)
+        mock_arch = MagicMock()
+        mock_arch.name = "application-architect"
+        session._app_architect = mock_arch
+
+        stage = {"name": "Custom Service", "layer": "app", "services": [], "dir": ""}
+        agent, ctx = session._decompose_app_stage(stage, "", lambda *a: None)
+        assert agent is mock_arch
+        assert ctx == ""
+
+
+# ======================================================================
+# AgentContract.sub_layers tests
+# ======================================================================
+
+
+class TestAgentContractSubLayers:
+    """Tests for the sub_layers field on AgentContract."""
+
+    def test_sub_layers_default_empty(self):
+        from azext_prototype.agents.base import AgentContract
+
+        contract = AgentContract()
+        assert contract.sub_layers == []
+
+    def test_sub_layers_set_on_csharp(self):
+        from azext_prototype.agents.builtin.csharp_developer import CSharpDeveloperAgent
+
+        agent = CSharpDeveloperAgent()
+        assert "api" in agent._contract.sub_layers
+        assert "presentation" in agent._contract.sub_layers
+
+    def test_sub_layers_set_on_python(self):
+        from azext_prototype.agents.builtin.python_developer import PythonDeveloperAgent
+
+        agent = PythonDeveloperAgent()
+        assert "api" in agent._contract.sub_layers
+        assert "presentation" not in agent._contract.sub_layers
+
+    def test_sub_layers_set_on_react(self):
+        from azext_prototype.agents.builtin.react_developer import ReactDeveloperAgent
+
+        agent = ReactDeveloperAgent()
+        assert agent._contract.sub_layers == ["presentation"]
+
+    def test_sub_layers_set_on_app_architect(self):
+        from azext_prototype.agents.builtin.application_architect import ApplicationArchitectAgent
+
+        agent = ApplicationArchitectAgent()
+        assert len(agent._contract.sub_layers) == 5
+
+
+# ======================================================================
 # _build_stage_task governor brief tests
 # ======================================================================
 

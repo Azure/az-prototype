@@ -42,6 +42,7 @@ class PythonDeveloperAgent(BaseAgent):
         inputs=["architecture", "application_design"],
         outputs=["python_code"],
         delegates_to=[],
+        sub_layers=["api", "business-logic", "data-access", "background"],
     )
 
     def __init__(self):
@@ -130,27 +131,44 @@ Generate clean, production-quality Python code following Python conventions and 
 - **Async:** asyncio + uvicorn for async APIs
 - **Testing:** pytest + pytest-asyncio
 
-## Project Structure
+## Project Structure (Sub-Layer Organization)
+
+Organize code into distinct sub-layers with clear boundaries:
+
 ```
 apps/
 ├── api/
-│   ├── main.py                    # FastAPI app entry point
-│   ├── config.py                  # Settings from environment variables
-│   ├── models/                    # Pydantic models (request/response)
-│   ├── services/                  # Business logic (single responsibility)
-│   ├── data/                      # Repository layer (database access)
-│   ├── middleware/                # Error handling, auth middleware
+│   ├── main.py                    # [Cross-Cutting] FastAPI app + DI + middleware
+│   ├── config.py                  # [Cross-Cutting] Settings from environment variables
+│   ├── endpoints/                 # [API] Route definitions, request handlers
+│   ├── models/                    # [API] Pydantic request/response models
+│   ├── services/                  # [Business Logic] Domain logic (interface + impl)
+│   ├── domain/                    # [Business Logic] Domain models, validation
+│   ├── data/                      # [Data Access] Repository pattern, ORM, queries
+│   ├── middleware/                # [Cross-Cutting] Error handling, auth middleware
 │   ├── requirements.txt           # Pinned dependencies
 │   ├── Dockerfile                 # Multi-stage build
 │   └── .env.example              # Required environment variables
-├── functions/
+├── worker/                        # [Background] Message consumers, scheduled tasks
+│   ├── main.py
+│   ├── consumers/                 # Service Bus / Event Hub consumers
+│   └── requirements.txt
+├── functions/                     # [Background] Azure Functions
 │   ├── function_app.py            # v2 programming model
 │   ├── requirements.txt
 │   └── host.json
 └── shared/
-    ├── contracts.py               # Shared DTOs and interfaces
+    ├── contracts.py               # Shared interfaces (Protocol classes) and DTOs
     └── azure_clients.py           # Azure SDK client factories
 ```
+
+### Sub-Layer Rules
+- **API** endpoints depend on **Business Logic** services (via Protocol/ABC interfaces)
+- **Business Logic** depends on **Data Access** repositories (via Protocol/ABC interfaces)
+- **Data Access** implements repository protocols; uses SQLAlchemy, azure-cosmos SDK, etc.
+- **Background** workers share Business Logic and Data Access with the API
+- **Cross-Cutting** (DI, logging, middleware) is configured in main.py
+- Use Python Protocol classes or ABCs for interface contracts
 
 ## Azure Service Patterns (DefaultAzureCredential)
 

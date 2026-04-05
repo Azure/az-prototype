@@ -44,6 +44,7 @@ class ReactDeveloperAgent(BaseAgent):
         inputs=["architecture", "application_design"],
         outputs=["react_code"],
         delegates_to=[],
+        sub_layers=["presentation"],
     )
 
     def __init__(self):
@@ -132,24 +133,28 @@ Generate clean, production-quality React code with TypeScript for Azure prototyp
 - **Real-time:** @microsoft/signalr (when SignalR backend is present)
 - **Testing:** Vitest + React Testing Library
 
-## Project Structure
+## Project Structure (Presentation Sub-Layer)
+
+The React frontend is the **Presentation** sub-layer of the application. It communicates \
+with backend APIs exclusively — never directly with Azure services.
+
 ```
 apps/
 └── web/
     ├── src/
     │   ├── main.tsx                # App entry point
     │   ├── App.tsx                 # Root component with providers
-    │   ├── auth/
-    │   │   ├── authConfig.ts       # MSAL configuration
-    │   │   └── AuthProvider.tsx    # MSAL provider wrapper
-    │   ├── components/
-    │   │   ├── layout/             # Layout components (Header, Sidebar, Footer)
-    │   │   ├── common/             # Reusable components (Button, Card, Modal)
-    │   │   └── features/           # Feature-specific components
-    │   ├── pages/                  # Route page components
-    │   ├── hooks/                  # Custom hooks (useApi, useAuth, useSignalR)
-    │   ├── services/               # API client functions (typed)
-    │   ├── types/                  # TypeScript interfaces and types
+    │   ├── auth/                   # [Auth] MSAL configuration and provider
+    │   │   ├── authConfig.ts
+    │   │   └── AuthProvider.tsx
+    │   ├── components/             # [UI] Reusable UI components
+    │   │   ├── layout/             #   Layout (Header, Sidebar, Footer)
+    │   │   ├── common/             #   Shared (Button, Card, Modal)
+    │   │   └── features/           #   Feature-specific components
+    │   ├── pages/                  # [Routing] Route page components
+    │   ├── hooks/                  # [State] Custom hooks (useApi, useAuth)
+    │   ├── services/               # [API Client] Typed API calls to backend
+    │   ├── types/                  # [Contracts] TypeScript interfaces and types
     │   └── utils/                  # Helper functions
     ├── public/
     ├── index.html
@@ -160,6 +165,13 @@ apps/
     ├── .env.example                # Required environment variables
     └── Dockerfile                  # Multi-stage build (node -> nginx)
 ```
+
+### Presentation Layer Rules
+- ALL data flows through backend API endpoints (via services/ typed clients)
+- NEVER access Azure services directly from the frontend
+- Authentication tokens acquired via MSAL, sent as Bearer in API calls
+- API client functions in services/ should be typed with request/response interfaces
+- State management via React Context + hooks (or Zustand for complex state)
 
 ## MSAL Authentication Pattern
 

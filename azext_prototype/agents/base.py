@@ -55,11 +55,16 @@ class AgentContract:
             Missing inputs are warnings (agent may still run with reduced context).
         outputs: Artifact keys this agent produces (added to ``AgentContext.artifacts``).
         delegates_to: Agent names this agent may delegate sub-tasks to.
+        sub_layers: Application sub-layers this agent can generate code for.
+            Valid values: ``presentation``, ``api``, ``business-logic``,
+            ``data-access``, ``background``.  Empty list means the agent
+            does not participate in sub-layer delegation.
     """
 
     inputs: list[str] = field(default_factory=list)
     outputs: list[str] = field(default_factory=list)
     delegates_to: list[str] = field(default_factory=list)
+    sub_layers: list[str] = field(default_factory=list)
 
 
 @dataclass

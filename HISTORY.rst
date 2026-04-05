@@ -35,6 +35,27 @@ Layer system
   layer architecture, service placement rules, and layer-category mapping
   table.
 
+Application sub-layers
+~~~~~~~~~~~~~~~~~~~~~~~
+* **``sub_layers`` on ``AgentContract``** — developer agents now declare which
+  application sub-layers they can generate: ``csharp-developer`` handles API,
+  business-logic, data-access, background, and presentation (Blazor);
+  ``python-developer`` handles API, business-logic, data-access, background;
+  ``react-developer`` handles presentation only.
+* **Architect → developer delegation** — ``_decompose_app_stage()`` detects
+  the language from stage name, service names, and architecture context, then
+  routes directly to the matching developer with sub-layer guidance injected
+  into the task prompt.  Falls back to the application-architect when no
+  language can be detected.
+* **Application-architect prompt rewrite** — sub-layer definitions now include
+  directory conventions, developer assignments, and cross-layer dependency
+  rules.  The delegation strategy section documents how technology choices
+  from discovery map to developer assignments.
+* **Developer prompt sub-layer organization** — C#, Python, and React
+  developer prompts now include sub-layer annotated project structures with
+  explicit rules for inter-layer dependencies (API → Business Logic →
+  Data Access, all via interfaces/DI).
+
 Code quality
 ~~~~~~~~~~~~~
 * **American English normalization** — renamed ``_normalise_stages()`` to

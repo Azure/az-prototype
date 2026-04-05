@@ -512,7 +512,13 @@ class BuildSession(SessionMixin):
             # Use condensed per-stage context (from one-time condensation call)
             focused_context = stage_contexts.get(stage_num, "")
 
-            agent = self._select_agent(stage)
+            # App-layer stages use architect → developer delegation
+            sub_layer_context = ""
+            layer = stage.get("layer", "")
+            if layer == "app" and (self._app_architect or self._csharp_dev or self._python_dev or self._react_dev):
+                agent, sub_layer_context = self._decompose_app_stage(stage, focused_context, _print)
+            else:
+                agent = self._select_agent(stage)
             if not agent:
                 _print(f"       Skipped (no agent for category '{stage.get('category', '')}')")
                 continue
@@ -523,6 +529,10 @@ class BuildSession(SessionMixin):
                 self._context.conversation_history.clear()
 
                 _, task = self._build_stage_task(stage, focused_context, templates)
+
+                # Inject sub-layer guidance for app stages
+                if sub_layer_context:
+                    task += f"\n{sub_layer_context}\n"
 
                 _dbg_flow(
                     "build_session.generate",
@@ -1954,6 +1964,105 @@ class BuildSession(SessionMixin):
             return self._doc_agent
         else:
             return self._iac_agents.get(self._iac_tool) or self._dev_agent
+
+    # ------------------------------------------------------------------ #
+    # Internal — app-layer architect → developer delegation
+    # ------------------------------------------------------------------ #
+
+    # Language detection keywords for developer routing.
+    _LANG_HINTS: dict[str, str] = {
+        "csharp": "csharp",
+        "c#": "csharp",
+        ".net": "csharp",
+        "dotnet": "csharp",
+        "aspnet": "csharp",
+        "blazor": "csharp",
+        "entity-framework": "csharp",
+        "python": "python",
+        "fastapi": "python",
+        "flask": "python",
+        "django": "python",
+        "react": "react",
+        "typescript": "react",
+        "next": "react",
+        "angular": "react",
+        "vue": "react",
+        "frontend": "react",
+        "spa": "react",
+    }
+
+    def _resolve_developer_for_stage(self, stage: dict, architecture: str) -> Any | None:
+        """Pick the language-specific developer for an app stage.
+
+        Scans the stage name, service names, directory path, and
+        architecture context for language hints.  Returns the matching
+        developer agent, or ``None`` if no match is found.
+        """
+        # Collect text signals from the stage
+        signals = " ".join(
+            [
+                stage.get("name", ""),
+                stage.get("dir", ""),
+            ]
+            + [s.get("name", "") for s in stage.get("services", [])]
+        ).lower()
+
+        # Also scan the architecture excerpt for this stage
+        stage_name = stage.get("name", "").lower()
+        for line in architecture.lower().splitlines():
+            if stage_name and stage_name in line:
+                signals += " " + line
+
+        # Score each language
+        scores: dict[str, int] = {"csharp": 0, "python": 0, "react": 0}
+        for hint, lang in self._LANG_HINTS.items():
+            if hint in signals:
+                scores[lang] += 1
+
+        best = max(scores, key=lambda k: scores[k])
+        if scores[best] == 0:
+            return None  # No language detected
+
+        return {
+            "csharp": self._csharp_dev,
+            "python": self._python_dev,
+            "react": self._react_dev,
+        }.get(best)
+
+    def _decompose_app_stage(self, stage: dict, architecture: str, _print: Any) -> tuple[Any | None, str]:
+        """Architect → developer delegation for app-layer stages.
+
+        1. If a language-specific developer can be identified from stage
+           context, route directly to that developer with sub-layer guidance.
+        2. Otherwise fall back to the application-architect (or generic
+           developer) which handles both design and code generation.
+
+        Returns ``(agent, sub_layer_context)`` where *sub_layer_context*
+        is injected into the developer's task prompt.
+        """
+        # Try to detect the developer from stage/architecture signals
+        developer = self._resolve_developer_for_stage(stage, architecture)
+
+        if developer:
+            # Build sub-layer guidance for the developer
+            sub_layer_context = (
+                "## Application Sub-Layer Structure\n"
+                "Organize your output into these distinct layers:\n"
+                "1. **Services/API** — API endpoints, controllers, route definitions\n"
+                "2. **Business Logic** — Domain models, validation, workflow orchestration\n"
+                "3. **Data Access** — Repository implementations, ORM mappings, queries\n"
+                "4. **Background** — Background workers, message consumers, scheduled tasks\n"
+                "5. **Cross-Cutting** — DI configuration, logging setup, middleware,\n"
+                "   health checks, configuration binding\n\n"
+                "Each layer should have its own directory. Use dependency injection\n"
+                "for all cross-layer communication. Define interfaces before implementations.\n"
+            )
+            _print(f"       Developer: {developer.name}")
+            return developer, sub_layer_context
+
+        # Fallback: use application-architect or generic developer
+        fallback = self._app_architect or self._dev_agent
+        return fallback, ""
 
     def _build_stage_task(
         self,
