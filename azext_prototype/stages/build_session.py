@@ -1727,11 +1727,16 @@ class BuildSession(SessionMixin):
         try:
             from azext_prototype.knowledge import KnowledgeLoader
 
-            svc_names = [s.get("name", "") for s in stage.get("services", []) if s.get("name")]
+            # Prefer resource_type (ARM namespace) for knowledge resolution; fall back to name
+            svc_identifiers = [
+                s.get("resource_type") or s.get("name", "")
+                for s in stage.get("services", [])
+                if s.get("resource_type") or s.get("name")
+            ]
             is_iac = category in ("infra", "data", "integration")
             loader = KnowledgeLoader()
             knowledge = loader.compose_context(
-                services=svc_names,
+                services=svc_identifiers,
                 tool=self._iac_tool if is_iac else None,
                 role="infrastructure" if is_iac else "developer",
                 include_constraints=True,
@@ -2821,24 +2826,27 @@ class BuildSession(SessionMixin):
     # ------------------------------------------------------------------ #
 
     def _resolve_service_policies(self, services: list[dict]) -> str:
-        """Resolve deterministic service policies via exact service matching."""
+        """Resolve deterministic service policies via ARM namespace matching."""
         try:
             from azext_prototype.governance.policies import PolicyEngine
 
             engine = PolicyEngine()
             engine.load()
-            svc_names = [s.get("name", "") for s in services if s.get("name")]
-            if not svc_names:
+            # Prefer resource_type (ARM namespace) for exact matching; fall back to name
+            svc_identifiers = [
+                s.get("resource_type") or s.get("name", "") for s in services if s.get("resource_type") or s.get("name")
+            ]
+            if not svc_identifiers:
                 return ""
             agent_name = f"{self._iac_tool}-agent" if self._iac_tool in ("terraform", "bicep") else "terraform-agent"
-            result = engine.resolve_for_stage(svc_names, self._iac_tool, agent_name=agent_name)
+            result = engine.resolve_for_stage(svc_identifiers, self._iac_tool, agent_name=agent_name)
 
             from azext_prototype.debug_log import log_flow as _dbg
 
             _dbg(
                 "build_session.policies",
                 "Service policies resolved",
-                service_names=svc_names,
+                service_names=svc_identifiers,
                 policy_len=len(result),
                 policy_full=result if result else "(empty)",
             )
