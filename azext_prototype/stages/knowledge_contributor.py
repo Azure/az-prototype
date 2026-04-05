@@ -33,20 +33,21 @@ def check_knowledge_gap(finding: dict, knowledge_loader: Any) -> bool:
     covered by the relevant service knowledge file.  Returns ``False``
     if the content already exists or the finding is empty.
 
-    Uses a substring match on the first 80 characters of the finding's
-    ``context`` field against the loaded service file content.
+    Resolves by ``service_namespace`` (ARM resource type) first, then
+    falls back to ``service`` (friendly name).
     """
     if not finding:
         return False
 
-    service = finding.get("service", "")
+    # Prefer namespace for resolution
+    service_id = finding.get("service_namespace") or finding.get("service", "")
     context = finding.get("context", "")
-    if not service or not context:
+    if not service_id or not context:
         return False
 
-    # Load the service knowledge file
+    # Load the service knowledge file (KnowledgeLoader resolves by namespace first)
     try:
-        content = knowledge_loader.load_service(service)
+        content = knowledge_loader.load_service(service_id)
     except Exception:
         content = ""
 
@@ -70,9 +71,10 @@ def check_knowledge_gap(finding: dict, knowledge_loader: Any) -> bool:
 def format_contribution_title(finding: dict) -> str:
     """Format a finding as a GitHub Issue title.
 
-    Produces ``"[Knowledge] {service}: {context[:60]}"``.
+    Produces ``"[Knowledge] {namespace or service}: {context[:60]}"``.
     """
-    service = finding.get("service", "unknown")
+    namespace = finding.get("service_namespace", "")
+    service = namespace or finding.get("service", "unknown")
     context = finding.get("context", "") or finding.get("description", "")
     if not context:
         context = "Knowledge contribution"
@@ -86,11 +88,15 @@ def format_contribution_body(finding: dict) -> str:
     """Format a finding as a structured GitHub Issue body.
 
     Produces markdown matching the knowledge-contribution issue template
-    with Type, File, Section, Context, Rationale, Content to Add, and
-    Source sections.
+    with Type, Namespace, File, Section, Context, Rationale, Content to Add,
+    and Source sections.
+
+    For new-service findings, includes the full 8-section template that
+    the knowledge file must contain.
     """
     contribution_type = finding.get("type", "Pitfall")
     service = finding.get("service", "unknown")
+    namespace = finding.get("service_namespace", "")
     file_path = finding.get("file", f"knowledge/services/{service}.md")
     section = finding.get("section", "")
     context = finding.get("context", "")
@@ -102,9 +108,11 @@ def format_contribution_body(finding: dict) -> str:
     lines.append("## Knowledge Contribution")
     lines.append("")
     lines.append(f"**Type:** {contribution_type}")
+    if namespace:
+        lines.append(f"**Service Namespace:** `{namespace}`")
     lines.append(f"**File:** `{file_path}`")
     if section:
-        lines.append(f"**Section:** {section}")
+        lines.append(f"**Section to update:** {section}")
     lines.append("")
     lines.append("### Context")
     lines.append(context or "No context provided.")
@@ -122,6 +130,20 @@ def format_contribution_body(finding: dict) -> str:
     lines.append("")
     lines.append("### Source")
     lines.append(source)
+
+    # For new services, include the required file template
+    if contribution_type == "New service":
+        lines.append("")
+        lines.append("### Required Knowledge File Sections")
+        lines.append("The new knowledge file MUST include ALL of these sections:")
+        lines.append("1. **Description** (one-line summary)")
+        lines.append("2. **When to Use** (scenarios and selection criteria)")
+        lines.append("3. **POC Defaults** (default SKU, tier, configuration)")
+        lines.append("4. **Terraform Patterns** (azapi_resource with RBAC)")
+        lines.append("5. **Bicep Patterns** (ARM template resources)")
+        lines.append("6. **Application Code** (Python, C#, Node.js — where applicable)")
+        lines.append("7. **Common Pitfalls** (deployment failures, misconfigurations)")
+        lines.append("8. **Production Backlog Items** (what changes for production)")
 
     return "\n".join(lines)
 
@@ -206,12 +228,25 @@ def submit_contribution(
 def build_finding_from_qa(
     qa_content: str,
     service: str = "unknown",
+    service_namespace: str = "",
     source: str = "QA diagnosis",
+    section: str = "",
 ) -> dict:
     """Convert raw QA text into a finding dict.
 
     Extracts a reasonable context snippet from the QA response and
     packages it as a finding suitable for ``submit_contribution()``.
+
+    Parameters
+    ----------
+    service:
+        Friendly service name (e.g., ``cosmos-db``).
+    service_namespace:
+        ARM resource type namespace (e.g., ``Microsoft.DocumentDB/databaseAccounts``).
+        Preferred over ``service`` for file resolution.
+    section:
+        Which of the 8 knowledge sections needs updating (e.g.,
+        ``"Common Pitfalls"``, ``"Terraform Patterns"``).
     """
     # Use the first 500 chars as context, first 200 as content
     context = qa_content[:500].strip() if qa_content else ""
@@ -219,9 +254,10 @@ def build_finding_from_qa(
 
     return {
         "service": service,
+        "service_namespace": service_namespace,
         "type": "Pitfall",
         "file": f"knowledge/services/{service}.md",
-        "section": "",
+        "section": section,
         "context": context,
         "rationale": context,
         "content": content,
