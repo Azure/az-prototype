@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Resources/resourceGroups
+display_name: Azure Resource Group
+---
+
 # Azure Resource Groups
 > Logical container for Azure resources that share a common lifecycle, enabling unified management, access control, cost tracking, and deployment scoping.
 

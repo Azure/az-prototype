@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies
+display_name: WAF Policy
+---
+
 # Azure WAF Policy
 > Web Application Firewall policy providing centralized protection against common web exploits, bots, and vulnerabilities using OWASP rule sets, custom rules, and bot protection for Front Door and Application Gateway.
 

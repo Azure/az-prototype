@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Automation/automationAccounts
+display_name: Azure Automation
+---
+
 # Azure Automation
 > Cloud-based automation service for process automation, configuration management, and update management using PowerShell and Python runbooks.
 

@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.SecurityInsights/settings
+display_name: Microsoft Sentinel
+---
+
 # Microsoft Sentinel
 > Cloud-native SIEM and SOAR platform built on Log Analytics, providing intelligent security analytics, threat detection, and automated incident response across the enterprise.
 

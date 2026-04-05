@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.EventGrid/topics
+display_name: Azure Event Grid
+---
+
 # Azure Event Grid
 > Fully managed event routing service for building event-driven architectures with publish-subscribe semantics.
 

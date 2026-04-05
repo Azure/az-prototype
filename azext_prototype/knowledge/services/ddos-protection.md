@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Network/ddosProtectionPlans
+display_name: Azure DDoS Protection
+---
+
 # Azure DDoS Protection
 > Always-on traffic monitoring and automatic DDoS attack mitigation for Azure public IP resources, providing L3/L4 volumetric, protocol, and resource-layer attack protection.
 

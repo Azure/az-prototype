@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.KeyVault/managedHSMs
+display_name: Azure Managed HSM
+---
+
 # Azure Managed HSM
 > FIPS 140-2 Level 3 validated, fully managed hardware security module for cryptographic key management, providing single-tenant HSM pools with full administrative control over the security domain.
 

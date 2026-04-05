@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Batch/batchAccounts
+display_name: Azure Batch
+---
+
 # Azure Batch
 > Managed service for running large-scale parallel and high-performance computing (HPC) workloads with automatic VM provisioning and job scheduling.
 

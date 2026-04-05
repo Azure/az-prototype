@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Devices/IotHubs
+display_name: Azure IoT Hub
+---
+
 # Azure IoT Hub
 > Managed service for bi-directional communication between IoT applications and devices, with device management, security, and message routing at scale.
 

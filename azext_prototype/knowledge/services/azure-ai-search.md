@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Search/searchServices
+display_name: Azure AI Search
+---
+
 # Azure AI Search
 > Fully managed search-as-a-service with AI enrichment, vector search, and semantic ranking for building rich search experiences over heterogeneous content.
 

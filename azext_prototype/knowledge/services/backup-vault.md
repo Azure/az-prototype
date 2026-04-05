@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.DataProtection/backupVaults
+display_name: Azure Backup Vault
+---
+
 # Azure Backup Vault
 > Purpose-built vault for newer Azure Backup workloads including Azure Disks, Azure Blobs, Azure Database for PostgreSQL, and Azure Kubernetes Service, using Backup policies with immutability and soft delete support.
 

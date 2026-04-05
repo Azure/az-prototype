@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Network/azureFirewalls
+display_name: Azure Firewall
+---
+
 # Azure Firewall
 > Cloud-native, fully managed network security service providing centralized network and application rule enforcement, threat intelligence-based filtering, and FQDN-based egress control.
 

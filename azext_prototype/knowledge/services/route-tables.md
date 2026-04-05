@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Network/routeTables
+display_name: Azure Route Tables
+---
+
 # Azure Route Tables
 > User-defined routing (UDR) resource that controls network traffic flow within and between Azure virtual network subnets, enabling traffic steering through network virtual appliances, firewalls, and VPN gateways.
 

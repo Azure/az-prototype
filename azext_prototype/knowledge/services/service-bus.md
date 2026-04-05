@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.ServiceBus/namespaces
+display_name: Azure Service Bus
+---
+
 # Azure Service Bus
 > Enterprise messaging service providing reliable message queuing and publish-subscribe patterns with support for transactions, sessions, and dead-lettering.
 

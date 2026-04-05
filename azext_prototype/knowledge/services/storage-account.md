@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Storage/storageAccounts
+display_name: Azure Storage Account
+---
+
 # Azure Blob Storage
 
 > Massively scalable object storage for unstructured data including documents, images, video, backups, and data lake workloads.

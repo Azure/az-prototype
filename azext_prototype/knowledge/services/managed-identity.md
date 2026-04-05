@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.ManagedIdentity/userAssignedIdentities
+display_name: User-Assigned Managed Identity
+---
+
 # Azure Managed Identity
 > Zero-credential authentication for Azure resources, providing automatically managed service principals in Azure AD that eliminate the need for secrets, keys, or certificates in application code.
 

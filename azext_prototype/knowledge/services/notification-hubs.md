@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.NotificationHubs/namespaces
+display_name: Azure Notification Hubs
+---
+
 # Azure Notification Hubs
 > Scalable push notification engine for sending personalized notifications to mobile and web applications across all major platforms (iOS, Android, Windows, Web Push).
 

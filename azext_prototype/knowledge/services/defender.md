@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Security/pricings
+display_name: Microsoft Defender for Cloud
+---
+
 # Microsoft Defender for Cloud
 > Unified cloud security posture management (CSPM) and cloud workload protection platform (CWPP) providing security recommendations, threat detection, and vulnerability assessment across Azure, multi-cloud, and hybrid environments.
 

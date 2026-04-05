@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.EventHub/namespaces
+display_name: Azure Event Hubs
+---
+
 # Azure Event Hubs
 > Fully managed real-time data ingestion service capable of receiving and processing millions of events per second with low latency and high throughput.
 

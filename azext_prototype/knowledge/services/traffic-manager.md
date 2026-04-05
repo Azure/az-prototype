@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Network/trafficManagerProfiles
+display_name: Azure Traffic Manager
+---
+
 # Azure Traffic Manager
 > DNS-based global traffic distribution service that routes users to the closest or healthiest endpoint across Azure regions, on-premises, or external services.
 

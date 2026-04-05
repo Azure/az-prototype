@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Dashboard/grafana
+display_name: Azure Managed Grafana
+---
+
 # Azure Managed Grafana
 > Fully managed Grafana instance for building rich observability dashboards with native Azure Monitor, Azure Data Explorer, and Prometheus data source integrations.
 

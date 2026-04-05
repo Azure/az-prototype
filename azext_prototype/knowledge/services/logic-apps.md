@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Logic/workflows
+display_name: Azure Logic Apps
+---
+
 # Azure Logic Apps
 > Low-code workflow orchestration service for automating business processes and integrating with hundreds of connectors across cloud and on-premises systems.
 

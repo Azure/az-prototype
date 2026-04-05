@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Fabric/capacities
+display_name: Microsoft Fabric
+---
+
 # Microsoft Fabric
 > Unified analytics platform combining data engineering, data science, real-time analytics, data warehousing, and business intelligence in a single SaaS experience with OneLake storage.
 

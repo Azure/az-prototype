@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.RecoveryServices/vaults
+display_name: Azure Recovery Services Vault
+---
+
 # Azure Recovery Services
 > Unified vault for Azure Backup (VMs, SQL, Files, SAP HANA) and Azure Site Recovery (disaster recovery replication), providing centralized management of backup policies, replication, and restore operations.
 

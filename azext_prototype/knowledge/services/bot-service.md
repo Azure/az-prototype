@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.BotService/botServices
+display_name: Azure Bot Service
+---
+
 # Azure Bot Service
 > Managed platform for building, deploying, and managing intelligent bots that interact with users across channels like Teams, Web Chat, Slack, and more.
 

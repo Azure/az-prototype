@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Network/networkInterfaces
+display_name: Network Interface
+---
+
 # Azure Network Interface
 > Virtual network interface card (NIC) that connects Azure virtual machines and other compute resources to a virtual network for network communication.
 

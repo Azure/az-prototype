@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.CognitiveServices/accounts
+display_name: Azure OpenAI Service
+---
+
 # Azure OpenAI Service
 > Managed deployment of OpenAI language models (GPT-4o, GPT-4, GPT-3.5, DALL-E, Whisper, text-embedding) with Azure enterprise security, compliance, and regional availability.
 

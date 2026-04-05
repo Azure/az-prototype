@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.DBforMySQL/flexibleServers
+display_name: Azure MySQL Flexible Server
+---
+
 # Azure Database for MySQL Flexible Server
 > Fully managed MySQL database service with flexible compute and storage scaling, built-in high availability, and automated backups.
 

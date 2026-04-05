@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.DocumentDB/databaseAccounts
+display_name: Azure Cosmos DB
+---
+
 # Azure Cosmos DB (NoSQL API)
 
 > Globally distributed, multi-model database with single-digit millisecond latency and automatic scaling.

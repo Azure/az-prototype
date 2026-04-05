@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.SignalRService/signalR
+display_name: Azure SignalR Service
+---
+
 # Azure SignalR Service
 > Fully managed real-time messaging service that enables bi-directional communication between servers and connected clients using WebSockets, Server-Sent Events, and long polling.
 

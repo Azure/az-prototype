@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Network/frontDoors
+display_name: Azure Front Door (Classic)
+---
+
 # Azure Front Door
 > Global load balancer and CDN with built-in WAF, SSL offloading, and intelligent traffic routing for web applications.
 

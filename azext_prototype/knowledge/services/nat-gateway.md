@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Network/natGateways
+display_name: Azure NAT Gateway
+---
+
 # Azure NAT Gateway
 > Fully managed, highly resilient outbound-only network address translation service providing predictable SNAT ports and static public IP addresses for outbound internet connectivity.
 

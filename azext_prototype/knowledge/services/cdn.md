@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Cdn/profiles
+display_name: Azure CDN / Front Door
+---
+
 # Azure CDN
 > Global content delivery network for caching and accelerating static and dynamic content with edge locations worldwide.
 

@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.StreamAnalytics/streamingjobs
+display_name: Azure Stream Analytics
+---
+
 # Azure Stream Analytics
 > Real-time analytics service for processing high-velocity streaming data from IoT devices, applications, and infrastructure with SQL-like query language.
 

@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.DBforPostgreSQL/flexibleServers
+display_name: Azure PostgreSQL (alias)
+---
+
 # Azure Database for PostgreSQL (Flexible Server)
 > Fully managed PostgreSQL database service with built-in high availability, automated backups, and intelligent performance optimization.
 

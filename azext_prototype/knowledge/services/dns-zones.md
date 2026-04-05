@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Network/dnsZones
+display_name: Azure DNS Zones
+---
+
 # Azure DNS Zones
 > Managed DNS hosting service for both public domains and private name resolution within Azure Virtual Networks, providing high availability and fast DNS queries using Azure's global anycast network.
 

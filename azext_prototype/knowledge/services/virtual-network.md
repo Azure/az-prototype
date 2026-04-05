@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Network/virtualNetworks
+display_name: Azure Virtual Network
+---
+
 # Azure Virtual Network
 > Foundation networking service providing isolated network environments, subnets, network security groups, and private DNS resolution for Azure resources.
 

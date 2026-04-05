@@ -1,3 +1,10 @@
+---
+service_namespace: Microsoft.Web/sites#functionapp
+display_name: Azure Functions
+depends_on:
+  - Microsoft.Web/serverfarms
+---
+
 # Azure Functions
 > Event-driven serverless compute platform for running code on-demand without managing infrastructure, supporting multiple languages and trigger types.
 

@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Synapse/workspaces
+display_name: Azure Synapse Analytics
+---
+
 # Azure Synapse Analytics
 > Unified analytics platform combining enterprise data warehousing, big data analytics, and data integration with serverless and dedicated SQL pools, Apache Spark, and pipelines.
 

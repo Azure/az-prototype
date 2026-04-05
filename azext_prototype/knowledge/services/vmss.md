@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Compute/virtualMachineScaleSets
+display_name: VM Scale Sets
+---
+
 # Azure Virtual Machine Scale Sets
 > Managed service for deploying and managing a group of identical, auto-scaling virtual machines with integrated load balancing and availability zone support.
 

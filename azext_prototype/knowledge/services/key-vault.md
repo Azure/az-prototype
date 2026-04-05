@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.KeyVault/vaults
+display_name: Azure Key Vault
+---
+
 # Azure Key Vault
 
 > Centralized secrets management, key management, and certificate management with hardware security module (HSM) backing.

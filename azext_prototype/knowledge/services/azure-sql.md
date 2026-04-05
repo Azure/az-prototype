@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Sql/servers
+display_name: Azure SQL Server
+---
+
 # Azure SQL Database
 
 > Fully managed relational database engine with built-in intelligence, high availability, and serverless compute for cost-effective POCs.

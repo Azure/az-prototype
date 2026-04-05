@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.ContainerInstance/containerGroups
+display_name: Azure Container Instances
+---
+
 # Azure Container Instances
 > Serverless container platform for running isolated containers on demand without managing VMs or orchestrators, ideal for burst workloads, batch jobs, and simple container deployments.
 

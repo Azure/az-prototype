@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Network/expressRouteCircuits
+display_name: Azure ExpressRoute
+---
+
 # Azure ExpressRoute
 > Private, dedicated, high-bandwidth connection between on-premises networks and Azure, bypassing the public internet for consistent latency, higher throughput, and enhanced security.
 

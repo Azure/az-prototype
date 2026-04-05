@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.MachineLearningServices/workspaces
+display_name: Azure Machine Learning
+---
+
 # Azure Machine Learning
 > Enterprise-grade platform for building, training, deploying, and managing machine learning models at scale, with MLOps capabilities, experiment tracking, and managed compute.
 

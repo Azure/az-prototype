@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Network/publicIPAddresses
+display_name: Azure Public IP Address
+---
+
 # Azure Public IP Address
 > Static or dynamic public IPv4/IPv6 address resource used by load balancers, application gateways, VPN gateways, Bastion hosts, and virtual machines for internet-facing connectivity.
 

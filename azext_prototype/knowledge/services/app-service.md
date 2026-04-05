@@ -1,3 +1,10 @@
+---
+service_namespace: Microsoft.Web/sites
+display_name: Azure App Service
+depends_on:
+  - Microsoft.Web/serverfarms
+---
+
 # Azure App Service (Web Apps)
 > Fully managed platform for building, deploying, and scaling web applications with built-in CI/CD, autoscaling, and high availability.
 

@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.OperationalInsights/workspaces
+display_name: Log Analytics Workspace
+---
+
 # Log Analytics Workspace
 > Centralized log aggregation and query service in Azure Monitor, providing the data store and query engine for diagnostics, metrics, and operational insights across all Azure resources.
 

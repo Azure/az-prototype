@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Network/virtualNetworkGateways
+display_name: Azure VPN Gateway
+---
+
 # Azure VPN Gateway
 > Managed virtual network gateway providing encrypted site-to-site, point-to-site, and VNet-to-VNet VPN connectivity over IPsec/IKE tunnels.
 

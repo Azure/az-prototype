@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Compute/virtualMachines
+display_name: Azure Virtual Machines
+---
+
 # Azure Virtual Machines
 > IaaS compute for running custom workloads, legacy applications, and specialized software that requires full OS control.
 

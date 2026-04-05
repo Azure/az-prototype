@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.ContainerRegistry/registries
+display_name: Azure Container Registry
+---
+
 # Azure Container Registry
 > Managed Docker container registry for storing, managing, and serving container images and OCI artifacts.
 

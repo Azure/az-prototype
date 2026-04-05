@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Network/bastionHosts
+display_name: Azure Bastion
+---
+
 # Azure Bastion
 > Fully managed PaaS service providing secure RDP and SSH access to virtual machines over TLS, without exposing public IPs on VMs.
 

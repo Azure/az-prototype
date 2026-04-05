@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Network/applicationGateways
+display_name: Azure Application Gateway
+---
+
 # Azure Application Gateway
 > Regional Layer 7 load balancer with SSL termination, URL-based routing, cookie-based session affinity, and optional Web Application Firewall (WAF) for web traffic.
 

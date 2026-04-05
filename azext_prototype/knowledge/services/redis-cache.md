@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Cache/redis
+display_name: Azure Cache for Redis
+---
+
 # Azure Cache for Redis
 > Managed in-memory data store for caching, session management, and real-time analytics powered by open-source Redis.
 

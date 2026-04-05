@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Web/staticSites
+display_name: Azure Static Web Apps
+---
+
 # Azure Static Web Apps
 > Fully managed hosting for static frontends (SPA, SSG, SSR) with integrated serverless API backends, global CDN distribution, and built-in authentication.
 

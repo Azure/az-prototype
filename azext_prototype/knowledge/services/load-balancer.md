@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Network/loadBalancers
+display_name: Azure Load Balancer
+---
+
 # Azure Load Balancer
 > High-performance, ultra-low-latency Layer 4 (TCP/UDP) load balancer for distributing traffic across virtual machines, VM scale sets, and availability sets within a region.
 

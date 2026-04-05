@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.ContainerService/managedClusters
+display_name: Azure Kubernetes Service
+---
+
 # Azure Kubernetes Service (AKS)
 > Managed Kubernetes cluster for deploying, scaling, and operating containerized applications with enterprise-grade security and governance.
 

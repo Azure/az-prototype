@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.ApiManagement/service
+display_name: Azure API Management
+---
+
 # Azure API Management
 > Managed API gateway for publishing, securing, transforming, and monitoring APIs at scale.
 

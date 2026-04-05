@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Insights/actionGroups
+display_name: Azure Monitor Action Groups
+---
+
 # Azure Monitor Action Groups
 > Reusable notification and automation targets for Azure Monitor alerts, enabling email, SMS, webhook, Logic App, Azure Function, and ITSM integrations when alerts fire.
 

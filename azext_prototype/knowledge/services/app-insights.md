@@ -1,3 +1,10 @@
+---
+service_namespace: Microsoft.Insights/components
+display_name: Application Insights
+depends_on:
+  - Microsoft.OperationalInsights/workspaces
+---
+
 # Application Insights
 > Application performance monitoring (APM) service that provides deep observability into application behavior, including request tracing, dependency tracking, exception logging, and live metrics.
 

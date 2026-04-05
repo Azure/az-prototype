@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.DataFactory/factories
+display_name: Azure Data Factory
+---
+
 # Azure Data Factory
 > Cloud-based ETL/ELT service for orchestrating data integration pipelines at scale with 100+ built-in connectors and visual authoring.
 

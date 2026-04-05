@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Databricks/workspaces
+display_name: Azure Databricks
+---
+
 # Azure Databricks
 > Unified analytics platform for data engineering, data science, and machine learning built on Apache Spark with collaborative notebooks and Delta Lake.
 

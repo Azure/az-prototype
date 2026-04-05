@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Communication/communicationServices
+display_name: Azure Communication Services
+---
+
 # Azure Communication Services
 > Cloud-based communication platform for adding voice, video, chat, SMS, and email capabilities to applications without managing telephony infrastructure.
 

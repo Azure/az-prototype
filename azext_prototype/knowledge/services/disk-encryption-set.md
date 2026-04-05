@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Compute/diskEncryptionSets
+display_name: Disk Encryption Set
+---
+
 # Azure Disk Encryption Set
 > Resource that binds Azure Managed Disks to a customer-managed key (CMK) in Key Vault or Managed HSM, enabling server-side encryption of OS and data disks with keys you control.
 

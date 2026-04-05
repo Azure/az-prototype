@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Network/privateEndpoints
+display_name: Azure Private Endpoints
+---
+
 # Azure Private Endpoints
 > Network interface that connects you privately and securely to a service powered by Azure Private Link, routing traffic over the Microsoft backbone network instead of the public internet.
 

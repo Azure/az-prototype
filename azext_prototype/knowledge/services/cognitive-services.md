@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.CognitiveServices/accounts#cognitive
+display_name: Azure Cognitive Services
+---
+
 # Azure OpenAI Service / Cognitive Services
 > Managed AI platform for deploying OpenAI models (GPT-4o, GPT-4, GPT-3.5, DALL-E, Whisper, embeddings) and Azure AI services with enterprise security and compliance.
 

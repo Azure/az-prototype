@@ -1,3 +1,10 @@
+---
+service_namespace: Microsoft.App/containerApps
+display_name: Azure Container Apps
+depends_on:
+  - Microsoft.App/managedEnvironments
+---
+
 # Azure Container Apps
 
 > Serverless container platform for running microservices and containerized applications with built-in autoscaling, HTTPS ingress, and Dapr integration.
