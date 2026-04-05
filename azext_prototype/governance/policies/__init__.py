@@ -147,7 +147,7 @@ def validate_policy_file(path: Path) -> list[ValidationError]:
         rules = []
 
     # Same ID is allowed with different targets (different services)
-    rule_id_targets: set[tuple[str, ...]] = set()
+    rule_id_targets: set[tuple] = set()
     for i, rule in enumerate(rules):
         prefix = f"rules[{i}]"
         if not isinstance(rule, dict):

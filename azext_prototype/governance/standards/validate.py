@@ -120,7 +120,7 @@ def main(argv: list[str] | None = None) -> int:
         errors = validate_standards_directory(_STANDARDS_DIR)
 
     if not errors:
-        print(f"All standards files valid.")
+        print("All standards files valid.")
         return 0
 
     for e in errors:

@@ -669,7 +669,13 @@ class TestBuiltinPolicies:
         """Same ID is allowed for different services, but same ID+services is a duplicate."""
         engine = get_policy_engine()
         for policy in engine.list_policies():
-            pairs = [(r.id, tuple(sorted(r.targets.get("services", [])))) for r in policy.rules]
+            pairs = []
+            for r in policy.rules:
+                all_svcs: list[str] = []
+                for t in r.targets:
+                    if isinstance(t, dict):
+                        all_svcs.extend(t.get("services", []))
+                pairs.append((r.id, tuple(sorted(all_svcs))))
             assert len(pairs) == len(set(pairs)), f"{policy.name} has duplicate rule id+target pairs"
 
     def test_builtin_policies_pass_strict_validation(self) -> None:

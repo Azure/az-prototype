@@ -2934,9 +2934,7 @@ class TestAdvisoryQA:
             ]
         )
         # Pre-store advisory (as if per-stage advisory already ran)
-        session._build_state.set_stage_advisory(
-            1, "- **[Scalability]** Consider upgrading SKUs for production."
-        )
+        session._build_state.set_stage_advisory(1, "- **[Scalability]** Consider upgrading SKUs for production.")
         # Set design snapshot so run() sees no design changes
         session._build_state.set_design_snapshot({"architecture": "Simple architecture"})
 
