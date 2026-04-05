@@ -82,8 +82,8 @@ def knowledge_dir(tmp_path):
     )
 
     # Role files
-    (kd / "roles" / "architect.md").write_text(
-        "# Architect Role\n\nDesign Azure architectures.\n",
+    (kd / "roles" / "cloud-architect.md").write_text(
+        "# Cloud Architect Role\n\nDesign Azure architectures.\n",
         encoding="utf-8",
     )
     (kd / "roles" / "infrastructure.md").write_text(
@@ -139,7 +139,7 @@ class TestKnowledgeLoaderIndividual:
         assert loader.load_language("java") == ""
 
     def test_load_role(self, loader):
-        text = loader.load_role("architect")
+        text = loader.load_role("cloud-architect")
         assert "Architect" in text
 
     def test_load_role_missing(self, loader):
@@ -187,7 +187,7 @@ class TestKnowledgeLoaderList:
 
     def test_list_roles(self, loader):
         roles = loader.list_roles()
-        assert "architect" in roles
+        assert "cloud-architect" in roles
         assert "infrastructure" in roles
         assert "developer" in roles
         assert "analyst" in roles
@@ -206,8 +206,8 @@ class TestKnowledgeLoaderCompose:
     """Test context composition."""
 
     def test_compose_with_role(self, loader):
-        ctx = loader.compose_context(role="architect")
-        assert "ROLE: architect" in ctx
+        ctx = loader.compose_context(role="cloud-architect")
+        assert "ROLE: cloud-architect" in ctx
         assert "SHARED CONSTRAINTS" in ctx
 
     def test_compose_with_tool(self, loader):
@@ -240,9 +240,9 @@ class TestKnowledgeLoaderCompose:
         assert "Azure Cosmos DB" in ctx
 
     def test_compose_no_constraints(self, loader):
-        ctx = loader.compose_context(role="architect", include_constraints=False)
+        ctx = loader.compose_context(role="cloud-architect", include_constraints=False)
         assert "SHARED CONSTRAINTS" not in ctx
-        assert "ROLE: architect" in ctx
+        assert "ROLE: cloud-architect" in ctx
 
     def test_compose_empty_returns_empty(self, loader):
         ctx = loader.compose_context(include_constraints=False)
@@ -251,11 +251,11 @@ class TestKnowledgeLoaderCompose:
     def test_compose_priority_order(self, loader):
         """Role should appear before constraints before tool before services."""
         ctx = loader.compose_context(
-            role="architect",
+            role="cloud-architect",
             tool="terraform",
             services=["cosmos-db"],
         )
-        role_pos = ctx.index("ROLE: architect")
+        role_pos = ctx.index("ROLE: cloud-architect")
         constraints_pos = ctx.index("SHARED CONSTRAINTS")
         tool_pos = ctx.index("TOOL PATTERNS: terraform")
         service_pos = ctx.index("SERVICE: cosmos-db")
@@ -312,7 +312,7 @@ class TestKnowledgeLoaderBudget:
         # Create a loader with a very small budget (20 tokens = 80 chars)
         loader = KnowledgeLoader(knowledge_dir=knowledge_dir, token_budget=20)
         ctx = loader.compose_context(
-            role="architect",
+            role="cloud-architect",
             tool="terraform",
             services=["cosmos-db"],
         )
@@ -356,7 +356,7 @@ class TestKnowledgeLoaderReal:
     def test_real_roles_exist(self):
         loader = KnowledgeLoader()
         roles = loader.list_roles()
-        assert "architect" in roles
+        assert "cloud-architect" in roles
         assert "infrastructure" in roles
         assert "developer" in roles
         assert "analyst" in roles
@@ -414,7 +414,7 @@ class TestBaseAgentKnowledge:
             system_prompt="You are a test agent.",
         )
         agent._governance_aware = False
-        agent._knowledge_role = "architect"
+        agent._knowledge_role = "cloud-architect"
 
         with patch(
             "azext_prototype.knowledge._KNOWLEDGE_DIR",
@@ -425,7 +425,7 @@ class TestBaseAgentKnowledge:
         # Should have system_prompt + knowledge
         assert len(messages) >= 2
         knowledge_msg = messages[-1]
-        assert "ROLE: architect" in knowledge_msg.content
+        assert "ROLE: cloud-architect" in knowledge_msg.content
 
     def test_knowledge_injected_when_tools_set(self, knowledge_dir):
         from azext_prototype.agents.base import BaseAgent
@@ -448,7 +448,7 @@ class TestBaseAgentKnowledge:
 
         agent = BaseAgent(name="test", description="test")
         agent._governance_aware = False
-        agent._knowledge_role = "architect"
+        agent._knowledge_role = "cloud-architect"
 
         with patch(
             "azext_prototype.knowledge.KnowledgeLoader",
@@ -472,7 +472,7 @@ class TestBuiltinAgentKnowledge:
         from azext_prototype.agents.builtin.cloud_architect import CloudArchitectAgent
 
         agent = CloudArchitectAgent()
-        assert agent._knowledge_role == "architect"
+        assert agent._knowledge_role == "cloud-architect"
         assert agent._knowledge_tools is None
         assert agent._knowledge_languages is None
 

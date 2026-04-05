@@ -6,8 +6,8 @@ Release History
 0.2.1b6
 +++++++
 
-Knowledge — networking boundary and ARM schema
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Knowledge
+~~~~~~~~~~
 * **Private endpoint architecture boundary** — ``constraints.md`` now
   explicitly forbids creating private endpoint or DNS zone group resources
   outside the dedicated Networking stage.  ``terraform.md`` updated: PE
@@ -19,9 +19,6 @@ Knowledge — networking boundary and ARM schema
   documents that ``disableLocalAuth`` must be a top-level property under
   ``properties``, never nested inside ``properties.features``.  ARM
   silently drops the property at the wrong nesting level.
-
-Knowledge — azapi provider
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * **azapi-provider.md** — new knowledge file documenting the azapi provider
   configuration pattern: empty ``provider "azapi" {}`` block (subscription
   from CLI context), ``deploy.sh`` must run ``az account set`` and
