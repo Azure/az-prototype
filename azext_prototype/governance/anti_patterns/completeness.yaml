@@ -5,7 +5,7 @@ last_updated: '2026-04-04'
 patterns:
 - id: ANTI-COMP-001
   description: Detects placeholder or TODO markers in generated code that indicate incomplete output
-  rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  rationale: Placeholder markers indicate the code generation was incomplete and the output is not deployable.
   warning_message: Local/key-based authentication is disabled but no managed identity or RBAC role assignment found in the
     same stage. Applications will be unable to authenticate.
   applies_to: []
@@ -31,7 +31,7 @@ patterns:
     - '# Include managed identity AND role assignment when disabling local auth'
 - id: ANTI-COMP-002
   description: Detects missing error handling or empty catch blocks in generated code
-  rationale: Missing outputs or incomplete configurations cause downstream failures in dependent stages.
+  rationale: Empty catch blocks silently swallow errors, making failures invisible and debugging impossible.
   warning_message: Incomplete color echo statement in deploy script — use uppercase color variables and close with ${NC}.
   applies_to: []
   targets:
@@ -48,7 +48,7 @@ patterns:
     - echo -e "${GREEN}message${NC}"
 - id: ANTI-COMP-003
   description: Detects hardcoded resource names instead of variable references
-  rationale: Following established patterns ensures consistency and reduces deployment failures.
+  rationale: Hardcoded names prevent reuse across environments and break when resource naming conventions change.
   warning_message: ''
   applies_to:
   - terraform-agent
@@ -61,7 +61,7 @@ patterns:
     - '# Use variable inputs or data sources instead of terraform_remote_state'
 - id: ANTI-COMP-004
   description: Detects missing variable type constraints in Terraform variable declarations
-  rationale: Hardcoded credentials or access keys create security vulnerabilities and prevent key rotation.
+  rationale: Missing type constraints allow invalid values to pass validation, causing runtime deployment failures.
   warning_message: Data source references existing resource by hardcoded name — use terraform_remote_state or variables to
     reference resources from prior stages.
   applies_to:
@@ -82,7 +82,7 @@ patterns:
     - '# Reference prior-stage resources via remote state or input variables'
 - id: ANTI-COMP-005
   description: Detects missing output descriptions in Terraform output declarations
-  rationale: Consistent file structure and modularization improve maintainability and code review efficiency.
+  rationale: Missing output descriptions make it unclear what downstream stages should expect from this module.
   warning_message: Terraform config uses versions.tf — this WILL cause deployment failure. Provider configuration (terraform
     {}, required_providers, backend) must be in providers.tf only. Using both files causes duplicate required_providers blocks
     that break terraform init. Remove versions.tf and consolidate into providers.tf.
@@ -99,7 +99,7 @@ patterns:
     - '# Consolidate terraform {}, required_providers, and backend into providers.tf only'
 - id: ANTI-COMP-006
   description: Detects empty or commented-out resource blocks that serve no purpose
-  rationale: Following established patterns ensures consistency and reduces deployment failures.
+  rationale: Empty resource blocks waste prompt tokens and confuse the deployment plan with no-op resources.
   warning_message: Backend config uses variable references — Terraform does not support variables in backend blocks. Use literal
     values or omit the backend to use local state.
   applies_to:
@@ -117,7 +117,7 @@ patterns:
     - backend "local" {}
 - id: ANTI-COMP-007
   description: Detects missing provider version constraints in required_providers block
-  rationale: Following established patterns ensures consistency and reduces deployment failures.
+  rationale: Missing provider version constraints cause non-deterministic behavior when provider versions change.
   warning_message: Backend config has empty required fields — terraform init will fail. Either provide literal values or omit
     the backend block to use local state.
   applies_to:
@@ -139,7 +139,7 @@ patterns:
     - '# Provide literal values or use local backend'
 - id: ANTI-COMP-008
   description: Detects missing backend configuration for Terraform state management
-  rationale: Hardcoded credentials or access keys create security vulnerabilities and prevent key rotation.
+  rationale: Missing backend configuration defaults to local state, which cannot be shared across team members or CI/CD.
   warning_message: Hardcoded upstream resource name detected — use terraform_remote_state outputs or variables to reference
     resources from other stages. NEVER hardcode resource names.
   applies_to: []
@@ -167,12 +167,14 @@ patterns:
 - id: ANTI-COMP-009
   description: Storage Blob Delegator role detected. This role only grants User Delegation Key access, NOT actual blob read/write.
     Use Storage Blob Data Contributor (ba92f5b4-2d11-453d-a403-e96b0029c9fe) for blob da
-  rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  rationale: Storage Blob Delegator only grants User Delegation Key access, not actual blob read/write — use Blob Data Contributor
+    instead.
   warning_message: Storage Blob Delegator role detected. This role only grants User Delegation Key access, NOT actual blob
     read/write. Use Storage Blob Data Contributor (ba92f5b4-2d11-453d-a403-e96b0029c9fe) for blob data access.
   applies_to: []
   targets:
-  - services: []
+  - services:
+    - Microsoft.Storage/storageAccounts
     search_patterns:
     - storage blob delegator
     safe_patterns:
@@ -183,12 +185,13 @@ patterns:
     - '# ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 - id: ANTI-COMP-010
   description: 'Completeness anti-pattern: capacityMode property does NOT exist in the Cosmos DB ARM schema'
-  rationale: Following established patterns ensures consistency and reduces deployment failures.
+  rationale: The capacityMode property does not exist in the Cosmos DB ARM schema and will be silently ignored.
   warning_message: capacityMode property does NOT exist in the Cosmos DB ARM schema. Use capabilities = [{ name = "EnableServerless"
     }] to enable serverless mode.
   applies_to: []
   targets:
-  - services: []
+  - services:
+    - Microsoft.DocumentDB/databaseAccounts
     search_patterns:
     - capacitymode = "serverless"
     - capacitymode
@@ -199,13 +202,14 @@ patterns:
 - id: ANTI-COMP-011
   description: 'Blob service diagnostic settings use string interpolation instead of an explicit blob service child resource.
     Create an azapi_resource for Microsoft.Storage/storageAccounts/blobServices and reference '
-  rationale: Observability is essential for detecting issues, debugging failures, and ensuring operational health.
+  rationale: String interpolation for diagnostic settings parent_id breaks when the resource ID format changes.
   warning_message: Blob service diagnostic settings use string interpolation instead of an explicit blob service child resource.
     Create an azapi_resource for Microsoft.Storage/storageAccounts/blobServices and reference its .id.
   applies_to:
   - terraform-agent
   targets:
-  - services: []
+  - services:
+    - Microsoft.Storage/storageAccounts
     search_patterns:
     - /blobservices/default
     safe_patterns:

@@ -5,7 +5,7 @@ last_updated: '2026-04-04'
 patterns:
 - id: ANTI-AUTH-001
   description: Detects SQL authentication (username/password) instead of Microsoft Entra (AAD) authentication
-  rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  rationale: SQL authentication with passwords is vulnerable to brute force and cannot be audited through Entra ID.
   warning_message: SQL authentication with username/password detected — use Microsoft Entra (Azure AD) authentication with
     managed identity.
   applies_to: []
@@ -32,7 +32,7 @@ patterns:
     - '# Use Microsoft Entra authentication with managed identity'
 - id: ANTI-AUTH-002
   description: Detects shared access signature (SAS) tokens where managed identity with RBAC should be used
-  rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  rationale: SAS tokens are time-limited shared secrets that cannot be revoked individually and bypass RBAC audit trails.
   warning_message: Key Vault access policies detected — use enable_rbac_authorization = true with role assignments instead.
   applies_to: []
   targets:
@@ -52,7 +52,7 @@ patterns:
     - azurerm_role_assignment
 - id: ANTI-AUTH-003
   description: Detects access policy authorization on Key Vault instead of RBAC authorization model
-  rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  rationale: Access policies provide coarse-grained control and cannot leverage Entra ID conditional access or PIM.
   warning_message: Broad role assignment detected (Owner/Contributor at subscription/RG scope) -- use the most specific built-in
     role at the narrowest scope.
   applies_to: []

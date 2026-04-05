@@ -5,7 +5,7 @@ last_updated: '2026-04-04'
 patterns:
 - id: ANTI-ENC-001
   description: Detects TLS version below 1.2 or missing minimum TLS configuration
-  rationale: Weak or missing encryption exposes data in transit to interception.
+  rationale: TLS versions below 1.2 have known vulnerabilities (BEAST, POODLE) and are deprecated by most compliance frameworks.
   warning_message: Outdated TLS version detected — enforce minimum TLS 1.2 for all connections.
   applies_to: []
   targets:
@@ -25,7 +25,7 @@ patterns:
     - minimumTlsVersion = "TLS1_2"
 - id: ANTI-ENC-002
   description: Detects HTTP-only endpoints without HTTPS enforcement
-  rationale: Following established patterns ensures consistency and reduces deployment failures.
+  rationale: HTTP transmits data in plaintext, exposing credentials and data to network interception.
   warning_message: HTTPS enforcement disabled — set https_only = true to redirect all HTTP to HTTPS.
   applies_to: []
   targets:
@@ -39,11 +39,12 @@ patterns:
     - httpsOnly = true
 - id: ANTI-ENC-003
   description: Detects disabled encryption at rest using deprecated InstrumentationKey instead of ConnectionString
-  rationale: Weak or missing encryption exposes data in transit to interception.
+  rationale: InstrumentationKey is deprecated; ConnectionString is the supported integration point for Application Insights.
   warning_message: SSL enforcement disabled — enable SSL enforcement with TLS 1.2 minimum.
   applies_to: []
   targets:
-  - services: []
+  - services:
+    - Microsoft.Insights/components
     search_patterns:
     - ssl_enforcement_enabled = false
     - ssl_minimal_tls_version_enforced = "tldisabled"

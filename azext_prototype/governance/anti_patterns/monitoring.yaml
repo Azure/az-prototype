@@ -5,7 +5,7 @@ last_updated: '2026-04-04'
 patterns:
 - id: ANTI-MON-001
   description: Detects missing diagnostic settings on Azure resources that support them
-  rationale: Observability is essential for detecting issues, debugging failures, and ensuring operational health.
+  rationale: Without diagnostic settings, resource metrics and logs are not captured, making issues invisible.
   warning_message: Log retention set to 0 days — configure at least 30 days for compliance and incident investigation.
   applies_to: []
   targets:
@@ -19,11 +19,12 @@ patterns:
     - retentionInDays = 30
 - id: ANTI-MON-002
   description: Detects disabled Application Insights or missing telemetry configuration
-  rationale: Observability is essential for detecting issues, debugging failures, and ensuring operational health.
+  rationale: Missing Application Insights prevents distributed tracing, request tracking, and failure detection.
   warning_message: Diagnostic logs or metrics disabled — enable logging for all PaaS resources.
   applies_to: []
   targets:
-  - services: []
+  - services:
+    - Microsoft.Insights/components
     search_patterns:
     - enabled_log_category = []
     - logs_enabled = false
@@ -36,12 +37,13 @@ patterns:
     - '# Enable diagnostic settings for all PaaS resources'
 - id: ANTI-MON-003
   description: 'Monitoring anti-pattern: InstrumentationKey output detected'
-  rationale: Hardcoded credentials or access keys create security vulnerabilities and prevent key rotation.
+  rationale: InstrumentationKey is deprecated and exposes a credential-like value; use ConnectionString instead.
   warning_message: InstrumentationKey output detected — InstrumentationKey is deprecated and does not support regional ingestion.
     Use connection_string instead.
   applies_to: []
   targets:
-  - services: []
+  - services:
+    - Microsoft.Insights/components
     search_patterns:
     - instrumentation_key
     - instrumentationkey

@@ -5,7 +5,7 @@ last_updated: '2026-04-04'
 patterns:
 - id: ANTI-BCS-001
   description: Detects inline resource definitions instead of Bicep module references
-  rationale: Consistent file structure and modularization improve maintainability and code review efficiency.
+  rationale: Inline resources in main.bicep create monolithic templates that are hard to test and reuse.
   warning_message: Bicep resources defined inline in main.bicep instead of in modules. Use module references (module <name>
     './modules/<service>.bicep') for all resources.
   applies_to:
@@ -23,7 +23,7 @@ patterns:
     - module monitoring './modules/monitoring.bicep'
 - id: ANTI-BCS-002
   description: Detects listKeys() or listSas() calls instead of managed identity with RBAC
-  rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  rationale: listKeys() exposes secrets in deployment outputs and ARM template history; managed identity avoids secret exposure.
   warning_message: listKeys() or listSas() detected — use managed identity with RBAC role assignments instead of extracting
     keys or SAS tokens.
   applies_to:
@@ -43,7 +43,8 @@ patterns:
     - 'identity: { type: ''UserAssigned'' }'
 - id: ANTI-BCS-003
   description: Detects missing targetScope declaration in subscription-scoped deployments
-  rationale: Hardcoded credentials or access keys create security vulnerabilities and prevent key rotation.
+  rationale: Missing targetScope causes deployment to default to resource group scope, which fails for subscription-level
+    resources.
   warning_message: Hardcoded resource name detected — use variables with a consistent naming pattern (e.g., var resourceName
     = '${prefix}-${type}-${suffix}').
   applies_to:
@@ -63,7 +64,7 @@ patterns:
     - 'name: storageAccountName'
 - id: ANTI-BCS-004
   description: Detects hardcoded resource names instead of parameterized naming
-  rationale: Missing outputs or incomplete configurations cause downstream failures in dependent stages.
+  rationale: Hardcoded resource names prevent reuse across environments and violate naming convention standards.
   warning_message: Parameter missing @description decorator — all parameters must have @description decorators for documentation
     and discoverability.
   applies_to:
@@ -80,7 +81,7 @@ patterns:
     - param location string
 - id: ANTI-BCS-005
   description: Detects missing @description decorator on Bicep parameters
-  rationale: Consistent file structure and modularization improve maintainability and code review efficiency.
+  rationale: Missing parameter descriptions make templates harder to use and prevent proper validation at deployment time.
   warning_message: Modules referenced but no outputs declared — main.bicep must output all resource IDs, endpoints, and principal
     IDs from module outputs.
   applies_to:
@@ -96,7 +97,7 @@ patterns:
     - output identityPrincipalId string = identity.outputs.principalId
 - id: ANTI-BCS-006
   description: Detects missing dependsOn for resources that have implicit ordering dependencies
-  rationale: Missing outputs or incomplete configurations cause downstream failures in dependent stages.
+  rationale: Missing explicit dependencies can cause race conditions where resources deploy before their prerequisites.
   warning_message: deploy.sh missing error handling — script must start with set -euo pipefail for safe execution.
   applies_to:
   - bicep-agent
@@ -112,7 +113,8 @@ patterns:
     - '#!/bin/bash'
 - id: ANTI-BCS-007
   description: Detects missing output declarations for resources consumed by downstream modules
-  rationale: Following established patterns ensures consistency and reduces deployment failures.
+  rationale: Missing outputs prevent downstream modules from referencing this module's resources, breaking the deployment
+    chain.
   warning_message: Outdated API version detected — use API versions from 2023 or later for current resource type definitions
     and feature support.
   applies_to:

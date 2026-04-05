@@ -6,7 +6,7 @@ patterns:
 - id: ANTI-SEC-001
   description: Detects connection strings, access keys, or shared secrets in generated code that should use managed identity
     instead
-  rationale: Hardcoded credentials or access keys create security vulnerabilities and prevent key rotation.
+  rationale: Connection strings and access keys are shared secrets that cannot be scoped, rotated automatically, or audited.
   warning_message: Possible credential/secret in output — use managed identity instead of connection strings or keys.
   applies_to: []
   targets:
@@ -46,11 +46,12 @@ patterns:
     - Microsoft.ManagedIdentity/userAssignedIdentities
 - id: ANTI-SEC-002
   description: Detects admin credential usage (admin_enabled, admin_username) which bypasses RBAC and managed identity
-  rationale: Hardcoded credentials or access keys create security vulnerabilities and prevent key rotation.
+  rationale: Admin credentials bypass RBAC and create unauditable privileged access.
   warning_message: Admin credentials detected — use managed identity or RBAC-based authentication instead.
   applies_to: []
   targets:
-  - services: []
+  - services:
+    - Microsoft.ContainerRegistry/registries
     search_patterns:
     - admin_enabled = true
     - admin_username
@@ -62,7 +63,7 @@ patterns:
     - '# Use managed identity with RBAC role assignment'
 - id: ANTI-SEC-003
   description: Detects potential hardcoded values that should be parameterized or sourced from Key Vault
-  rationale: Hardcoded credentials or access keys create security vulnerabilities and prevent key rotation.
+  rationale: Hardcoded values in code cannot be rotated and are exposed in source control history.
   warning_message: Possible hard-coded value detected — externalize secrets to Key Vault or use managed identity.
   applies_to: []
   targets:
@@ -85,11 +86,14 @@ patterns:
     - Microsoft.KeyVault/vaults/secrets
 - id: ANTI-SEC-004
   description: Detects disabled encryption at rest on storage or database services
-  rationale: Weak or missing encryption exposes data in transit to interception.
+  rationale: Disabled encryption at rest exposes data if storage media is compromised or improperly decommissioned.
   warning_message: Encryption at rest appears disabled — leave default encryption enabled on all data services.
   applies_to: []
   targets:
-  - services: []
+  - services:
+    - Microsoft.Storage/storageAccounts
+    - Microsoft.Sql/servers
+    - Microsoft.DocumentDB/databaseAccounts
     search_patterns:
     - disable_tde
     - transparent_data_encryption = false
@@ -101,7 +105,7 @@ patterns:
     - transparentDataEncryption = "Enabled"
 - id: ANTI-SEC-005
   description: Detects sensitive values exposed as Terraform outputs without the sensitive flag
-  rationale: Managed identity with RBAC provides secure, auditable access without credential management.
+  rationale: Terraform outputs are stored in state files — sensitive values in outputs are visible to anyone with state access.
   warning_message: Sensitive value exposed as Terraform output — remove this output entirely. Use managed identity instead
     of keys.
   applies_to: []
@@ -127,7 +131,7 @@ patterns:
     - output "principal_id"
 - id: ANTI-SEC-006
   description: Detects public network access enabled on services that should be private-only
-  rationale: Missing outputs or incomplete configurations cause downstream failures in dependent stages.
+  rationale: Public network access exposes the service data plane to internet-based attacks.
   warning_message: Output marked as 'do not use' should be removed entirely, not left with a warning. Omit sensitive outputs.
   applies_to: []
   targets:

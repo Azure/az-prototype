@@ -5,7 +5,7 @@ last_updated: '2026-04-04'
 patterns:
 - id: ANTI-COST-001
   description: Detects Premium or Enterprise SKU tiers that may be excessive for POC workloads
-  rationale: Non-optimal SKU or tier selection increases costs without proportional benefit for POC workloads.
+  rationale: Premium/Enterprise SKUs are 10-50x more expensive than basic tiers and rarely needed for POC validation.
   warning_message: Premium SKU detected — consider Standard or Basic tier for POC workloads to reduce cost.
   applies_to: []
   targets:
@@ -27,7 +27,7 @@ patterns:
     - tier = "Standard"
 - id: ANTI-COST-002
   description: Detects fixed high-scale configurations (replica counts, DTU) without autoscale
-  rationale: Non-optimal SKU or tier selection increases costs without proportional benefit for POC workloads.
+  rationale: Fixed high-scale configurations waste money during low-traffic periods; autoscale matches cost to demand.
   warning_message: Minimum instances set to 1 — consider 0 for dev/test to avoid idle costs.
   applies_to: []
   targets:
@@ -44,7 +44,7 @@ patterns:
     - minReplicas = 0
 - id: ANTI-COST-003
   description: Detects zone-redundant configurations that add cost without POC benefit
-  rationale: Following established patterns ensures consistency and reduces deployment failures.
+  rationale: Zone-redundant deployments add 2-3x cost for high availability that POCs don't require.
   warning_message: Reserved capacity in POC — reserved instances lock in commitment; use pay-as-you-go for prototypes.
   applies_to: []
   targets:
