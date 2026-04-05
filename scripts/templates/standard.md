@@ -7,10 +7,17 @@ Standards for generated .NET/C# application code, including project structure, d
 
 ### Checks (2)
 
-| Check | Description |
-| ----- | ----------- |
-| <span style="text-wrap:nowrap;">[STAN-CS-001](#STAN-CS-001)</span> | Use Azure SDK with DefaultAzureCredential: Always use DefaultAzureCredential from Azure.Identity for authenticating to Azure services.  This works with managed identity in Azure and developer credentials locally. |
-| <span style="text-wrap:nowrap;">[STAN-CS-002](#STAN-CS-002)</span> | Complete Project Structure: Every generated .NET app must include a .csproj file with all NuGet PackageReferences, a Program.cs entry point, and all model/DTO classes referenced by services.  No file may reference type that is not defined in the generated output. |
+<table>
+<thead>
+<tr>
+<th width="185">Check</th><th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr><td><a href="#STAN-CS-001">STAN-CS-001</a></td><td>Use Azure SDK with DefaultAzureCredential: Always use DefaultAzureCredential from Azure.Identity for authenticating to Azure services.  This works with managed identity in Azure and developer credentials locally.</td></tr>
+<tr><td><a href="#STAN-CS-002">STAN-CS-002</a></td><td>Complete Project Structure: Every generated .NET app must include a .csproj file with all NuGet PackageReferences, a Program.cs entry point, and all model/DTO classes referenced by services.  No file may reference type that is not defined in the generated output.</td></tr>
+</tbody>
+</table>
 
 <hr />
 

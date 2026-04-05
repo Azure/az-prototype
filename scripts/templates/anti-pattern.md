@@ -7,10 +7,17 @@ TLS enforcement, encryption at rest, and transport security detection
 
 ### Checks (3)
 
-| Check | Description |
-| ----- | ----------- |
-| [ANTI-ENC-001](#ANTI-ENC-001) | Detects TLS version below 1.2 which has known vulnerabilities |
-| [ANTI-ENC-002](#ANTI-ENC-002) | Detects HTTPS disabled on App Service or Function Apps |
+<table>
+<thead>
+<tr>
+<th width="185">Check</th><th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr><td><a href="#ANTI-ENC-001">ANTI-ENC-001</a></td><td>Detects TLS version below 1.2 which has known vulnerabilities</td></tr>
+<tr><td><a href="#ANTI-ENC-002">ANTI-ENC-002</a></td><td>Detects HTTPS disabled on App Service or Function Apps</td></tr>
+</tbody>
+</table>
 
 <hr />
 
@@ -22,9 +29,16 @@ Detects TLS version below 1.2 which has known vulnerabilities
 
 ### Targets
 
-| Services  | Triggers On | Correct Patterns |
-| --------- | ----------- | ---------------- |
-| <ul><li>Microsoft.Storage/storageAccounts</li><li>Microsoft.Sql/servers</li><li>Microsoft.Cache/redis</li><li>Microsoft.Web/sites</li><li>Microsoft.KeyVault/vaults</li><li>Microsoft.ServiceBus/namespaces</li><li>Microsoft.DocumentDB/databaseAccounts</li></ul>|<ul><li>'min_tls_version = "1.0"'</li><li>'min_tls_version = "1.1"'</li><li>'minimum_tls_version = "1.0"'</li><li>'minimum_tls_version = "1.1"'</li><li>"tls1_0"</li><li>"tls1_1"</li></ul>|<ul><li>'min_tls_version = "1.2"'</li><li>'minimum_tls_version = "1.2"'</li><li>'minimalTlsVersion = "1.2"'</li><li>'minimumTlsVersion = "TLS1_2"'</li></ul>|
+<table>
+<thead>
+<tr>
+<th>Services</th><th>Triggers On</th><th>Correct Patterns</th>
+</tr>
+</thead>
+<tbody>
+<tr><td><ul><li>Microsoft.Storage/storageAccounts</li><li>Microsoft.Sql/servers</li><li>Microsoft.Cache/redis</li><li>Microsoft.Web/sites</li><li>Microsoft.KeyVault/vaults</li><li>Microsoft.ServiceBus/namespaces</li><li>Microsoft.DocumentDB/databaseAccounts</li></ul></td><td><ul><li>'min_tls_version = "1.0"'</li><li>'min_tls_version = "1.1"'</li><li>'minimum_tls_version = "1.0"'</li><li>'minimum_tls_version = "1.1"'</li><li>"tls1_0"</li><li>"tls1_1"</li></ul></td><td><ul><li>'min_tls_version = "1.2"'</li><li>'minimum_tls_version = "1.2"'</li><li>'minimalTlsVersion = "1.2"'</li><li>'minimumTlsVersion = "TLS1_2"'</li></ul></td></tr>
+</tbody>
+</table>
 
 <hr />
 
@@ -36,8 +50,15 @@ Detects HTTPS disabled on App Service or Function Apps
 
 ### Targets
 
-| Services  | Triggers On | Correct Patterns |
-| --------- | ----------- | ---------------- |
-| <ul><li>Microsoft.Web/sites</li></ul>|<ul><li>"https_only = false"</li><li>"https_required = false"</li></ul>|<ul><li>"https_only = true"</li><li>"httpsOnly = true"</li></ul>|
+<table>
+<thead>
+<tr>
+<th>Services</th><th>Triggers On</th><th>Correct Patterns</th>
+</tr>
+</thead>
+<tbody>
+<tr><td><ul><li>Microsoft.Web/sites</li></ul></td><td><ul><li>"https_only = false"</li><li>"https_required = false"</li></ul></td><td><ul><li>"https_only = true"</li><li>"httpsOnly = true"</li></ul></td></tr>
+</tbody>
+</table>
 
 <hr />

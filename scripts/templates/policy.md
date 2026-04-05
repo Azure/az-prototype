@@ -5,16 +5,30 @@ Governance policies for Logic Apps
 
 ### Patterns
 
-| Name | Description |
-| ---- | ----------- |
-| Logic App with managed identity and access control | Secure Logic App with managed identity, IP restrictions, and Key Vault-backed parameters |
+<table>
+<thead>
+<tr>
+<th>Name</th><th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr><td>Logic App with managed identity and access control</td><td>Secure Logic App with managed identity, IP restrictions, and Key Vault-backed parameters</td></tr>
+</tbody>
+</table>
 
 ### Anti-Patterns
 
-| Description | Instead |
-| ----------- | ------- |
-| Do not hardcode credentials in workflow parameters | Use managed identity for API connections and Key Vault references for secrets |
-| Do not expose trigger URLs without access restrictions | Configure allowedCallerIpAddresses to restrict trigger invocation |
+<table>
+<thead>
+<tr>
+<th>Description</th><th>Instead</th>
+</tr>
+</thead>
+<tbody>
+<tr><td>Do not hardcode credentials in workflow parameters</td><td>Use managed identity for API connections and Key Vault references for secrets</td></tr>
+<tr><td>Do not expose trigger URLs without access restrictions</td><td>Configure allowedCallerIpAddresses to restrict trigger invocation</td></tr>
+</tbody>
+</table>
 
 ### References
 
@@ -25,10 +39,17 @@ Governance policies for Logic Apps
 
 ### Checks (3)
 
-| Check | Severity | Description |
-| ----- | -------- | ----------- |
-| <span style="text-wrap:nowrap;">[AZ-LA-001](#AZ-LA-001)</span> | Required | Deploy Logic Apps Standard with managed identity, VNet integration, and disabled public access |
-| <span style="text-wrap:nowrap;">[AZ-LA-002](#AZ-LA-002)</span> | Required | Use managed identity for all API connections instead of connection strings |
+<table>
+<thead>
+<tr>
+<th width="185">Check</th><th>Severity</th><th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr><td><a href="#AZ-LA-001">AZ-LA-001</a></td><td>Required</td><td>Deploy Logic Apps Standard with managed identity, VNet integration, and disabled public access</td></tr>
+<tr><td><a href="#AZ-LA-002">AZ-LA-002</a></td><td>Required</td><td>Use managed identity for all API connections instead of connection strings</td></tr>
+</tbody>
+</table>
 
 <hr />
 
@@ -36,7 +57,7 @@ Governance policies for Logic Apps
 Deploy Logic Apps Standard with managed identity, VNet integration, and disabled public access
 
 **Severity:** Required  
-**Rationale:** Logic Apps process business workflows that often handle sensitive data; managed identity eliminates connection credentials.
+**Rationale:** Logic Apps process business workflows that often handle sensitive data; managed identity eliminates connection credentials.  
 **Agents:** `terraform-agent, bicep-agent, cloud-architect`
 
 ### Targets
@@ -45,10 +66,17 @@ Deploy Logic Apps Standard with managed identity, VNet integration, and disabled
 
 ### Companion Resources
 
-| Resource | Name | Purpose |
-| -------- | ---- | ------- |
-| <span style="text-wrap:nowrap;">Microsoft.Insights/diagnosticSettings</span> | <span style="text-wrap:nowrap;">diag-logic-app</span> | Diagnostic settings to route workflow run logs and trigger events to Log Analytics |
-| <span style="text-wrap:nowrap;">Microsoft.Authorization/roleAssignments</span> | <span style="text-wrap:nowrap;">Logic App Contributor</span> | RBAC role assignments for Logic App management |
+<table>
+<thead>
+<tr>
+<th>Resource</th><th>Name</th><th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr><td>Microsoft.Insights/diagnosticSettings</td><td>diag-logic-app</td><td>Diagnostic settings to route workflow run logs and trigger events to Log Analytics</td></tr>
+<tr><td>Microsoft.Authorization/roleAssignments</td><td>Logic App Contributor</td><td>RBAC role assignments for Logic App management</td></tr>
+</tbody>
+</table>
 
 ### Prohibitions
 
@@ -64,7 +92,7 @@ Deploy Logic Apps Standard with managed identity, VNet integration, and disabled
 Use managed identity for all API connections instead of connection strings
 
 **Severity:** Required  
-**Rationale:** Connection strings are shared secrets; managed identity provides per-connection, auditable access.
+**Rationale:** Connection strings are shared secrets; managed identity provides per-connection, auditable access.  
 **Agents:** `terraform-agent, bicep-agent, cloud-architect, app-developer`
 
 ### Targets
