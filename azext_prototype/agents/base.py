@@ -299,7 +299,7 @@ class BaseAgent:
         avoid duplicating the governance warning block.
         """
         iac_tool = context.project_config.get("project", {}).get("iac_tool") if context.project_config else None
-        warnings = self.validate_response(response.content, iac_tool=iac_tool)
+        warnings = self.validate_response(response.content, iac_tool=iac_tool, services=None)
         if warnings:
             for w in warnings:
                 logger.warning("Governance: %s", w)

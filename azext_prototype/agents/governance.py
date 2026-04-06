@@ -144,4 +144,4 @@ class GovernanceContext:
 
         Returns a list of human-readable warning strings (empty = clean).
         """
-        return anti_patterns.scan(response_text, iac_tool=iac_tool, services=services)
+        return anti_patterns.scan(response_text, iac_tool=iac_tool, agent_name=agent_name, services=services)
