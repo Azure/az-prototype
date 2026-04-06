@@ -986,6 +986,9 @@ class TestBuildSession:
         assert mock_doc_agent.execute.call_count == 1
 
 
+    # Re-entry validating tests moved to tests/stages/test_build_session_reentry.py
+
+
 # ======================================================================
 # Incremental build / design snapshot tests
 # ======================================================================

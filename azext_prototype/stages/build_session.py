@@ -395,7 +395,8 @@ class BuildSession(SessionMixin):
         else:
             # Branch C: No design changes
             pending_check = self._build_state.get_pending_stages()
-            if pending_check:
+            validating_check = self._build_state.get_validating_stages()
+            if pending_check or validating_check:
                 _print("Resuming from existing deployment plan.")
                 _print("")
             else:
@@ -490,7 +491,7 @@ class BuildSession(SessionMixin):
             # Handle re-entry: "validating" stages need QA re-run only
             if stage_status == "validating":
                 _print(f"[{generated_count}/{total_stages}] Stage {stage_num}: {stage_name} (re-validating)")
-                if layer in ("core", "infra", "data", "app"):
+                if stage.get("files"):
                     qa_passed = self._run_stage_qa(stage, architecture, templates, use_styled, _print)
                     if qa_passed:
                         self._build_state.mark_stage_generated(stage_num, stage.get("files", []), "user-fix")
