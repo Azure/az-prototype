@@ -352,10 +352,60 @@ def _add_response_export_values(content: str) -> str:
     return new_content
 
 
+def _add_resource_group_parent_id(content: str) -> str:
+    """Add ``parent_id`` to resource group azapi_resource blocks missing it.
+
+    Finds ``azapi_resource`` blocks whose type contains
+    ``Microsoft.Resources/resourceGroups`` and injects
+    ``parent_id = "/subscriptions/${var.subscription_id}"``
+    after the ``name`` line.
+    """
+    # Match azapi_resource blocks with resourceGroups type
+    block_pattern = re.compile(
+        r'(resource\s+"azapi_resource"\s+"\w+"\s*\{)(.*?)(})',
+        re.DOTALL,
+    )
+
+    def _inject(match: re.Match) -> str:  # type: ignore[type-arg]
+        full = match.group(0)
+        if "resourcegroups" not in full.lower():
+            return full
+        if "parent_id" in full:
+            return full  # already has it
+
+        header = match.group(1)
+        body = match.group(2)
+        closing = match.group(3)
+
+        # Insert after the name line
+        lines = body.splitlines(keepends=True)
+        insert_idx = len(lines)
+        for i, line in enumerate(lines):
+            if line.strip().startswith("name"):
+                insert_idx = i + 1
+                break
+
+        # Detect indentation
+        indent = "  "
+        if insert_idx > 0 and insert_idx <= len(lines):
+            prev_line = lines[insert_idx - 1]
+            leading = len(prev_line) - len(prev_line.lstrip())
+            indent = " " * leading
+
+        lines.insert(insert_idx, f'{indent}parent_id = "/subscriptions/${{var.subscription_id}}"\n')
+        return header + "".join(lines) + closing
+
+    new_content = block_pattern.sub(_inject, content)
+    if new_content != content:
+        logger.debug("Added parent_id to resource group azapi_resource")
+    return new_content
+
+
 _STRUCTURED_HANDLERS: dict[str, Callable[[str], str]] = {
     "remove_unused_remote_state": _remove_unused_remote_state,
     "remove_private_endpoint_resources": _remove_private_endpoint_resources,
     "add_response_export_values": _add_response_export_values,
+    "add_resource_group_parent_id": _add_resource_group_parent_id,
 }
 
 
