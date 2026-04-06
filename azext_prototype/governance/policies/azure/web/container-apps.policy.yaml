@@ -257,6 +257,8 @@ rules:
         }
       }
     prohibitions:
+    - NEVER remove the identity field from KEDA custom scaler blocks — it is a SIBLING of type and metadata, NOT inside
+      metadata. Without it, KEDA cannot authenticate to Azure services and autoscaling is permanently broken.
     - NEVER deploy a Container App that references an ACR registry without an AcrPull role assignment for the managed
       identity — the image pull will fail silently at runtime
     - NEVER use admin credentials (adminUserEnabled) for ACR access — use managed identity with AcrPull role
