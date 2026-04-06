@@ -216,3 +216,18 @@ patterns:
     - blob_service
     correct_patterns:
     - parent_id = azapi_resource.blob_service.id
+- id: ANTI-COMP-011
+  description: Detects azapi_resource blocks that may be missing parent_id — required on every azapi_resource
+  rationale: The azapi provider requires parent_id on all resources. Omitting it causes terraform plan failure.
+    For resource groups, parent_id is /subscriptions/${var.subscription_id}. For child resources, parent_id
+    is the parent resource ID.
+  warning_message: azapi_resource may be missing parent_id — every azapi_resource MUST have parent_id set.
+  applies_to:
+  - terraform-agent
+  targets:
+  - services:
+    - Microsoft.Resources/resourceGroups
+    search_patterns:
+    - '!parent_id'
+    correct_patterns:
+    - parent_id = "/subscriptions/${var.subscription_id}"

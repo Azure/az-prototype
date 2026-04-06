@@ -132,6 +132,7 @@ class GovernanceContext:
         agent_name: str,
         response_text: str,
         iac_tool: str | None = None,
+        services: list[str] | None = None,
     ) -> list[str]:
         """Scan AI output for anti-pattern matches.
 
@@ -141,4 +142,4 @@ class GovernanceContext:
 
         Returns a list of human-readable warning strings (empty = clean).
         """
-        return anti_patterns.scan(response_text, iac_tool=iac_tool)
+        return anti_patterns.scan(response_text, iac_tool=iac_tool, services=services)

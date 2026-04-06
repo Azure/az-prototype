@@ -62,6 +62,8 @@ rules:
     - NEVER include publicNetworkAccessForIngestion or publicNetworkAccessForQuery on Microsoft.Insights/components@2020-02-02
       — these properties are NOT supported on this API version
     - NEVER use InstrumentationKey for new integrations — use ConnectionString instead
+    - NEVER set RetentionInDays on workspace-based Application Insights — this property does not exist on
+      Microsoft.Insights/components@2020-02-02; retention is controlled by the linked Log Analytics workspace
 - id: AZ-AI-002
   severity: required
   description: Link Application Insights to Log Analytics Workspace via WorkspaceResourceId

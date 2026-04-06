@@ -212,7 +212,17 @@ def scan(
                 continue
 
         for pattern in check.search_patterns:
-            if pattern in lower:
+            # "!" prefix = absence check — fire if pattern is NOT found.
+            # Only runs when services context is provided (absence checks
+            # are meaningless without knowing which service is in scope).
+            if pattern.startswith("!"):
+                if svc_set is None:
+                    continue  # skip absence checks without service context
+                absent_term = pattern[1:]
+                if absent_term not in lower:
+                    warnings.append(f"[{check.id}] {check.warning_message}")
+                    break
+            elif pattern in lower:
                 # Check safe patterns — if any match, skip this check
                 if check.safe_patterns and any(s in lower for s in check.safe_patterns):
                     continue

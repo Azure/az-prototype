@@ -264,12 +264,23 @@ class BaseAgent:
 
         return messages
 
-    def validate_response(self, response_text: str, iac_tool: str | None = None) -> list[str]:
+    def validate_response(
+        self,
+        response_text: str,
+        iac_tool: str | None = None,
+        services: list[str] | None = None,
+    ) -> list[str]:
         """Check AI output for obvious governance violations.
 
         Returns a list of warning strings (empty = clean).  Called
         automatically by the default ``execute()`` implementation.
         Subclasses with custom ``execute()`` should call this too.
+
+        Parameters
+        ----------
+        services:
+            ARM resource type namespaces for the current stage.
+            Filters anti-pattern checks by ``targets.services``.
         """
         if not self._governance_aware:
             return []
@@ -277,7 +288,7 @@ class BaseAgent:
             from azext_prototype.agents.governance import GovernanceContext
 
             ctx = GovernanceContext()
-            return ctx.check_response_for_violations(self.name, response_text, iac_tool=iac_tool)
+            return ctx.check_response_for_violations(self.name, response_text, iac_tool=iac_tool, services=services)
         except Exception:  # pragma: no cover — never let validation break the agent
             return []
 

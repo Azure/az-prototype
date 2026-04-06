@@ -17,9 +17,10 @@ rules:
     - Microsoft.Resources/resourceGroups
     terraform_pattern: |
       resource "azapi_resource" "resource_group" {
-        type     = "Microsoft.Resources/resourceGroups@2024-03-01"
-        name     = var.resource_group_name
-        location = var.location
+        type      = "Microsoft.Resources/resourceGroups@2024-03-01"
+        name      = var.resource_group_name
+        parent_id = "/subscriptions/${var.subscription_id}"
+        location  = var.location
 
         tags = {
           project     = var.project_name
