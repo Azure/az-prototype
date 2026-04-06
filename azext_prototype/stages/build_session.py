@@ -2670,14 +2670,28 @@ class BuildSession(SessionMixin):
                     transformed_content=transformed,
                 )
 
-        if all_applied:
-            _dbg(
-                "build_session.transforms",
-                f"Stage {stage.get('stage', '?')} transform summary",
-                total_transforms=len(all_applied),
-                transform_ids=all_applied,
-                files_modified=modified_files,
-            )
+        # Log full post-transform content for benchmark comparison.
+        # Reassemble all written files into a single string matching
+        # the format of content_full in the response log entry.
+        stage_num = stage.get("stage", "?")
+        assembled_parts: list[str] = []
+        for rel_path in written_paths:
+            full_path = project_root / rel_path
+            try:
+                file_content = full_path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            filename = Path(rel_path).name
+            assembled_parts.append(f"```{filename}\n{file_content}\n```")
+
+        _dbg(
+            "build_session.generate",
+            f"Stage {stage_num} post-transform",
+            transforms_applied=len(all_applied),
+            transform_ids=all_applied,
+            files_modified=modified_files,
+            transformed_full="\n\n".join(assembled_parts) if assembled_parts else "(no files)",
+        )
 
         return written_paths
 
