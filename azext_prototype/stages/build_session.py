@@ -609,7 +609,9 @@ class BuildSession(SessionMixin):
                     )
 
                     stage_svc_types = [s.get("resource_type", "") for s in services if s.get("resource_type")]
-                    _ap_violations = _ap_scan(content, iac_tool=self._iac_tool, services=stage_svc_types)
+                    _ap_violations = _ap_scan(
+                        content, iac_tool=self._iac_tool, agent_name=agent.name, services=stage_svc_types
+                    )
                     if _ap_violations:
                         _dbg_flow(
                             "build_session.generate",
