@@ -186,13 +186,19 @@ def resolve_resource_metadata(
                         )
                         continue
 
-        # 2. Microsoft Learn fetch
+        # 2. Microsoft Learn fetch (fallback — log warning for registry gaps)
+        logger.warning(
+            "API version for %s not in service registry — falling back to Microsoft Learn lookup. "
+            "Add this resource type to service-registry.yaml to prevent hallucinated versions.",
+            rt,
+        )
         meta = _fetch_from_learn(rt, search_cache)
         if meta:
             result[rt] = meta
             continue
 
         # 3. Default fallback
+        logger.warning("API version for %s not found in registry or Microsoft Learn — using default.", rt)
         result[rt] = _default_metadata(rt)
 
     return result

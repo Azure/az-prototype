@@ -140,12 +140,17 @@ terraform {
 
   backend "local" {
     path = "../../../.terraform-state/stage-N-slug.tfstate"
+    # REPLACE stage-N-slug with the ACTUAL stage number and name.
+    # Example: stage-1-managed-identity.tfstate, stage-4-networking.tfstate
+    # NEVER use the default "terraform.tfstate" — downstream stages WILL break.
   }
 }
 
 provider "azapi" {}
 ```
 Do NOT add `subscription_id` or `tenant_id` to the provider block. The az CLI context provides these.
+NEVER use `backend "local" {}` without an explicit `path` — it defaults to
+`terraform.tfstate` which breaks cross-stage references.
 
 ## CRITICAL: TAGS PLACEMENT
 Tags on `azapi_resource` MUST be a TOP-LEVEL attribute, NEVER inside `body`.
@@ -261,19 +266,23 @@ parent_id = data.terraform_remote_state.stage1.outputs.resource_group_id
 ```
 
 ## CRITICAL: STATE FILE NAMING CONVENTION
-ALL stages MUST use this EXACT naming pattern:
-  `stage-{N}-{slug}.tfstate`
+ALL stages MUST set an explicit `path` in `backend "local"`. The path MUST
+follow this EXACT pattern — NO EXCEPTIONS:
 
-Where {N} is the stage number (no zero-padding) and {slug} is the stage name
-in lowercase with hyphens. Examples:
-  Stage 1: `stage-1-managed-identity.tfstate`
-  Stage 2: `stage-2-log-analytics.tfstate`
-  Stage 4: `stage-4-networking.tfstate`
-  Stage 13: `stage-13-container-apps.tfstate`
+  path = "../../../.terraform-state/stage-{N}-{slug}.tfstate"
 
-The state directory is ALWAYS at the project root: `.terraform-state/`
-Calculate the relative path from your stage's output directory:
-  `concept/infra/terraform/stage-N-name/` uses `../../../.terraform-state/`
+Where {N} is the stage number and {slug} is the stage name in lowercase
+with hyphens. You MUST replace {N} and {slug} with the actual values.
+
+Examples:
+  Stage 1 "Managed Identity": path = "../../../.terraform-state/stage-1-managed-identity.tfstate"
+  Stage 4 "Networking":       path = "../../../.terraform-state/stage-4-networking.tfstate"
+  Stage 8 "Cosmos DB":        path = "../../../.terraform-state/stage-8-cosmos-db.tfstate"
+
+VIOLATIONS THAT WILL BE REJECTED:
+  backend "local" {}                              # WRONG — defaults to terraform.tfstate
+  path = "terraform.tfstate"                      # WRONG — breaks cross-stage references
+  path = "../stage-N-name/terraform.tfstate"      # WRONG — must use .terraform-state/ directory
 
 NEVER use variable references in backend config blocks.
 
