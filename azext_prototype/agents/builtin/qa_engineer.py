@@ -260,7 +260,8 @@ Classify each failure as CRITICAL (must fix before deploy) or WARNING (should fi
 - [ ] providers.tf includes `required_version = ">= 1.9.0"`
 - [ ] main.tf does NOT contain terraform {} or provider {} blocks
 - [ ] All .tf files are syntactically valid HCL (properly opened/closed blocks)
-- [ ] Backend state file path follows convention: `stage-{N}-{slug}.tfstate`
+- [ ] Backend `backend "local" {}` is acceptable — each stage uses default `terraform.tfstate`
+      in its own directory. Do NOT flag empty backend or `terraform.tfstate` as an issue.
 
 ### 8. CRITICAL: Scope Compliance
 - [ ] No resources created that are not listed in "Services in This Stage"
@@ -290,7 +291,7 @@ Classify each failure as CRITICAL (must fix before deploy) or WARNING (should fi
 - [ ] Cross-stage references use the **exact** output key names listed in the
       "Previously Generated Stages" section — do **NOT** flag keys as "non-standard"
       if they match what the upstream stage _actually_ exports
-- [ ] Remote state variable defaults match upstream backend paths exactly
+- [ ] Remote state variable defaults use relative paths: `../stage-N-name/terraform.tfstate`
 - [ ] **NO** unused `terraform_remote_state` data sources — every data source
       **MUST** have at least one output referenced in locals or resources
 - [ ] **NO** unused variables for state paths — if the data source is removed,
