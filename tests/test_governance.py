@@ -117,14 +117,14 @@ class TestGovernanceContext:
     def test_check_response_detects_credentials(self, governance_ctx):
         """Credential patterns trigger a warning."""
         warnings = governance_ctx.check_response_for_violations(
-            "cloud-architect",
+            "terraform-agent",
             'connection_string = "Server=mydb;Password=oops"',
         )
         assert any("credential" in w.lower() or "secret" in w.lower() for w in warnings)
 
     def test_check_response_detects_access_key(self, governance_ctx):
         warnings = governance_ctx.check_response_for_violations(
-            "cloud-architect",
+            "terraform-agent",
             "Use the storage account access_key to authenticate.",
         )
         assert len(warnings) > 0
@@ -211,8 +211,8 @@ class TestBaseAgentGovernanceIntegration:
         assert warnings == []
 
     def test_validate_response_returns_warnings_for_credentials(self, governance_ctx):
-        agent = _GovernanceStub()
-        warnings = agent.validate_response('connectionString = "Server=x;Password=y"')
+        agent = _GovernanceStub(name="terraform-agent")
+        warnings = agent.validate_response('connectionString = "Server=x;Password=y"', iac_tool="terraform")
         assert len(warnings) > 0
 
     def test_validate_response_skipped_when_not_aware(self):
@@ -222,7 +222,7 @@ class TestBaseAgentGovernanceIntegration:
 
     def test_execute_appends_governance_warnings(self, mock_agent_context, governance_ctx):
         """When AI returns problematic content, warnings are appended."""
-        agent = _GovernanceStub()
+        agent = _GovernanceStub(name="terraform-agent")
         mock_agent_context.ai_provider.chat.return_value = AIResponse(
             content='Use connection_string = "Server=abc;Password=oops"',
             model="test",
@@ -377,16 +377,16 @@ class TestBuiltinAgentSystemMessages:
         assert "NET-001" in all_content or "private endpoint" in all_content.lower() or "AZ-" in all_content
         assert "AZ-SQL-001" in all_content or "Entra authentication" in all_content
 
-    def test_biz_analyst_validate_response_catches_anti_patterns(self):
-        """Biz-analyst should detect anti-patterns in its own AI output."""
+    def test_biz_analyst_validate_response_skips_anti_patterns(self):
+        """Biz-analyst is not a code-generating agent — anti-patterns should not fire."""
         from azext_prototype.agents.builtin.biz_analyst import BizAnalystAgent
 
         agent = BizAnalystAgent()
-        # Recommending SQL auth with password is an anti-pattern
+        # Biz-analyst discussing SQL auth is not an anti-pattern — it's analysis
         warnings = agent.validate_response(
             "We recommend using SQL authentication with username/password " "for the database connection."
         )
-        assert len(warnings) > 0
+        assert len(warnings) == 0
 
 
 # ------------------------------------------------------------------ #
@@ -432,7 +432,8 @@ class TestMultiStepAgentGovernance:
         ]
 
         result = agent.execute(mock_agent_context, "Estimate costs")
-        assert "Governance warnings" in result.content
+        # Cost analyst is not a code-generating agent — anti-patterns should not fire
+        assert "Governance warnings" not in result.content
 
     @patch("azext_prototype.agents.builtin.cost_analyst.requests.get")
     def test_cost_analyst_clean_response(self, mock_get, mock_agent_context):
@@ -481,7 +482,8 @@ class TestMultiStepAgentGovernance:
         ]
 
         result = agent.execute(mock_agent_context, "Generate backlog")
-        assert "Governance warnings" in result.content
+        # Project manager is not a code-generating agent — anti-patterns should not fire
+        assert "Governance warnings" not in result.content
 
     def test_cloud_architect_validates_response(self, mock_agent_context):
         from azext_prototype.agents.builtin.cloud_architect import CloudArchitectAgent
@@ -494,7 +496,8 @@ class TestMultiStepAgentGovernance:
         )
 
         result = agent.execute(mock_agent_context, "Design architecture")
-        assert "Governance warnings" in result.content
+        # Cloud architect is not a code-generating agent — anti-patterns should not fire
+        assert "Governance warnings" not in result.content
 
 
 # ------------------------------------------------------------------ #
@@ -529,7 +532,7 @@ class TestCredentialDetection:
         ],
     )
     def test_credential_pattern_detected(self, pattern, governance_ctx):
-        warnings = governance_ctx.check_response_for_violations("cloud-architect", f"Use {pattern} for auth")
+        warnings = governance_ctx.check_response_for_violations("terraform-agent", f"Use {pattern} for auth")
         assert any(
             "credential" in w.lower() or "secret" in w.lower() or "managed identity" in w.lower() for w in warnings
         ), f"Pattern '{pattern}' should be detected as credential"
