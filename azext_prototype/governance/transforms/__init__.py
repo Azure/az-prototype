@@ -262,20 +262,42 @@ def _remove_private_endpoint_resources(content: str) -> str:
         "virtualnetworklinks",
     )
 
-    # Find and remove azapi_resource blocks with PE/DNS types
-    block_pattern = re.compile(
-        r'resource\s+"azapi_resource"\s+"(\w+)"\s*\{[^}]*?type\s*=\s*"([^"]+)"[^}]*\}',
-        re.DOTALL,
+    # Find resource block starts and use brace counting to find the end
+    block_start_pattern = re.compile(
+        r'resource\s+"azapi_resource"\s+"(\w+)"\s*\{',
     )
 
     removed_names: list[str] = []
     result = content
 
-    for match in reversed(list(block_pattern.finditer(result))):
+    for match in reversed(list(block_start_pattern.finditer(result))):
         resource_name = match.group(1)
-        resource_type = match.group(2).lower()
+        # Find the matching closing brace using brace counting
+        start = match.start()
+        brace_start = match.end() - 1  # position of opening {
+        depth = 1
+        pos = brace_start + 1
+        while pos < len(result) and depth > 0:
+            if result[pos] == "{":
+                depth += 1
+            elif result[pos] == "}":
+                depth -= 1
+            pos += 1
+        if depth != 0:
+            continue  # malformed block, skip
+
+        block_text = result[start:pos]
+        # Check if this block's type is a PE/DNS type
+        type_match = re.search(r'type\s*=\s*"([^"]+)"', block_text)
+        if not type_match:
+            continue
+        resource_type = type_match.group(1).lower()
         if any(pt in resource_type for pt in pe_types):
-            result = result[: match.start()] + result[match.end() :]
+            # Remove the block plus any trailing whitespace/newlines
+            end = pos
+            while end < len(result) and result[end] in ("\n", "\r", " "):
+                end += 1
+            result = result[:start] + result[end:]
             removed_names.append(resource_name)
             logger.debug("Removed PE/DNS resource: azapi_resource.%s", resource_name)
 
