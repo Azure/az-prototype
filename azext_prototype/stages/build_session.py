@@ -1286,10 +1286,32 @@ class BuildSession(SessionMixin):
             for svc in services:
                 if isinstance(svc, dict) and "component" not in svc:
                     svc["component"] = ""
+            layer = self._infer_layer(s)
+
+            # IaC stages (core/infra/data) create or reference resource groups.
+            # Ensure Microsoft.Resources/resourceGroups is in the services list
+            # so governance targeting (transforms, anti-patterns, policies) fires.
+            if layer in ("core", "infra", "data"):
+                has_rg = any(
+                    isinstance(svc, dict)
+                    and "resourcegroups" in (svc.get("resource_type", "") or "").lower()
+                    for svc in services
+                )
+                if not has_rg:
+                    services.append(
+                        {
+                            "name": "resource-group",
+                            "computed_name": "",
+                            "component": "",
+                            "resource_type": "Microsoft.Resources/resourceGroups",
+                            "sku": "",
+                        }
+                    )
+
             entry = {
                 "stage": s.get("stage", len(normalized) + 1),
                 "name": s.get("name", f"Stage {len(normalized) + 1}"),
-                "layer": self._infer_layer(s),
+                "layer": layer,
                 "capability": capability,
                 "dir": self._enforce_concept_prefix(s.get("dir", "")),
                 "services": services,

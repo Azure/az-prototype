@@ -11,8 +11,7 @@ transforms:
   applies_to:
   - terraform-agent
   targets:
-  - services:
-    - Microsoft.Resources/resourceGroups
+  - services: []
   type: structured
   handler: add_resource_group_parent_id
   search: azapi_resource for resourceGroups without parent_id
