@@ -75,10 +75,6 @@ category group and `AllMetrics`. NSGs and VNets are exceptions (see Networking r
   role must be applied _after_ the identity stage deploys.
 
 ## CRITICAL: deploy.sh STATE DIRECTORY
-deploy.sh **MUST** create the Terraform state directory before `terraform init`:
-```bash
-STATE_DIR="$(cd "$(dirname "$0")/../../.." && pwd)/.terraform-state"
-mkdir -p "${STATE_DIR}"
-```
-Without this, `terraform init` fails on first run in a clean environment.
+Each stage stores its state as `terraform.tfstate` in its own directory.
+Cross-stage references use relative paths (e.g., `../stage-1-managed-identity/terraform.tfstate`).
 """.strip()

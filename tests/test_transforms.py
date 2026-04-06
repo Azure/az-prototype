@@ -5,7 +5,6 @@ import pytest
 from azext_prototype.governance.transforms import (
     _add_resource_group_parent_id,
     _add_response_export_values,
-    _fix_state_path,
     _remove_private_endpoint_resources,
     _remove_unused_remote_state,
     apply,
@@ -50,7 +49,7 @@ class TestLoad:
 
     def test_known_transforms_exist(self):
         ids = {t.id for t in load()}
-        expected = {"TFM-LA-001", "TFM-CDB-001", "TFM-TF-001", "TFM-TF-002", "TFM-TF-003", "TFM-RG-001", "TFM-NET-001"}
+        expected = {"TFM-LA-001", "TFM-CDB-001", "TFM-TF-001", "TFM-TF-002", "TFM-RG-001", "TFM-NET-001"}
         for eid in expected:
             assert eid in ids, f"Expected transform {eid} not found"
 
@@ -356,74 +355,11 @@ resource "azapi_resource" "la_pe" {
 
 
 # ------------------------------------------------------------------
-# _fix_state_path (TFM-TF-003)
-# ------------------------------------------------------------------
-
-
-class TestFixStatePath:
-    def test_fixes_empty_backend(self):
-        content = """terraform {
-  required_version = ">= 1.9.0"
-  backend "local" {}
-}
-"""
-        result = _fix_state_path(content, stage={"stage": 4, "name": "Networking"})
-        assert "stage-4-networking.tfstate" in result
-        assert "terraform.tfstate" not in result
-
-    def test_fixes_wrong_path(self):
-        content = """terraform {
-  backend "local" {
-    path = "terraform.tfstate"
-  }
-}
-"""
-        result = _fix_state_path(content, stage={"stage": 7, "name": "Azure SQL"})
-        assert "stage-7-azure-sql.tfstate" in result
-
-    def test_preserves_correct_path(self):
-        content = """terraform {
-  backend "local" {
-    path = "../../../.terraform-state/stage-4-networking.tfstate"
-  }
-}
-"""
-        result = _fix_state_path(content, stage={"stage": 4, "name": "Networking"})
-        assert result == content
-
-    def test_no_stage_returns_unchanged(self):
-        content = 'backend "local" {}'
-        result = _fix_state_path(content, stage=None)
-        assert result == content
-
-    def test_slug_generation(self):
-        content = 'backend "local" {}'
-        result = _fix_state_path(content, stage={"stage": 12, "name": "Container Apps Environment"})
-        assert "stage-12-container-apps-environment.tfstate" in result
-
-
-# ------------------------------------------------------------------
 # apply() — integration with stage context
 # ------------------------------------------------------------------
 
 
 class TestApplyWithStageContext:
-    def test_state_path_fix_uses_stage(self):
-        content = """terraform {
-  backend "local" {
-    path = "terraform.tfstate"
-  }
-}
-"""
-        result, ids = apply(
-            content,
-            services=[],
-            iac_tool="terraform",
-            stage={"stage": 5, "name": "Container Registry"},
-        )
-        assert "TFM-TF-003" in ids
-        assert "stage-5-container-registry.tfstate" in result
-
     def test_cross_file_remote_state_preserved(self):
         main_tf = """data "terraform_remote_state" "stage1" {
   backend = "local"

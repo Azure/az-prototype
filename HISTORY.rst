@@ -8,10 +8,13 @@ Release History
 
 Generation quality improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* **TFM-TF-003** — structured transform that fixes backend state file
-  paths: replaces ``terraform.tfstate`` or empty ``backend "local" {}``
-  with the correct ``stage-N-slug.tfstate`` path derived from stage
-  context.  The #1 recurring QA failure across all builds.
+* **Simplified state management** — removed centralized
+  ``.terraform-state/`` directory and ``stage-N-slug.tfstate`` naming
+  convention.  Each stage uses the default ``terraform.tfstate`` in its
+  own directory.  Cross-stage references use simple relative paths
+  (``../stage-1-managed-identity/terraform.tfstate``).  Removed
+  TFM-TF-003, STAN-TF-011, and the CRITICAL STATE FILE NAMING section
+  from TERRAFORM_PROMPT.  Eliminates the #1 recurring QA failure.
 * **Stage context in transforms** — ``apply()`` now accepts ``stage``
   dict and ``stage_content`` (all files concatenated), enabling
   structured handlers to use stage metadata and cross-file reference
@@ -20,11 +23,10 @@ Generation quality improvements
   checks references across ALL stage files (via ``stage_content``),
   not just the file containing the declaration.  Prevents false removal
   of remote state blocks referenced in ``locals.tf`` or ``outputs.tf``.
-* **35 transform unit tests** — comprehensive tests for all 7 handlers:
+* **29 transform unit tests** — comprehensive tests for all 6 handlers:
   load, apply filtering, capacityMode replacement, unused remote state
   (single-file and cross-file), response_export_values injection,
-  resource group parent_id, PE removal, state path fix, and stage
-  context integration.
+  resource group parent_id, PE removal, and stage context integration.
 * **``response_export_values`` prompt strengthening** — TERRAFORM_PROMPT
   changed from "add when outputs reference it" to "add to EVERY
   azapi_resource, no exceptions."  Violations section with rejected
