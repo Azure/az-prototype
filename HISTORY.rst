@@ -12,9 +12,19 @@ Generation quality improvements
   paths: replaces ``terraform.tfstate`` or empty ``backend "local" {}``
   with the correct ``stage-N-slug.tfstate`` path derived from stage
   context.  The #1 recurring QA failure across all builds.
-* **Stage context in transforms** — ``apply()`` now accepts a ``stage``
-  dict, enabling structured handlers to use stage number, name, and
-  directory for context-dependent fixes.
+* **Stage context in transforms** — ``apply()`` now accepts ``stage``
+  dict and ``stage_content`` (all files concatenated), enabling
+  structured handlers to use stage metadata and cross-file reference
+  checking.
+* **TFM-TF-001 cross-file fix** — unused remote state detection now
+  checks references across ALL stage files (via ``stage_content``),
+  not just the file containing the declaration.  Prevents false removal
+  of remote state blocks referenced in ``locals.tf`` or ``outputs.tf``.
+* **35 transform unit tests** — comprehensive tests for all 7 handlers:
+  load, apply filtering, capacityMode replacement, unused remote state
+  (single-file and cross-file), response_export_values injection,
+  resource group parent_id, PE removal, state path fix, and stage
+  context integration.
 * **``response_export_values`` prompt strengthening** — TERRAFORM_PROMPT
   changed from "add when outputs reference it" to "add to EVERY
   azapi_resource, no exceptions."  Violations section with rejected

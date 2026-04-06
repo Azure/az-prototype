@@ -2652,6 +2652,16 @@ class BuildSession(SessionMixin):
         all_applied: list[str] = []
         modified_files: list[str] = []
 
+        # Read ALL stage files upfront for cross-file reference context.
+        # Some transforms (TFM-TF-001) need to check if a block declared
+        # in main.tf is referenced in locals.tf or outputs.tf.
+        all_stage_content = ""
+        for rel_path in written_paths:
+            try:
+                all_stage_content += (project_root / rel_path).read_text(encoding="utf-8") + "\n"
+            except (OSError, UnicodeDecodeError):
+                pass
+
         for rel_path in written_paths:
             full_path = project_root / rel_path
             try:
@@ -2660,7 +2670,11 @@ class BuildSession(SessionMixin):
                 continue
 
             transformed, applied_ids = apply_transforms(
-                content, services=stage_services, iac_tool=self._iac_tool, stage=stage
+                content,
+                services=stage_services,
+                iac_tool=self._iac_tool,
+                stage=stage,
+                stage_content=all_stage_content,
             )
             if applied_ids:
                 full_path.write_text(transformed, encoding="utf-8")

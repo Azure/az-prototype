@@ -129,6 +129,7 @@ def apply(
     iac_tool: str | None = None,
     agent_name: str | None = None,
     stage: dict | None = None,
+    stage_content: str | None = None,
 ) -> tuple[str, list[str]]:
     """Apply transforms to generated content.
 
@@ -193,10 +194,13 @@ def apply(
             if handler_fn:
                 import inspect
 
-                if "stage" in inspect.signature(handler_fn).parameters:
-                    new_result = handler_fn(result, stage=stage)
-                else:
-                    new_result = handler_fn(result)
+                params = inspect.signature(handler_fn).parameters
+                kwargs: dict = {}
+                if "stage" in params:
+                    kwargs["stage"] = stage
+                if "stage_content" in params:
+                    kwargs["stage_content"] = stage_content
+                new_result = handler_fn(result, **kwargs) if kwargs else handler_fn(result)
                 if new_result != result:
                     result = new_result
                     applied.append(tfm.id)
@@ -212,13 +216,20 @@ def apply(
 # ------------------------------------------------------------------
 
 
-def _remove_unused_remote_state(content: str) -> str:
+def _remove_unused_remote_state(content: str, stage_content: str | None = None) -> str:
     """Remove terraform_remote_state blocks that are never referenced.
 
     Scans for ``data "terraform_remote_state" "name"`` blocks and checks
-    if ``data.terraform_remote_state.name`` appears anywhere else in the
-    content.  Removes unreferenced blocks, their state path variables,
-    and pass-through outputs.
+    if ``data.terraform_remote_state.name`` appears anywhere in the full
+    stage content (all files).  Removes unreferenced blocks and their
+    state path variables.
+
+    Parameters
+    ----------
+    stage_content:
+        Concatenated content of ALL files in the stage.  Used for
+        cross-file reference checking (e.g., remote state declared in
+        main.tf but referenced in locals.tf).
     """
     # Find all remote state block names
     rs_pattern = re.compile(
@@ -229,17 +240,22 @@ def _remove_unused_remote_state(content: str) -> str:
     if not matches:
         return content
 
+    # Use full stage content for reference checking if available
+    reference_text = stage_content or content
+
     result = content
     for match in reversed(matches):  # reverse to preserve offsets
         name = match.group(1)
         ref = f"data.terraform_remote_state.{name}"
 
-        # Check if referenced anywhere outside the block itself
-        before = result[: match.start()]
-        after = result[match.end() :]
-        if ref not in before and ref not in after:
-            # Remove the block
-            result = before + after
+        # Count references in full stage content, excluding the declaration block
+        ref_count = reference_text.count(ref)
+        block_self_refs = match.group(0).count(ref)
+        external_refs = ref_count - block_self_refs
+
+        if external_refs <= 0:
+            # Remove the block from this file's content
+            result = result[: match.start()] + result[match.end() :]
             logger.debug("Removed unused terraform_remote_state.%s", name)
 
             # Remove corresponding state path variable
