@@ -60,7 +60,7 @@ rules:
             enableNonSslPort    = false
             minimumTlsVersion   = "1.2"
             publicNetworkAccess = "Disabled"
-            redisVersion        = "6.0"
+            redisVersion        = "6"
             redisConfiguration = {
               "aad-enabled"                    = "true"
               "maxmemory-policy"               = "volatile-lru"
@@ -90,7 +90,7 @@ rules:
           enableNonSslPort: false
           minimumTlsVersion: '1.2'
           publicNetworkAccess: 'Disabled'
-          redisVersion: '6.0'
+          redisVersion: '6'
           redisConfiguration: {
             'maxmemory-policy': 'volatile-lru'
             'maxfragmentationmemory-reserved': '125'

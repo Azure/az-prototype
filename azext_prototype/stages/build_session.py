@@ -66,10 +66,12 @@ _QA_PASS_PHRASES = ("all checks passed", "no issues found", "no issues remain", 
 
 
 def _qa_has_issues(qa_content: str) -> bool:
-    """Determine whether QA found actionable issues.
+    """Determine whether QA found actionable (CRITICAL) issues.
 
     Three-tier detection (checked in order):
     1. **Verdict line** — ``VERDICT: PASS`` or ``VERDICT: FAIL``.
+       If FAIL, verify at least one CRITICAL exists — WARNING-only
+       FAILs are overridden to PASS (safety net for QA agent errors).
     2. **Pass phrases** — common phrases indicating all clear.
     3. **Keyword fallback** — any issue keyword present in the response.
     """
@@ -82,7 +84,14 @@ def _qa_has_issues(qa_content: str) -> bool:
     stripped = re.sub(r"[*_]{1,3}", "", lower)
     verdict_match = re.search(r"verdict:\s*(pass|fail)", stripped)
     if verdict_match:
-        return verdict_match.group(1) == "fail"
+        if verdict_match.group(1) == "pass":
+            return False
+        # FAIL verdict — verify at least one CRITICAL exists.
+        # WARNING-only FAILs are a QA agent error; override to PASS.
+        if "critical" not in lower:
+            logger.info("QA returned FAIL but no CRITICAL issues found — overriding to PASS")
+            return False
+        return True
 
     # Tier 2: pass phrases
     if any(phrase in lower for phrase in _QA_PASS_PHRASES):
@@ -599,7 +608,8 @@ class BuildSession(SessionMixin):
                         scan as _ap_scan,
                     )
 
-                    _ap_violations = _ap_scan(content, iac_tool=self._iac_tool)
+                    stage_svc_types = [s.get("resource_type", "") for s in services if s.get("resource_type")]
+                    _ap_violations = _ap_scan(content, iac_tool=self._iac_tool, services=stage_svc_types)
                     if _ap_violations:
                         _dbg_flow(
                             "build_session.generate",
@@ -1779,20 +1789,18 @@ class BuildSession(SessionMixin):
     def _agent_build_context(self, agent: Any, stage: dict) -> Iterator[Any]:
         """Configure agent for focused build generation, restore after.
 
-        Applies the governor brief + stage-specific knowledge and disables
-        standards (already covered by the governance brief).  On exit the
-        knowledge override is cleared and standards are restored.
+        Applies the governor brief + stage-specific knowledge.  Standards
+        remain enabled — they're agent-scoped (via ``applies_to``) and
+        injected by ``get_system_messages()``.  On exit the knowledge
+        override is cleared.
         """
         layer = stage.get("layer", "")
         self._apply_governor_brief(agent, stage.get("name", ""), stage.get("services", []), layer)
         self._apply_stage_knowledge(agent, stage)
-        saved_standards = agent._include_standards
-        agent._include_standards = False
         try:
             yield agent
         finally:
             agent.set_knowledge_override("")
-            agent._include_standards = saved_standards
 
     def _apply_stage_knowledge(self, agent: Any, stage: dict) -> None:
         """Set stage-specific knowledge on the agent.
@@ -1860,6 +1868,7 @@ class BuildSession(SessionMixin):
             from azext_prototype.governance.governor import brief as governor_brief
 
             svc_names = [s.get("name", "") for s in services if s.get("name")]
+            svc_namespaces = [s.get("resource_type", "") for s in services if s.get("resource_type")]
             if layer in ("core", "infra", "data"):
                 task_desc = f"Generate {self._iac_tool} code for {stage_name}: {', '.join(svc_names)}"
             elif layer == "app":
@@ -1871,6 +1880,7 @@ class BuildSession(SessionMixin):
                 task_description=task_desc,
                 agent_name=agent.name,
                 top_k=15,
+                services=svc_namespaces or None,
             )
             if policy_brief:
                 agent.set_governor_brief(policy_brief)
@@ -2849,6 +2859,17 @@ class BuildSession(SessionMixin):
             companion_brief = self._resolve_companion_requirements(services)
             if companion_brief:
                 parts.append(companion_brief)
+
+        # Standards — agent-scoped, included for all layers
+        try:
+            from azext_prototype.governance.standards import format_for_qa
+
+            standards_text = format_for_qa(iac_tool=self._iac_tool if is_iac else None, layer=layer)
+            if standards_text and standards_text.strip():
+                parts.append(standards_text)
+        except Exception:
+            pass
+
         return "\n".join(parts)
 
     @staticmethod

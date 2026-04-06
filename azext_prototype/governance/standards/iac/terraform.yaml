@@ -117,3 +117,14 @@ principles:
   - resource "azapi_resource" "cosmosdb_role_assignment" { type = "Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-05-15";
     body = { properties = { principalId = azapi_resource.managed_identity.output.properties.principalId } } }
   rationale: Complete outputs enable downstream stages to reference resources without hardcoding.
+- id: STAN-TF-011
+  description: 'State File Naming: The backend local block must specify an explicit path using the pattern stage-N-slug.tfstate
+    (e.g., stage-1-managed-identity.tfstate). Never use the default terraform.tfstate. Downstream stages reference upstream
+    state via terraform_remote_state with these paths — a mismatch silently reads empty state.'
+  applies_to:
+  - terraform-agent
+  examples:
+  - 'backend "local" { path = "stage-1-managed-identity.tfstate" }'
+  - 'backend "local" { path = "stage-4-networking.tfstate" }'
+  - 'WRONG: backend "local" {} — defaults to terraform.tfstate'
+  rationale: Consistent state file naming enables cross-stage references via terraform_remote_state without path guessing.

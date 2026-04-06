@@ -1723,10 +1723,10 @@ class TestAgentBuildContext:
 
         with patch.object(session, "_apply_governor_brief"), patch.object(session, "_apply_stage_knowledge"):
             with session._agent_build_context(mock_tf_agent, stage):
-                # Inside the context, standards should be disabled
-                assert mock_tf_agent._include_standards is False
+                # Standards remain enabled during generation (agent-scoped filtering)
+                assert mock_tf_agent._include_standards is True
 
-        # After exiting, standards should be restored
+        # After exiting, standards unchanged
         assert mock_tf_agent._include_standards is True
 
     def test_agent_build_context_clears_knowledge_on_exit(self, build_context, build_registry, mock_tf_agent):
@@ -4448,7 +4448,8 @@ class TestBuildSessionRefactored:
 
         with patch.object(session, "_apply_governor_brief"), patch.object(session, "_apply_stage_knowledge"):
             with session._agent_build_context(mock_tf_agent, stage):
-                assert mock_tf_agent._include_standards is False
+                # Standards remain enabled (agent-scoped filtering via applies_to)
+                assert mock_tf_agent._include_standards is True
 
         assert mock_tf_agent._include_standards is True
 

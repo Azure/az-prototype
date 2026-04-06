@@ -371,7 +371,14 @@ or
 
     VERDICT: FAIL
 
-Use PASS when there are zero CRITICAL issues remaining. Use FAIL when any CRITICAL
-issue exists. WARNING-only results should use PASS. This verdict line must appear
-on its own line at the very end of your response.
+**CRITICAL RULE:** VERDICT: FAIL requires at least one issue with severity **CRITICAL**.
+If all remaining issues are **WARNING** severity, you MUST return VERDICT: PASS.
+WARNINGs are informational — they do NOT block the build. Only CRITICALs block.
+
+Do NOT return VERDICT: FAIL for:
+- Policy template deviations that don't cause deployment failures (WARNING)
+- Naming convention preferences (WARNING)
+- Minor formatting differences (WARNING)
+
+This verdict line must appear on its own line at the very end of your response.
 """

@@ -143,6 +143,7 @@ def scan(
     text: str,
     iac_tool: str | None = None,
     agent_name: str | None = None,
+    services: list[str] | None = None,
 ) -> list[str]:
     """Scan *text* for anti-pattern matches.
 
@@ -158,6 +159,12 @@ def scan(
     agent_name:
         If provided, skip checks whose ``applies_to`` list is non-empty
         and does not contain this agent name.
+    services:
+        If provided, a list of ARM resource type namespaces (e.g.,
+        ``["Microsoft.KeyVault/vaults"]``).  Checks whose
+        ``targets[].services`` list specific namespaces that don't
+        overlap with *services* are skipped.  Checks with no service
+        targeting (structural checks) run unconditionally.
 
     Returns a list of human-readable warning strings (empty = clean).
     """
@@ -186,10 +193,23 @@ def scan(
     _TOOL_TO_AGENT = {"terraform": "terraform-agent", "bicep": "bicep-agent"}
     effective_agent = agent_name or _TOOL_TO_AGENT.get(iac_tool or "", "")
 
+    # Build service namespace set for filtering
+    svc_set = {s.lower() for s in services} if services else None
+
     for check in checks:
         # Skip checks not applicable to this agent
         if check.applies_to and effective_agent and effective_agent not in check.applies_to:
             continue
+
+        # Skip checks not applicable to this stage's services
+        if svc_set is not None:
+            check_services: set[str] = set()
+            for t in check.targets:
+                if isinstance(t, dict):
+                    check_services.update(s.lower() for s in t.get("services", []))
+            # Checks with specific services that don't overlap → skip
+            if check_services and not (check_services & svc_set):
+                continue
 
         for pattern in check.search_patterns:
             if pattern in lower:

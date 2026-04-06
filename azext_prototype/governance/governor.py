@@ -81,6 +81,7 @@ def brief(
     agent_name: str = "",
     top_k: int = 10,
     status_fn: Any = None,
+    services: list[str] | None = None,
 ) -> str:
     """Retrieve relevant policies and format as concise directives.
 
@@ -101,19 +102,24 @@ def brief(
         Maximum number of rules to include.
     status_fn:
         Optional status callback for loading indicators.
+    services:
+        ARM resource type namespaces for this stage (e.g.,
+        ``["Microsoft.KeyVault/vaults"]``).  When provided, rules whose
+        ``targets.services`` don't overlap are excluded.  Rules with
+        no service targeting pass through.
     """
     from azext_prototype.debug_log import log_flow
 
     index = _get_or_build_index(project_dir, status_fn=status_fn)
     if agent_name:
-        rules = index.retrieve_for_agent(task_description, agent_name, top_k=top_k)
+        rules = index.retrieve_for_agent(task_description, agent_name, top_k=top_k, services=services)
     else:
-        rules = index.retrieve(task_description, top_k=top_k)
+        rules = index.retrieve(task_description, top_k=top_k, services=services)
 
     # Always include MUST rules with severity="required" regardless of
     # embedding similarity — these are universal governance constraints
     # (e.g. network isolation, managed identity) that apply to ALL infra stages.
-    all_rules = index.retrieve(task_description, top_k=top_k * 3)
+    all_rules = index.retrieve(task_description, top_k=top_k * 3, services=services)
     must_rules = [r for r in all_rules if r.severity == "required" and r not in rules]
     combined = list(rules)
     for r in must_rules:

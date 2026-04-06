@@ -341,25 +341,28 @@ rules:
   - services:
     - Microsoft.DocumentDB/databaseAccounts
     terraform_pattern: |
-      # Set backupPolicy on the Cosmos DB account resource (CDB-001)
-      # Add to the properties block:
-      #   backupPolicy = {
-      #     type = "Continuous"
-      #     continuousModeProperties = {
-      #       tier = "Continuous7Days"
-      #     }
-      #   }
+      # CRITICAL: backupPolicy MUST be set explicitly on the Cosmos DB account.
+      # Serverless accounts MUST use Continuous — ARM rejects Periodic for serverless.
+      # Omitting backupPolicy entirely causes undefined behavior on some API versions.
+      backupPolicy = {
+        type = "Continuous"
+        continuousModeProperties = {
+          tier = "Continuous7Days"
+        }
+      }
     bicep_pattern: |
-      // Set backupPolicy on the Cosmos DB account resource (CDB-001)
-      // Add to the properties block:
-      //   backupPolicy: {
-      //     type: 'Continuous'
-      //     continuousModeProperties: {
-      //       tier: 'Continuous7Days'
-      //     }
-      //   }
+      // CRITICAL: backupPolicy MUST be set explicitly on the Cosmos DB account.
+      // Serverless accounts MUST use Continuous — ARM rejects Periodic for serverless.
+      backupPolicy: {
+        type: 'Continuous'
+        continuousModeProperties: {
+          tier: 'Continuous7Days'
+        }
+      }
     prohibitions:
-    - NEVER use Periodic backup for production workloads when Continuous is available — it provides inferior RPO
+    - NEVER omit backupPolicy on Cosmos DB accounts — explicit declaration is required
+    - NEVER use Periodic backup for serverless accounts — ARM rejects the deployment
+    - NEVER use Periodic backup for production workloads when Continuous is available
 - id: AZ-CDB-006
   severity: recommended
   description: Configure availability zone support on the Cosmos DB account

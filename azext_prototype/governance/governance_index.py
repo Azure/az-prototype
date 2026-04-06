@@ -222,7 +222,13 @@ class GovernanceIndex:
             f"Index built: {len(self._items)} items, {len(self._vectors[0])}-dim vectors",
         )
 
-    def retrieve(self, query: str, top_k: int = 10, kind: str | None = None) -> list[IndexedItem]:
+    def retrieve(
+        self,
+        query: str,
+        top_k: int = 10,
+        kind: str | None = None,
+        services: list[str] | None = None,
+    ) -> list[IndexedItem]:
         """Find the top-k most relevant items for a query.
 
         Parameters
@@ -234,9 +240,15 @@ class GovernanceIndex:
         kind:
             Optional filter — only return items of this kind
             ("policy", "anti-pattern", "standard").
+        services:
+            ARM resource type namespaces.  When provided, items whose
+            ``services`` list specific namespaces that don't overlap
+            are excluded.  Items with empty services pass through.
         """
         if not self._built or not self._items:
             return []
+
+        svc_set = {s.lower() for s in services} if services else None
 
         query_vec = self._backend.embed_query(query)
         scored = [(cosine_similarity(query_vec, vec), item) for vec, item in zip(self._vectors, self._items)]
@@ -246,16 +258,26 @@ class GovernanceIndex:
         for _, item in scored:
             if kind and item.kind != kind:
                 continue
+            # Filter by service namespace overlap
+            if svc_set is not None and item.services:
+                item_svcs = {s.lower() for s in item.services}
+                if not (item_svcs & svc_set):
+                    continue
             results.append(item)
             if len(results) >= top_k:
                 break
         return results
 
     def retrieve_for_agent(
-        self, query: str, agent_name: str, top_k: int = 10, kind: str | None = None
+        self,
+        query: str,
+        agent_name: str,
+        top_k: int = 10,
+        kind: str | None = None,
+        services: list[str] | None = None,
     ) -> list[IndexedItem]:
-        """Retrieve items filtered by agent applicability."""
-        candidates = self.retrieve(query, top_k=top_k * 2, kind=kind)
+        """Retrieve items filtered by agent applicability and service namespace."""
+        candidates = self.retrieve(query, top_k=top_k * 2, kind=kind, services=services)
         filtered = []
         for item in candidates:
             if not item.applies_to or agent_name in item.applies_to:

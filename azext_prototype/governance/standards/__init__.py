@@ -135,6 +135,48 @@ def format_for_prompt(agent_name: str | None = None, domain: str | None = None) 
     return "\n".join(sections)
 
 
+def format_for_qa(iac_tool: str | None = None, layer: str = "infra") -> str:
+    """Format standards for QA context injection.
+
+    Returns standards relevant to the stage's technology stack:
+    - IaC stages (core/infra/data): IaC-specific + universal coding/design
+    - App stages: all application + universal coding/design
+
+    Parameters
+    ----------
+    iac_tool:
+        ``"terraform"`` or ``"bicep"`` — selects IaC standards.
+    layer:
+        Stage layer — ``"core"``, ``"infra"``, ``"data"``, ``"app"``.
+    """
+    standards = load()
+    if not standards:
+        return ""
+
+    # Determine which domains to include
+    include_domains: set[str] = {"principles"}  # always include coding/design
+    if layer in ("core", "infra", "data"):
+        if iac_tool == "terraform":
+            include_domains.add("terraform")
+        elif iac_tool == "bicep":
+            include_domains.add("bicep")
+    elif layer == "app":
+        include_domains.add("application")
+
+    filtered = [s for s in standards if s.domain in include_domains]
+    if not filtered:
+        return ""
+
+    sections: list[str] = ["## Applicable Standards\n"]
+    for standard in filtered:
+        sections.append(f"### {standard.domain}")
+        for p in standard.principles:
+            sections.append(f"- **[{p.id}]** {p.description}")
+        sections.append("")
+
+    return "\n".join(sections)
+
+
 def reset_cache() -> None:
     """Clear the module-level cache (useful in tests)."""
     global _cache  # noqa: PLW0603
