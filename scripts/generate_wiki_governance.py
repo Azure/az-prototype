@@ -654,7 +654,7 @@ _AZURE_SECTIONS = {
 # Ordered per Microsoft Well-Architected Framework pillar order
 _OTHER_SECTIONS: dict[str, str] = {}
 _OTHER_SECTIONS["reliability"] = "Reliability"
-_OTHER_SECTIONS["security"] = "Security Principles"
+_OTHER_SECTIONS["security"] = "Security"
 _OTHER_SECTIONS["cost"] = "Cost Optimization"
 _OTHER_SECTIONS["operational-excellence"] = "Operational Excellence"
 _OTHER_SECTIONS["performance"] = "Performance Efficiency"
