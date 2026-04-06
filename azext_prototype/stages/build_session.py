@@ -2671,27 +2671,30 @@ class BuildSession(SessionMixin):
                 )
 
         # Log full post-transform content for benchmark comparison.
-        # Reassemble all written files into a single string matching
-        # the format of content_full in the response log entry.
-        stage_num = stage.get("stage", "?")
-        assembled_parts: list[str] = []
-        for rel_path in written_paths:
-            full_path = project_root / rel_path
-            try:
-                file_content = full_path.read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError):
-                continue
-            filename = Path(rel_path).name
-            assembled_parts.append(f"```{filename}\n{file_content}\n```")
+        # Only reassemble files when debug logging is active — avoids
+        # unnecessary I/O in production runs.
+        from azext_prototype.debug_log import is_active as _debug_active
 
-        _dbg(
-            "build_session.generate",
-            f"Stage {stage_num} post-transform",
-            transforms_applied=len(all_applied),
-            transform_ids=all_applied,
-            files_modified=modified_files,
-            transformed_full="\n\n".join(assembled_parts) if assembled_parts else "(no files)",
-        )
+        stage_num = stage.get("stage", "?")
+        if _debug_active():
+            assembled_parts: list[str] = []
+            for rel_path in written_paths:
+                full_path = project_root / rel_path
+                try:
+                    file_content = full_path.read_text(encoding="utf-8")
+                except (OSError, UnicodeDecodeError):
+                    continue
+                filename = Path(rel_path).name
+                assembled_parts.append(f"```{filename}\n{file_content}\n```")
+
+            _dbg(
+                "build_session.generate",
+                f"Stage {stage_num} post-transform",
+                transforms_applied=len(all_applied),
+                transform_ids=all_applied,
+                files_modified=modified_files,
+                transformed_full="\n\n".join(assembled_parts) if assembled_parts else "(no files)",
+            )
 
         return written_paths
 
