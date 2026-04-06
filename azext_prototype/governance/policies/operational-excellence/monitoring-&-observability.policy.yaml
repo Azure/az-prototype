@@ -3,7 +3,7 @@ domain: performance
 description: Governance policies for Monitoring Observability
 last_updated: '2026-03-27'
 rules:
-- id: WAF-PERF-OBS-001
+- id: WAF-OPEX-OBS-001
   severity: required
   description: Configure Application Insights with auto-instrumentation for .NET, Python, and Node.js — use connection string,
     not instrumentation key
@@ -25,7 +25,7 @@ rules:
     - Microsoft.App/containerApps
     - Microsoft.ContainerService/managedClusters
     - Microsoft.ApiManagement/service
-- id: WAF-PERF-OBS-002
+- id: WAF-OPEX-OBS-002
   severity: required
   description: Configure custom metric alerts for key performance indicators — P95 latency, error rate, throughput, and resource
     utilization
@@ -48,7 +48,7 @@ rules:
     - Microsoft.App/containerApps
     - Microsoft.ContainerService/managedClusters
     - Microsoft.ApiManagement/service
-- id: WAF-PERF-OBS-003
+- id: WAF-OPEX-OBS-003
   severity: required
   description: Enable W3C distributed tracing with trace context propagation across all services in the request chain
   rationale: Without distributed tracing, diagnosing performance issues in microservices requires correlating logs across
@@ -67,7 +67,7 @@ rules:
     - Microsoft.App/containerApps
     - Microsoft.ContainerService/managedClusters
     - Microsoft.ApiManagement/service
-- id: WAF-PERF-OBS-004
+- id: WAF-OPEX-OBS-004
   severity: recommended
   description: Create standard KQL queries for performance monitoring — P95 latency, error rates, throughput, and slow dependency
     calls
@@ -85,7 +85,7 @@ rules:
     - Microsoft.App/containerApps
     - Microsoft.ContainerService/managedClusters
     - Microsoft.ApiManagement/service
-- id: WAF-PERF-OBS-005
+- id: WAF-OPEX-OBS-005
   severity: recommended
   description: Configure availability tests for public endpoints — standard URL ping test and multi-step web tests
   rationale: Availability tests detect outages from external perspective (outside Azure network); internal health checks may
