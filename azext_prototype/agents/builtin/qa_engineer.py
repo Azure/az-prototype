@@ -269,6 +269,8 @@ Classify each failure as CRITICAL (must fix before deploy) or WARNING (should fi
 - [ ] Companion resources (PE, DNS, diagnostics) only from MANDATORY RESOURCE POLICIES
 - [ ] No azurerm_* resources — all resources MUST use azapi_resource
 - [ ] Tags placed as top-level attribute on azapi_resource, NOT inside body{}
+- [ ] `provider "azapi" {}` MUST be empty — do NOT add subscription_id or tenant_id.
+      The az CLI context provides these. An empty provider block is CORRECT.
 
 ### 9. Networking Stage
 - [ ] No placeholder private endpoints — PEs belong in service stages
