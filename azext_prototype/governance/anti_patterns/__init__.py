@@ -183,7 +183,7 @@ def scan(
     scan_text = text
     for marker in _DESIGN_MARKERS:
         idx = scan_text.find(marker)
-        if idx > 0:
+        if idx >= 0:
             scan_text = scan_text[:idx]
             break
 
