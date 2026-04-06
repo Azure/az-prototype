@@ -23,6 +23,7 @@ import logging
 
 from azext_prototype.governance import anti_patterns
 from azext_prototype.governance.policies import PolicyEngine
+from azext_prototype.governance.transforms import reset_cache as _reset_transforms
 from azext_prototype.templates.registry import TemplateRegistry
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,7 @@ def reset_caches() -> None:
     _policy_engine = None
     _template_registry = None
     anti_patterns.reset_cache()
+    _reset_transforms()
 
 
 class GovernanceContext:
@@ -131,6 +133,8 @@ class GovernanceContext:
         self,
         agent_name: str,
         response_text: str,
+        iac_tool: str | None = None,
+        services: list[str] | None = None,
     ) -> list[str]:
         """Scan AI output for anti-pattern matches.
 
@@ -140,4 +144,4 @@ class GovernanceContext:
 
         Returns a list of human-readable warning strings (empty = clean).
         """
-        return anti_patterns.scan(response_text)
+        return anti_patterns.scan(response_text, iac_tool=iac_tool, agent_name=agent_name, services=services)

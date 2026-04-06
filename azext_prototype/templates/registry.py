@@ -39,7 +39,7 @@ class ProjectTemplate:
     name: str
     display_name: str
     description: str
-    category: str  # web-app, data-pipeline, ai-app, microservices, serverless
+    domain: str  # web-app, data-pipeline, ai-app, microservices, serverless
     services: list[TemplateService] = field(default_factory=list)
     iac_defaults: dict[str, Any] = field(default_factory=dict)
     requirements: str = ""
@@ -102,7 +102,7 @@ class TemplateRegistry:
         """
         templates = self.list_templates()
         if category:
-            templates = [t for t in templates if t.category == category]
+            templates = [t for t in templates if t.domain == category]
         if not templates:
             return ""
 
@@ -117,7 +117,7 @@ class TemplateRegistry:
         for tmpl in templates:
             lines.append(f"### {tmpl.display_name} (`{tmpl.name}`)")
             lines.append(f"{tmpl.description.strip()}")
-            lines.append(f"**Category:** {tmpl.category}  ")
+            lines.append(f"**Domain:** {tmpl.domain}  ")
             lines.append(f"**Tags:** {', '.join(tmpl.tags)}")
             svc_list = ", ".join(f"{s.name} ({s.type})" for s in tmpl.services)
             lines.append(f"**Services:** {svc_list}")
@@ -156,7 +156,7 @@ class TemplateRegistry:
             name=str(metadata.get("name", path.stem)),
             display_name=str(metadata.get("display_name", metadata.get("name", ""))),
             description=str(metadata.get("description", "")),
-            category=str(metadata.get("category", "")),
+            domain=str(metadata.get("domain", "")),
             services=services,
             iac_defaults=data.get("iac_defaults", {}),
             requirements=str(data.get("requirements", "")),

@@ -10,10 +10,10 @@ from azext_prototype.agents.base import AgentContext
 from azext_prototype.ai.provider import AIResponse
 from azext_prototype.stages.qa_router import route_error_to_qa
 
-
 # ======================================================================
 # Helpers
 # ======================================================================
+
 
 def _make_response(content: str = "Root cause: X. Fix: do Y.") -> AIResponse:
     return AIResponse(content=content, model="gpt-4o", usage={})
@@ -46,6 +46,7 @@ def _make_tracker():
 # Core routing tests
 # ======================================================================
 
+
 class TestRouteErrorToQA:
     """Tests for route_error_to_qa()."""
 
@@ -56,8 +57,12 @@ class TestRouteErrorToQA:
         printed = []
 
         result = route_error_to_qa(
-            "Something broke", "Build Stage 1",
-            qa, ctx, tracker, printed.append,
+            "Something broke",
+            "Build Stage 1",
+            qa,
+            ctx,
+            tracker,
+            printed.append,
         )
 
         assert result["diagnosed"] is True
@@ -71,8 +76,12 @@ class TestRouteErrorToQA:
         printed = []
 
         result = route_error_to_qa(
-            "Something broke", "Build Stage 1",
-            None, ctx, None, printed.append,
+            "Something broke",
+            "Build Stage 1",
+            None,
+            ctx,
+            None,
+            printed.append,
         )
 
         assert result["diagnosed"] is False
@@ -86,8 +95,12 @@ class TestRouteErrorToQA:
         printed = []
 
         result = route_error_to_qa(
-            "Connection refused", "Deploy Stage 2",
-            qa, ctx, None, printed.append,
+            "Connection refused",
+            "Deploy Stage 2",
+            qa,
+            ctx,
+            None,
+            printed.append,
         )
 
         assert result["diagnosed"] is True
@@ -99,8 +112,12 @@ class TestRouteErrorToQA:
         printed = []
 
         result = route_error_to_qa(
-            ValueError("bad value"), "Build Stage 3",
-            qa, ctx, None, printed.append,
+            ValueError("bad value"),
+            "Build Stage 3",
+            qa,
+            ctx,
+            None,
+            printed.append,
         )
 
         assert result["diagnosed"] is True
@@ -114,8 +131,12 @@ class TestRouteErrorToQA:
         long_error = "x" * 5000
 
         result = route_error_to_qa(
-            long_error, "Build Stage 1",
-            qa, ctx, None, printed.append,
+            long_error,
+            "Build Stage 1",
+            qa,
+            ctx,
+            None,
+            printed.append,
             max_error_chars=100,
         )
 
@@ -131,8 +152,12 @@ class TestRouteErrorToQA:
         printed = []
 
         result = route_error_to_qa(
-            "Original error", "Build Stage 1",
-            qa, ctx, None, printed.append,
+            "Original error",
+            "Build Stage 1",
+            qa,
+            ctx,
+            None,
+            printed.append,
         )
 
         assert result["diagnosed"] is False
@@ -145,8 +170,12 @@ class TestRouteErrorToQA:
         tracker = _make_tracker()
 
         route_error_to_qa(
-            "error", "context",
-            qa, ctx, tracker, lambda m: None,
+            "error",
+            "context",
+            qa,
+            ctx,
+            tracker,
+            lambda m: None,
         )
 
         tracker.record.assert_called_once()
@@ -156,8 +185,12 @@ class TestRouteErrorToQA:
         ctx = _make_context()
 
         result = route_error_to_qa(
-            "error", "context",
-            qa, ctx, None, lambda m: None,
+            "error",
+            "context",
+            qa,
+            ctx,
+            None,
+            lambda m: None,
         )
 
         assert result["diagnosed"] is True
@@ -168,8 +201,12 @@ class TestRouteErrorToQA:
         printed = []
 
         route_error_to_qa(
-            "error", "context",
-            qa, ctx, None, printed.append,
+            "error",
+            "context",
+            qa,
+            ctx,
+            None,
+            printed.append,
         )
 
         assert any("QA Diagnosis" in p for p in printed)
@@ -182,8 +219,12 @@ class TestRouteErrorToQA:
         printed = []
 
         route_error_to_qa(
-            "error", "context",
-            qa, ctx, None, printed.append,
+            "error",
+            "context",
+            qa,
+            ctx,
+            None,
+            printed.append,
             max_display_chars=500,
         )
 
@@ -198,8 +239,12 @@ class TestRouteErrorToQA:
         printed = []
 
         result = route_error_to_qa(
-            "error", "context",
-            qa, ctx, None, printed.append,
+            "error",
+            "context",
+            qa,
+            ctx,
+            None,
+            printed.append,
         )
 
         assert result["diagnosed"] is False
@@ -209,8 +254,12 @@ class TestRouteErrorToQA:
         ctx = _make_context()
 
         result = route_error_to_qa(
-            "", "context",
-            qa, ctx, None, lambda m: None,
+            "",
+            "context",
+            qa,
+            ctx,
+            None,
+            lambda m: None,
         )
 
         assert result["diagnosed"] is True
@@ -223,8 +272,12 @@ class TestRouteErrorToQA:
         ctx = _make_context()
 
         result = route_error_to_qa(
-            None, "context",
-            qa, ctx, None, lambda m: None,
+            None,
+            "context",
+            qa,
+            ctx,
+            None,
+            lambda m: None,
         )
 
         assert result["diagnosed"] is True
@@ -237,8 +290,12 @@ class TestRouteErrorToQA:
         printed = []
 
         result = route_error_to_qa(
-            "error", "context",
-            qa, ctx, None, printed.append,
+            "error",
+            "context",
+            qa,
+            ctx,
+            None,
+            printed.append,
         )
 
         assert result["diagnosed"] is False
@@ -249,8 +306,12 @@ class TestRouteErrorToQA:
         ctx = _make_context()
 
         route_error_to_qa(
-            "error", "Build Stage 1",
-            qa, ctx, None, lambda m: None,
+            "error",
+            "Build Stage 1",
+            qa,
+            ctx,
+            None,
+            lambda m: None,
             services=["key-vault"],
         )
 
@@ -267,8 +328,12 @@ class TestRouteErrorToQA:
 
         # Should not raise
         result = route_error_to_qa(
-            "error", "context",
-            qa, ctx, None, lambda m: None,
+            "error",
+            "context",
+            qa,
+            ctx,
+            None,
+            lambda m: None,
             services=["svc"],
         )
 
@@ -280,8 +345,12 @@ class TestRouteErrorToQA:
 
         with patch("azext_prototype.stages.qa_router._submit_knowledge") as mock_submit:
             route_error_to_qa(
-                "error", "context",
-                qa, ctx, None, lambda m: None,
+                "error",
+                "context",
+                qa,
+                ctx,
+                None,
+                lambda m: None,
             )
 
             mock_submit.assert_called_once()
@@ -293,8 +362,12 @@ class TestRouteErrorToQA:
         ctx = _make_context()
 
         route_error_to_qa(
-            "error", "Deploy Stage 5: Redis Cache",
-            qa, ctx, None, lambda m: None,
+            "error",
+            "Deploy Stage 5: Redis Cache",
+            qa,
+            ctx,
+            None,
+            lambda m: None,
         )
 
         task_text = qa.execute.call_args[0][1]
@@ -308,8 +381,12 @@ class TestRouteErrorToQA:
 
         # Should not raise
         result = route_error_to_qa(
-            "error", "context",
-            qa, ctx, tracker, lambda m: None,
+            "error",
+            "context",
+            qa,
+            ctx,
+            tracker,
+            lambda m: None,
         )
 
         assert result["diagnosed"] is True
@@ -318,6 +395,7 @@ class TestRouteErrorToQA:
 # ======================================================================
 # Integration: Build session QA routing
 # ======================================================================
+
 
 class TestBuildSessionQARouting:
     """Test that build session routes errors through qa_router."""
@@ -350,6 +428,7 @@ class TestBuildSessionQARouting:
 
         def find_by_cap(cap):
             from azext_prototype.agents.base import AgentCapability
+
             if cap == AgentCapability.TERRAFORM:
                 return [iac_agent]
             if cap == AgentCapability.QA:
@@ -363,14 +442,19 @@ class TestBuildSessionQARouting:
         registry.find_by_capability.side_effect = find_by_cap
 
         build_state = BuildState(str(tmp_project))
-        build_state.set_deployment_plan([
-            {
-                "stage": 1, "name": "Foundation", "category": "infra",
-                "dir": "concept/infra/terraform/stage-1-foundation",
-                "services": [{"name": "key-vault", "computed_name": "kv-1", "resource_type": "", "sku": ""}],
-                "status": "pending", "files": [],
-            },
-        ])
+        build_state.set_deployment_plan(
+            [
+                {
+                    "stage": 1,
+                    "name": "Foundation",
+                    "category": "infra",
+                    "dir": "concept/infra/terraform/stage-1-foundation",
+                    "services": [{"name": "key-vault", "computed_name": "kv-1", "resource_type": "", "sku": ""}],
+                    "status": "pending",
+                    "files": [],
+                },
+            ]
+        )
 
         with patch("azext_prototype.stages.build_session.ProjectConfig") as mock_config:
             mock_config.return_value.load.return_value = None
@@ -378,7 +462,10 @@ class TestBuildSessionQARouting:
                 "project.iac_tool": "terraform",
                 "project.name": "test",
             }.get(k, d)
-            mock_config.return_value.to_dict.return_value = {"naming": {"strategy": "simple"}, "project": {"name": "test"}}
+            mock_config.return_value.to_dict.return_value = {
+                "naming": {"strategy": "simple"},
+                "project": {"name": "test"},
+            }
             session = BuildSession(ctx, registry, build_state=build_state)
 
         return session, qa
@@ -388,7 +475,7 @@ class TestBuildSessionQARouting:
         session, qa = self._make_session(tmp_project)
         printed = []
 
-        result = session.run(
+        session.run(
             design={"architecture": "Simple web app"},
             input_fn=lambda p: "done",
             print_fn=printed.append,
@@ -403,7 +490,7 @@ class TestBuildSessionQARouting:
         session, qa = self._make_session(tmp_project, response=empty_resp)
         printed = []
 
-        result = session.run(
+        session.run(
             design={"architecture": "Simple web app"},
             input_fn=lambda p: "done",
             print_fn=printed.append,
@@ -416,6 +503,7 @@ class TestBuildSessionQARouting:
 # ======================================================================
 # Integration: Discovery session QA routing
 # ======================================================================
+
 
 class TestDiscoveryQARouting:
     """Test that discovery routes non-vision errors through qa_router."""
@@ -442,6 +530,7 @@ class TestDiscoveryQARouting:
         registry = MagicMock()
 
         from azext_prototype.agents.base import AgentCapability
+
         def find_by_cap(cap):
             if cap == AgentCapability.BIZ_ANALYSIS:
                 return [biz_agent]
@@ -470,6 +559,7 @@ class TestDiscoveryQARouting:
 # Integration: Backlog session QA routing
 # ======================================================================
 
+
 class TestBacklogQARouting:
     """Test that backlog session routes errors through qa_router."""
 
@@ -490,6 +580,7 @@ class TestBacklogQARouting:
 
         registry = MagicMock()
         from azext_prototype.agents.base import AgentCapability
+
         def find_by_cap(cap):
             if cap == AgentCapability.BACKLOG_GENERATION:
                 return [pm]
@@ -500,7 +591,8 @@ class TestBacklogQARouting:
         registry.find_by_capability.side_effect = find_by_cap
 
         ctx.ai_provider.chat.return_value = AIResponse(
-            content=items_response, model="gpt-4o",
+            content=items_response,
+            model="gpt-4o",
             usage={"prompt_tokens": 10, "completion_tokens": 5},
         )
 
@@ -526,13 +618,14 @@ class TestBacklogQARouting:
     @patch("azext_prototype.stages.backlog_session.push_github_issue")
     def test_push_error_triggers_qa(self, mock_push, mock_auth, mock_knowledge, tmp_project):
         import json
+
         items = [{"epic": "Infra", "title": "Setup VNet", "description": "Create VNet", "tasks": [], "effort": "M"}]
         session, qa, ctx = self._make_session(tmp_project, items_response=json.dumps(items))
 
         mock_push.return_value = {"error": "gh: auth required"}
 
         printed = []
-        result = session.run(
+        session.run(
             design_context="web app",
             provider="github",
             org="myorg",
@@ -548,6 +641,7 @@ class TestBacklogQARouting:
 # ======================================================================
 # Integration: Deploy session refactored QA routing
 # ======================================================================
+
 
 class TestDeploySessionRefactoredQA:
     """Test that refactored deploy session still works correctly."""
@@ -565,10 +659,12 @@ class TestDeploySessionRefactoredQA:
         qa = _make_qa_agent(_make_response("Root cause: missing permissions"))
         registry = MagicMock()
         from azext_prototype.agents.base import AgentCapability
+
         def find_by_cap(cap):
             if cap == AgentCapability.QA:
                 return [qa]
             return []
+
         registry.find_by_capability.side_effect = find_by_cap
 
         with patch("azext_prototype.stages.deploy_session.ProjectConfig") as mock_config:
@@ -583,7 +679,11 @@ class TestDeploySessionRefactoredQA:
         result = {"error": "Deployment failed: access denied"}
 
         session._handle_deploy_failure(
-            stage, result, False, printed.append, lambda p: "",
+            stage,
+            result,
+            False,
+            printed.append,
+            lambda p: "",
         )
 
         qa.execute.assert_called_once()
@@ -616,7 +716,11 @@ class TestDeploySessionRefactoredQA:
         result = {"error": "access denied"}
 
         session._handle_deploy_failure(
-            stage, result, False, printed.append, lambda p: "",
+            stage,
+            result,
+            False,
+            printed.append,
+            lambda p: "",
         )
 
         assert any("Error:" in p for p in printed)

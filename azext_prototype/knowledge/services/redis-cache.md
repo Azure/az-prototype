@@ -1,3 +1,8 @@
+---
+service_namespace: Microsoft.Cache/redis
+display_name: Azure Cache for Redis
+---
+
 # Azure Cache for Redis
 > Managed in-memory data store for caching, session management, and real-time analytics powered by open-source Redis.
 
@@ -21,83 +26,127 @@ Prefer Redis over Cosmos DB when data is ephemeral, latency-sensitive, and does 
 | AAD auth | Enabled | `aad_auth_enabled = true` in redis_configuration |
 | Access keys | Disabled (preview) | Prefer AAD auth; set `access_key_authentication_disabled = true` |
 | TLS | 1.2 minimum | `minimum_tls_version = "1.2"` |
-| Public network access | Allowed (POC) | Flag private endpoint as production backlog item |
+| Public network access | Disabled (unless user overrides) | Flag private endpoint as production backlog item |
 
 ## Terraform Patterns
 
 ### Basic Resource
 
 ```hcl
-resource "azurerm_redis_cache" "this" {
-  name                          = var.name
-  location                      = var.location
-  resource_group_name           = var.resource_group_name
-  capacity                      = 0
-  family                        = "C"
-  sku_name                      = "Basic"
-  minimum_tls_version           = "1.2"
-  public_network_access_enabled = true  # Set false when using private endpoint
+resource "azapi_resource" "redis" {
+  type      = "Microsoft.Cache/redis@2024-03-01"
+  name      = var.name
+  location  = var.location
+  parent_id = azapi_resource.resource_group.id
 
-  # CRITICAL: Enable AAD authentication
-  redis_configuration {
-    active_directory_authentication_enabled = true
+  body = {
+    properties = {
+      sku = {
+        name     = "Basic"
+        family   = "C"
+        capacity = 0
+      }
+      enableNonSslPort    = false
+      minimumTlsVersion   = "1.2"
+      publicNetworkAccess = "Disabled"  # Unless told otherwise, disabled per governance policy
+      redisConfiguration = {
+        "aad-enabled" = "true"   # CRITICAL: Enable AAD authentication
+      }
+    }
   }
 
   tags = var.tags
+
+  response_export_values = ["properties.hostName", "properties.sslPort"]
 }
 ```
 
 ### RBAC Assignment
 
-Redis uses its own data-plane RBAC roles (not standard Azure resource RBAC). Assign via `azurerm_redis_cache_access_policy_assignment`:
+Redis uses its own data-plane RBAC roles (not standard Azure resource RBAC). Assign via `Microsoft.Cache/redis/accessPolicyAssignments`:
 
 ```hcl
 # Redis Data Owner -- full read/write access
-resource "azurerm_redis_cache_access_policy_assignment" "app" {
-  name               = "app-identity-data-owner"
-  redis_cache_id     = azurerm_redis_cache.this.id
-  access_policy_name = "Data Owner"
-  object_id          = var.managed_identity_principal_id
-  object_id_alias    = "app-identity"
+resource "azapi_resource" "redis_access_policy_owner" {
+  type      = "Microsoft.Cache/redis/accessPolicyAssignments@2024-03-01"
+  name      = "app-identity-data-owner"
+  parent_id = azapi_resource.redis.id
+
+  body = {
+    properties = {
+      accessPolicyName = "Data Owner"
+      objectId         = var.managed_identity_principal_id
+      objectIdAlias    = "app-identity"
+    }
+  }
 }
 
 # Redis Data Contributor -- read/write, no admin commands
-resource "azurerm_redis_cache_access_policy_assignment" "app_contributor" {
-  name               = "app-identity-data-contributor"
-  redis_cache_id     = azurerm_redis_cache.this.id
-  access_policy_name = "Data Contributor"
-  object_id          = var.managed_identity_principal_id
-  object_id_alias    = "app-identity-contributor"
+resource "azapi_resource" "redis_access_policy_contributor" {
+  type      = "Microsoft.Cache/redis/accessPolicyAssignments@2024-03-01"
+  name      = "app-identity-data-contributor"
+  parent_id = azapi_resource.redis.id
+
+  body = {
+    properties = {
+      accessPolicyName = "Data Contributor"
+      objectId         = var.managed_identity_principal_id
+      objectIdAlias    = "app-identity-contributor"
+    }
+  }
 }
 ```
 
 ### Private Endpoint
 
 ```hcl
-resource "azurerm_private_endpoint" "redis" {
-  count = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
+resource "azapi_resource" "redis_private_endpoint" {
+  count     = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
 
-  name                = "pe-${var.name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  subnet_id           = var.subnet_id
+  type      = "Microsoft.Network/privateEndpoints@2023-11-01"
+  name      = "pe-${var.name}"
+  location  = var.location
+  parent_id = azapi_resource.resource_group.id
 
-  private_service_connection {
-    name                           = "psc-${var.name}"
-    private_connection_resource_id = azurerm_redis_cache.this.id
-    subresource_names              = ["redisCache"]
-    is_manual_connection           = false
-  }
-
-  dynamic "private_dns_zone_group" {
-    for_each = var.private_dns_zone_id != null ? [1] : []
-    content {
-      name                 = "dns-zone-group"
-      private_dns_zone_ids = [var.private_dns_zone_id]
+  body = {
+    properties = {
+      subnet = {
+        id = var.subnet_id
+      }
+      privateLinkServiceConnections = [
+        {
+          name = "psc-${var.name}"
+          properties = {
+            privateLinkServiceId = azapi_resource.redis.id
+            groupIds             = ["redisCache"]
+          }
+        }
+      ]
     }
   }
 
   tags = var.tags
+}
+
+resource "azapi_resource" "redis_pe_dns_zone_group" {
+  count     = var.enable_private_endpoint && var.subnet_id != null && var.private_dns_zone_id != null ? 1 : 0
+
+  type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01"
+  name      = "dns-zone-group"
+  parent_id = azapi_resource.redis_private_endpoint[0].id
+
+  body = {
+    properties = {
+      privateDnsZoneConfigs = [
+        {
+          name = "config"
+          properties = {
+            privateDnsZoneId = var.private_dns_zone_id
+          }
+        }
+      ]
+    }
+  }
 }
 ```
 
@@ -129,7 +178,7 @@ resource redis 'Microsoft.Cache/redis@2024-03-01' = {
     }
     enableNonSslPort: false
     minimumTlsVersion: '1.2'
-    publicNetworkAccess: 'Enabled'  // Set 'Disabled' when using private endpoint
+    publicNetworkAccess: 'Disabled'  // Unless told otherwise, disabled per governance policy
     redisConfiguration: {
       'aad-enabled': 'true'
     }
@@ -241,15 +290,22 @@ await client.set("key", "value", "EX", 3600);
 const value = await client.get("key");
 ```
 
+## CRITICAL: Entra Authentication and Access Keys
+- When Entra (AAD) authentication is enabled, access keys are **disabled** by the platform
+- Do **NOT** output or reference `accessKeys`, `primaryKey`, or connection strings when `aad-enabled = true`
+- Do **NOT** create Key Vault secrets containing Redis connection strings when Entra auth is enabled
+- Downstream applications **MUST** authenticate via `DefaultAzureCredential` using the worker identity's `accessPolicyAssignment`
+- Do **NOT** declare `terraform_remote_state` for Key Vault (Stage 6) unless this stage _actually writes_ a secret to it
+
 ## Common Pitfalls
 
-1. **Forgetting to enable AAD auth** -- `active_directory_authentication_enabled = true` in `redis_configuration` is required for token-based authentication. Without it, only access key auth works.
+1. **Forgetting to enable AAD auth** -- `"aad-enabled" = "true"` in `redisConfiguration` is required for token-based authentication. Without it, only access key auth works.
 2. **Using access keys instead of AAD** -- Access keys are prohibited per governance policies. Always use `DefaultAzureCredential` with the `https://redis.azure.com/.default` scope.
 3. **Token expiration** -- Redis AAD tokens expire (typically 1 hour). Long-lived connections must refresh tokens. StackExchange.Redis handles this automatically with `ConfigureForAzureWithTokenCredentialAsync`; Python and Node.js require manual refresh logic.
 4. **Basic tier limitations** -- Basic C0 has no SLA, no replication, and a 250 MB cache size limit. Suitable for POC only.
-5. **Non-SSL port** -- Always disable the non-SSL port (`enable_non_ssl_port = false`). All connections must use TLS on port 6380.
-6. **Redis data-plane RBAC vs Azure RBAC** -- Redis uses its own access policy system (Data Owner, Data Contributor, Data Reader) via `accessPolicyAssignments`, not standard `Microsoft.Authorization/roleAssignments`.
-7. **Firewall rules with private endpoints** -- When using private endpoints, set `public_network_access_enabled = false` to prevent bypassing the private link.
+5. **Non-SSL port** -- Always set `enableNonSslPort = false`. All connections must use TLS on port 6380.
+6. **Redis data-plane RBAC vs Azure RBAC** -- Redis uses its own access policy system (Data Owner, Data Contributor, Data Reader) via `Microsoft.Cache/redis/accessPolicyAssignments`, not standard `Microsoft.Authorization/roleAssignments`.
+7. **Firewall rules with private endpoints** -- When using private endpoints, set `publicNetworkAccess = "Disabled"` to prevent bypassing the private link.
 
 ## Production Backlog Items
 

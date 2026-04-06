@@ -1,76 +1,183 @@
-# Anti-pattern detection — Security domain
-#
-# Detects credentials, secrets, and insecure configurations in
-# AI-generated output.  Each pattern entry is evaluated independently;
-# when any search_pattern matches and no safe_pattern matches, the
-# warning_message is surfaced to the user for review.
-
+kind: anti-pattern
 domain: security
 description: Credentials, secrets, and insecure configuration detection
-
+last_updated: '2026-04-04'
 patterns:
-  - search_patterns:
-      - "connection_string"
-      - "connectionstring"
-      - "access_key"
-      - "accesskey"
-      - "account_key"
-      - "accountkey"
-      - "shared_access_key"
-      - "client_secret"
-      - "password ="
-      - "password=\""
-      - "password='"
+- id: ANTI-SEC-001
+  description: Detects connection strings, access keys, or shared secrets that should use managed identity
+  rationale: Connection strings and access keys are shared secrets that cannot be scoped to specific identities, automatically
+    rotated, or audited through Entra ID.
+  warning_message: Possible credential/secret in output — use managed identity instead of connection strings or keys.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services: []
+    search_patterns:
+    - connection_string
+    - connectionstring
+    - access_key
+    - accesskey
+    - account_key
+    - accountkey
+    - shared_access_key
+    - client_secret
+    - password =
+    - password="
+    - password='
     safe_patterns:
-      - "applicationinsights_connection_string"
-      - "appinsights_connection_string"
-      - "application_insights_connection_string"
-      - "appinsights_connectionstring"
-    warning_message: "Possible credential/secret in output — use managed identity instead of connection strings or keys."
-
-  - search_patterns:
-      - "admin_enabled = true"
-      - "admin_username"
-      - "admin_password"
-    safe_patterns: []
-    warning_message: "Admin credentials detected — use managed identity or RBAC-based authentication instead."
-
-  - search_patterns:
-      - "hardcoded"
-      - "hard-coded"
-      - "hard coded"
+    - applicationinsights_connection_string
+    - appinsights_connection_string
+    - application_insights_connection_string
+    - .properties.connectionstring
+    - never output
+    - are disabled
+    - is disabled
+    - do not output
+    - do not use
+    - prohibited
+    - defaultazurecredential
+    correct_patterns:
+    - '# Use managed identity via DefaultAzureCredential'
+    - Microsoft.ManagedIdentity/userAssignedIdentities
+- id: ANTI-SEC-002
+  description: Detects container registry admin credentials enabled instead of managed identity with AcrPull
+  rationale: Admin credentials are shared secrets that cannot be scoped per-service and bypass RBAC audit trails.
+  warning_message: Admin credentials detected — disable admin user and use managed identity with AcrPull role assignment.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.ContainerRegistry/registries
+    search_patterns:
+    - admin_enabled = true
+    - admin_username
+    - admin_password
+    - adminUserEnabled = true
+    correct_patterns:
+    - admin_enabled = false
+    - adminUserEnabled = false
+    - '# Use managed identity with AcrPull role assignment'
+- id: ANTI-SEC-003
+  description: Detects hardcoded secret values that should be parameterized or stored in Key Vault
+  rationale: Hardcoded values in code cannot be rotated and are permanently exposed in source control history.
+  warning_message: Possible hardcoded value detected — externalize to Key Vault or use variables.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services: []
+    search_patterns:
+    - hardcoded
+    - hard-coded
+    - hard coded
     safe_patterns:
-      - "do not hardcode"
-      - "avoid hardcod"
-      - "never hardcode"
-      - "don't hardcode"
-    warning_message: "Possible hard-coded value detected — externalize secrets to Key Vault or use managed identity."
-
-  - search_patterns:
-      - "disable_tde"
-      - "transparent_data_encryption = false"
-      - "encryption_at_rest = false"
-    safe_patterns: []
-    warning_message: "Encryption at rest appears disabled — leave default encryption enabled on all data services."
-
-  - search_patterns:
-      - "output \"cosmos_account_primary_key\""
-      - "output \"cosmos_primary_key\""
-      - "output \"cosmos_connection_strings\""
-      - "output \"primary_key\""
-      - "output \"primary_connection_string\""
-      - "output \"secondary_key\""
-      - "output \"storage_account_key\""
-      - "output \"storage_primary_key\""
-      - "output \"sql_admin_password\""
+    - do not hardcode
+    - avoid hardcod
+    - never hardcode
+    - don't hardcode
+    - possible hard-coded value detected
+    - rather than hardcoded
+    - instead of hardcod
+    correct_patterns:
+    - '# Externalize secrets to Key Vault or use managed identity'
+- id: ANTI-SEC-004
+  description: Detects disabled encryption at rest on storage or database services
+  rationale: Disabled encryption exposes data if storage media is compromised or improperly decommissioned.
+  warning_message: Encryption at rest is disabled — enable TDE for SQL, SSE for Storage.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.Sql/servers
+    - Microsoft.Sql/servers/databases
+    search_patterns:
+    - disable_tde
+    - transparent_data_encryption = false
+    correct_patterns:
+    - transparent_data_encryption = true
+    - transparentDataEncryption = "Enabled"
+  - services:
+    - Microsoft.Storage/storageAccounts
+    - Microsoft.DocumentDB/databaseAccounts
+    search_patterns:
+    - encryption_at_rest = false
+    correct_patterns:
+    - encryption_at_rest = true
+- id: ANTI-SEC-005
+  description: Detects sensitive values exposed as Terraform outputs (keys, passwords, connection strings)
+  rationale: Terraform outputs are stored in plaintext state files — sensitive values are visible to anyone with state access.
+  warning_message: Sensitive value in Terraform output — remove the output or add sensitive = true.
+  applies_to:
+  - terraform-agent
+  targets:
+  - services: []
+    search_patterns:
+    - output "cosmos_account_primary_key"
+    - output "cosmos_primary_key"
+    - output "cosmos_connection_strings"
+    - output "primary_key"
+    - output "primary_connection_string"
+    - output "secondary_key"
+    - output "storage_account_key"
+    - output "storage_primary_key"
+    - output "sql_admin_password"
     safe_patterns:
-      - "deprecated"
-      - "do not use"
-    warning_message: "Sensitive value exposed as Terraform output — remove this output entirely. Use managed identity instead of keys."
-
-  - search_patterns:
-      - "DO NOT USE - use managed identity"
-      - "DEPRECATED: Use managed identity"
-      - "WARNING: Do not use"
-    safe_patterns: []
-    warning_message: "Output marked as 'do not use' should be removed entirely, not left with a warning. Omit sensitive outputs."
+    - deprecated
+    - do not use
+    correct_patterns:
+    - '# Remove sensitive outputs — use managed identity for service-to-service auth'
+    - output "resource_id"
+    - output "principal_id"
+- id: ANTI-SEC-006
+  description: Detects deprecated sensitive outputs with warning comments still present in code
+  rationale: Outputs marked with "DO NOT USE" or "DEPRECATED" should be removed entirely, not left with warnings.
+  warning_message: Deprecated sensitive output detected — remove the output entirely instead of adding a warning comment.
+  applies_to:
+  - terraform-agent
+  targets:
+  - services: []
+    search_patterns:
+    - DO NOT USE - use managed identity
+    - 'DEPRECATED: Use managed identity'
+    - 'WARNING: Do not use'
+    correct_patterns:
+    - '# Remove this output entirely — do not emit sensitive values'
+- id: ANTI-SEC-007
+  description: Detects Owner or Contributor role assignments on service identities (overprivileged)
+  rationale: Owner and Contributor roles grant full control — service identities should use the most specific data-plane role
+    at the narrowest scope.
+  warning_message: Overprivileged role assignment detected — use the most specific built-in role at the narrowest scope.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.Authorization/roleAssignments
+    search_patterns:
+    - '"Owner"'
+    - '"Contributor"'
+    safe_patterns:
+    - storage blob data
+    - key vault secrets
+    - key vault crypto
+    - cosmos db
+    - signalr service owner
+    - service bus data
+    - redis cache contributor
+    - acrpull
+    - acrpush
+    - monitoring reader
+    - log analytics reader
+    correct_patterns:
+    - '"Storage Blob Data Contributor"'
+    - '"Key Vault Secrets User"'
+    - '# Use the most specific built-in role at the narrowest scope'

@@ -1,11 +1,13 @@
 """Tests for azext_prototype.stages — guards, base, init, design, build, deploy."""
 
-
 from unittest.mock import MagicMock, patch
 
-
 from azext_prototype.stages.base import StageGuard, StageState
-from azext_prototype.stages.guards import check_prerequisites
+from azext_prototype.stages.guards import (
+    _check_az_logged_in,
+    _check_gh_installed,
+    check_prerequisites,
+)
 
 
 class TestStageState:
@@ -77,6 +79,43 @@ class TestCheckPrerequisites:
         passed, failures = check_prerequisites("deploy", str(project_with_build))
         build_fail = [f for f in failures if "build" in f.lower()]
         assert len(build_fail) == 0
+
+    def test_check_fn_exception_captured(self, tmp_project):
+        """Lines 26-27: check_fn that raises is caught and recorded."""
+        with patch(
+            "azext_prototype.stages.guards._get_checks",
+            return_value=[("boom", lambda: (_ for _ in ()).throw(RuntimeError("oops")), "unused")],
+        ):
+            passed, failures = check_prerequisites("init", str(tmp_project))
+        assert not passed
+        assert len(failures) == 1
+        assert "[boom] Check error: oops" in failures[0]
+
+
+class TestCheckGhInstalled:
+    """Tests for _check_gh_installed (lines 102-113)."""
+
+    @patch("subprocess.run")
+    def test_gh_installed(self, mock_run):
+        mock_run.return_value = MagicMock(returncode=0)
+        assert _check_gh_installed() is True
+
+    @patch("subprocess.run")
+    def test_gh_not_installed_nonzero(self, mock_run):
+        mock_run.return_value = MagicMock(returncode=1)
+        assert _check_gh_installed() is False
+
+    @patch("subprocess.run", side_effect=FileNotFoundError)
+    def test_gh_not_found(self, mock_run):
+        assert _check_gh_installed() is False
+
+
+class TestCheckAzLoggedIn:
+    """Tests for _check_az_logged_in (lines 128-129)."""
+
+    @patch("subprocess.run", side_effect=FileNotFoundError)
+    def test_az_not_found(self, mock_run):
+        assert _check_az_logged_in() is False
 
 
 class TestBaseStageCanRun:
@@ -205,7 +244,9 @@ class TestDeployBicepStaging:
         from azext_prototype.stages.deploy_helpers import is_subscription_scoped
 
         bicep_file = tmp_path / "main.bicep"
-        bicep_file.write_text("targetScope = 'subscription'\n\nresource rg 'Microsoft.Resources/resourceGroups@2023-07-01' = {}")
+        bicep_file.write_text(
+            "targetScope = 'subscription'\n\nresource rg 'Microsoft.Resources/resourceGroups@2023-07-01' = {}"
+        )
 
         assert is_subscription_scoped(bicep_file) is True
 
@@ -258,7 +299,9 @@ class TestDeployBicepStaging:
 
         bicep_dir = tmp_path / "stage1"
         bicep_dir.mkdir()
-        (bicep_dir / "main.bicep").write_text("targetScope = 'subscription'\n\nresource rg 'Microsoft.Resources/resourceGroups@2023-07-01' = {}")
+        (bicep_dir / "main.bicep").write_text(
+            "targetScope = 'subscription'\n\nresource rg 'Microsoft.Resources/resourceGroups@2023-07-01' = {}"
+        )
 
         mock_run.return_value = MagicMock(returncode=0, stdout='{"properties":{}}', stderr="")
 
@@ -346,12 +389,10 @@ class TestDesignStage:
         stage = DesignStage()
         assert callable(stage.execute)
 
-    def test_design_execute_single_pass(
-        self, project_with_config, mock_agent_context, populated_registry
-    ):
+    def test_design_execute_single_pass(self, project_with_config, mock_agent_context, populated_registry):
         """Design stage runs architect agent and writes docs in single-pass mode."""
-        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.stages.discovery import DiscoveryResult
 
         # Patch guards so the stage can run
@@ -373,9 +414,7 @@ class TestDesignStage:
             policy_overrides=[],
             exchange_count=2,
         )
-        with patch(
-            "azext_prototype.stages.design_stage.DiscoverySession"
-        ) as MockDS:
+        with patch("azext_prototype.stages.design_stage.DiscoverySession") as MockDS:
             MockDS.return_value.run.return_value = mock_discovery_result
 
             result = stage.execute(
@@ -389,12 +428,10 @@ class TestDesignStage:
         arch_path = project_with_config / "concept" / "docs" / "ARCHITECTURE.md"
         assert arch_path.exists()
 
-    def test_design_refine_loop_accept_immediately(
-        self, project_with_config, mock_agent_context, populated_registry
-    ):
+    def test_design_refine_loop_accept_immediately(self, project_with_config, mock_agent_context, populated_registry):
         """When user immediately accepts, loop exits without extra iterations."""
-        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.stages.discovery import DiscoveryResult
 
         stage = DesignStage()
@@ -433,8 +470,8 @@ class TestDesignStage:
         self, project_with_config, mock_agent_context, populated_registry
     ):
         """User gives feedback once, then accepts."""
-        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.stages.discovery import DiscoveryResult
 
         stage = DesignStage()
@@ -491,12 +528,10 @@ class TestDesignStage:
         arch_content = arch_path.read_text(encoding="utf-8")
         assert "Refined design with Redis" in arch_content
 
-    def test_design_refine_loop_eof_exits_gracefully(
-        self, project_with_config, mock_agent_context, populated_registry
-    ):
+    def test_design_refine_loop_eof_exits_gracefully(self, project_with_config, mock_agent_context, populated_registry):
         """EOFError (non-interactive terminal) exits the loop gracefully."""
-        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.stages.discovery import DiscoveryResult
 
         stage = DesignStage()
@@ -528,13 +563,12 @@ class TestDesignStage:
 
         assert result["status"] == "success"
 
-    def test_design_state_persists_decisions(
-        self, project_with_config, mock_agent_context, populated_registry
-    ):
+    def test_design_state_persists_decisions(self, project_with_config, mock_agent_context, populated_registry):
         """Feedback from refinement loop is stored in design state decisions."""
         import json as _json
-        from azext_prototype.stages.design_stage import DesignStage
+
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.stages.discovery import DiscoveryResult
 
         stage = DesignStage()
@@ -587,13 +621,10 @@ class TestDesignStage:
         assert len(state["decisions"]) == 1
         assert "AKS" in state["decisions"][0]["feedback"]
 
-
-    def test_design_iterative_planning_fallback(
-        self, project_with_config, mock_agent_context, populated_registry
-    ):
+    def test_design_iterative_planning_fallback(self, project_with_config, mock_agent_context, populated_registry):
         """If the planning call returns invalid JSON, default sections are used."""
-        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.stages.discovery import DiscoveryResult
 
         stage = DesignStage()
@@ -613,9 +644,7 @@ class TestDesignStage:
             policy_overrides=[],
             exchange_count=2,
         )
-        with patch(
-            "azext_prototype.stages.design_stage.DiscoverySession"
-        ) as MockDS:
+        with patch("azext_prototype.stages.design_stage.DiscoverySession") as MockDS:
             MockDS.return_value.run.return_value = mock_discovery_result
             result = stage.execute(
                 mock_agent_context,
@@ -631,12 +660,10 @@ class TestDesignStage:
         # Should contain content from multiple section calls (9 default sections)
         assert len(content) > 0
 
-    def test_design_iterative_section_failure(
-        self, project_with_config, mock_agent_context, populated_registry
-    ):
+    def test_design_iterative_section_failure(self, project_with_config, mock_agent_context, populated_registry):
         """If a section call fails, the error propagates (partial work is saved by caller)."""
-        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.stages.discovery import DiscoveryResult
 
         stage = DesignStage()
@@ -665,10 +692,9 @@ class TestDesignStage:
             exchange_count=2,
         )
         import pytest
+
         with pytest.raises(RuntimeError, match="API connection lost"):
-            with patch(
-                "azext_prototype.stages.design_stage.DiscoverySession"
-            ) as MockDS:
+            with patch("azext_prototype.stages.design_stage.DiscoverySession") as MockDS:
                 MockDS.return_value.run.return_value = mock_discovery_result
                 stage.execute(
                     mock_agent_context,
@@ -676,17 +702,16 @@ class TestDesignStage:
                     **{"context": "Build a web app", "interactive": False},
                 )
 
-    def test_design_iterative_usage_accumulation(
-        self, project_with_config, mock_agent_context, populated_registry
-    ):
+    def test_design_iterative_usage_accumulation(self, project_with_config, mock_agent_context, populated_registry):
         """Token usage is accumulated across all iterative section calls."""
-        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
 
         # Directly test _generate_architecture_sections with known sections
         from azext_prototype.config import ProjectConfig
+
         config = ProjectConfig(str(project_with_config))
         config.load()
 
@@ -730,12 +755,10 @@ class TestDesignStage:
         assert usage["completion_tokens"] == 450
         assert usage["total_tokens"] == 700
 
-    def test_design_architecture_sliding_window(
-        self, project_with_config, mock_agent_context, populated_registry
-    ):
+    def test_design_architecture_sliding_window(self, project_with_config, mock_agent_context, populated_registry):
         """Older sections are summarised to headings only when >3 accumulated."""
-        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
         from azext_prototype.config import ProjectConfig
@@ -787,9 +810,9 @@ class TestDesignStage:
         self, project_with_config, mock_agent_context, populated_registry
     ):
         """--skip-discovery skips the discovery session and uses existing state."""
+        from azext_prototype.ai.provider import AIResponse
         from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.stages.discovery_state import DiscoveryState
-        from azext_prototype.ai.provider import AIResponse
 
         # Create a discovery state with content
         ds = DiscoveryState(str(project_with_config))
@@ -811,15 +834,16 @@ class TestDesignStage:
 
         # User presses Enter (no extra context) at the skip-discovery prompt
         # DiscoverySession should NOT be called
-        with patch(
-            "azext_prototype.stages.design_stage.DiscoverySession"
-        ) as MockDS:
+        with patch("azext_prototype.stages.design_stage.DiscoverySession") as MockDS:
             result = stage.execute(
                 mock_agent_context,
                 populated_registry,
                 **{
-                    "context": "", "interactive": False, "skip_discovery": True,
-                    "input_fn": lambda _: "", "print_fn": lambda x: None,
+                    "context": "",
+                    "interactive": False,
+                    "skip_discovery": True,
+                    "input_fn": lambda _: "",
+                    "print_fn": lambda x: None,
                 },
             )
             MockDS.assert_not_called()
@@ -832,9 +856,9 @@ class TestDesignStage:
         self, project_with_config, mock_agent_context, populated_registry
     ):
         """--skip-discovery allows user to add context before architecture generation."""
+        from azext_prototype.ai.provider import AIResponse
         from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.stages.discovery_state import DiscoveryState
-        from azext_prototype.ai.provider import AIResponse
 
         ds = DiscoveryState(str(project_with_config))
         ds.load()
@@ -848,6 +872,7 @@ class TestDesignStage:
         mock_agent_context.project_dir = str(project_with_config)
         # Capture the prompts sent to the AI so we can verify extra context is included
         calls = []
+
         def _chat(*args, **kwargs):
             calls.append(args)
             return AIResponse(
@@ -855,6 +880,7 @@ class TestDesignStage:
                 model="gpt-4o",
                 usage={"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
             )
+
         mock_agent_context.ai_provider.chat.side_effect = _chat
 
         # User types additional context at the prompt
@@ -862,7 +888,9 @@ class TestDesignStage:
             mock_agent_context,
             populated_registry,
             **{
-                "context": "", "interactive": False, "skip_discovery": True,
+                "context": "",
+                "interactive": False,
+                "skip_discovery": True,
                 "input_fn": lambda _: "Also add Redis caching",
                 "print_fn": lambda x: None,
             },
@@ -874,9 +902,9 @@ class TestDesignStage:
         self, project_with_config, mock_agent_context, populated_registry
     ):
         """--skip-discovery extracts requirements from conversation history, not empty structured fields."""
+        from azext_prototype.ai.provider import AIResponse
         from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.stages.discovery_state import DiscoveryState
-        from azext_prototype.ai.provider import AIResponse
 
         # Create a discovery state with EMPTY structured fields but rich conversation
         ds = DiscoveryState(str(project_with_config))
@@ -912,6 +940,7 @@ class TestDesignStage:
         mock_agent_context.project_dir = str(project_with_config)
         # Capture what the AI receives to verify context is from conversation
         prompts_received = []
+
         def _chat(*args, **kwargs):
             prompts_received.append(args)
             return AIResponse(
@@ -919,14 +948,18 @@ class TestDesignStage:
                 model="gpt-4o",
                 usage={"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
             )
+
         mock_agent_context.ai_provider.chat.side_effect = _chat
 
         result = stage.execute(
             mock_agent_context,
             populated_registry,
             **{
-                "context": "", "interactive": False, "skip_discovery": True,
-                "input_fn": lambda _: "", "print_fn": lambda x: None,
+                "context": "",
+                "interactive": False,
+                "skip_discovery": True,
+                "input_fn": lambda _: "",
+                "print_fn": lambda x: None,
             },
         )
 
@@ -938,8 +971,9 @@ class TestDesignStage:
 
     def test_design_extract_last_summary_method(self):
         """_extract_last_summary delegates to DiscoveryState.extract_conversation_summary."""
-        from azext_prototype.stages.design_stage import DesignStage
         from unittest.mock import MagicMock
+
+        from azext_prototype.stages.design_stage import DesignStage
 
         ds = MagicMock()
         ds.extract_conversation_summary.return_value = "## Project Summary\nA web app."
@@ -950,8 +984,9 @@ class TestDesignStage:
 
     def test_design_extract_last_summary_empty_history(self):
         """_extract_last_summary returns empty string when delegate returns empty."""
-        from azext_prototype.stages.design_stage import DesignStage
         from unittest.mock import MagicMock
+
+        from azext_prototype.stages.design_stage import DesignStage
 
         ds = MagicMock()
         ds.extract_conversation_summary.return_value = ""
@@ -962,8 +997,9 @@ class TestDesignStage:
     ):
         """--skip-discovery raises CLIError when no discovery state exists."""
         import pytest
-        from azext_prototype.stages.design_stage import DesignStage
         from knack.util import CLIError
+
+        from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
         stage.get_guards = lambda: []  # type: ignore[assignment]
@@ -975,8 +1011,10 @@ class TestDesignStage:
                 mock_agent_context,
                 populated_registry,
                 **{
-                    "interactive": False, "skip_discovery": True,
-                    "input_fn": lambda _: "", "print_fn": lambda x: None,
+                    "interactive": False,
+                    "skip_discovery": True,
+                    "input_fn": lambda _: "",
+                    "print_fn": lambda x: None,
                 },
             )
 

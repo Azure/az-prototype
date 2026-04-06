@@ -126,7 +126,7 @@ class TUIAdapter:
         console renders colored output.
         """
         if self._shutdown.is_set():
-            return
+            raise ShutdownRequested()
 
         msg = str(message)
 
@@ -149,7 +149,7 @@ class TUIAdapter:
     def response_fn(self, content: str) -> None:
         """Render an agent response as colored Markdown — full content, no pagination."""
         if self._shutdown.is_set():
-            return
+            raise ShutdownRequested()
         try:
 
             def _render():
@@ -164,12 +164,15 @@ class TUIAdapter:
     # input_fn — called from worker thread, blocks until user submits
     # ------------------------------------------------------------------ #
 
-    def input_fn(self, prompt_text: str = "> ") -> str:
+    def input_fn(self, prompt_text: str = "> ", allow_empty: bool = False) -> str:
         """Block the worker thread until the user submits input.
 
         1. Schedules prompt activation on the main thread.
         2. Waits on ``_input_event`` (checks for shutdown every 0.25 s).
         3. Returns the submitted text.
+
+        When *allow_empty* is True, pressing Enter with no text submits
+        an empty string (used for "Press Enter to continue" prompts).
 
         Raises :class:`ShutdownRequested` if the app is shutting down.
         """
@@ -179,7 +182,7 @@ class TUIAdapter:
         self._input_event.clear()
 
         def _enable_prompt() -> None:
-            self._app.prompt_input.enable(placeholder=prompt_text)
+            self._app.prompt_input.enable(placeholder=prompt_text, allow_empty=allow_empty)
             self._request_screen_update()
 
         try:
@@ -230,7 +233,7 @@ class TUIAdapter:
             ``"tokens"`` — replace the timer/elapsed text with token usage.
         """
         if self._shutdown.is_set():
-            return
+            raise ShutdownRequested()
 
         if event == "start":
 
@@ -258,7 +261,7 @@ class TUIAdapter:
                     elapsed = time.monotonic() - self._timer_start
                     self._app.info_bar.update_status(f"\u23f1 {_format_elapsed(elapsed)}")
                 self._timer_start = None
-                self._app.info_bar.update_assist("Enter = submit | Ctrl+J = newline | Ctrl+C = quit")
+                self._app.info_bar.update_assist("Enter = submit | Ctrl+J = newline | Ctrl+Q = quit")
                 self._request_screen_update()
 
             try:

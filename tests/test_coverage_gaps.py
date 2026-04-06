@@ -527,9 +527,7 @@ class TestPrototypeDeployOutputsExtended:
         mock_dir.return_value = str(project_with_build)
         state_dir = project_with_build / ".prototype" / "state"
         state_dir.mkdir(parents=True, exist_ok=True)
-        (state_dir / "deploy_outputs.json").write_text(
-            json.dumps({"rg_name": {"value": "test-rg"}}), encoding="utf-8"
-        )
+        (state_dir / "deploy_outputs.json").write_text(json.dumps({"rg_name": {"value": "test-rg"}}), encoding="utf-8")
         cmd = MagicMock()
         result = prototype_deploy(cmd, outputs=True, json_output=True)
         assert isinstance(result, dict)

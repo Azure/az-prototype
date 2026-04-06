@@ -2,7 +2,6 @@
 
 import json
 
-
 from azext_prototype.tracking import ChangeTracker
 
 

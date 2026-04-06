@@ -1,18 +1,20 @@
 """Tests for azext_prototype.knowledge — KnowledgeLoader and agent integration."""
 
-import textwrap
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 import yaml
 
-from azext_prototype.knowledge import KnowledgeLoader, DEFAULT_TOKEN_BUDGET, _CHARS_PER_TOKEN
-
+from azext_prototype.knowledge import (
+    _CHARS_PER_TOKEN,
+    DEFAULT_TOKEN_BUDGET,
+    KnowledgeLoader,
+)
 
 # ------------------------------------------------------------------
 # Fixtures
 # ------------------------------------------------------------------
+
 
 @pytest.fixture
 def knowledge_dir(tmp_path):
@@ -45,45 +47,75 @@ def knowledge_dir(tmp_path):
         },
     }
     (kd / "service-registry.yaml").write_text(
-        yaml.dump(registry, default_flow_style=False), encoding="utf-8",
+        yaml.dump(registry, default_flow_style=False),
+        encoding="utf-8",
     )
 
     # Service files
     (kd / "services" / "cosmos-db.md").write_text(
-        "# Cosmos DB\n\nUse Cosmos DB for NoSQL.\n", encoding="utf-8",
+        "# Cosmos DB\n\nUse Cosmos DB for NoSQL.\n",
+        encoding="utf-8",
     )
     (kd / "services" / "key-vault.md").write_text(
-        "# Key Vault\n\nUse Key Vault for secrets.\n", encoding="utf-8",
+        "# Key Vault\n\nUse Key Vault for secrets.\n",
+        encoding="utf-8",
     )
 
     # Tool files
     (kd / "tools" / "terraform.md").write_text(
-        "# Terraform Patterns\n\nUse azurerm provider.\n", encoding="utf-8",
+        "# Terraform Patterns\n\nUse azurerm provider.\n",
+        encoding="utf-8",
     )
     (kd / "tools" / "bicep.md").write_text(
-        "# Bicep Patterns\n\nUse modules.\n", encoding="utf-8",
+        "# Bicep Patterns\n\nUse modules.\n",
+        encoding="utf-8",
     )
 
     # Language files
     (kd / "languages" / "python.md").write_text(
-        "# Python Patterns\n\nUse FastAPI.\n", encoding="utf-8",
+        "# Python Patterns\n\nUse FastAPI.\n",
+        encoding="utf-8",
     )
     (kd / "languages" / "auth-patterns.md").write_text(
-        "# Auth Patterns\n\nUse DefaultAzureCredential.\n", encoding="utf-8",
+        "# Auth Patterns\n\nUse DefaultAzureCredential.\n",
+        encoding="utf-8",
     )
 
     # Role files
-    (kd / "roles" / "architect.md").write_text(
-        "# Architect Role\n\nDesign Azure architectures.\n", encoding="utf-8",
+    (kd / "roles" / "cloud-architect.md").write_text(
+        "# Cloud Architect Role\n\nDesign Azure architectures.\n",
+        encoding="utf-8",
     )
     (kd / "roles" / "infrastructure.md").write_text(
-        "# Infrastructure Role\n\nGenerate IaC code.\n", encoding="utf-8",
+        "# Infrastructure Role\n\nGenerate IaC code.\n",
+        encoding="utf-8",
     )
     (kd / "roles" / "developer.md").write_text(
-        "# Developer Role\n\nWrite application code.\n", encoding="utf-8",
+        "# Developer Role\n\nWrite application code.\n",
+        encoding="utf-8",
     )
     (kd / "roles" / "analyst.md").write_text(
-        "# Analyst Role\n\nGather requirements.\n", encoding="utf-8",
+        "# Analyst Role\n\nGather requirements.\n",
+        encoding="utf-8",
+    )
+
+    # Layer files
+    (kd / "layers").mkdir()
+    (kd / "layers" / "core.md").write_text(
+        "# Core Layer\n\nIdentity and observability foundations.\n",
+        encoding="utf-8",
+    )
+    (kd / "layers" / "infrastructure.md").write_text(
+        "# Infrastructure Layer\n\nAzure resource provisioning via IaC.\n",
+        encoding="utf-8",
+    )
+    (kd / "layers" / "data.md").write_text(
+        "# Data Layer\n\nDatabases, storage, and messaging.\n",
+        encoding="utf-8",
+    )
+    (kd / "layers" / "application.md").write_text(
+        "# Application Layer\n\nSource code: APIs, workers, frontends.\n",
+        encoding="utf-8",
     )
 
     return kd
@@ -98,6 +130,7 @@ def loader(knowledge_dir):
 # ------------------------------------------------------------------
 # KnowledgeLoader — individual loaders
 # ------------------------------------------------------------------
+
 
 class TestKnowledgeLoaderIndividual:
     """Test individual load methods."""
@@ -125,11 +158,30 @@ class TestKnowledgeLoaderIndividual:
         assert loader.load_language("java") == ""
 
     def test_load_role(self, loader):
-        text = loader.load_role("architect")
+        text = loader.load_role("cloud-architect")
         assert "Architect" in text
 
     def test_load_role_missing(self, loader):
         assert loader.load_role("devops") == ""
+
+    def test_load_layer(self, loader):
+        text = loader.load_layer("core")
+        assert "Core Layer" in text
+
+    def test_load_layer_infrastructure(self, loader):
+        text = loader.load_layer("infrastructure")
+        assert "Infrastructure Layer" in text
+
+    def test_load_layer_data(self, loader):
+        text = loader.load_layer("data")
+        assert "Data Layer" in text
+
+    def test_load_layer_application(self, loader):
+        text = loader.load_layer("application")
+        assert "Application Layer" in text
+
+    def test_load_layer_missing(self, loader):
+        assert loader.load_layer("nonexistent") == ""
 
     def test_load_constraints(self, loader):
         text = loader.load_constraints()
@@ -152,6 +204,7 @@ class TestKnowledgeLoaderIndividual:
 # KnowledgeLoader — list methods
 # ------------------------------------------------------------------
 
+
 class TestKnowledgeLoaderList:
     """Test list methods for introspection."""
 
@@ -172,10 +225,17 @@ class TestKnowledgeLoaderList:
 
     def test_list_roles(self, loader):
         roles = loader.list_roles()
-        assert "architect" in roles
+        assert "cloud-architect" in roles
         assert "infrastructure" in roles
         assert "developer" in roles
         assert "analyst" in roles
+
+    def test_list_layers(self, loader):
+        layers = loader.list_layers()
+        assert "core" in layers
+        assert "infrastructure" in layers
+        assert "data" in layers
+        assert "application" in layers
 
     def test_list_missing_subdir(self, tmp_path):
         loader = KnowledgeLoader(knowledge_dir=tmp_path)
@@ -186,12 +246,13 @@ class TestKnowledgeLoaderList:
 # KnowledgeLoader — compose_context
 # ------------------------------------------------------------------
 
+
 class TestKnowledgeLoaderCompose:
     """Test context composition."""
 
     def test_compose_with_role(self, loader):
-        ctx = loader.compose_context(role="architect")
-        assert "ROLE: architect" in ctx
+        ctx = loader.compose_context(role="cloud-architect")
+        assert "ROLE: cloud-architect" in ctx
         assert "SHARED CONSTRAINTS" in ctx
 
     def test_compose_with_tool(self, loader):
@@ -224,9 +285,9 @@ class TestKnowledgeLoaderCompose:
         assert "Azure Cosmos DB" in ctx
 
     def test_compose_no_constraints(self, loader):
-        ctx = loader.compose_context(role="architect", include_constraints=False)
+        ctx = loader.compose_context(role="cloud-architect", include_constraints=False)
         assert "SHARED CONSTRAINTS" not in ctx
-        assert "ROLE: architect" in ctx
+        assert "ROLE: cloud-architect" in ctx
 
     def test_compose_empty_returns_empty(self, loader):
         ctx = loader.compose_context(include_constraints=False)
@@ -235,16 +296,38 @@ class TestKnowledgeLoaderCompose:
     def test_compose_priority_order(self, loader):
         """Role should appear before constraints before tool before services."""
         ctx = loader.compose_context(
-            role="architect",
+            role="cloud-architect",
             tool="terraform",
             services=["cosmos-db"],
         )
-        role_pos = ctx.index("ROLE: architect")
+        role_pos = ctx.index("ROLE: cloud-architect")
         constraints_pos = ctx.index("SHARED CONSTRAINTS")
         tool_pos = ctx.index("TOOL PATTERNS: terraform")
         service_pos = ctx.index("SERVICE: cosmos-db")
 
         assert role_pos < constraints_pos < tool_pos < service_pos
+
+    def test_compose_with_layer(self, loader):
+        ctx = loader.compose_context(layer="infrastructure")
+        assert "LAYER: infrastructure" in ctx
+        assert "Infrastructure Layer" in ctx
+
+    def test_compose_layer_priority_after_role(self, loader):
+        """Layer should appear after role but before constraints."""
+        ctx = loader.compose_context(
+            role="cloud-architect",
+            layer="core",
+            tool="terraform",
+        )
+        role_pos = ctx.index("ROLE: cloud-architect")
+        layer_pos = ctx.index("LAYER: core")
+        constraints_pos = ctx.index("SHARED CONSTRAINTS")
+        tool_pos = ctx.index("TOOL PATTERNS: terraform")
+        assert role_pos < layer_pos < constraints_pos < tool_pos
+
+    def test_compose_layer_missing_skipped(self, loader):
+        ctx = loader.compose_context(layer="nonexistent", include_constraints=False)
+        assert ctx == ""
 
     def test_compose_missing_files_skipped(self, loader):
         """Missing files should be silently skipped."""
@@ -280,6 +363,7 @@ class TestKnowledgeLoaderCompose:
 # KnowledgeLoader — token budget
 # ------------------------------------------------------------------
 
+
 class TestKnowledgeLoaderBudget:
     """Test token budget enforcement."""
 
@@ -295,7 +379,7 @@ class TestKnowledgeLoaderBudget:
         # Create a loader with a very small budget (20 tokens = 80 chars)
         loader = KnowledgeLoader(knowledge_dir=knowledge_dir, token_budget=20)
         ctx = loader.compose_context(
-            role="architect",
+            role="cloud-architect",
             tool="terraform",
             services=["cosmos-db"],
         )
@@ -308,6 +392,7 @@ class TestKnowledgeLoaderBudget:
 # ------------------------------------------------------------------
 # KnowledgeLoader — real knowledge directory
 # ------------------------------------------------------------------
+
 
 class TestKnowledgeLoaderReal:
     """Test against the actual knowledge/ directory shipped with the package."""
@@ -338,7 +423,7 @@ class TestKnowledgeLoaderReal:
     def test_real_roles_exist(self):
         loader = KnowledgeLoader()
         roles = loader.list_roles()
-        assert "architect" in roles
+        assert "cloud-architect" in roles
         assert "infrastructure" in roles
         assert "developer" in roles
         assert "analyst" in roles
@@ -369,6 +454,7 @@ class TestKnowledgeLoaderReal:
 # BaseAgent — knowledge injection
 # ------------------------------------------------------------------
 
+
 class TestBaseAgentKnowledge:
     """Test that BaseAgent.get_system_messages() injects knowledge."""
 
@@ -395,17 +481,18 @@ class TestBaseAgentKnowledge:
             system_prompt="You are a test agent.",
         )
         agent._governance_aware = False
-        agent._knowledge_role = "architect"
+        agent._knowledge_role = "cloud-architect"
 
         with patch(
-            "azext_prototype.knowledge._KNOWLEDGE_DIR", knowledge_dir,
+            "azext_prototype.knowledge._KNOWLEDGE_DIR",
+            knowledge_dir,
         ):
             messages = agent.get_system_messages()
 
         # Should have system_prompt + knowledge
         assert len(messages) >= 2
         knowledge_msg = messages[-1]
-        assert "ROLE: architect" in knowledge_msg.content
+        assert "ROLE: cloud-architect" in knowledge_msg.content
 
     def test_knowledge_injected_when_tools_set(self, knowledge_dir):
         from azext_prototype.agents.base import BaseAgent
@@ -415,7 +502,8 @@ class TestBaseAgentKnowledge:
         agent._knowledge_tools = ["terraform"]
 
         with patch(
-            "azext_prototype.knowledge._KNOWLEDGE_DIR", knowledge_dir,
+            "azext_prototype.knowledge._KNOWLEDGE_DIR",
+            knowledge_dir,
         ):
             messages = agent.get_system_messages()
 
@@ -427,7 +515,7 @@ class TestBaseAgentKnowledge:
 
         agent = BaseAgent(name="test", description="test")
         agent._governance_aware = False
-        agent._knowledge_role = "architect"
+        agent._knowledge_role = "cloud-architect"
 
         with patch(
             "azext_prototype.knowledge.KnowledgeLoader",
@@ -443,6 +531,7 @@ class TestBaseAgentKnowledge:
 # Builtin agents — knowledge declarations
 # ------------------------------------------------------------------
 
+
 class TestBuiltinAgentKnowledge:
     """Test that builtin agents have correct knowledge declarations."""
 
@@ -450,7 +539,7 @@ class TestBuiltinAgentKnowledge:
         from azext_prototype.agents.builtin.cloud_architect import CloudArchitectAgent
 
         agent = CloudArchitectAgent()
-        assert agent._knowledge_role == "architect"
+        assert agent._knowledge_role == "cloud-architect"
         assert agent._knowledge_tools is None
         assert agent._knowledge_languages is None
 

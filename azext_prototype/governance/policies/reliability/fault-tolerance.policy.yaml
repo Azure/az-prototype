@@ -1,0 +1,243 @@
+kind: policy
+domain: reliability
+description: Governance policies for Fault Tolerance
+last_updated: '2026-03-27'
+rules:
+- id: WAF-REL-FT-001
+  severity: required
+  description: 'Implement the circuit breaker pattern for ALL external service calls. Circuit breakers prevent cascading failures
+    by stopping calls to a failing dependency after a threshold of consecutive errors.  Use Dapr resiliency policies for Container
+    Apps, Polly for .NET applications, resilience4j for Java, and APIM circuit breaker policy for API gateway-level protection.  Every
+    circuit breaker MUST define: failure threshold, open duration (timeout), and half-open probe count.'
+  rationale: Without circuit breakers, a single failing dependency causes all callers to block on timeout, exhausting connection
+    pools and thread pools, which cascades failure to the entire system.  Circuit breakers fail fast, preserve resources,
+    and allow recovery.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services:
+    - Microsoft.App/containerApps
+    - Microsoft.Web/sites
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.ApiManagement/service
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.Cache/redis
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Sql/servers/databases
+    - Microsoft.Network/loadBalancers
+    - Microsoft.Network/applicationGateways
+- id: WAF-REL-FT-002
+  severity: required
+  description: Configure retry policies with exponential backoff and jitter for ALL external service calls.  Azure SDK clients
+    have built-in retry policies — configure them explicitly rather than relying on defaults. For custom HTTP calls, implement
+    exponential backoff with jitter to avoid thundering herd effects.  Maximum retry count MUST be bounded (3-5 retries).  Base
+    delay MUST start at 1-2 seconds. Jitter MUST be added to prevent synchronized retries.
+  rationale: Transient failures (network glitches, throttling, brief service restarts) are inevitable in distributed systems.  Without
+    retry, every transient failure becomes a user-visible error.  Without backoff, rapid retries overwhelm the recovering
+    service.  Without jitter, synchronized retries from multiple clients create load spikes.
+  applies_to:
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services:
+    - Microsoft.App/containerApps
+    - Microsoft.Web/sites
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.ApiManagement/service
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.Cache/redis
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Sql/servers/databases
+    - Microsoft.Network/loadBalancers
+    - Microsoft.Network/applicationGateways
+- id: WAF-REL-FT-003
+  severity: required
+  description: Implement bulkhead isolation to prevent a single failing component from consuming all system resources.  Container
+    Apps and AKS MUST have resource limits (CPU/memory) per container.  AKS MUST have Pod Disruption Budgets (PDBs) to ensure
+    minimum availability during voluntary disruptions.  Thread pools and connection pools MUST be bounded.  Separate critical
+    and non-critical workloads into different compute instances.
+  rationale: Without bulkhead isolation, a single runaway process can consume all CPU/memory, starving healthy workloads.  Connection
+    pool exhaustion from one dependency blocks all other outbound calls. PDBs prevent Kubernetes evictions from violating
+    availability requirements.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services:
+    - Microsoft.App/containerApps
+    - Microsoft.Web/sites
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.ApiManagement/service
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.Cache/redis
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Sql/servers/databases
+    - Microsoft.Network/loadBalancers
+    - Microsoft.Network/applicationGateways
+- id: WAF-REL-FT-004
+  severity: recommended
+  description: Implement graceful degradation patterns so that partial failures do not cause total service unavailability.  Use
+    feature flags to disable non-critical features when dependencies fail.  Configure fallback endpoints and cached responses.  Implement
+    degraded mode that serves stale data or reduced functionality rather than returning errors.  Azure App Configuration with
+    feature filters provides centralized feature flag management.
+  rationale: Users prefer a degraded experience over a complete outage.  If the recommendation engine fails, the e-commerce
+    site should still show products without recommendations — not return a 500 error. Feature flags enable instant degradation
+    without redeployment.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  companion_resources:
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    name: pe-resource
+    description: 'Private endpoint for App Configuration (groupId: configurationStores)'
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.azconfig.io
+    description: Private DNS zone privatelink.azconfig.io for App Configuration private endpoint
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-resource
+    description: Diagnostic settings for App Configuration audit and request logs
+  targets:
+  - services:
+    - Microsoft.App/containerApps
+    - Microsoft.Web/sites
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.ApiManagement/service
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.Cache/redis
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Sql/servers/databases
+    - Microsoft.Network/loadBalancers
+    - Microsoft.Network/applicationGateways
+- id: WAF-REL-FT-005
+  severity: required
+  description: Use queue-based load leveling for all workloads with variable or bursty traffic patterns.  Place Service Bus
+    queues or Event Hubs between producers and consumers to absorb traffic spikes and decouple processing rate from arrival
+    rate.  Service Bus Premium tier provides zone redundancy, large message support, and FIFO ordering.  Event Hubs is for
+    high-throughput streaming (millions of events/sec).  NEVER process high-volume workloads synchronously without a buffer.
+  rationale: Synchronous processing of bursty traffic causes cascading failures when arrival rate exceeds processing capacity.  Queues
+    absorb spikes, enable independent scaling of producers and consumers, and provide at-least-once delivery guarantees.  Without
+    queues, every traffic spike risks service overload and data loss.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  companion_resources:
+  - type: Microsoft.ServiceBus/namespaces/queues@2024-01-01
+    name: sb-namespace
+    description: Dead-letter queue (automatic sub-queue) — monitor for poison messages
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    name: pe-resource
+    description: Private endpoint for Service Bus / Event Hub namespace
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-metrics
+    description: Diagnostic settings for queue depth, dead-letter count, and throughput metrics
+  targets:
+  - services:
+    - Microsoft.App/containerApps
+    - Microsoft.Web/sites
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.ApiManagement/service
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.Cache/redis
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Sql/servers/databases
+    - Microsoft.Network/loadBalancers
+    - Microsoft.Network/applicationGateways
+patterns:
+- name: Circuit breaker with retry composition
+  description: 'Compose circuit breaker and retry policies correctly: retry wraps the circuit breaker, so transient failures
+    are retried but sustained failures trip the circuit.'
+  example: |
+    // .NET: Correct composition order
+    builder.Services.AddHttpClient("api")
+        .AddResilienceHandler("pipeline", builder => {
+            builder.AddRetry(new HttpRetryStrategyOptions {
+                MaxRetryAttempts = 3,
+                BackoffType = DelayBackoffType.ExponentialWithJitter
+            });
+            builder.AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions {
+                FailureRatio = 0.5,
+                SamplingDuration = TimeSpan.FromSeconds(30),
+                BreakDuration = TimeSpan.FromSeconds(15)
+            });
+            builder.AddTimeout(TimeSpan.FromSeconds(10));
+        });
+- name: Competing consumers pattern
+  description: Scale consumers independently from producers using queue-based load leveling.  Multiple consumers process from
+    the same queue concurrently, each handling one message at a time.
+  example: |
+    // Container Apps: Scale consumers based on queue depth
+    // Use KEDA Service Bus scaler
+    resource containerAppConsumer 'Microsoft.App/containerApps@2024-03-01' = {
+      properties: {
+        template: {
+          scale: {
+            minReplicas: 1
+            maxReplicas: 10
+            rules: [
+              {
+                name: 'queue-scaling'
+                custom: {
+                  type: 'azure-servicebus'
+                  metadata: {
+                    queueName: 'orders'
+                    namespace: serviceBusNamespace.name
+                    messageCount: '5'  // Scale when 5+ messages per replica
+                  }
+                  identity: userAssignedIdentity.id
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+anti_patterns:
+- description: Making synchronous calls to external services without timeout or circuit breaker
+  instead: Wrap all external calls with circuit breaker + retry + timeout using Polly, resilience4j, or Dapr
+- description: Deploying containers without CPU and memory resource limits
+  instead: Set explicit CPU and memory limits on every container to prevent resource starvation
+- description: Processing bursty workloads synchronously without a message queue
+  instead: Use Service Bus or Event Hub as a buffer between producers and consumers
+- description: Hardcoding feature flags in application code
+  instead: Use Azure App Configuration for centralized feature flag management with instant toggle capability
+- description: Using Service Bus connection strings instead of managed identity
+  instead: 'Disable local auth (disableLocalAuth: true) and use RBAC with managed identity'
+- description: Deploying AKS workloads without Pod Disruption Budgets
+  instead: Create PDBs with minAvailable or maxUnavailable to protect availability during voluntary disruptions
+references:
+- title: Azure Well-Architected Framework — Design for resilience
+  url: https://learn.microsoft.com/azure/well-architected/reliability/design-resiliency
+- title: Circuit breaker pattern
+  url: https://learn.microsoft.com/azure/architecture/patterns/circuit-breaker
+- title: Retry pattern with exponential backoff
+  url: https://learn.microsoft.com/azure/architecture/patterns/retry
+- title: Bulkhead pattern
+  url: https://learn.microsoft.com/azure/architecture/patterns/bulkhead
+- title: Queue-based load leveling pattern
+  url: https://learn.microsoft.com/azure/architecture/patterns/queue-based-load-leveling
+- title: Graceful degradation pattern
+  url: https://learn.microsoft.com/azure/architecture/patterns/graceful-degradation

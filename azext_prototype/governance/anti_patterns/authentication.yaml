@@ -1,38 +1,111 @@
-# Anti-pattern detection — Authentication domain
-#
-# Detects weak or deprecated authentication methods in AI-generated output.
-
+kind: anti-pattern
 domain: authentication
-description: Authentication method and RBAC assignment detection
-
+description: Authentication method detection — ensures managed identity and Entra ID are used
+last_updated: '2026-04-04'
 patterns:
-  - search_patterns:
-      - "sql authentication"
-      - "username/password"
-      - "sql_login"
-      - "administrator_login_password"
+- id: ANTI-AUTH-001
+  description: Detects SQL authentication (username/password) instead of Microsoft Entra authentication
+  rationale: SQL authentication with passwords is vulnerable to brute force attacks and cannot be audited through Entra ID
+    conditional access.
+  warning_message: SQL authentication with username/password detected — use Microsoft Entra (Azure AD) authentication with
+    managed identity.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.Sql/servers
+    search_patterns:
+    - sql authentication
+    - username/password
+    - sql_login
+    - administrator_login_password
     safe_patterns:
-      - "do not use sql authentication"
-      - "avoid sql authentication"
-      - "entra authentication"
-    warning_message: "SQL authentication with username/password detected — use Microsoft Entra (Azure AD) authentication with managed identity."
-
-  - search_patterns:
-      - "access_policy {"
-      - "access_policy ="
-      - "access policies"
+    - do not use sql authentication
+    - avoid sql authentication
+    - entra authentication
+    - sql authentication is fully disabled
+    - sql authentication is disabled
+    - sql authentication must be disabled
+    - azureadonlyauthentication = true
+    - azureadonlyauthentications
+    correct_patterns:
+    - azureADOnlyAuthentication = true
+    - '# Use Microsoft Entra authentication with managed identity'
+- id: ANTI-AUTH-002
+  description: Detects Key Vault access policy model instead of RBAC authorization
+  rationale: Access policies provide coarse-grained control and cannot leverage Entra ID conditional access, PIM, or per-identity
+    audit trails.
+  warning_message: Key Vault using access policies — switch to RBAC authorization model (enableRbacAuthorization = true).
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.KeyVault/vaults
+    search_patterns:
+    - access_policy {
+    - access_policy =
+    - access policies
     safe_patterns:
-      - "do not use access policies"
-      - "avoid access policies"
-      - "rbac_authorization"
-    warning_message: "Key Vault access policies detected — use enable_rbac_authorization = true with role assignments instead."
-
-  - search_patterns:
-      - "\"owner\""
-      - "\"contributor\""
+    - do not use access policies
+    - avoid access policies
+    - rbac_authorization
+    - enableRbacAuthorization = true
+    correct_patterns:
+    - enableRbacAuthorization = true
+    - '# Use RBAC authorization model, not access policies'
+- id: ANTI-AUTH-003
+  description: Detects SAS token usage where managed identity with RBAC should be used
+  rationale: SAS tokens are time-limited shared secrets that cannot be revoked individually and bypass RBAC audit trails.
+  warning_message: SAS token detected — use managed identity with appropriate RBAC role instead.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services:
+    - Microsoft.Storage/storageAccounts
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    search_patterns:
+    - shared_access_policy
+    - sas_token
+    - sas_policy
+    - generate_sas
+    - listAccountSas
+    - listServiceSas
+    - SharedAccessSignature
     safe_patterns:
-      - "built-in role"
-      - "narrowest scope"
-      - "least privilege"
-      - "specific role"
-    warning_message: "Broad role assignment detected (Owner/Contributor) — use the most specific built-in role at the narrowest scope."
+    - do not use sas
+    - avoid sas token
+    - managed identity
+    - DefaultAzureCredential
+    correct_patterns:
+    - '# Use managed identity with RBAC role assignment'
+    - DefaultAzureCredential()
+- id: ANTI-AUTH-004
+  description: Detects Cosmos DB local/key authentication when Entra RBAC should be used
+  rationale: Cosmos DB key authentication uses shared master keys that grant full access — Entra RBAC provides per-identity
+    scoping and audit.
+  warning_message: Cosmos DB local authentication detected — disable local auth and use Entra RBAC with sqlRoleAssignments.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.DocumentDB/databaseAccounts
+    search_patterns:
+    - primary_key
+    - primary_readonly_key
+    - listKeys(
+    - AccountKey=
+    safe_patterns:
+    - disableLocalAuth = true
+    - DefaultAzureCredential
+    - do not use keys
+    correct_patterns:
+    - disableLocalAuth = true
+    - '# Use Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments for data-plane RBAC'

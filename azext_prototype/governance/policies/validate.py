@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 """Validate .policy.yaml files against the governance schema.
 
+This is the original policy-only validator. For unified governance
+validation (policies + anti-patterns + standards), use:
+    python -m azext_prototype.governance.validate --all --strict
+
 Usage:
     # Validate all built-in policies
     python -m azext_prototype.governance.policies.validate

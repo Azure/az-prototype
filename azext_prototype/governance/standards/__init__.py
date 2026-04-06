@@ -7,12 +7,15 @@ anti-patterns (detection), standards describe *how to build well*.
 Directory layout::
 
     standards/
-        principles/       Design principles (DRY, SOLID, etc.)
-            design.yaml
+        application/          Application code patterns
+            dotnet.yaml
+            python.yaml
+        iac/                  Infrastructure-as-Code patterns
+            bicep.yaml
+            terraform.yaml
+        principles/           Design principles
             coding.yaml
-        terraform/        Reference patterns per service type
-        bicep/            Reference patterns per service type
-        application/      Code patterns per language/framework
+            design.yaml
 """
 
 from __future__ import annotations
@@ -21,7 +24,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import yaml
+from azext_prototype.governance import safe_load_yaml
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +37,9 @@ class StandardPrinciple:
     """A single design principle or coding standard."""
 
     id: str
-    name: str
+    name: str  # kept for backward compat; new format merges into description
     description: str
+    rationale: str = ""
     applies_to: list[str] = field(default_factory=list)
     examples: list[str] = field(default_factory=list)
 
@@ -45,8 +49,8 @@ class Standard:
     """A loaded standards document."""
 
     domain: str
-    category: str
     description: str = ""
+    last_updated: str = ""
     principles: list[StandardPrinciple] = field(default_factory=list)
 
 
@@ -65,12 +69,7 @@ def load(directory: Path | None = None) -> list[Standard]:
         return _cache
 
     for yaml_file in sorted(target.rglob("*.yaml")):
-        try:
-            data = yaml.safe_load(yaml_file.read_text(encoding="utf-8")) or {}
-        except (OSError, yaml.YAMLError) as exc:
-            logger.warning("Could not load standards file %s: %s", yaml_file.name, exc)
-            continue
-
+        data = safe_load_yaml(yaml_file)
         if not isinstance(data, dict):
             continue
 
@@ -83,6 +82,7 @@ def load(directory: Path | None = None) -> list[Standard]:
                     id=entry.get("id", ""),
                     name=entry.get("name", ""),
                     description=entry.get("description", ""),
+                    rationale=entry.get("rationale", ""),
                     applies_to=entry.get("applies_to", []),
                     examples=entry.get("examples", []),
                 )
@@ -92,8 +92,8 @@ def load(directory: Path | None = None) -> list[Standard]:
             standards.append(
                 Standard(
                     domain=data.get("domain", yaml_file.stem),
-                    category=data.get("category", str(yaml_file.parent.relative_to(target))),
                     description=data.get("description", ""),
+                    last_updated=data.get("last_updated", ""),
                     principles=principles,
                 )
             )
@@ -102,15 +102,15 @@ def load(directory: Path | None = None) -> list[Standard]:
     return _cache
 
 
-def format_for_prompt(agent_name: str | None = None, category: str | None = None) -> str:
+def format_for_prompt(agent_name: str | None = None, domain: str | None = None) -> str:
     """Format standards as text for injection into agent system prompts."""
     standards = load()
     if not standards:
         return ""
 
     filtered = standards
-    if category:
-        filtered = [s for s in filtered if s.category == category]
+    if domain:
+        filtered = [s for s in filtered if s.domain == domain]
 
     if not filtered:
         return ""
@@ -130,6 +130,48 @@ def format_for_prompt(agent_name: str | None = None, category: str | None = None
             for ex in p.examples:
                 sections.append(f"  - {ex}")
 
+        sections.append("")
+
+    return "\n".join(sections)
+
+
+def format_for_qa(iac_tool: str | None = None, layer: str = "infra") -> str:
+    """Format standards for QA context injection.
+
+    Returns standards relevant to the stage's technology stack:
+    - IaC stages (core/infra/data): IaC-specific + universal coding/design
+    - App stages: all application + universal coding/design
+
+    Parameters
+    ----------
+    iac_tool:
+        ``"terraform"`` or ``"bicep"`` — selects IaC standards.
+    layer:
+        Stage layer — ``"core"``, ``"infra"``, ``"data"``, ``"app"``.
+    """
+    standards = load()
+    if not standards:
+        return ""
+
+    # Determine which domains to include
+    include_domains: set[str] = {"principles"}  # always include coding/design
+    if layer in ("core", "infra", "data"):
+        if iac_tool == "terraform":
+            include_domains.add("terraform")
+        elif iac_tool == "bicep":
+            include_domains.add("bicep")
+    elif layer == "app":
+        include_domains.add("application")
+
+    filtered = [s for s in standards if s.domain in include_domains]
+    if not filtered:
+        return ""
+
+    sections: list[str] = ["## Applicable Standards\n"]
+    for standard in filtered:
+        sections.append(f"### {standard.domain}")
+        for p in standard.principles:
+            sections.append(f"- **[{p.id}]** {p.description}")
         sections.append("")
 
     return "\n".join(sections)

@@ -7,6 +7,7 @@ providing at-a-glance token counts and context-window budget tracking.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 # Model context-window sizes (prompt token budget).
 # Used for budget-percentage display.  Values are the *input* context
@@ -28,11 +29,45 @@ _CONTEXT_WINDOWS: dict[str, int] = {
     # Claude models (Copilot)
     "claude-sonnet-4": 200_000,
     "claude-sonnet-4.5": 200_000,
+    "claude-sonnet-4.6": 200_000,
     "claude-haiku-4.5": 200_000,
     "claude-opus-4": 200_000,
+    "claude-opus-4.5": 200_000,
+    "claude-opus-4.6": 200_000,
     # Gemini models (Copilot)
     "gemini-2.0-flash": 1_048_576,
     "gemini-2.5-pro": 1_048_576,
+    "gemini-3-flash": 1_048_576,
+    "gemini-3-pro": 1_048_576,
+}
+
+# GitHub Copilot Premium Request Unit (PRU) multipliers.
+# Each API call costs (1 × multiplier) PRUs.  Only applies to the
+# Copilot provider — models not in this table produce 0 PRUs.
+# Source: https://docs.github.com/en/copilot/concepts/billing/copilot-requests
+_PRU_MULTIPLIERS: dict[str, float] = {
+    # Included with paid plans (0 PRUs)
+    "gpt-5-mini": 0,
+    "gpt-4.1": 0,
+    "gpt-4o": 0,
+    # Low-cost (0.25–0.33 PRUs per request)
+    "grok-code-fast-1": 0.25,
+    "claude-haiku-4.5": 0.33,
+    "gemini-3-flash": 0.33,
+    "gpt-5.1-codex-mini": 0.33,
+    "gpt-5.4-mini": 0.33,
+    # Standard (1 PRU per request)
+    "claude-sonnet-4": 1,
+    "claude-sonnet-4.5": 1,
+    "claude-sonnet-4.6": 1,
+    "gemini-3-pro": 1,
+    "gemini-3-pro-1.5": 1,
+    "gpt-5.1": 1,
+    "gpt-5.2": 1,
+    "gpt-5.4": 1,
+    # Premium (3+ PRUs per request)
+    "claude-opus-4.5": 3,
+    "claude-opus-4.6": 3,
 }
 
 
@@ -57,8 +92,12 @@ class TokenTracker:
     _this_turn_completion: int = field(default=0, repr=False)
     _session_prompt: int = field(default=0, repr=False)
     _session_completion: int = field(default=0, repr=False)
+    _this_turn_pru: float = field(default=0.0, repr=False)
+    _session_pru: float = field(default=0.0, repr=False)
     _turn_count: int = field(default=0, repr=False)
     _model: str = field(default="", repr=False)
+    _is_copilot: bool = field(default=False, repr=False)
+    _on_update: Any = field(default=None, repr=False)
 
     # ------------------------------------------------------------------
     # Public API
@@ -80,6 +119,23 @@ class TokenTracker:
         model = getattr(response, "model", "")
         if model:
             self._model = model
+
+        # Auto-detect Copilot provider from usage metadata
+        if usage.get("_copilot"):
+            self._is_copilot = True
+
+        # Compute PRUs from the model multiplier table (Copilot only).
+        # Each API call = 1 request × multiplier.
+        pru = self._compute_pru(model)
+        self._this_turn_pru = pru
+        self._session_pru += pru
+
+        # Auto-push status update to the UI if a callback is set
+        if self._on_update:
+            try:
+                self._on_update(self.format_status())
+            except Exception:
+                pass  # Never let UI callbacks break the AI flow
 
     @property
     def this_turn(self) -> int:
@@ -107,6 +163,11 @@ class TokenTracker:
         return self._model
 
     @property
+    def session_pru(self) -> float:
+        """Cumulative Premium Request Units (Copilot only)."""
+        return self._session_pru
+
+    @property
     def budget_pct(self) -> float | None:
         """Percentage of context window consumed (prompt tokens only).
 
@@ -131,6 +192,12 @@ class TokenTracker:
             f"{self.this_turn:,} tokens this turn",
             f"{self.session_total:,} session",
         ]
+        if self._session_pru > 0:
+            # Display as integer when whole, otherwise 1 decimal place
+            if self._session_pru == int(self._session_pru):
+                parts.append(f"{int(self._session_pru):,} PRUs")
+            else:
+                parts.append(f"{self._session_pru:.1f} PRUs")
         pct = self.budget_pct
         if pct is not None:
             parts.append(f"~{pct:.0f}%")
@@ -138,7 +205,7 @@ class TokenTracker:
 
     def to_dict(self) -> dict:
         """Serialisable snapshot (for state persistence or telemetry)."""
-        return {
+        d: dict = {
             "this_turn": {
                 "prompt": self._this_turn_prompt,
                 "completion": self._this_turn_completion,
@@ -150,25 +217,44 @@ class TokenTracker:
             "turn_count": self._turn_count,
             "model": self._model,
         }
+        if self._session_pru > 0:
+            d["session"]["premium_request_units"] = self._session_pru
+        return d
 
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _lookup_model(model_name: str, table: dict) -> object | None:
+        """Look up *model_name* in *table* using exact-then-substring matching.
+
+        Returns the matched value or ``None`` if no match is found.
+        """
+        model_lower = model_name.lower()
+        if model_lower in table:
+            return table[model_lower]
+        for key, value in table.items():
+            if key in model_lower:
+                return value
+        return None
+
+    def _compute_pru(self, model: str) -> float:
+        """Compute PRUs for one API request based on the model multiplier.
+
+        Returns 0 for non-Copilot sessions or unknown models.
+        """
+        if not self._is_copilot or not model:
+            return 0.0
+        result = self._lookup_model(model, _PRU_MULTIPLIERS)
+        if result is not None:
+            return result  # type: ignore[return-value]
+        # Unknown model on Copilot — assume 1 PRU (standard rate)
+        return 1.0
+
     def _get_context_window(self) -> int | None:
         """Look up the context window for the current model."""
         if not self._model:
             return None
-
-        model_lower = self._model.lower()
-
-        # Exact match first
-        if model_lower in _CONTEXT_WINDOWS:
-            return _CONTEXT_WINDOWS[model_lower]
-
-        # Substring match (e.g. "gpt-4o-2024-05-13" matches "gpt-4o")
-        for key, window in _CONTEXT_WINDOWS.items():
-            if key in model_lower:
-                return window
-
-        return None
+        result = self._lookup_model(self._model, _CONTEXT_WINDOWS)
+        return result  # type: ignore[return-value]

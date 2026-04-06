@@ -3,11 +3,16 @@
 Tests the YAML-based anti-pattern loader and scanner across all domains.
 """
 
-import pytest
 from pathlib import Path
 
-from azext_prototype.governance import anti_patterns
-from azext_prototype.governance.anti_patterns import AntiPatternCheck, load, scan, reset_cache
+import pytest
+
+from azext_prototype.governance.anti_patterns import (
+    AntiPatternCheck,
+    load,
+    reset_cache,
+    scan,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -21,6 +26,7 @@ def _clean_cache():
 # ------------------------------------------------------------------ #
 # Loader tests
 # ------------------------------------------------------------------ #
+
 
 class TestAntiPatternLoader:
     """Test YAML loading from the anti_patterns directory."""
@@ -41,9 +47,7 @@ class TestAntiPatternLoader:
     def test_all_checks_have_search_patterns(self):
         checks = load()
         for check in checks:
-            assert len(check.search_patterns) > 0, (
-                f"Check has no search_patterns: {check.warning_message}"
-            )
+            assert len(check.search_patterns) > 0, f"Check has no search_patterns: {check.warning_message}"
 
     def test_all_checks_have_warning_message(self):
         checks = load()
@@ -74,6 +78,21 @@ class TestAntiPatternLoader:
         assert first is not second
         assert len(first) == len(second)
 
+    def test_all_checks_have_id(self):
+        checks = load()
+        for check in checks:
+            assert check.id, f"Check missing id in domain {check.domain}: {check.warning_message}"
+
+    def test_all_ids_have_anti_prefix(self):
+        checks = load()
+        for check in checks:
+            assert check.id.startswith("ANTI-"), f"ID {check.id} missing ANTI- prefix"
+
+    def test_all_ids_are_unique(self):
+        checks = load()
+        ids = [c.id for c in checks]
+        assert len(ids) == len(set(ids)), f"Duplicate IDs: {[i for i in ids if ids.count(i) > 1]}"
+
     def test_domains_loaded(self):
         checks = load()
         domains = {c.domain for c in checks}
@@ -91,19 +110,47 @@ class TestAntiPatternLoader:
 
     def test_load_from_custom_directory(self, tmp_path):
         yaml_content = (
-            "domain: test\n"
+            "kind: anti-pattern\n"
+            "category: test\n"
+            "description: Test anti-patterns\n"
+            "last_updated: '2026-04-04'\n"
             "patterns:\n"
-            "  - search_patterns:\n"
-            "      - \"test_pattern\"\n"
-            "    safe_patterns: []\n"
-            "    warning_message: \"Test warning\"\n"
+            "  - id: ANTI-TEST-001\n"
+            "    description: Test detection\n"
+            '    warning_message: "Test warning"\n'
+            "    applies_to: []\n"
+            "    targets:\n"
+            "      - services: []\n"
+            "        search_patterns:\n"
+            '          - "test_pattern"\n'
+            "        safe_patterns: []\n"
         )
         (tmp_path / "test.yaml").write_text(yaml_content)
         reset_cache()
         checks = load(directory=tmp_path)
         assert len(checks) == 1
+        assert checks[0].id == "ANTI-TEST-001"
         assert checks[0].domain == "test"
         assert checks[0].search_patterns == ["test_pattern"]
+
+    def test_load_generates_fallback_id_when_missing(self, tmp_path):
+        yaml_content = (
+            "kind: anti-pattern\n"
+            "category: test\n"
+            "description: Test\n"
+            "last_updated: '2026-04-04'\n"
+            "patterns:\n"
+            "  - description: Test detection\n"
+            '    warning_message: "Test warning"\n'
+            "    targets:\n"
+            "      - services: []\n"
+            "        search_patterns:\n"
+            '          - "test_pattern"\n'
+        )
+        (tmp_path / "test.yaml").write_text(yaml_content)
+        reset_cache()
+        checks = load(directory=tmp_path)
+        assert checks[0].id == "TEST-001"
 
     def test_load_skips_invalid_yaml(self, tmp_path):
         (tmp_path / "bad.yaml").write_text("{{invalid yaml")
@@ -113,10 +160,7 @@ class TestAntiPatternLoader:
 
     def test_load_skips_entries_without_search_patterns(self, tmp_path):
         yaml_content = (
-            "domain: test\n"
-            "patterns:\n"
-            "  - search_patterns: []\n"
-            "    warning_message: \"Empty search\"\n"
+            "domain: test\n" "patterns:\n" "  - search_patterns: []\n" '    warning_message: "Empty search"\n'
         )
         (tmp_path / "test.yaml").write_text(yaml_content)
         reset_cache()
@@ -125,11 +169,7 @@ class TestAntiPatternLoader:
 
     def test_load_skips_entries_without_warning_message(self, tmp_path):
         yaml_content = (
-            "domain: test\n"
-            "patterns:\n"
-            "  - search_patterns:\n"
-            "      - \"foo\"\n"
-            "    warning_message: \"\"\n"
+            "domain: test\n" "patterns:\n" "  - search_patterns:\n" '      - "foo"\n' '    warning_message: ""\n'
         )
         (tmp_path / "test.yaml").write_text(yaml_content)
         reset_cache()
@@ -141,27 +181,31 @@ class TestAntiPatternLoader:
 # Scanner tests — Security domain
 # ------------------------------------------------------------------ #
 
+
 class TestSecurityPatterns:
     """Test security anti-pattern detection."""
 
-    @pytest.mark.parametrize("pattern", [
-        "connection_string",
-        "connectionstring",
-        "access_key",
-        "accesskey",
-        "account_key",
-        "accountkey",
-        "shared_access_key",
-        "client_secret",
-        'password = "bad"',
-        "password=\"bad\"",
-        "password='bad'",
-    ])
+    @pytest.mark.parametrize(
+        "pattern",
+        [
+            "connection_string",
+            "connectionstring",
+            "access_key",
+            "accesskey",
+            "account_key",
+            "accountkey",
+            "shared_access_key",
+            "client_secret",
+            'password = "bad"',
+            'password="bad"',
+            "password='bad'",
+        ],
+    )
     def test_credential_patterns_detected(self, pattern):
         warnings = scan(f"Use {pattern} for auth")
-        assert any("credential" in w.lower() or "managed identity" in w.lower() for w in warnings), (
-            f"Pattern '{pattern}' should trigger credential warning"
-        )
+        assert any(
+            "credential" in w.lower() or "managed identity" in w.lower() for w in warnings
+        ), f"Pattern '{pattern}' should trigger credential warning"
 
     def test_app_insights_connection_string_safe(self):
         warnings = scan("applicationinsights_connection_string = InstrumentationKey=...")
@@ -189,11 +233,12 @@ class TestSecurityPatterns:
 # Scanner tests — Networking domain
 # ------------------------------------------------------------------ #
 
+
 class TestNetworkingPatterns:
     """Test networking anti-pattern detection."""
 
     def test_public_network_access_detected(self):
-        warnings = scan('public_network_access_enabled = true')
+        warnings = scan("public_network_access_enabled = true")
         assert any("public network" in w.lower() for w in warnings)
 
     def test_open_firewall_detected(self):
@@ -208,6 +253,7 @@ class TestNetworkingPatterns:
 # ------------------------------------------------------------------ #
 # Scanner tests — Authentication domain
 # ------------------------------------------------------------------ #
+
 
 class TestAuthenticationPatterns:
     """Test authentication anti-pattern detection."""
@@ -225,6 +271,7 @@ class TestAuthenticationPatterns:
 # Scanner tests — Storage domain
 # ------------------------------------------------------------------ #
 
+
 class TestStoragePatterns:
     """Test storage anti-pattern detection."""
 
@@ -233,13 +280,14 @@ class TestStoragePatterns:
         assert any("account-level" in w.lower() or "managed identity" in w.lower() for w in warnings)
 
     def test_public_blob_access_detected(self):
-        warnings = scan('allow_blob_public_access = true')
+        warnings = scan("allow_blob_public_access = true")
         assert any("public" in w.lower() and "blob" in w.lower() for w in warnings)
 
 
 # ------------------------------------------------------------------ #
 # Scanner tests — Containers domain
 # ------------------------------------------------------------------ #
+
 
 class TestContainerPatterns:
     """Test container anti-pattern detection."""
@@ -252,6 +300,7 @@ class TestContainerPatterns:
 # ------------------------------------------------------------------ #
 # Scanner — safe pattern exemptions
 # ------------------------------------------------------------------ #
+
 
 class TestSafePatternExemptions:
     """Test that safe patterns properly exempt matches."""
@@ -280,6 +329,7 @@ class TestSafePatternExemptions:
 # Scanner tests — Encryption domain
 # ------------------------------------------------------------------ #
 
+
 class TestEncryptionPatterns:
     """Test encryption anti-pattern detection."""
 
@@ -305,6 +355,7 @@ class TestEncryptionPatterns:
 # Scanner tests — Monitoring domain
 # ------------------------------------------------------------------ #
 
+
 class TestMonitoringPatterns:
     """Test monitoring anti-pattern detection."""
 
@@ -317,6 +368,7 @@ class TestMonitoringPatterns:
 # Scanner tests — Cost domain
 # ------------------------------------------------------------------ #
 
+
 class TestCostPatterns:
     """Test cost anti-pattern detection."""
 
@@ -324,8 +376,15 @@ class TestCostPatterns:
         warnings = scan('sku_name = "premium"')
         assert any("premium" in w.lower() or "sku" in w.lower() for w in warnings)
 
-    def test_premium_with_production_safe(self):
+    def test_premium_still_flagged_with_production_context(self):
+        """Premium SKU should still be flagged even if 'production' appears in text."""
         warnings = scan('sku_name = "premium" for production high availability')
+        cost_warnings = [w for w in warnings if "premium" in w.lower()]
+        assert len(cost_warnings) > 0
+
+    def test_premium_safe_when_parameterized(self):
+        """Premium SKU should not be flagged when using a variable."""
+        warnings = scan("sku_name = var.sku_name  # premium is required for vnet integration")
         cost_warnings = [w for w in warnings if "premium" in w.lower()]
         assert cost_warnings == []
 
@@ -334,19 +393,30 @@ class TestCostPatterns:
 # Loader — domain coverage
 # ------------------------------------------------------------------ #
 
+
 class TestDomainCoverage:
     """Verify all expected domains are present."""
 
     def test_all_domains_loaded(self):
         checks = load()
         domains = {c.domain for c in checks}
-        expected = {"security", "networking", "authentication", "storage", "containers", "encryption", "monitoring", "cost"}
+        expected = {
+            "security",
+            "networking",
+            "authentication",
+            "storage",
+            "containers",
+            "encryption",
+            "monitoring",
+            "cost",
+        }
         assert expected.issubset(domains), f"Missing domains: {expected - domains}"
 
 
 # ------------------------------------------------------------------ #
 # Scanner — deduplication
 # ------------------------------------------------------------------ #
+
 
 class TestScannerDeduplication:
     """Test that the scanner produces one warning per check."""
@@ -358,3 +428,101 @@ class TestScannerDeduplication:
         credential_warnings = [w for w in warnings if "credential" in w.lower()]
         # Should be exactly 1, not 3
         assert len(credential_warnings) == 1
+
+
+# ------------------------------------------------------------------ #
+# Scanner — ID prefix in warnings
+# ------------------------------------------------------------------ #
+
+
+class TestScannerIdPrefix:
+    """Test that scan() includes the check ID in each warning."""
+
+    def test_warnings_include_anti_prefix(self):
+        warnings = scan("connection_string = bad")
+        assert len(warnings) > 0
+        for w in warnings:
+            assert w.startswith("[ANTI-"), f"Warning missing [ANTI-] prefix: {w}"
+
+    def test_warning_format(self):
+        warnings = scan("admin_enabled = true")
+        assert len(warnings) > 0
+        # Should be "[ANTI-SEC-002] Admin credentials detected..."
+        assert warnings[0].startswith("[ANTI-SEC-002]")
+
+
+# ------------------------------------------------------------------ #
+# Scanner — iac_tool filtering
+# ------------------------------------------------------------------ #
+
+
+class TestIacToolFiltering:
+    """Test that scan() filters checks by IaC tool via applies_to."""
+
+    def test_terraform_skips_bicep_checks(self):
+        """Terraform scan should not trigger ANTI-BCS checks."""
+        # 'resource ' triggers ANTI-BCS-001 when unfiltered
+        text = 'resource "azapi_resource" "test" {}'
+        all_warnings = scan(text)
+        tf_warnings = scan(text, iac_tool="terraform")
+        bcs_in_all = [w for w in all_warnings if "ANTI-BCS" in w]
+        bcs_in_tf = [w for w in tf_warnings if "ANTI-BCS" in w]
+        assert len(bcs_in_all) > 0, "BCS checks should fire without iac_tool filter"
+        assert len(bcs_in_tf) == 0, "BCS checks should NOT fire for terraform"
+
+    def test_bicep_skips_terraform_checks(self):
+        """Bicep scan should not trigger ANTI-TFS checks."""
+        # azurerm provider triggers ANTI-TFS-001
+        text = 'source = "hashicorp/azurerm"'
+        all_warnings = scan(text)
+        bcp_warnings = scan(text, iac_tool="bicep")
+        tfs_in_all = [w for w in all_warnings if "ANTI-TFS" in w]
+        tfs_in_bcp = [w for w in bcp_warnings if "ANTI-TFS" in w]
+        assert len(tfs_in_all) > 0, "TFS checks should fire without iac_tool filter"
+        assert len(tfs_in_bcp) == 0, "TFS checks should NOT fire for bicep"
+
+    def test_bicep_skips_tf_completeness_checks(self):
+        """Bicep scan should skip TF-specific completeness checks."""
+        # COMP-005 triggers on var.tfstate_storage_account (backend variable detection)
+        text = "var.tfstate_storage_account"
+        all_warnings = scan(text)
+        bcp_warnings = scan(text, iac_tool="bicep")
+        comp5_all = [w for w in all_warnings if "ANTI-COMP-005" in w]
+        comp5_bcp = [w for w in bcp_warnings if "ANTI-COMP-005" in w]
+        assert len(comp5_all) > 0, "COMP-005 should fire without filter"
+        assert len(comp5_bcp) == 0, "COMP-005 should NOT fire for bicep"
+
+    def test_bicep_still_runs_generic_completeness(self):
+        """Bicep scan should still run generic completeness checks (COMP-001)."""
+        text = "local_authentication_disabled = true"
+        warnings = scan(text, iac_tool="bicep")
+        comp1 = [w for w in warnings if "ANTI-COMP-001" in w]
+        assert len(comp1) > 0, "Generic COMP-001 should fire for bicep"
+
+    def test_no_iac_tool_runs_all(self):
+        """scan() without iac_tool should run all checks."""
+        text = 'resource "test" source = "hashicorp/azurerm"'
+        warnings = scan(text)
+        has_bcs = any("ANTI-BCS" in w for w in warnings)
+        has_tfs = any("ANTI-TFS" in w for w in warnings)
+        assert has_bcs, "BCS checks should fire without filter"
+        assert has_tfs, "TFS checks should fire without filter"
+
+    def test_generic_domains_always_run(self):
+        """Security/networking checks should run regardless of iac_tool."""
+        text = "connection_string = bad"
+        tf_warnings = scan(text, iac_tool="terraform")
+        bcp_warnings = scan(text, iac_tool="bicep")
+        assert any("ANTI-SEC" in w for w in tf_warnings)
+        assert any("ANTI-SEC" in w for w in bcp_warnings)
+
+    def test_applies_to_loaded_on_checks(self):
+        """Verify applies_to is populated on loaded checks."""
+        checks = load()
+        bcs_checks = [c for c in checks if c.domain == "bicep_structure"]
+        tfs_checks = [c for c in checks if c.domain == "terraform_structure"]
+        assert all(c.applies_to == ["bicep-agent"] for c in bcs_checks)
+        assert all(c.applies_to == ["terraform-agent"] for c in tfs_checks)
+        # Security checks now have specific applies_to (e.g., terraform-agent, bicep-agent)
+        sec_checks = [c for c in checks if c.domain == "security"]
+        assert len(sec_checks) > 0  # Security patterns should exist

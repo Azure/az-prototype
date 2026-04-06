@@ -3,7 +3,7 @@
 
 from setuptools import find_packages, setup
 
-VERSION = "0.2.1b5"
+VERSION = "0.2.1b6"
 CLASSIFIERS = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -59,7 +59,8 @@ setup(
             "azext_metadata.json",
             "agents/builtin/definitions/*.yaml",
             "governance/policies/**/*.yaml",
-            "governance/policies/*.json",
+            "governance/*.vectors.json",
+            "governance/schemas/*.json",
             "governance/anti_patterns/*.yaml",
             "governance/standards/**/*.yaml",
             "templates/**/*",

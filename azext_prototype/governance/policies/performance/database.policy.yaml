@@ -1,0 +1,115 @@
+kind: policy
+domain: performance
+description: Governance policies for Database Optimization
+last_updated: '2026-03-27'
+rules:
+- id: WAF-PERF-DB-001
+  severity: required
+  description: Define SQL indexing strategy — create indexes in deploy.sh post-deployment script for primary query patterns
+  rationale: Missing indexes cause full table scans; proper indexing can improve query performance by 100-1000x. Indexes are
+    created post-deployment via T-SQL
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services:
+    - Microsoft.Sql/servers/databases
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.DBforPostgreSQL/flexibleServers
+    - Microsoft.Cache/redis
+- id: WAF-PERF-DB-002
+  severity: required
+  description: Design Cosmos DB partition keys based on query patterns — use high-cardinality fields that align with read
+    and write access patterns
+  rationale: Partition key choice is the single most important Cosmos DB design decision; bad keys cause hot partitions, throttling,
+    and cross-partition queries
+  applies_to:
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.Sql/servers/databases
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.DBforPostgreSQL/flexibleServers
+    - Microsoft.Cache/redis
+- id: WAF-PERF-DB-003
+  severity: required
+  description: Configure connection pooling for all database connections — exact connection string patterns for SQL, Cosmos,
+    and PostgreSQL
+  rationale: Connection creation takes 20-100ms; pooling reuses connections, reducing latency and preventing connection exhaustion
+    under load
+  applies_to:
+  - app-developer
+  - csharp-developer
+  - python-developer
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.Sql/servers/databases
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.DBforPostgreSQL/flexibleServers
+    - Microsoft.Cache/redis
+- id: WAF-PERF-DB-004
+  severity: recommended
+  description: Configure read replicas for SQL and PostgreSQL to offload read traffic from the primary
+  rationale: Read replicas handle 50-80% of typical application traffic (reads); offloading reduces primary load and improves
+    read latency
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  targets:
+  - services:
+    - Microsoft.Sql/servers/databases
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.DBforPostgreSQL/flexibleServers
+    - Microsoft.Cache/redis
+- id: WAF-PERF-DB-005
+  severity: required
+  description: Enable Query Performance Insight and diagnostic settings for database performance monitoring
+  rationale: Without query monitoring, slow queries go undetected until they cause user-visible performance degradation
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - monitoring-agent
+  targets:
+  - services:
+    - Microsoft.Sql/servers/databases
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.DBforPostgreSQL/flexibleServers
+    - Microsoft.Cache/redis
+patterns:
+- name: Database performance baseline
+  description: Enable diagnostics on all databases, create indexes for primary queries in deploy.sh, configure connection
+    pooling, and set up read replicas for production
+anti_patterns:
+- description: Do not use SELECT * in application queries
+  instead: Select only required columns and use covering indexes with INCLUDE
+- description: Do not use cross-partition queries in Cosmos DB for common operations
+  instead: Design partition keys to align with primary query patterns; use point reads where possible
+- description: Do not create database connections in a loop
+  instead: Use connection pooling with Min/Max Pool Size configured in the connection string
+- description: Do not skip indexing for known query patterns
+  instead: Create nonclustered indexes with INCLUDE columns for all primary query patterns in deploy.sh
+references:
+- title: SQL Database performance monitoring
+  url: https://learn.microsoft.com/azure/azure-sql/database/monitor-tune-overview
+- title: Cosmos DB partition key design
+  url: https://learn.microsoft.com/azure/cosmos-db/partitioning-overview
+- title: PostgreSQL performance tuning
+  url: https://learn.microsoft.com/azure/postgresql/flexible-server/concepts-query-performance-insight
+- title: SQL indexing best practices
+  url: https://learn.microsoft.com/sql/relational-databases/indexes/indexes
+- title: Azure SQL read scale-out
+  url: https://learn.microsoft.com/azure/azure-sql/database/read-scale-out

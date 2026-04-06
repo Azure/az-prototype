@@ -1,0 +1,256 @@
+kind: policy
+domain: azure-networking
+description: Governance policies for Traffic Manager
+last_updated: '2026-03-27'
+rules:
+- id: AZ-TM-001
+  severity: required
+  description: Configure Traffic Manager profile with appropriate routing method and HTTPS monitoring
+  rationale: HTTPS monitoring ensures endpoints are reachable and TLS is functional; routing method must match traffic pattern
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  companion_resources:
+  - type: Microsoft.Network/trafficManagerProfiles/azureEndpoints@2022-04-01
+    name: ep-azure
+    description: Azure endpoint definitions
+  - type: Microsoft.Network/trafficManagerProfiles/externalEndpoints@2022-04-01
+    name: ep-external
+    description: External endpoint definitions
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-udr
+    description: Route logs to Log Analytics
+  targets:
+  - services:
+    - Microsoft.Network/trafficManagerProfiles
+    terraform_pattern: |
+      resource "azapi_resource" "traffic_manager" {
+        type      = "Microsoft.Network/trafficManagerProfiles@2022-04-01"
+        name      = var.tm_profile_name
+        location  = "global"
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            profileStatus        = "Enabled"
+            trafficRoutingMethod = "Performance"
+            dnsConfig = {
+              relativeName = var.tm_dns_name
+              ttl          = 60
+            }
+            monitorConfig = {
+              protocol                    = "HTTPS"
+              port                        = 443
+              path                        = "/health"
+              intervalInSeconds           = 30
+              toleratedNumberOfFailures   = 3
+              timeoutInSeconds            = 10
+              expectedStatusCodeRanges = [
+                {
+                  min = 200
+                  max = 299
+                }
+              ]
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource trafficManager 'Microsoft.Network/trafficManagerProfiles@2022-04-01' = {
+        name: tmProfileName
+        location: 'global'
+        properties: {
+          profileStatus: 'Enabled'
+          trafficRoutingMethod: 'Performance'
+          dnsConfig: {
+            relativeName: tmDnsName
+            ttl: 60
+          }
+          monitorConfig: {
+            protocol: 'HTTPS'
+            port: 443
+            path: '/health'
+            intervalInSeconds: 30
+            toleratedNumberOfFailures: 3
+            timeoutInSeconds: 10
+            expectedStatusCodeRanges: [
+              {
+                min: 200
+                max: 299
+              }
+            ]
+          }
+        }
+      }
+    prohibitions:
+    - Do not use HTTP monitoring — always use HTTPS for health probes
+    - Do not set TTL higher than 60 seconds for failover scenarios — increases failover time
+    - Do not use Traffic Manager without health monitoring enabled
+- id: AZ-TM-002
+  severity: required
+  description: Configure endpoints with proper priority and geographic constraints
+  rationale: Endpoint configuration determines traffic distribution and failover behavior
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  companion_resources:
+  - type: Microsoft.Network/trafficManagerProfiles@2022-04-01
+    name: tm-profile
+    description: Parent profile
+  - type: Microsoft.Web/sites@2023-12-01
+    name: app
+    description: Target resources
+  targets:
+  - services:
+    - Microsoft.Network/trafficManagerProfiles
+    terraform_pattern: |
+      resource "azapi_resource" "tm_endpoint" {
+        type      = "Microsoft.Network/trafficManagerProfiles/azureEndpoints@2022-04-01"
+        name      = var.endpoint_name
+        parent_id = azapi_resource.traffic_manager.id
+        body = {
+          properties = {
+            targetResourceId = var.target_resource_id
+            endpointStatus   = "Enabled"
+            weight           = 100
+            priority         = 1
+            endpointLocation = var.endpoint_location
+          }
+        }
+      }
+    bicep_pattern: |
+      resource tmEndpoint 'Microsoft.Network/trafficManagerProfiles/azureEndpoints@2022-04-01' = {
+        parent: trafficManager
+        name: endpointName
+        properties: {
+          targetResourceId: targetResourceId
+          endpointStatus: 'Enabled'
+          weight: 100
+          priority: 1
+          endpointLocation: endpointLocation
+        }
+      }
+    prohibitions:
+    - Do not configure all endpoints with the same priority in Priority routing — creates ambiguous failover
+    - Do not leave endpoints in Disabled state without documentation
+- id: AZ-TM-003
+  severity: recommended
+  description: Enable diagnostic settings for Traffic Manager profile
+  rationale: Monitor endpoint health probe results and DNS query patterns
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - monitoring-agent
+  companion_resources:
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace
+  targets:
+  - services:
+    - Microsoft.Network/trafficManagerProfiles
+    terraform_pattern: |
+      resource "azapi_resource" "tm_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-traffic-manager"
+        parent_id = azapi_resource.traffic_manager.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "ProbeHealthStatusEvents"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource tmDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-traffic-manager'
+        scope: trafficManager
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
+            {
+              category: 'ProbeHealthStatusEvents'
+              enabled: true
+            }
+          ]
+          metrics: [
+            {
+              category: 'AllMetrics'
+              enabled: true
+            }
+          ]
+        }
+      }
+    prohibitions:
+    - Do not omit ProbeHealthStatusEvents — they are critical for failover diagnostics
+- id: AZ-TM-004
+  severity: recommended
+  description: Use nested profiles for complex routing topologies
+  rationale: Nested profiles allow combining routing methods (e.g., Performance at top, Weighted at region level)
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  companion_resources:
+  - type: Microsoft.Network/trafficManagerProfiles@2022-04-01
+    name: tm-child
+    description: Child profile
+  targets:
+  - services:
+    - Microsoft.Network/trafficManagerProfiles
+    terraform_pattern: |
+      resource "azapi_resource" "tm_nested_endpoint" {
+        type      = "Microsoft.Network/trafficManagerProfiles/nestedEndpoints@2022-04-01"
+        name      = var.nested_endpoint_name
+        parent_id = azapi_resource.traffic_manager.id
+        body = {
+          properties = {
+            targetResourceId     = azapi_resource.child_profile.id
+            endpointStatus       = "Enabled"
+            minChildEndpoints    = 1
+            minChildEndpointsIPv4 = 1
+            priority             = 1
+          }
+        }
+      }
+    bicep_pattern: |
+      resource tmNestedEndpoint 'Microsoft.Network/trafficManagerProfiles/nestedEndpoints@2022-04-01' = {
+        parent: trafficManager
+        name: nestedEndpointName
+        properties: {
+          targetResourceId: childProfile.id
+          endpointStatus: 'Enabled'
+          minChildEndpoints: 1
+          minChildEndpointsIPv4: 1
+          priority: 1
+        }
+      }
+    prohibitions:
+    - Do not set minChildEndpoints to 0 — profile will never fail over
+patterns:
+- name: Traffic Manager with Performance routing and HTTPS monitoring
+  description: Multi-region failover with Performance routing and health probes
+  example: |
+    # See TM-001 through TM-004 for complete azapi_resource patterns
+anti_patterns:
+- description: Do not use HTTP health monitoring for production endpoints
+  instead: Always use HTTPS monitoring with a proper health check path
+- description: Do not use Traffic Manager with a single endpoint
+  instead: Use at least two endpoints in different regions for high availability
+references:
+- title: Traffic Manager documentation
+  url: https://learn.microsoft.com/azure/traffic-manager/traffic-manager-overview
+- title: Traffic Manager routing methods
+  url: https://learn.microsoft.com/azure/traffic-manager/traffic-manager-routing-methods

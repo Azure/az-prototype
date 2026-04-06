@@ -1,0 +1,173 @@
+kind: policy
+domain: integration
+description: Governance policies for Event Driven
+last_updated: '2026-03-27'
+rules:
+- id: CC-INT-ED-001
+  severity: required
+  description: Wire Event Grid subscriptions to Function App or Container App endpoints with dead-letter storage and managed
+    identity delivery
+  rationale: Event Grid provides at-least-once delivery; dead-letter captures undeliverable events; managed identity eliminates
+    connection strings
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - csharp-developer
+  - python-developer
+  companion_resources:
+  - type: Microsoft.EventGrid/systemTopics@2024-06-01-preview
+    name: system-topic
+    description: System topic with managed identity for secure event delivery
+  - type: Microsoft.Storage/storageAccounts@2023-05-01
+    name: dead-letter-storage
+    description: Storage account with blob container for dead-letter event capture
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: eg-dlq-role
+    description: Storage Blob Data Contributor role for Event Grid to write dead-letter blobs
+  template_check:
+    when_services_present:
+    - event-grid
+    - functions
+    require_service:
+    - storage-account
+    severity: warning
+    error_message: Event Grid + Functions template must include a storage account for dead-letter configuration
+  targets:
+  - services:
+    - Microsoft.EventGrid/topics
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+    - Microsoft.StreamAnalytics/streamingjobs
+- id: CC-INT-ED-002
+  severity: required
+  description: Wire Service Bus triggers to Function App or Container App using managed identity connections
+  rationale: Service Bus provides reliable ordered messaging; managed identity eliminates connection string management and
+    rotation burden
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - csharp-developer
+  - python-developer
+  companion_resources:
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: fn-sb-data-receiver
+    description: Azure Service Bus Data Receiver role (4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0) for Function App identity
+  template_check:
+    when_services_present:
+    - service-bus
+    - functions
+    require_service:
+    - managed-identity
+    severity: warning
+    error_message: Service Bus + Functions template must include managed identity for connection string-free triggers
+  targets:
+  - services:
+    - Microsoft.EventGrid/topics
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+    - Microsoft.StreamAnalytics/streamingjobs
+- id: CC-INT-ED-003
+  severity: required
+  description: Wire Event Hubs to Stream Analytics to Storage/SQL for real-time stream processing pipelines
+  rationale: Event Hubs provides high-throughput ingestion; Stream Analytics handles windowed aggregation; output to durable
+    storage completes the pipeline
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - csharp-developer
+  - python-developer
+  companion_resources:
+  - type: Microsoft.EventHub/namespaces/eventhubs/consumergroups@2024-01-01
+    name: asa-consumer-group
+    description: Dedicated consumer group for Stream Analytics — never use $Default
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: asa-eh-receiver
+    description: Azure Event Hubs Data Receiver role for Stream Analytics managed identity
+  targets:
+  - services:
+    - Microsoft.EventGrid/topics
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+    - Microsoft.StreamAnalytics/streamingjobs
+- id: CC-INT-ED-004
+  severity: required
+  description: Configure dead-letter queues for Service Bus and dead-letter storage for Event Grid
+  rationale: Dead-letter captures messages/events that cannot be delivered or processed, enabling investigation and replay
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services:
+    - Microsoft.EventGrid/topics
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+    - Microsoft.StreamAnalytics/streamingjobs
+- id: CC-INT-ED-005
+  severity: required
+  description: Implement poison message handling patterns for failed message processing
+  rationale: Poison messages that repeatedly fail processing block other messages; explicit handling prevents queue stalls
+  applies_to:
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  - terraform-agent
+  - bicep-agent
+  companion_resources:
+  - type: Microsoft.Insights/metricAlerts@2018-03-01
+    name: dlq-depth-alert
+    description: Alert when dead-letter queue depth exceeds threshold — triggers investigation
+  - type: Microsoft.Insights/actionGroups@2023-01-01
+    name: ops-action-group
+    description: Action group for dead-letter alerts — email and webhook notifications
+  targets:
+  - services:
+    - Microsoft.EventGrid/topics
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+    - Microsoft.StreamAnalytics/streamingjobs
+patterns:
+- name: Event Grid to Function App with dead-letter
+  description: System topic subscription delivering to Azure Function with managed identity and dead-letter storage
+- name: Service Bus trigger with managed identity
+  description: Function App consuming Service Bus queue using managed identity connection string-free binding
+- name: Event Hub to Stream Analytics pipeline
+  description: Real-time stream processing with Event Hub input, Stream Analytics windowed query, and blob output
+anti_patterns:
+- description: Do not use connection strings for event source authentication
+  instead: Use managed identity with RBAC role assignments for all event source connections
+- description: Do not skip dead-letter configuration on any event subscription or queue
+  instead: Always configure dead-letter storage for Event Grid and ensure deadLetteringOnMessageExpiration for Service Bus
+- description: Do not process events without idempotency checks
+  instead: Use message deduplication (requiresDuplicateDetection) and implement idempotent event handlers
+references:
+- title: Event Grid dead-letter and retry
+  url: https://learn.microsoft.com/azure/event-grid/delivery-and-retry
+- title: Service Bus dead-letter queues
+  url: https://learn.microsoft.com/azure/service-bus-messaging/service-bus-dead-letter-queues
+- title: Azure Functions Service Bus trigger
+  url: https://learn.microsoft.com/azure/azure-functions/functions-bindings-service-bus-trigger
+- title: Stream Analytics with Event Hubs
+  url: https://learn.microsoft.com/azure/stream-analytics/stream-analytics-define-inputs
+- title: Event Grid managed identity delivery
+  url: https://learn.microsoft.com/azure/event-grid/managed-service-identity

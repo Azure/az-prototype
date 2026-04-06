@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Benchmark Run: {{DATE}}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    body{font-family:'Inter',sans-serif}
+    .gradient-bg{background:linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#0f172a 100%)}
+    .card{background:rgba(30,41,59,.8);border:1px solid rgba(71,85,105,.4)}
+    .tab-btn{transition:all .15s}
+    .tab-btn.active{background:#1e293b;color:#f8fafc;border-bottom:2px solid #8b5cf6}
+    .tab-btn:not(.active){color:#94a3b8}
+    .tab-btn:not(.active):hover{color:#cbd5e1;background:rgba(30,41,59,.4)}
+    .tab-content{display:none}.tab-content.active{display:block}
+    .cp-bar{background:#3b82f6}.cc-bar{background:#f97316}
+    pre{font-size:.7rem;overflow-x:auto}
+    @media print{.no-print{display:none}}
+  </style>
+</head>
+<body class="gradient-bg text-gray-100 min-h-screen">
+
+<!-- ============================================================
+  BENCHMARK REPORT TEMPLATE
+
+  To create a new report, replace the DATA section below with
+  actual benchmark data. The layout and structure remain fixed.
+
+  Placeholders to replace:
+    {{DATE}}        — Run timestamp (e.g., "2026-04-15 14:30:00")
+    {{PROJECT}}     — Project name (e.g., "KanFlow Azure POC")
+    {{MODEL}}       — Model used (e.g., "Sonnet 4.6")
+    {{GHCP_WINS}}   — Number of stages won by GHCP
+    {{CC_WINS}}     — Number of stages won by Claude Code
+
+  Data arrays to populate:
+    benchmarks[]    — 14 benchmark scores {id, name, ghcp, comp, desc}
+    stages[]        — Per-stage data {n, name, ghcp, comp, winner, dims[], notes}
+    heatmapData[]   — Dimension winners grid [dimName, s1..sN]
+    bugs[]          — Critical bugs {desc, tool, stages, severity}
+    strengths{}     — Systematic strengths/weaknesses for each tool
+============================================================ -->
+
+<header class="max-w-[1400px] mx-auto px-6 pt-8 pb-4">
+  <div class="flex items-end justify-between flex-wrap gap-4">
+    <div>
+      <h1 class="text-2xl font-extrabold tracking-tight">
+        <span class="text-blue-400">GitHub Copilot</span>
+        <span class="text-gray-500 mx-2">vs</span>
+        <span class="text-orange-400">Claude Code</span>
+      </h1>
+      <p class="text-gray-400 mt-1 text-xs">Benchmark Run &mdash; <span id="runDate"></span></p>
+    </div>
+    <div class="text-right text-[10px] text-gray-500 leading-relaxed">
+      <p>Project: <span id="projectName"></span></p>
+      <p>Model: <span id="modelName"></span></p>
+      <p>Stages won &mdash; GHCP: <span id="ghcpWins"></span> &bull; Claude Code: <span id="ccWins"></span></p>
+    </div>
+  </div>
+</header>
+
+<!-- Tab navigation — generated dynamically based on stage count -->
+<nav class="max-w-[1400px] mx-auto px-6 overflow-x-auto no-print">
+  <div class="flex gap-0.5 border-b border-slate-700 min-w-max" id="tabNav"></div>
+</nav>
+
+<main class="max-w-[1400px] mx-auto px-6 py-6">
+
+<!-- OVERVIEW TAB -->
+<div class="tab-content active" id="tab-overview">
+
+  <!-- Project Summary -->
+  <section class="mb-6">
+    <div class="card rounded-xl p-5">
+      <h2 class="text-sm font-bold text-gray-200 mb-2">Project: <span class="projectNameInline"></span></h2>
+      <p class="text-xs text-gray-400" id="projectSummary"></p>
+    </div>
+  </section>
+
+  <!-- Benchmark Scores Table -->
+  <section class="mb-6">
+    <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-purple-500 rounded-full inline-block"></span>Benchmark Scores</h2>
+    <div class="card rounded-xl overflow-hidden">
+      <table class="w-full text-xs">
+        <thead><tr class="bg-slate-800">
+          <th class="px-3 py-2 text-left text-gray-300">Benchmark</th>
+          <th class="px-3 py-2 text-left text-gray-300">Description</th>
+          <th class="px-3 py-2 text-center text-blue-400">GHCP</th>
+          <th class="px-3 py-2 text-center text-orange-400">Claude Code</th>
+          <th class="px-3 py-2 text-center text-gray-300">Delta</th>
+          <th class="px-3 py-2 text-center text-gray-300">Winner</th>
+        </tr></thead>
+        <tbody class="divide-y divide-slate-700" id="benchmarkTable"></tbody>
+        <tfoot><tr class="bg-slate-800 font-bold text-sm">
+          <td class="px-3 py-2" colspan="2">Overall Average</td>
+          <td class="px-3 py-2 text-center text-blue-400" id="ghcpAvg"></td>
+          <td class="px-3 py-2 text-center text-orange-400" id="compAvg"></td>
+          <td class="px-3 py-2 text-center" id="deltaAvg"></td>
+          <td class="px-3 py-2 text-center" id="overallWinner"></td>
+        </tr></tfoot>
+      </table>
+    </div>
+  </section>
+
+  <!-- Aggregate Scores by Stage -->
+  <section class="mb-6">
+    <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-green-500 rounded-full inline-block"></span>Aggregate Scores by Stage</h2>
+    <div class="card rounded-xl overflow-hidden">
+      <table class="w-full text-xs">
+        <thead><tr class="bg-slate-800">
+          <th class="px-3 py-2 text-left text-gray-300">Stage</th>
+          <th class="px-3 py-2 text-left text-gray-300">Service</th>
+          <th class="px-3 py-2 text-center text-blue-400">GHCP</th>
+          <th class="px-3 py-2 text-center text-orange-400">Claude Code</th>
+          <th class="px-3 py-2 text-center text-gray-300">Winner</th>
+        </tr></thead>
+        <tbody class="divide-y divide-slate-700" id="stageTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Systematic Strengths & Weaknesses -->
+  <section class="mb-6 grid md:grid-cols-2 gap-4" id="patternsSection"></section>
+
+  <!-- Critical Bugs -->
+  <section class="mb-6" id="bugsSection"></section>
+
+  <!-- Dimension Winners Heatmap -->
+  <section class="mb-6" id="heatmapSection"></section>
+
+  <!-- Final Verdict -->
+  <section class="mb-6">
+    <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-amber-500 rounded-full inline-block"></span>Final Verdict</h2>
+    <div class="card rounded-xl p-6">
+      <div class="grid md:grid-cols-2 gap-6 mb-5">
+        <div class="text-center">
+          <div class="text-4xl font-extrabold text-blue-400" id="verdictGhcp"></div>
+          <div class="text-sm text-blue-300 font-semibold mt-1">GitHub Copilot</div>
+          <p class="text-[10px] text-gray-500" id="verdictGhcpSub"></p>
+        </div>
+        <div class="text-center">
+          <div class="text-4xl font-extrabold text-orange-400" id="verdictComp"></div>
+          <div class="text-sm text-orange-300 font-semibold mt-1">Claude Code</div>
+          <p class="text-[10px] text-gray-500" id="verdictCompSub"></p>
+        </div>
+      </div>
+      <div class="bg-slate-700/30 rounded-lg p-4 text-sm text-gray-300 space-y-2" id="verdictText"></div>
+    </div>
+  </section>
+
+</div><!-- /overview -->
+
+</main>
+
+<footer class="max-w-[1400px] mx-auto px-6 pb-8 text-center text-[10px] text-gray-600">
+  <p>Benchmark Suite v1.0</p>
+</footer>
+
+<!-- ============================================================
+  DATA SECTION — Replace everything below with actual run data.
+  Keep the structure of each object/array intact.
+============================================================ -->
+<script>
+const META = {
+  date: "2026-03-31 11:16:46",
+  project: "KanFlow Azure POC",
+  model: "Sonnet 4.6",
+  summary: "14-stage Azure infrastructure pipeline: managed identity, monitoring (Log Analytics + App Insights), networking (VNet, NSGs, DNS), data services (ACR, Key Vault, Service Bus, SQL, Cosmos DB, Redis, Storage), real-time (SignalR), compute (Container Apps), and documentation. All stages use azapi provider with Terraform. Second benchmark run after prompt pipeline improvements (tag placement fix, NEVER directive hierarchy, deploy.sh requirements, scope boundary, provider restrictions, subnet drift prevention).",
+};
+
+const benchmarks = [
+  {id:"B-INST",name:"Instruction Adherence",ghcp:90,comp:89,desc:"Following prompt requirements exactly"},
+  {id:"B-CNST",name:"Constraint Compliance",ghcp:92,comp:91,desc:"NEVER/MUST directive adherence"},
+  {id:"B-TECH",name:"Technical Correctness",ghcp:88,comp:80,desc:"Syntax validity, API versions, runtime viability"},
+  {id:"B-SEC",name:"Security Posture",ghcp:92,comp:91,desc:"MI, RBAC, encryption, network controls"},
+  {id:"B-OPS",name:"Operational Readiness",ghcp:91,comp:86,desc:"deploy.sh completeness and quality"},
+  {id:"B-DEP",name:"Dependency Hygiene",ghcp:88,comp:74,desc:"Minimal, correct, consistent dependencies"},
+  {id:"B-SCOPE",name:"Scope Discipline",ghcp:87,comp:86,desc:"No over/under engineering"},
+  {id:"B-QUAL",name:"Code Quality",ghcp:89,comp:86,desc:"Organization, naming, idioms, validation"},
+  {id:"B-OUT",name:"Output Completeness",ghcp:90,comp:89,desc:"All required interfaces exported"},
+  {id:"B-CONS",name:"Cross-Stage Consistency",ghcp:86,comp:76,desc:"Uniform patterns across stages"},
+  {id:"B-DOC",name:"Documentation Quality",ghcp:83,comp:83,desc:"Design docs, rationale, actionability"},
+  {id:"B-REL",name:"Response Reliability",ghcp:85,comp:91,desc:"Complete, parseable, hallucination-free"},
+  {id:"B-RBAC",name:"RBAC & Identity",ghcp:88,comp:88,desc:"Correct mechanisms, deterministic names"},
+  {id:"B-ANTI",name:"Anti-Pattern Absence",ghcp:89,comp:87,desc:"No known bad patterns"},
+];
+
+const stages = [
+  {n:1,name:"Managed Identity",ghcp:92,comp:89,winner:"ghcp",
+   dims:[["Provider source","hashicorp/azapi (correct)","azure/azapi (incorrect source)","B"],["Backend type","Local backend (POC-appropriate)","azurerm backend (requires pre-existing storage)","B"],["Resource group parent_id","Correctly uses /subscriptions/${var.subscription_id}","Missing parent_id on resource_group resource","B"],["Tags placement","Top-level tags = local.tags","Top-level tags = local.tags","T"],["deploy.sh completeness","637 lines, --auto-approve, comprehensive","413 lines, no --auto-approve, good verify","B"],["Variable validation","Environment validation block","No variable validation blocks","B"],["Output completeness","All required + tenant_id","All required + tenant_id","T"],["Naming convention","Dynamic via locals formula","Hardcoded defaults in variables","T"]],
+   notes:"GHCP produces more robust code with correct hashicorp/azapi provider source, proper parent_id on resource group, and a more feature-complete deploy.sh with --auto-approve. CC uses incorrect provider source azure/azapi and is missing parent_id on the resource group azapi_resource, which would cause a deployment failure."},
+  {n:2,name:"Log Analytics",ghcp:92,comp:85,winner:"ghcp",
+   dims:[["Provider source","hashicorp/azapi (correct)","azure/azapi (incorrect)","B"],["Retention default","90 days (matches architecture spec)","30 days (policy minimum only)","B"],["Daily quota cap","Present with validation (5 GB default)","Not included","B"],["Secret exposure","No secrets in state or exports","response_export_values includes primarySharedKey","B"],["Post-deploy verify","Checks provisioning state, public access, SKU, retention","Similar but fragile RG name extraction","B"],["Output naming","workspace_id, workspace_name (clean)","log_analytics_workspace_id (prefixed)","T"],["Remote state","Stage 1 via variable path, validates outputs","Stage 1 via hardcoded backend config","B"],["Backend consistency","Local backend (same as Stage 1)","azurerm backend (same as CC Stage 1)","T"]],
+   notes:"GHCP continues its advantage with correct provider source, better adherence to architecture spec (90-day retention vs 30-day), and inclusion of daily quota cap. CC exports primarySharedKey in response_export_values, a security anti-pattern that unnecessarily exposes a sensitive value in Terraform state."},
+  {n:3,name:"Application Insights",ghcp:92,comp:90,winner:"ghcp",
+   dims:[["Provider source","hashicorp/azapi ~>2.8.0 (consistent)","hashicorp/azapi ~>2.8.0 (now matches GHCP, inconsistent with own S1/S2)","B"],["Resource config","Workspace-based, 100% sampling, public access disabled","Identical configuration","T"],["Sensitive outputs","connection_string, instrumentation_key marked sensitive","Identical treatment","T"],["Variable validation","application_type, retention_in_days, sampling_percentage","Identical validations","T"],["Backend","Local (consistent with S1, S2)","Local (inconsistent with own S1, S2 azurerm)","B"],["Post-deploy verify","Checks provisioning state, ingestion mode, public access","Identical checks","T"],["Cross-stage consistency","Same patterns throughout","Provider source and backend changed from S1/S2","B"],["deploy.sh quality","~770 lines, comprehensive","~770 lines, nearly identical","T"]],
+   notes:"Stage 3 responses are nearly identical. CC switches to hashicorp/azapi and local backend (matching GHCP), creating an internal inconsistency with its own Stages 1-2 where it used azure/azapi and azurerm backend. GHCP maintains consistent patterns throughout."},
+  {n:4,name:"Networking",ghcp:90,comp:90,winner:"ghcp",
+   dims:[["Subnets as child resources","Separate azapi_resource per subnet (VNET-001 compliant)","Identical pattern","T"],["NSG per subnet","4 NSGs, one attached to each subnet","Identical","T"],["Subnet sizing","PE /27, Data /27, ACA /23, App /26 (policy-compliant)","Identical","T"],["DNS zone count","14 zones, deduplicates eventhub/servicebus","Identical dedup logic","T"],["Subnet serialization","depends_on chaining (pe -> data -> aca -> app)","Identical","T"],["API versions","Correct mandatory versions used","Identical","T"],["deploy.sh structure","Complete with pre-flight, verify, destroy","Identical quality","T"],["VNet link naming","link-${vnet_name}-${each.key}","Identical","T"]],
+   notes:"Stage 4 responses are remarkably similar. Both correctly implement VNET-001 through VNET-004 policies with separate child resources for subnets, proper delegation, correct sizing, and comprehensive DNS zone provisioning. Effectively a tie."},
+  {n:5,name:"Container Registry",ghcp:91,comp:90,winner:"ghcp",
+   dims:[["NEVER directive compliance","Overrides arch context (Standard->Premium, public->Disabled)","Identical override behavior","T"],["Provider dependency","Only azapi declared and used","Adds unused data azurerm_client_config (requires undeclared azurerm)","B"],["RBAC mechanism","uuidv5 deterministic names, correct GUIDs","Identical","T"],["Principal separation","AcrPull to worker, AcrPush to CI/CD (with try() fallback)","Identical","T"],["Post-deploy verification","Checks state, admin, public access, SKU, AcrPull role","Same + additionally checks AcrPush role","C"],["ACR policies","retentionPolicy, quarantinePolicy, trustPolicy, exportPolicy","Identical","T"],["Design notes","Summary table with scope/RBAC/outputs sections","More detailed directive hierarchy explanation","C"],["deploy.sh quality","Full lifecycle with all flags","Identical quality","T"]],
+   notes:"Both correctly override architecture context with NEVER directives (Premium SKU, disabled public access). GHCP has cleaner provider setup without unused azurerm_client_config. CC shows slightly better documentation of the directive hierarchy resolution."},
+  {n:6,name:"Key Vault",ghcp:90,comp:90,winner:"ghcp",
+   dims:[["Provider Setup","azapi ~>2.8.0, local backend","azapi ~>2.8.0, local backend","T"],["KV Configuration","RBAC, soft-delete 90d, purge protection, public disabled","Identical configuration","T"],["RBAC Roles","3 roles (User/Officer/Admin), uuidv5, ServicePrincipal","3 roles, uuidv5, uses subscription_resource_id local","T"],["Networking Boundary","No PE, references Stage 4 state read-only","No PE, references Stage 4 state read-only","T"],["Diagnostics","allLogs + AllMetrics to LAW","Identical diagnostics","T"],["Variable Validation","KV name length 3-24, soft_delete_retention 7-90","Identical validations","T"],["deploy.sh Quality","~375 lines, full lifecycle, detailed verification","~375 lines, nearly identical structure","T"],["File Organization","providers.tf, variables.tf, locals.tf, data.tf, main.tf, keyvault_rbac.tf, outputs.tf","Identical file structure","T"]],
+   notes:"Stage 6 responses are remarkably similar, both achieving near-identical scores. Both correctly omit private endpoints (Stage 4 boundary), implement all three RBAC roles with deterministic uuidv5 names, and produce comprehensive deploy.sh scripts. Essentially tied."},
+  {n:7,name:"Service Bus",ghcp:88,comp:89,winner:"comp",
+   dims:[["RBAC Completeness","Only Data Receiver (1 of 3 required)","All 3 roles: Receiver, Sender, Owner","C"],["Provider Hygiene","azapi only, clean","Includes azurerm_client_config without azurerm provider","B"],["SKU Override","Premium (policy over architecture context)","Premium (same reasoning)","T"],["Queue Configuration","board-events with correct TTL/lock/DLQ","Identical, better naming explanation","C"],["Namespace Config","disableLocalAuth, TLS 1.2, publicAccess Disabled","Identical","T"],["deploy.sh Quality","~430 lines, comprehensive verification","~490 lines, adds TLS + dead-letter verification","C"],["Remote State","Stage 1 + Stage 6, clean resolution","Same references","T"],["Documentation","Policy table + architecture notes","More detailed: directive hierarchy, RBAC table, queue naming","C"]],
+   notes:"CC wins on RBAC completeness (all 3 required roles vs only 1 for GHCP) and documentation quality, but loses on technical correctness due to including azurerm_client_config without declaring the azurerm provider. GHCP has cleaner provider hygiene but missed 2 of 3 mandatory RBAC role assignments."},
+  {n:8,name:"Azure SQL",ghcp:90,comp:79,winner:"ghcp",
+   dims:[["Provider Source","hashicorp/azapi (correct)","azure/azapi (wrong publisher)","B"],["Backend Type","local (consistent with prior stages)","azurerm (inconsistent, introduces storage dependency)","B"],["Policy Resources","All SQL-001 through SQL-008 + backup retention","SQL-001 through SQL-008 but no backup retention","B"],["AAD-Only Auth","3 separate child resources, correct dependency chain","Same pattern, correct implementation","T"],["Variable Validation","5 validations (env, max_size, auto_pause, min_capacity, backup)","1 validation only","B"],["deploy.sh Quality","~340 lines, structured preflight, robust verification","~290 lines, fragile RG lookup, weaker preflight","B"],["Cross-Stage Consistency","Local backend, hashicorp/azapi throughout","Switches to azurerm backend and azure/azapi source","B"],["NEVER Directive","publicNetworkAccess=Disabled, overrides architecture POC note","Same override, correctly applied","T"]],
+   notes:"GHCP significantly outperforms CC. CC switches to azure/azapi provider source (wrong publisher) and azurerm backend (inconsistent with prior stages), creating major cross-stage consistency issues. CC deploy.sh uses fragile patterns like querying az sql server list to find the resource group."},
+  {n:9,name:"Cosmos DB",ghcp:90,comp:75,winner:"ghcp",
+   dims:[["Provider Hygiene","azapi only, hashicorp/azapi","azapi + azurerm mixed, Azure/azapi (wrong case)","B"],["Serverless Mode","capacityMode = Serverless (newer API)","capabilities = [EnableServerless] (legacy)","B"],["Diagnostics Provider","azapi_resource for diagnostics (consistent)","azurerm_monitor_diagnostic_setting (mixed)","B"],["RBAC Implementation","sqlRoleAssignments, uuidv5 URL namespace","sqlRoleAssignments, uuidv5 dns namespace (inconsistent)","B"],["Resource Group Reference","azapi data source from remote state","azurerm_resource_group data source","B"],["deploy.sh Quality","~425 lines, key validation, parameterized names","~135 lines, hardcoded names, weaker preflight","B"],["Output Completeness","All IDs, names, RBAC assignment IDs, passthroughs","Missing RBAC assignment IDs in outputs","B"],["Documentation","Detailed: RBAC system explanation, API split, no-azurerm rationale","Brief intro only","B"]],
+   notes:"GHCP dominates with a 15-point lead. CC introduces azurerm provider unnecessarily, uses wrong provider source capitalization, and has a significantly shorter deploy.sh with hardcoded resource names. GHCP maintains azapi-only consistency and provides comprehensive documentation."},
+  {n:10,name:"Redis Cache",ghcp:91,comp:75,winner:"ghcp",
+   dims:[["Provider Source","hashicorp/azapi, azapi only","Azure/azapi (wrong), adds azurerm unnecessarily","B"],["Backend Consistency","local (consistent across all stages)","azurerm (3rd different backend in 5 stages)","B"],["maxmemory-policy","allkeys-lru (matches architecture context)","volatile-lru (differs from architecture spec)","B"],["Access Policy","Correct accessPolicyAssignment, Data Owner","Same pattern, correct","T"],["KV Secrets","hostname + ssl-port, no keys (correct per RED-001)","Same pattern","T"],["deploy.sh Robustness","Parameterized names, state-based verification","Hardcoded REDIS_NAME/RESOURCE_GROUP constants","B"],["Variable Validation","redis_maxmemory_reserved_mb range check","No range validation","B"],["Documentation","Detailed SKU upgrade, no-keys, PE boundary rationale","Brief summary only","B"]],
+   notes:"GHCP leads by 16 points. CC continues inconsistent provider setup (wrong source publisher, unnecessary azurerm, switching backend types). CC deploy.sh hardcodes resource names as constants instead of reading from terraform outputs. GHCP correctly uses allkeys-lru per architecture context while CC deviates to volatile-lru."},
+  {n:11,name:"Storage Account",ghcp:91,comp:90,winner:"ghcp",
+   dims:[["Resource completeness","All resources present, clean provider usage","All resources present but includes orphaned azurerm data source","B"],["API versions","Correct: 2023-05-01 storage, 2025-08-01 container","Correct: same versions","T"],["Security posture","Shared key disabled, TLS 1.2, infra encryption, RBAC","Identical security configuration","T"],["deploy.sh quality","200+ lines, full argument parsing, post-verify","Nearly identical structure and quality","T"],["Provider hygiene","Only azapi declared and used","Declares azapi but references azurerm_client_config without provider","B"],["RBAC assignments","Reader + Contributor with uuidv5, principalType set","Identical RBAC pattern","T"],["Variable validation","spa_origin regex, blob_cool_tier_days range, soft_delete range","Same validations plus environment enum","C"],["Cross-stage references","terraform_remote_state for Stage 1","Identical remote state pattern","T"]],
+   notes:"Both responses are remarkably similar. GHCP edges ahead because CC includes a data azurerm_client_config block without declaring an azurerm provider, which would cause a terraform init failure. Both omit the Storage Blob Data Owner role listed in companion requirements."},
+  {n:12,name:"SignalR",ghcp:90,comp:88,winner:"ghcp",
+   dims:[["Provider version","~>2.8.0 consistent with Stage 11","~>2.4 inconsistent with Stage 11 ~>2.8.0","B"],["KV secret naming","signalr-endpoint + signalr-service-name (2 secrets)","signalr-connection-string (matches architecture spec)","C"],["SignalR configuration","Serverless, disableLocalAuth, networkACLs, CORS","Identical configuration","T"],["Diagnostic settings","ConnectivityLogs, MessagingLogs, HttpRequestLogs, AllMetrics","Identical categories","T"],["deploy.sh verification","7 verification checks including KV secrets","8 checks including SKU check","C"],["Output completeness","Exports ports, SKU config, and 2 KV secret names","Exports KV secret name, resource_group_name passthrough","B"],["Design notes","Inline observations","5 numbered design decisions section","C"],["response_export_values","Uses * (exports all)","Uses specific property list (more precise)","C"]],
+   notes:"GHCP wins on provider version consistency (~>2.8.0 matching Stage 11) whereas CC downgraded to ~>2.4 creating a cross-stage version mismatch. CC makes a better architectural choice naming the KV secret signalr-connection-string to match the architecture spec and uses more precise response_export_values."},
+  {n:13,name:"Container Apps",ghcp:76,comp:84,winner:"comp",
+   dims:[["Response completeness","TRUNCATED mid-deploy.sh with context loss message","Complete response, all files present","C"],["Hardcoded resource names","Hardcodes upstream names in RBAC parent_ids (KV, Cosmos, SignalR, SB)","Uses variable references (var.key_vault_id, var.signalr_id)","C"],["Cross-stage reference pattern","Switches to direct variables + data sources, breaking remote_state pattern","Uses direct variables with resource ID inputs for clean RBAC scoping","C"],["RBAC implementation","Correct roles but hardcoded parent_ids violate NEVER directive","Correct roles with variable-based parent_ids","C"],["Cosmos DB data-plane auth","sqlRoleAssignments with correct role def, hardcoded account name","sqlRoleAssignments with var.cosmos_account_name","C"],["Container App configuration","System MI for API, User MI for Worker, correct env vars, health probes","Identical container configuration","T"],["KEDA scaling","Service Bus queue-depth scaling with identity","Identical KEDA configuration","T"],["deploy.sh quality","Truncated, incomplete","Complete with preflight, upstream loading, post-verify, summary","C"]],
+   notes:"CC wins decisively due to two critical GHCP failures: (1) response truncated mid-output with context-loss error message making deploy.sh incomplete; (2) GHCP hardcodes upstream resource names in RBAC parent_id values directly violating the NEVER hardcode directive. CC avoids both issues with a complete response and variable-based resource ID references."},
+  {n:14,name:"Documentation",ghcp:74,comp:89,winner:"comp",
+   dims:[["Response completeness","TRUNCATED, deployment-guide.md cuts off mid-section with context loss","Both architecture.md and deployment-guide.md complete","C"],["Architecture diagrams","Excellent mermaid diagrams with all 13 stages","Slightly more detailed with child resources","C"],["Service inventory","Complete tables with stage, name, SKU, purpose","Same quality with additional child resource detail","C"],["Connection endpoints","Not present (truncated)","Dedicated Connection Endpoints Reference table with FQDNs","C"],["KQL queries","5 practical queries","6 queries (adds Cosmos RU consumption)","C"],["Production backlog","Comprehensive (if complete)","Equally comprehensive","T"],["Deployment guide","Truncated mid-Stage 9 verification","Complete with all 14 stages, rollback, troubleshooting, CI/CD","C"],["Mermaid deployment map","Complete dependency graph","Identical quality","T"]],
+   notes:"CC wins decisively. GHCP response truncated twice with context-loss error. CC provides both documents complete with Connection Endpoints Reference table, Cosmos DB RU KQL query, resource provider registration, and a deploy.sh validation script."},
+];
+
+const patterns = {
+  ghcpStrengths: [
+    {text:"Consistent provider setup", detail:"hashicorp/azapi with local backend maintained across all 14 stages. No unnecessary azurerm or random providers."},
+    {text:"Production deploy.sh", detail:"Every stage has 200-770 line deploy.sh with --dry-run, --destroy, --help, --auto-approve, pre-flight validation, and post-deployment verification."},
+    {text:"Correct RBAC mechanisms", detail:"Uses Cosmos DB sqlRoleAssignments (not ARM RBAC), Redis accessPolicyAssignments, uuidv5 with URL namespace consistently."},
+    {text:"Variable validation", detail:"Validation blocks on SKUs, retention ranges, CIDR blocks, storage names across all stages."},
+    {text:"Tags placement", detail:"Top-level tags attribute on azapi_resource consistently (fixed from previous run)."},
+  ],
+  ccStrengths: [
+    {text:"RBAC completeness", detail:"Stage 7: all 3 Service Bus roles (Receiver, Sender, Owner) vs GHCP's 1. Better adherence to companion requirements."},
+    {text:"No hardcoded upstream names", detail:"Stages 13-14: uses variable-based resource IDs for RBAC parent_ids instead of hardcoding names."},
+    {text:"Response completeness (S13-14)", detail:"Completed all files for the complex Container Apps and Documentation stages where GHCP truncated."},
+    {text:"Directive hierarchy documentation", detail:"Stage 5: explicitly documents how NEVER directives override architecture context."},
+    {text:"Precise response_export_values", detail:"Stage 12: uses specific property list instead of wildcard * export."},
+  ],
+  ghcpWeaknesses: [
+    {text:"Context loss on large stages", detail:"Stages 13 and 14 truncated mid-response with 'I don't have context' error messages."},
+    {text:"Hardcoded upstream names (S13)", detail:"RBAC parent_ids hardcode resource names like zd-kv-testing-dev-wus3, violating NEVER hardcode directive."},
+    {text:"Incomplete RBAC (S7)", detail:"Only assigned Data Receiver (1 of 3 required Service Bus roles)."},
+  ],
+  ccWeaknesses: [
+    {text:"Inconsistent provider source", detail:"Alternates between azure/azapi (wrong) and hashicorp/azapi across stages. Wrong publisher in S1-2, S8-10."},
+    {text:"Backend instability", detail:"Switches between azurerm and local backends across stages, creating split state strategies."},
+    {text:"Unnecessary azurerm dependency", detail:"Adds azurerm provider or data sources (azurerm_client_config, azurerm_resource_group) in multiple stages."},
+    {text:"Hardcoded names in deploy.sh", detail:"Stages 9-10: hardcodes REDIS_NAME, RESOURCE_GROUP constants instead of reading from terraform outputs."},
+    {text:"Secret exposure (S2)", detail:"Exports primarySharedKey in response_export_values, unnecessarily exposing a sensitive value in state."},
+  ],
+};
+
+const bugs = [
+  {desc:"Response truncated with context loss (Stages 13 + 14)",tool:"Copilot",stages:"13, 14",severity:"Critical"},
+  {desc:"Hardcoded upstream resource names in RBAC parent_ids",tool:"Copilot",stages:"13",severity:"High"},
+  {desc:"Missing 2 of 3 Service Bus RBAC roles (Data Sender, Data Owner)",tool:"Copilot",stages:"7",severity:"High"},
+  {desc:"Wrong provider source <code>azure/azapi</code> (should be <code>hashicorp/azapi</code>)",tool:"Claude Code",stages:"1, 2, 8, 9, 10",severity:"High"},
+  {desc:"Missing <code>parent_id</code> on resource group azapi_resource",tool:"Claude Code",stages:"1",severity:"Critical"},
+  {desc:"<code>response_export_values</code> includes <code>primarySharedKey</code> (secret exposure)",tool:"Claude Code",stages:"2",severity:"High"},
+  {desc:"Unused <code>data azurerm_client_config</code> without azurerm provider declared",tool:"Claude Code",stages:"5, 7, 11",severity:"High"},
+  {desc:"Backend switches between azurerm and local across stages",tool:"Claude Code",stages:"1-2 vs 3-7 vs 8-10",severity:"Medium"},
+  {desc:"Mixed azapi + azurerm resources (diagnostics, resource group data sources)",tool:"Claude Code",stages:"9",severity:"Medium"},
+];
+
+const heatmapData = [
+  ["Provider Hygiene","B","B","B","T","B","T","B","B","B","B","B","B","T","T"],
+  ["Tags Placement","T","T","T","T","T","T","T","T","T","T","T","T","T","T"],
+  ["deploy.sh Quality","B","B","T","T","T","T","C","B","B","B","T","C","C","C"],
+  ["RBAC Design","T","T","T","T","T","T","C","T","B","T","T","T","T","-"],
+  ["Cross-Stage Consistency","B","B","B","T","B","T","T","B","B","B","T","B","C","C"],
+  ["Output Completeness","T","B","T","T","T","T","T","B","B","T","T","B","T","C"],
+  ["Documentation","B","B","T","T","C","T","C","B","B","B","C","C","C","C"],
+  ["Scope Discipline","T","T","T","T","T","T","T","T","T","T","T","T","T","T"],
+  ["Security Posture","T","B","T","T","T","T","C","T","T","T","T","T","T","-"],
+  ["NEVER Compliance","T","T","T","T","T","T","T","T","T","T","T","T","T","-"],
+];
+
+const verdictParagraphs = [
+  '<p><strong class="text-blue-400">GHCP wins overall</strong> with a benchmark average of 88.1 vs Claude Code\'s 84.6, winning 11 of 14 stages. GHCP\'s key advantages are consistent provider setup (hashicorp/azapi with local backend across all stages), production-grade deploy.sh scripts, and correct use of service-specific RBAC mechanisms (Cosmos sqlRoleAssignments, Redis accessPolicyAssignments).</p>',
+  '<p><strong class="text-orange-400">Claude Code wins</strong> on the two largest stages (Container Apps and Documentation) where GHCP suffered context-loss truncation failures. CC also shows better RBAC completeness in Stage 7 (all 3 Service Bus roles) and avoids hardcoding upstream resource names in Stage 13.</p>',
+  '<p class="text-gray-400 text-xs pt-2 border-t border-slate-600"><em>Compared to the previous run (2026-03-30 02:43:51): GHCP improved significantly on tag placement (now consistently top-level), NEVER directive compliance (SQL public access now disabled), and deploy.sh quality. However, context-loss truncation on Stages 13-14 remains an unresolved issue. CC improved on subnet patterns (separate child resources) but regressed on provider consistency and backend stability.</em></p>',
+];
+</script>
+
+<!-- ============================================================
+  RENDERING ENGINE — Do NOT modify below this line.
+  This code reads the DATA section above and renders the report.
+============================================================ -->
+<script>
+// Compute wins
+META.ghcpWins = stages.filter(s=>s.winner==='ghcp').length;
+META.ccWins = stages.filter(s=>s.winner==='comp'||s.winner==='cc').length;
+
+// Populate metadata
+document.getElementById('runDate').textContent = META.date;
+document.getElementById('projectName').textContent = META.project;
+document.querySelectorAll('.projectNameInline').forEach(el=>el.textContent=META.project);
+document.getElementById('modelName').textContent = META.model;
+document.getElementById('ghcpWins').textContent = META.ghcpWins;
+document.getElementById('ccWins').textContent = META.ccWins;
+document.getElementById('projectSummary').textContent = META.summary;
+
+// Build tab navigation
+const tabNav = document.getElementById('tabNav');
+tabNav.innerHTML = '<button class="tab-btn active px-3 py-2 text-xs font-semibold rounded-t" onclick="showTab(\'overview\')">Overview</button>';
+stages.forEach(s => {
+  tabNav.innerHTML += `<button class="tab-btn px-3 py-2 text-xs font-medium rounded-t" onclick="showTab('s${s.n}')">S${s.n}</button>`;
+});
+
+// Benchmark table
+const bt = document.getElementById('benchmarkTable');
+let ghcpSum=0, compSum=0;
+benchmarks.forEach(b => {
+  const d = b.ghcp - b.comp;
+  const dStr = d>0?`+${d}`:d<0?`${d}`:'0';
+  const dCls = d>0?'text-blue-400':d<0?'text-orange-400':'text-gray-500';
+  const w = d>=0
+    ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">GHCP</span>'
+    : '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#7c2d12;color:#fdba74">Claude Code</span>';
+  bt.innerHTML += `<tr><td class="px-3 py-1.5 font-mono text-purple-300">${b.id}</td><td class="px-3 py-1.5 text-gray-400">${b.desc}</td><td class="px-3 py-1.5 text-center ${d>=0?'font-bold text-blue-300':''}">${b.ghcp}</td><td class="px-3 py-1.5 text-center ${d<0?'font-bold text-orange-300':''}">${b.comp}</td><td class="px-3 py-1.5 text-center ${dCls}">${dStr}</td><td class="px-3 py-1.5 text-center">${w}</td></tr>`;
+  ghcpSum += b.ghcp; compSum += b.comp;
+});
+const gA = (ghcpSum/benchmarks.length).toFixed(1), cA = (compSum/benchmarks.length).toFixed(1);
+document.getElementById('ghcpAvg').textContent = gA;
+document.getElementById('compAvg').textContent = cA;
+const oDelta = parseFloat(gA) - parseFloat(cA);
+document.getElementById('deltaAvg').textContent = (oDelta>0?'+':'') + oDelta.toFixed(1);
+document.getElementById('deltaAvg').className = `px-3 py-2 text-center ${oDelta>=0?'text-blue-400':'text-orange-400'}`;
+document.getElementById('overallWinner').innerHTML = oDelta>=0
+  ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">GHCP</span>'
+  : '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#7c2d12;color:#fdba74">Claude Code</span>';
+
+// Stage table
+const st = document.getElementById('stageTable');
+stages.forEach(s => {
+  const isGhcp = s.winner==='ghcp';
+  const w = isGhcp
+    ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">GHCP</span>'
+    : '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#7c2d12;color:#fdba74">Claude Code</span>';
+  st.innerHTML += `<tr><td class="px-3 py-1.5">${s.n}</td><td class="px-3 py-1.5 cursor-pointer hover:text-purple-300" onclick="showTab('s${s.n}')">${s.name}</td><td class="px-3 py-1.5 text-center ${isGhcp?'font-bold text-blue-300':''}">${s.ghcp}</td><td class="px-3 py-1.5 text-center ${!isGhcp?'font-bold text-orange-300':''}">${s.comp}</td><td class="px-3 py-1.5 text-center">${w}</td></tr>`;
+});
+
+// Systematic patterns (strengths/weaknesses)
+const ps = document.getElementById('patternsSection');
+function renderPatternCard(title, items, borderColor, titleColor, icon, iconColor) {
+  if (!items || items.length === 0) return '';
+  const lis = items.map(i => `<li class="flex items-start gap-2"><span class="${iconColor} mt-0.5 flex-shrink-0">${icon}</span><div><strong class="text-gray-200">${i.text}</strong> &mdash; ${i.detail}</div></li>`).join('');
+  return `<div class="card rounded-xl p-5 border-l-4 ${borderColor}"><h3 class="font-bold ${titleColor} text-sm mb-3">${title}</h3><ul class="text-xs text-gray-400 space-y-2">${lis}</ul></div>`;
+}
+ps.innerHTML =
+  renderPatternCard('Systematic Copilot Strengths', patterns.ghcpStrengths, 'border-blue-500', 'text-blue-400', '+', 'text-green-400') +
+  renderPatternCard('Systematic Claude Code Strengths', patterns.ccStrengths, 'border-orange-500', 'text-orange-400', '+', 'text-green-400') +
+  renderPatternCard('Systematic Copilot Weaknesses', patterns.ghcpWeaknesses, 'border-blue-800', 'text-blue-300', '&minus;', 'text-red-400') +
+  renderPatternCard('Systematic Claude Code Weaknesses', patterns.ccWeaknesses, 'border-orange-800', 'text-orange-300', '&minus;', 'text-red-400');
+
+// Critical bugs
+const bs = document.getElementById('bugsSection');
+if (bugs.length > 0) {
+  const sevColor = s => s==='Critical'?'color:#ef4444':s==='High'?'color:#f97316':'color:#eab308';
+  const toolColor = t => t==='Copilot'?'text-blue-400':'text-orange-400';
+  const rows = bugs.map(b => `<tr><td class="px-3 py-2">${b.desc}</td><td class="px-3 py-2 text-center ${toolColor(b.tool)}">${b.tool}</td><td class="px-3 py-2 text-center">${b.stages}</td><td class="px-3 py-2 text-center" style="${sevColor(b.severity)}">${b.severity}</td></tr>`).join('');
+  bs.innerHTML = `<h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-red-500 rounded-full inline-block"></span>Critical Bugs</h2><div class="card rounded-xl overflow-hidden"><table class="w-full text-xs"><thead><tr class="bg-slate-800"><th class="px-3 py-2 text-left text-gray-300">Bug</th><th class="px-3 py-2 text-center">Tool</th><th class="px-3 py-2 text-center">Stage(s)</th><th class="px-3 py-2 text-center">Severity</th></tr></thead><tbody class="divide-y divide-slate-700">${rows}</tbody></table></div>`;
+}
+
+// Dimension heatmap
+const hs = document.getElementById('heatmapSection');
+if (heatmapData.length > 0) {
+  const stageCount = stages.length;
+  let thCells = '<th class="px-2 py-2 text-left text-gray-300 whitespace-nowrap">Dimension</th>';
+  for (let i = 1; i <= stageCount; i++) thCells += `<th class="px-1 py-2 text-center">${i}</th>`;
+  const rows = heatmapData.map(row => {
+    let cells = `<td class="px-2 py-1 text-gray-300 whitespace-nowrap font-medium">${row[0]}</td>`;
+    for (let i = 1; i <= stageCount; i++) {
+      const v = row[i] || '-';
+      let cls='text-gray-600', txt='\u2014';
+      if(v==='B'){cls='text-blue-400 font-bold';txt='CP';}
+      else if(v==='C'){cls='text-orange-400 font-bold';txt='CC';}
+      else if(v==='T'){cls='text-gray-500';txt='T';}
+      cells += `<td class="px-1 py-1 text-center ${cls}">${txt}</td>`;
+    }
+    return `<tr class="border-b border-slate-700/30">${cells}</tr>`;
+  }).join('');
+  hs.innerHTML = `<h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-teal-500 rounded-full inline-block"></span>Dimension Winners Across All Stages</h2><div class="card rounded-xl overflow-x-auto"><table class="w-full text-[10px]"><thead><tr class="bg-slate-800">${thCells}</tr></thead><tbody class="divide-y divide-slate-700/30">${rows}</tbody></table></div><p class="text-[10px] text-gray-500 mt-2"><span class="text-blue-400">CP</span> = Copilot wins &bull; <span class="text-orange-400">CC</span> = Claude Code wins &bull; <span class="text-gray-400">T</span> = Tie &bull; <span class="text-gray-600">&mdash;</span> = N/A</p>`;
+}
+
+// Verdict
+document.getElementById('verdictGhcp').textContent = gA;
+document.getElementById('verdictComp').textContent = cA;
+document.getElementById('verdictGhcpSub').textContent = `${META.ghcpWins}/${stages.length} stages won`;
+document.getElementById('verdictCompSub').textContent = `${META.ccWins}/${stages.length} stages won`;
+document.getElementById('verdictText').innerHTML = verdictParagraphs.join('');
+
+// Generate stage tabs
+stages.forEach(s => {
+  const div = document.createElement('div');
+  div.className = 'tab-content';
+  div.id = 'tab-s' + s.n;
+  const isGhcp = s.winner === 'ghcp';
+  const wBadge = isGhcp
+    ? '<span class="text-[10px] px-2 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">GHCP Wins</span>'
+    : '<span class="text-[10px] px-2 py-0.5 rounded-full" style="background:#7c2d12;color:#fdba74">Claude Code Wins</span>';
+
+  let dimsHTML = '';
+  if (s.dims && s.dims.length > 0) {
+    dimsHTML = s.dims.map(d => {
+      const wClass = d[3]==='B'?'text-blue-400':d[3]==='C'?'text-orange-400':'text-gray-500';
+      const wText = d[3]==='B'?'Copilot':d[3]==='C'?'Claude Code':d[3]==='T'?'Tie':'N/A';
+      return `<tr class="border-b border-slate-700/50"><td class="px-3 py-1.5 font-medium text-gray-300">${d[0]}</td><td class="px-3 py-1.5">${d[1]}</td><td class="px-3 py-1.5">${d[2]}</td><td class="px-3 py-1.5 text-center"><span class="${wClass} font-semibold">${wText}</span></td></tr>`;
+    }).join('');
+  }
+
+  div.innerHTML = `
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+      <h2 class="text-lg font-bold">Stage ${s.n}: ${s.name}</h2>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 text-sm">
+          <span class="text-blue-400 font-bold">${s.ghcp}</span>
+          <span class="text-gray-600">vs</span>
+          <span class="text-orange-400 font-bold">${s.comp}</span>
+        </div>
+        ${wBadge}
+      </div>
+    </div>
+    <div class="card rounded-xl p-4 mb-5">
+      <div class="space-y-2">
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-blue-400 w-16 text-right font-medium">Copilot</span>
+          <div class="flex-1 bg-slate-700 rounded-full h-5 overflow-hidden">
+            <div class="cp-bar h-full rounded-full flex items-center justify-end pr-2 text-[10px] font-bold text-white" style="width:${s.ghcp}%">${s.ghcp}</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-orange-400 w-16 text-right font-medium">Claude</span>
+          <div class="flex-1 bg-slate-700 rounded-full h-5 overflow-hidden">
+            <div class="cc-bar h-full rounded-full flex items-center justify-end pr-2 text-[10px] font-bold text-white" style="width:${s.comp}%">${s.comp}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    ${dimsHTML ? `<div class="card rounded-xl overflow-hidden mb-5">
+      <table class="w-full text-xs">
+        <thead><tr class="bg-slate-800">
+          <th class="px-3 py-2 text-left text-gray-300 w-1/4">Dimension</th>
+          <th class="px-3 py-2 text-left text-blue-400 w-[30%]">Copilot</th>
+          <th class="px-3 py-2 text-left text-orange-400 w-[30%]">Claude Code</th>
+          <th class="px-3 py-2 text-center text-gray-300 w-[10%]">Winner</th>
+        </tr></thead>
+        <tbody>${dimsHTML}</tbody>
+      </table>
+    </div>` : ''}
+    ${s.notes ? `<div class="card rounded-xl p-4">
+      <h3 class="text-xs font-semibold text-purple-300 mb-2">Analysis Notes</h3>
+      <p class="text-xs text-gray-400">${s.notes}</p>
+    </div>` : ''}
+  `;
+  document.querySelector('main').appendChild(div);
+});
+
+// Tab switching
+function showTab(id) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id==='overview'?'tab-overview':'tab-'+id).classList.add('active');
+  const btns = document.querySelectorAll('.tab-btn');
+  if (id === 'overview') { btns[0].classList.add('active'); }
+  else {
+    const idx = parseInt(id.replace('s',''));
+    if (btns[idx]) btns[idx].classList.add('active');
+  }
+}
+</script>
+</body>
+</html>

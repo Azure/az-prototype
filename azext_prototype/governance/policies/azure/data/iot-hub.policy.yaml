@@ -1,0 +1,273 @@
+kind: policy
+domain: azure-data
+description: Governance policies for Iot Hub
+last_updated: '2026-03-27'
+rules:
+- id: AZ-IOT-001
+  severity: required
+  description: Deploy IoT Hub with Standard tier, managed identity, TLS 1.2, and public access disabled
+  rationale: Standard tier supports cloud-to-device messaging and routing; managed identity eliminates connection strings
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  companion_resources:
+  - type: Microsoft.Network/privateEndpoints@2023-04-01
+    name: pe-iothub
+    description: Private endpoint for IoT Hub with groupId 'iotHub'
+  - type: Microsoft.Network/privateDnsZones@2020-06-01
+    name: privatelink.azure-devices.net
+    description: Private DNS zone for IoT Hub private endpoint resolution
+  - type: Microsoft.Devices/provisioningServices@2022-12-12
+    name: dps
+    description: Device Provisioning Service for automated X.509 device enrollment
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-iothub
+    description: Diagnostic settings routing connection, telemetry, and routing logs to Log Analytics
+  targets:
+  - services:
+    - Microsoft.Devices/IotHubs
+    terraform_pattern: |
+      resource "azapi_resource" "iot_hub" {
+        type      = "Microsoft.Devices/IotHubs@2023-06-30"
+        name      = var.iot_hub_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        identity {
+          type = "SystemAssigned"
+        }
+        body = {
+          sku = {
+            name     = "S1"
+            capacity = var.iot_hub_units
+          }
+          properties = {
+            minTlsVersion        = "1.2"
+            publicNetworkAccess  = "Disabled"
+            disableLocalAuth     = true
+            features             = "None"
+            routing = {
+              fallbackRoute = {
+                name      = "fallback"
+                source    = "DeviceMessages"
+                condition = "true"
+                endpointNames = ["events"]
+                isEnabled = true
+              }
+            }
+            networkRuleSets = {
+              defaultAction = "Deny"
+              applyToBuiltInEventHubEndpoint = true
+              ipRules = []
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      resource iotHub 'Microsoft.Devices/IotHubs@2023-06-30' = {
+        name: iotHubName
+        location: location
+        identity: {
+          type: 'SystemAssigned'
+        }
+        sku: {
+          name: 'S1'
+          capacity: iotHubUnits
+        }
+        properties: {
+          minTlsVersion: '1.2'
+          publicNetworkAccess: 'Disabled'
+          disableLocalAuth: true
+          features: 'None'
+          routing: {
+            fallbackRoute: {
+              name: 'fallback'
+              source: 'DeviceMessages'
+              condition: 'true'
+              endpointNames: ['events']
+              isEnabled: true
+            }
+          }
+          networkRuleSets: {
+            defaultAction: 'Deny'
+            applyToBuiltInEventHubEndpoint: true
+            ipRules: []
+          }
+        }
+      }
+    prohibitions:
+    - Do not use Basic tier — it lacks cloud-to-device messaging, device twins, and routing
+    - Do not use Free tier for production
+    - Do not enable publicNetworkAccess — use private endpoints
+    - Do not enable local auth — use Entra RBAC for service operations
+    - Do not allow TLS versions below 1.2
+- id: AZ-IOT-002
+  severity: required
+  description: Use X.509 certificates or TPM attestation for device authentication
+  rationale: Symmetric keys are less secure and harder to rotate at scale; X.509 provides stronger device identity
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  companion_resources:
+  - type: Microsoft.Devices/IotHubs@2023-06-30
+    name: iot-hub
+    description: Parent IoT Hub that the DPS enrollment connects to
+  - type: Microsoft.KeyVault/vaults@2023-07-01
+    name: kv-certs
+    description: Key Vault storing X.509 CA certificates for device authentication
+  targets:
+  - services:
+    - Microsoft.Devices/IotHubs
+    terraform_pattern: |
+      # Device authentication is configured at the device level, not in the IoT Hub resource
+      # Use Device Provisioning Service (DPS) with X.509 enrollment groups
+      resource "azapi_resource" "dps" {
+        type      = "Microsoft.Devices/provisioningServices@2022-12-12"
+        name      = var.dps_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          sku = {
+            name     = "S1"
+            capacity = 1
+          }
+          properties = {
+            publicNetworkAccess = "Disabled"
+            iotHubs = [
+              {
+                connectionString = ""
+                location         = var.location
+                name             = "${var.iot_hub_name}.azure-devices.net"
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      // Device authentication is configured at the device level, not in the IoT Hub resource
+      // Use Device Provisioning Service (DPS) with X.509 enrollment groups
+      resource dps 'Microsoft.Devices/provisioningServices@2022-12-12' = {
+        name: dpsName
+        location: location
+        sku: {
+          name: 'S1'
+          capacity: 1
+        }
+        properties: {
+          publicNetworkAccess: 'Disabled'
+          iotHubs: [
+            {
+              connectionString: ''
+              location: location
+              name: '${iotHubName}.azure-devices.net'
+            }
+          ]
+        }
+      }
+    prohibitions:
+    - Do not use symmetric keys for production device fleets — they cannot be rotated individually
+    - Do not embed device connection strings in application code
+- id: AZ-IOT-003
+  severity: recommended
+  description: Enable diagnostic settings for IoT Hub operations and device telemetry
+  rationale: Monitor device connections, message routing, and error rates for operational visibility
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - monitoring-agent
+  companion_resources:
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace as destination for IoT Hub diagnostic logs
+  targets:
+  - services:
+    - Microsoft.Devices/IotHubs
+    terraform_pattern: |
+      resource "azapi_resource" "iot_diagnostics" {
+        type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+        name      = "diag-iot-hub"
+        parent_id = azapi_resource.iot_hub.id
+        body = {
+          properties = {
+            workspaceId = var.log_analytics_workspace_id
+            logs = [
+              {
+                category = "Connections"
+                enabled  = true
+              },
+              {
+                category = "DeviceTelemetry"
+                enabled  = true
+              },
+              {
+                category = "Routes"
+                enabled  = true
+              },
+              {
+                category = "C2DCommands"
+                enabled  = true
+              }
+            ]
+            metrics = [
+              {
+                category = "AllMetrics"
+                enabled  = true
+              }
+            ]
+          }
+        }
+      }
+    bicep_pattern: |
+      resource iotDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+        name: 'diag-iot-hub'
+        scope: iotHub
+        properties: {
+          workspaceId: logAnalyticsWorkspaceId
+          logs: [
+            {
+              category: 'Connections'
+              enabled: true
+            }
+            {
+              category: 'DeviceTelemetry'
+              enabled: true
+            }
+            {
+              category: 'Routes'
+              enabled: true
+            }
+            {
+              category: 'C2DCommands'
+              enabled: true
+            }
+          ]
+          metrics: [
+            {
+              category: 'AllMetrics'
+              enabled: true
+            }
+          ]
+        }
+      }
+    prohibitions:
+    - Do not omit Connections logs — they are essential for device connectivity troubleshooting
+patterns:
+- name: IoT Hub Standard with private endpoint and DPS
+  description: Production IoT Hub with Entra auth, private endpoints, and device provisioning
+  example: |
+    # See IOT-001 through IOT-003 for complete azapi_resource patterns
+anti_patterns:
+- description: Do not expose IoT Hub to the public internet
+  instead: Disable public access and use private endpoints
+- description: Do not use symmetric keys for large device fleets
+  instead: Use X.509 certificates with Device Provisioning Service
+references:
+- title: IoT Hub documentation
+  url: https://learn.microsoft.com/azure/iot-hub/iot-concepts-and-iot-hub
+- title: IoT Hub security
+  url: https://learn.microsoft.com/azure/iot-hub/iot-hub-security-overview

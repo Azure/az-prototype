@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Benchmark Run: {{DATE}}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    body{font-family:'Inter',sans-serif}
+    .gradient-bg{background:linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#0f172a 100%)}
+    .card{background:rgba(30,41,59,.8);border:1px solid rgba(71,85,105,.4)}
+    .tab-btn{transition:all .15s}
+    .tab-btn.active{background:#1e293b;color:#f8fafc;border-bottom:2px solid #8b5cf6}
+    .tab-btn:not(.active){color:#94a3b8}
+    .tab-btn:not(.active):hover{color:#cbd5e1;background:rgba(30,41,59,.4)}
+    .tab-content{display:none}.tab-content.active{display:block}
+    .cp-bar{background:#3b82f6}.cc-bar{background:#f97316}
+    pre{font-size:.7rem;overflow-x:auto}
+    @media print{.no-print{display:none}}
+  </style>
+</head>
+<body class="gradient-bg text-gray-100 min-h-screen">
+
+<!-- ============================================================
+  BENCHMARK REPORT TEMPLATE
+
+  To create a new report, replace the DATA section below with
+  actual benchmark data. The layout and structure remain fixed.
+
+  Placeholders to replace:
+    {{DATE}}        — Run timestamp (e.g., "2026-04-15 14:30:00")
+    {{PROJECT}}     — Project name (e.g., "KanFlow Azure POC")
+    {{MODEL}}       — Model used (e.g., "Sonnet 4.6")
+    {{GHCP_WINS}}   — Number of stages won by GHCP
+    {{CC_WINS}}     — Number of stages won by Claude Code
+
+  Data arrays to populate:
+    benchmarks[]    — 14 benchmark scores {id, name, ghcp, comp, desc}
+    stages[]        — Per-stage data {n, name, ghcp, comp, winner, dims[], notes}
+    heatmapData[]   — Dimension winners grid [dimName, s1..sN]
+    bugs[]          — Critical bugs {desc, tool, stages, severity}
+    strengths{}     — Systematic strengths/weaknesses for each tool
+============================================================ -->
+
+<header class="max-w-[1400px] mx-auto px-6 pt-8 pb-4">
+  <div class="flex items-end justify-between flex-wrap gap-4">
+    <div>
+      <h1 class="text-2xl font-extrabold tracking-tight">
+        <span class="text-blue-400">GitHub Copilot</span>
+        <span class="text-gray-500 mx-2">vs</span>
+        <span class="text-orange-400">Claude Code</span>
+      </h1>
+      <p class="text-gray-400 mt-1 text-xs">Benchmark Run &mdash; <span id="runDate"></span></p>
+    </div>
+    <div class="text-right text-[10px] text-gray-500 leading-relaxed">
+      <p>Project: <span id="projectName"></span></p>
+      <p>Model: <span id="modelName"></span></p>
+      <p>Stages won &mdash; GHCP: <span id="ghcpWins"></span> &bull; Claude Code: <span id="ccWins"></span></p>
+    </div>
+  </div>
+</header>
+
+<!-- Tab navigation — generated dynamically based on stage count -->
+<nav class="max-w-[1400px] mx-auto px-6 overflow-x-auto no-print">
+  <div class="flex gap-0.5 border-b border-slate-700 min-w-max" id="tabNav"></div>
+</nav>
+
+<main class="max-w-[1400px] mx-auto px-6 py-6">
+
+<!-- OVERVIEW TAB -->
+<div class="tab-content active" id="tab-overview">
+
+  <!-- Project Summary -->
+  <section class="mb-6">
+    <div class="card rounded-xl p-5">
+      <h2 class="text-sm font-bold text-gray-200 mb-2">Project: <span class="projectNameInline"></span></h2>
+      <p class="text-xs text-gray-400" id="projectSummary"></p>
+    </div>
+  </section>
+
+  <!-- Benchmark Scores Table -->
+  <section class="mb-6">
+    <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-purple-500 rounded-full inline-block"></span>Benchmark Scores</h2>
+    <div class="card rounded-xl overflow-hidden">
+      <table class="w-full text-xs">
+        <thead><tr class="bg-slate-800">
+          <th class="px-3 py-2 text-left text-gray-300">Benchmark</th>
+          <th class="px-3 py-2 text-left text-gray-300">Description</th>
+          <th class="px-3 py-2 text-center text-blue-400">GHCP</th>
+          <th class="px-3 py-2 text-center text-orange-400">Claude Code</th>
+          <th class="px-3 py-2 text-center text-gray-300">Delta</th>
+          <th class="px-3 py-2 text-center text-gray-300">Winner</th>
+        </tr></thead>
+        <tbody class="divide-y divide-slate-700" id="benchmarkTable"></tbody>
+        <tfoot><tr class="bg-slate-800 font-bold text-sm">
+          <td class="px-3 py-2" colspan="2">Overall Average</td>
+          <td class="px-3 py-2 text-center text-blue-400" id="ghcpAvg"></td>
+          <td class="px-3 py-2 text-center text-orange-400" id="compAvg"></td>
+          <td class="px-3 py-2 text-center" id="deltaAvg"></td>
+          <td class="px-3 py-2 text-center" id="overallWinner"></td>
+        </tr></tfoot>
+      </table>
+    </div>
+  </section>
+
+  <!-- Aggregate Scores by Stage -->
+  <section class="mb-6">
+    <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-green-500 rounded-full inline-block"></span>Aggregate Scores by Stage</h2>
+    <div class="card rounded-xl overflow-hidden">
+      <table class="w-full text-xs">
+        <thead><tr class="bg-slate-800">
+          <th class="px-3 py-2 text-left text-gray-300">Stage</th>
+          <th class="px-3 py-2 text-left text-gray-300">Service</th>
+          <th class="px-3 py-2 text-center text-blue-400">GHCP</th>
+          <th class="px-3 py-2 text-center text-orange-400">Claude Code</th>
+          <th class="px-3 py-2 text-center text-gray-300">Winner</th>
+        </tr></thead>
+        <tbody class="divide-y divide-slate-700" id="stageTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Systematic Strengths & Weaknesses -->
+  <section class="mb-6 grid md:grid-cols-2 gap-4" id="patternsSection"></section>
+
+  <!-- Critical Bugs -->
+  <section class="mb-6" id="bugsSection"></section>
+
+  <!-- Dimension Winners Heatmap -->
+  <section class="mb-6" id="heatmapSection"></section>
+
+  <!-- Final Verdict -->
+  <section class="mb-6">
+    <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-amber-500 rounded-full inline-block"></span>Final Verdict</h2>
+    <div class="card rounded-xl p-6">
+      <div class="grid md:grid-cols-2 gap-6 mb-5">
+        <div class="text-center">
+          <div class="text-4xl font-extrabold text-blue-400" id="verdictGhcp"></div>
+          <div class="text-sm text-blue-300 font-semibold mt-1">GitHub Copilot</div>
+          <p class="text-[10px] text-gray-500" id="verdictGhcpSub"></p>
+        </div>
+        <div class="text-center">
+          <div class="text-4xl font-extrabold text-orange-400" id="verdictComp"></div>
+          <div class="text-sm text-orange-300 font-semibold mt-1">Claude Code</div>
+          <p class="text-[10px] text-gray-500" id="verdictCompSub"></p>
+        </div>
+      </div>
+      <div class="bg-slate-700/30 rounded-lg p-4 text-sm text-gray-300 space-y-2" id="verdictText"></div>
+    </div>
+  </section>
+
+</div><!-- /overview -->
+
+</main>
+
+<footer class="max-w-[1400px] mx-auto px-6 pb-8 text-center text-[10px] text-gray-600">
+  <p>Benchmark Suite v1.0</p>
+</footer>
+
+<!-- ============================================================
+  DATA SECTION — Replace everything below with actual run data.
+  Keep the structure of each object/array intact.
+============================================================ -->
+<script>
+// ---- METADATA ----
+const META = {
+  date: "{{DATE}}",
+  project: "{{PROJECT}}",
+  model: "{{MODEL}}",
+  summary: "{{PROJECT_SUMMARY}}",
+  ghcpWins: 0,  // computed below
+  ccWins: 0,    // computed below
+};
+
+// ---- BENCHMARK SCORES (averaged across all stages) ----
+// One entry per benchmark. ghcp/comp are 0-100 scores.
+const benchmarks = [
+  {id:"B-INST",name:"Instruction Adherence",ghcp:0,comp:0,desc:"Following prompt requirements exactly"},
+  {id:"B-CNST",name:"Constraint Compliance",ghcp:0,comp:0,desc:"NEVER/MUST directive adherence"},
+  {id:"B-TECH",name:"Technical Correctness",ghcp:0,comp:0,desc:"Syntax validity, API versions, runtime viability"},
+  {id:"B-SEC",name:"Security Posture",ghcp:0,comp:0,desc:"MI, RBAC, encryption, network controls"},
+  {id:"B-OPS",name:"Operational Readiness",ghcp:0,comp:0,desc:"deploy.sh completeness and quality"},
+  {id:"B-DEP",name:"Dependency Hygiene",ghcp:0,comp:0,desc:"Minimal, correct, consistent dependencies"},
+  {id:"B-SCOPE",name:"Scope Discipline",ghcp:0,comp:0,desc:"No over/under engineering"},
+  {id:"B-QUAL",name:"Code Quality",ghcp:0,comp:0,desc:"Organization, naming, idioms, validation"},
+  {id:"B-OUT",name:"Output Completeness",ghcp:0,comp:0,desc:"All required interfaces exported"},
+  {id:"B-CONS",name:"Cross-Stage Consistency",ghcp:0,comp:0,desc:"Uniform patterns across stages"},
+  {id:"B-DOC",name:"Documentation Quality",ghcp:0,comp:0,desc:"Design docs, rationale, actionability"},
+  {id:"B-REL",name:"Response Reliability",ghcp:0,comp:0,desc:"Complete, parseable, hallucination-free"},
+  {id:"B-RBAC",name:"RBAC & Identity",ghcp:0,comp:0,desc:"Correct mechanisms, deterministic names"},
+  {id:"B-ANTI",name:"Anti-Pattern Absence",ghcp:0,comp:0,desc:"No known bad patterns"},
+];
+
+// ---- PER-STAGE DATA ----
+// dims: array of [dimensionName, ghcpFinding, ccFinding, winner]
+//   winner: "B" = GHCP wins, "C" = Claude Code wins, "T" = Tie
+// notes: HTML string with analysis narrative
+const stages = [
+  // {n:1, name:"Stage Name", ghcp:0, comp:0, winner:"ghcp",
+  //  dims:[["Dimension","GHCP finding","CC finding","B"]],
+  //  notes:"Analysis notes here."},
+];
+
+// ---- SYSTEMATIC PATTERNS (strengths/weaknesses) ----
+// Each array: items with {text: "Bold label", detail: "Description"}
+const patterns = {
+  ghcpStrengths: [
+    // {text:"Label", detail:"Description"},
+  ],
+  ccStrengths: [
+    // {text:"Label", detail:"Description"},
+  ],
+  ghcpWeaknesses: [
+    // {text:"Label", detail:"Description"},
+  ],
+  ccWeaknesses: [
+    // {text:"Label", detail:"Description"},
+  ],
+};
+
+// ---- CRITICAL BUGS ----
+// severity: "Critical" | "High" | "Medium"
+const bugs = [
+  // {desc:"Bug description with <code>code</code>", tool:"Copilot", stages:"1-5", severity:"Medium"},
+];
+
+// ---- DIMENSION HEATMAP ----
+// Each row: [dimensionName, s1Winner, s2Winner, ...sNWinner]
+// Values: "B" = GHCP, "C" = Claude Code, "T" = Tie, "-" = N/A
+const heatmapData = [
+  // ["deploy.sh Quality","B","B","C","B",...],
+];
+
+// ---- VERDICT TEXT ----
+// Array of HTML paragraphs for the verdict section
+const verdictParagraphs = [
+  // '<p><strong class="text-blue-400">Copilot wins overall</strong> on ...</p>',
+  // '<p><strong class="text-orange-400">Claude Code wins</strong> on ...</p>',
+  // '<p class="text-gray-400 text-xs pt-2 border-t border-slate-600"><em>The ideal...</em></p>',
+];
+</script>
+
+<!-- ============================================================
+  RENDERING ENGINE — Do NOT modify below this line.
+  This code reads the DATA section above and renders the report.
+============================================================ -->
+<script>
+// Compute wins
+META.ghcpWins = stages.filter(s=>s.winner==='ghcp').length;
+META.ccWins = stages.filter(s=>s.winner==='comp'||s.winner==='cc').length;
+
+// Populate metadata
+document.getElementById('runDate').textContent = META.date;
+document.getElementById('projectName').textContent = META.project;
+document.querySelectorAll('.projectNameInline').forEach(el=>el.textContent=META.project);
+document.getElementById('modelName').textContent = META.model;
+document.getElementById('ghcpWins').textContent = META.ghcpWins;
+document.getElementById('ccWins').textContent = META.ccWins;
+document.getElementById('projectSummary').textContent = META.summary;
+
+// Build tab navigation
+const tabNav = document.getElementById('tabNav');
+tabNav.innerHTML = '<button class="tab-btn active px-3 py-2 text-xs font-semibold rounded-t" onclick="showTab(\'overview\')">Overview</button>';
+stages.forEach(s => {
+  tabNav.innerHTML += `<button class="tab-btn px-3 py-2 text-xs font-medium rounded-t" onclick="showTab('s${s.n}')">S${s.n}</button>`;
+});
+
+// Benchmark table
+const bt = document.getElementById('benchmarkTable');
+let ghcpSum=0, compSum=0;
+benchmarks.forEach(b => {
+  const d = b.ghcp - b.comp;
+  const dStr = d>0?`+${d}`:d<0?`${d}`:'0';
+  const dCls = d>0?'text-blue-400':d<0?'text-orange-400':'text-gray-500';
+  const w = d>=0
+    ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">GHCP</span>'
+    : '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#7c2d12;color:#fdba74">Claude Code</span>';
+  bt.innerHTML += `<tr><td class="px-3 py-1.5 font-mono text-purple-300">${b.id}</td><td class="px-3 py-1.5 text-gray-400">${b.desc}</td><td class="px-3 py-1.5 text-center ${d>=0?'font-bold text-blue-300':''}">${b.ghcp}</td><td class="px-3 py-1.5 text-center ${d<0?'font-bold text-orange-300':''}">${b.comp}</td><td class="px-3 py-1.5 text-center ${dCls}">${dStr}</td><td class="px-3 py-1.5 text-center">${w}</td></tr>`;
+  ghcpSum += b.ghcp; compSum += b.comp;
+});
+const gA = (ghcpSum/benchmarks.length).toFixed(1), cA = (compSum/benchmarks.length).toFixed(1);
+document.getElementById('ghcpAvg').textContent = gA;
+document.getElementById('compAvg').textContent = cA;
+const oDelta = parseFloat(gA) - parseFloat(cA);
+document.getElementById('deltaAvg').textContent = (oDelta>0?'+':'') + oDelta.toFixed(1);
+document.getElementById('deltaAvg').className = `px-3 py-2 text-center ${oDelta>=0?'text-blue-400':'text-orange-400'}`;
+document.getElementById('overallWinner').innerHTML = oDelta>=0
+  ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">GHCP</span>'
+  : '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#7c2d12;color:#fdba74">Claude Code</span>';
+
+// Stage table
+const st = document.getElementById('stageTable');
+stages.forEach(s => {
+  const isGhcp = s.winner==='ghcp';
+  const w = isGhcp
+    ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">GHCP</span>'
+    : '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#7c2d12;color:#fdba74">Claude Code</span>';
+  st.innerHTML += `<tr><td class="px-3 py-1.5">${s.n}</td><td class="px-3 py-1.5 cursor-pointer hover:text-purple-300" onclick="showTab('s${s.n}')">${s.name}</td><td class="px-3 py-1.5 text-center ${isGhcp?'font-bold text-blue-300':''}">${s.ghcp}</td><td class="px-3 py-1.5 text-center ${!isGhcp?'font-bold text-orange-300':''}">${s.comp}</td><td class="px-3 py-1.5 text-center">${w}</td></tr>`;
+});
+
+// Systematic patterns (strengths/weaknesses)
+const ps = document.getElementById('patternsSection');
+function renderPatternCard(title, items, borderColor, titleColor, icon, iconColor) {
+  if (!items || items.length === 0) return '';
+  const lis = items.map(i => `<li class="flex items-start gap-2"><span class="${iconColor} mt-0.5 flex-shrink-0">${icon}</span><div><strong class="text-gray-200">${i.text}</strong> &mdash; ${i.detail}</div></li>`).join('');
+  return `<div class="card rounded-xl p-5 border-l-4 ${borderColor}"><h3 class="font-bold ${titleColor} text-sm mb-3">${title}</h3><ul class="text-xs text-gray-400 space-y-2">${lis}</ul></div>`;
+}
+ps.innerHTML =
+  renderPatternCard('Systematic Copilot Strengths', patterns.ghcpStrengths, 'border-blue-500', 'text-blue-400', '+', 'text-green-400') +
+  renderPatternCard('Systematic Claude Code Strengths', patterns.ccStrengths, 'border-orange-500', 'text-orange-400', '+', 'text-green-400') +
+  renderPatternCard('Systematic Copilot Weaknesses', patterns.ghcpWeaknesses, 'border-blue-800', 'text-blue-300', '&minus;', 'text-red-400') +
+  renderPatternCard('Systematic Claude Code Weaknesses', patterns.ccWeaknesses, 'border-orange-800', 'text-orange-300', '&minus;', 'text-red-400');
+
+// Critical bugs
+const bs = document.getElementById('bugsSection');
+if (bugs.length > 0) {
+  const sevColor = s => s==='Critical'?'color:#ef4444':s==='High'?'color:#f97316':'color:#eab308';
+  const toolColor = t => t==='Copilot'?'text-blue-400':'text-orange-400';
+  const rows = bugs.map(b => `<tr><td class="px-3 py-2">${b.desc}</td><td class="px-3 py-2 text-center ${toolColor(b.tool)}">${b.tool}</td><td class="px-3 py-2 text-center">${b.stages}</td><td class="px-3 py-2 text-center" style="${sevColor(b.severity)}">${b.severity}</td></tr>`).join('');
+  bs.innerHTML = `<h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-red-500 rounded-full inline-block"></span>Critical Bugs</h2><div class="card rounded-xl overflow-hidden"><table class="w-full text-xs"><thead><tr class="bg-slate-800"><th class="px-3 py-2 text-left text-gray-300">Bug</th><th class="px-3 py-2 text-center">Tool</th><th class="px-3 py-2 text-center">Stage(s)</th><th class="px-3 py-2 text-center">Severity</th></tr></thead><tbody class="divide-y divide-slate-700">${rows}</tbody></table></div>`;
+}
+
+// Dimension heatmap
+const hs = document.getElementById('heatmapSection');
+if (heatmapData.length > 0) {
+  const stageCount = stages.length;
+  let thCells = '<th class="px-2 py-2 text-left text-gray-300 whitespace-nowrap">Dimension</th>';
+  for (let i = 1; i <= stageCount; i++) thCells += `<th class="px-1 py-2 text-center">${i}</th>`;
+  const rows = heatmapData.map(row => {
+    let cells = `<td class="px-2 py-1 text-gray-300 whitespace-nowrap font-medium">${row[0]}</td>`;
+    for (let i = 1; i <= stageCount; i++) {
+      const v = row[i] || '-';
+      let cls='text-gray-600', txt='\u2014';
+      if(v==='B'){cls='text-blue-400 font-bold';txt='CP';}
+      else if(v==='C'){cls='text-orange-400 font-bold';txt='CC';}
+      else if(v==='T'){cls='text-gray-500';txt='T';}
+      cells += `<td class="px-1 py-1 text-center ${cls}">${txt}</td>`;
+    }
+    return `<tr class="border-b border-slate-700/30">${cells}</tr>`;
+  }).join('');
+  hs.innerHTML = `<h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-teal-500 rounded-full inline-block"></span>Dimension Winners Across All Stages</h2><div class="card rounded-xl overflow-x-auto"><table class="w-full text-[10px]"><thead><tr class="bg-slate-800">${thCells}</tr></thead><tbody class="divide-y divide-slate-700/30">${rows}</tbody></table></div><p class="text-[10px] text-gray-500 mt-2"><span class="text-blue-400">CP</span> = Copilot wins &bull; <span class="text-orange-400">CC</span> = Claude Code wins &bull; <span class="text-gray-400">T</span> = Tie &bull; <span class="text-gray-600">&mdash;</span> = N/A</p>`;
+}
+
+// Verdict
+document.getElementById('verdictGhcp').textContent = gA;
+document.getElementById('verdictComp').textContent = cA;
+document.getElementById('verdictGhcpSub').textContent = `${META.ghcpWins}/${stages.length} stages won`;
+document.getElementById('verdictCompSub').textContent = `${META.ccWins}/${stages.length} stages won`;
+document.getElementById('verdictText').innerHTML = verdictParagraphs.join('');
+
+// Generate stage tabs
+stages.forEach(s => {
+  const div = document.createElement('div');
+  div.className = 'tab-content';
+  div.id = 'tab-s' + s.n;
+  const isGhcp = s.winner === 'ghcp';
+  const wBadge = isGhcp
+    ? '<span class="text-[10px] px-2 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">GHCP Wins</span>'
+    : '<span class="text-[10px] px-2 py-0.5 rounded-full" style="background:#7c2d12;color:#fdba74">Claude Code Wins</span>';
+
+  let dimsHTML = '';
+  if (s.dims && s.dims.length > 0) {
+    dimsHTML = s.dims.map(d => {
+      const wClass = d[3]==='B'?'text-blue-400':d[3]==='C'?'text-orange-400':'text-gray-500';
+      const wText = d[3]==='B'?'Copilot':d[3]==='C'?'Claude Code':d[3]==='T'?'Tie':'N/A';
+      return `<tr class="border-b border-slate-700/50"><td class="px-3 py-1.5 font-medium text-gray-300">${d[0]}</td><td class="px-3 py-1.5">${d[1]}</td><td class="px-3 py-1.5">${d[2]}</td><td class="px-3 py-1.5 text-center"><span class="${wClass} font-semibold">${wText}</span></td></tr>`;
+    }).join('');
+  }
+
+  div.innerHTML = `
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+      <h2 class="text-lg font-bold">Stage ${s.n}: ${s.name}</h2>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 text-sm">
+          <span class="text-blue-400 font-bold">${s.ghcp}</span>
+          <span class="text-gray-600">vs</span>
+          <span class="text-orange-400 font-bold">${s.comp}</span>
+        </div>
+        ${wBadge}
+      </div>
+    </div>
+    <div class="card rounded-xl p-4 mb-5">
+      <div class="space-y-2">
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-blue-400 w-16 text-right font-medium">Copilot</span>
+          <div class="flex-1 bg-slate-700 rounded-full h-5 overflow-hidden">
+            <div class="cp-bar h-full rounded-full flex items-center justify-end pr-2 text-[10px] font-bold text-white" style="width:${s.ghcp}%">${s.ghcp}</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-orange-400 w-16 text-right font-medium">Claude</span>
+          <div class="flex-1 bg-slate-700 rounded-full h-5 overflow-hidden">
+            <div class="cc-bar h-full rounded-full flex items-center justify-end pr-2 text-[10px] font-bold text-white" style="width:${s.comp}%">${s.comp}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    ${dimsHTML ? `<div class="card rounded-xl overflow-hidden mb-5">
+      <table class="w-full text-xs">
+        <thead><tr class="bg-slate-800">
+          <th class="px-3 py-2 text-left text-gray-300 w-1/4">Dimension</th>
+          <th class="px-3 py-2 text-left text-blue-400 w-[30%]">Copilot</th>
+          <th class="px-3 py-2 text-left text-orange-400 w-[30%]">Claude Code</th>
+          <th class="px-3 py-2 text-center text-gray-300 w-[10%]">Winner</th>
+        </tr></thead>
+        <tbody>${dimsHTML}</tbody>
+      </table>
+    </div>` : ''}
+    ${s.notes ? `<div class="card rounded-xl p-4">
+      <h3 class="text-xs font-semibold text-purple-300 mb-2">Analysis Notes</h3>
+      <p class="text-xs text-gray-400">${s.notes}</p>
+    </div>` : ''}
+  `;
+  document.querySelector('main').appendChild(div);
+});
+
+// Tab switching
+function showTab(id) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id==='overview'?'tab-overview':'tab-'+id).classList.add('active');
+  const btns = document.querySelectorAll('.tab-btn');
+  if (id === 'overview') { btns[0].classList.add('active'); }
+  else {
+    const idx = parseInt(id.replace('s',''));
+    if (btns[idx]) btns[idx].classList.add('active');
+  }
+}
+</script>
+</body>
+</html>

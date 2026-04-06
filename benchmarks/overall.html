@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Benchmark Trends Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    body{font-family:'Inter',sans-serif}
+    .gradient-bg{background:linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#0f172a 100%)}
+    .card{background:rgba(30,41,59,.8);border:1px solid rgba(71,85,105,.4)}
+    .tab-btn{transition:all .15s}
+    .tab-btn.active{background:#1e293b;color:#f8fafc;border-bottom:2px solid #8b5cf6}
+    .tab-btn:not(.active){color:#94a3b8}
+    .tab-btn:not(.active):hover{color:#cbd5e1;background:rgba(30,41,59,.4)}
+    .tab-content{display:none}.tab-content.active{display:block}
+    .sev-critical{color:#ef4444}.sev-high{color:#f97316}.sev-medium{color:#eab308}.sev-low{color:#22c55e}
+    @media print{.no-print{display:none}}
+  </style>
+</head>
+<body class="gradient-bg text-gray-100 min-h-screen">
+
+<header class="max-w-[1400px] mx-auto px-6 pt-8 pb-4">
+  <h1 class="text-2xl font-extrabold tracking-tight">Benchmark Trends Dashboard</h1>
+  <p class="text-gray-400 mt-1 text-xs">AI Code Generation Quality &mdash; Historical Tracking &amp; Factor Analysis</p>
+</header>
+
+<!-- Tab Navigation -->
+<nav class="max-w-[1400px] mx-auto px-6 overflow-x-auto no-print">
+  <div class="flex gap-0.5 border-b border-slate-700 min-w-max" id="tabNav">
+    <button class="tab-btn active px-3 py-2 text-xs font-semibold rounded-t" onclick="showTab('overview')">Overview</button>
+  </div>
+</nav>
+
+<main class="max-w-[1400px] mx-auto px-6 py-6">
+
+<!-- ============ OVERVIEW TAB ============ -->
+<div class="tab-content active" id="tab-overview">
+
+  <section class="mb-6">
+    <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-purple-500 rounded-full inline-block"></span>Current Benchmark Scores (Latest Run)</h2>
+    <div class="card rounded-xl overflow-hidden">
+      <table class="w-full text-xs">
+        <thead><tr class="bg-slate-800">
+          <th class="px-3 py-2 text-left text-gray-300">ID</th>
+          <th class="px-3 py-2 text-left text-gray-300">Benchmark</th>
+          <th class="px-3 py-2 text-center text-blue-400">GHCP</th>
+          <th class="px-3 py-2 text-center text-orange-400">Claude Code</th>
+          <th class="px-3 py-2 text-center text-gray-300">Delta</th>
+          <th class="px-3 py-2 text-center text-gray-300">Winner</th>
+          <th class="px-3 py-2 text-center text-gray-300">Detail</th>
+        </tr></thead>
+        <tbody class="divide-y divide-slate-700" id="currentTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="mb-6">
+    <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-teal-500 rounded-full inline-block"></span>Overall Score Trend</h2>
+    <div class="card rounded-xl p-5">
+      <canvas id="aggregateChart" height="120"></canvas>
+      <p class="text-[10px] text-gray-500 mt-2 text-center">Overall average across all 14 benchmarks per run</p>
+    </div>
+  </section>
+
+  <section class="mb-6">
+    <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-indigo-500 rounded-full inline-block"></span>Per-Benchmark Trends</h2>
+    <div class="grid md:grid-cols-2 gap-4" id="benchCharts"></div>
+  </section>
+
+  <section class="mb-6">
+    <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-red-500 rounded-full inline-block"></span>Significant Variances</h2>
+    <div class="card rounded-xl p-5" id="variancesSection">
+      <p class="text-xs text-gray-400">No previous runs to compare. Variances will appear after the second benchmark run (changes >10 points highlighted).</p>
+    </div>
+  </section>
+
+  <section class="mb-6">
+    <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-amber-500 rounded-full inline-block"></span>Run History</h2>
+    <div class="card rounded-xl overflow-hidden">
+      <table class="w-full text-xs">
+        <thead><tr class="bg-slate-800">
+          <th class="px-3 py-2 text-left text-gray-300">Date</th>
+          <th class="px-3 py-2 text-left text-gray-300">Model</th>
+          <th class="px-3 py-2 text-left text-gray-300">Project</th>
+          <th class="px-3 py-2 text-center text-blue-400">GHCP Avg</th>
+          <th class="px-3 py-2 text-center text-orange-400">Claude Code Avg</th>
+          <th class="px-3 py-2 text-center text-gray-300">Winner</th>
+        </tr></thead>
+        <tbody class="divide-y divide-slate-700" id="historyTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+</div><!-- /overview -->
+
+<!-- Benchmark detail tabs are generated dynamically -->
+
+</main>
+
+<footer class="max-w-[1400px] mx-auto px-6 pb-8 text-center text-[10px] text-gray-600">
+  <p>Benchmark Suite v1.0 &mdash; Updated with each benchmark run</p>
+</footer>
+
+<!-- ============ DATA ============ -->
+<script>
+const BENCHMARK_HISTORY = [
+  {
+    date: "2026-03-30",
+    model: "Sonnet 4.6",
+    project: "KanFlow Azure POC",
+    ghcp_scores: {
+      "B-INST":88,"B-CNST":82,"B-TECH":85,"B-SEC":84,
+      "B-OPS":95,"B-DEP":72,"B-SCOPE":76,"B-QUAL":87,
+      "B-OUT":88,"B-CONS":70,"B-DOC":55,"B-REL":90,
+      "B-RBAC":88,"B-ANTI":74
+    },
+    comparison_scores: {
+      "B-INST":85,"B-CNST":88,"B-TECH":78,"B-SEC":86,
+      "B-OPS":52,"B-DEP":68,"B-SCOPE":84,"B-QUAL":78,
+      "B-OUT":85,"B-CONS":65,"B-DOC":82,"B-REL":93,
+      "B-RBAC":72,"B-ANTI":82
+    },
+    // Per-benchmark sub-factor scores for the latest run
+    ghcp_factors: {
+      "B-INST":{f1:27,f2:18,f3:18,f4:15,f5:10},
+      "B-CNST":{f1:28,f2:27,f3:12,f4:5,f5:10},
+      "B-TECH":{f1:23,f2:23,f3:18,f4:12,f5:9},
+      "B-SEC":{f1:22,f2:25,f3:14,f4:13,f5:10},
+      "B-OPS":{f1:25,f2:20,f3:20,f4:18,f5:12},
+      "B-DEP":{f1:15,f2:20,f3:15,f4:12,f5:10},
+      "B-SCOPE":{f1:25,f2:15,f3:16,f4:10,f5:10},
+      "B-QUAL":{f1:23,f2:18,f3:18,f4:13,f5:15},
+      "B-OUT":{f1:32,f2:20,f3:18,f4:10,f5:8},
+      "B-CONS":{f1:18,f2:15,f3:8,f4:17,f5:12},
+      "B-DOC":{f1:10,f2:12,f3:10,f4:10,f5:13},
+      "B-REL":{f1:28,f2:25,f3:20,f4:17},
+      "B-RBAC":{f1:28,f2:20,f3:18,f4:12,f5:10},
+      "B-ANTI":{f1:22,f2:16,f3:12,f4:14,f5:10}
+    },
+    comparison_factors: {
+      "B-INST":{f1:26,f2:20,f3:17,f4:13,f5:9},
+      "B-CNST":{f1:35,f2:28,f3:12,f4:8,f5:5},
+      "B-TECH":{f1:20,f2:22,f3:16,f4:8,f5:12},
+      "B-SEC":{f1:25,f2:22,f3:18,f4:12,f5:9},
+      "B-OPS":{f1:5,f2:17,f3:10,f4:5,f5:15},
+      "B-DEP":{f1:18,f2:12,f3:15,f4:13,f5:10},
+      "B-SCOPE":{f1:30,f2:22,f3:12,f4:10,f5:10},
+      "B-QUAL":{f1:20,f2:17,f3:16,f4:8,f5:17},
+      "B-OUT":{f1:30,f2:20,f3:17,f4:12,f5:6},
+      "B-CONS":{f1:10,f2:12,f3:12,f4:18,f5:13},
+      "B-DOC":{f1:22,f2:22,f3:16,f4:12,f5:10},
+      "B-REL":{f1:28,f2:25,f3:22,f4:18},
+      "B-RBAC":{f1:18,f2:12,f3:18,f4:14,f5:10},
+      "B-ANTI":{f1:25,f2:18,f3:15,f4:10,f5:14}
+    },
+    stage_scores: [
+      {n:1,ghcp:96,comp:81},{n:2,ghcp:94,comp:77},{n:3,ghcp:91,comp:66},
+      {n:4,ghcp:82,comp:91},{n:5,ghcp:87,comp:80},{n:6,ghcp:83,comp:87},
+      {n:7,ghcp:85,comp:73},{n:8,ghcp:74,comp:86},{n:9,ghcp:86,comp:74},
+      {n:10,ghcp:82,comp:79},{n:11,ghcp:81,comp:77},{n:12,ghcp:85,comp:72},
+      {n:13,ghcp:95,comp:79},{n:14,ghcp:20,comp:95}
+    ]
+  }
+];
+
+// Full benchmark definitions with sub-factors, descriptions, improvement areas
+const BENCHMARK_DEFS = {
+  "B-INST": {
+    name: "Instruction Adherence",
+    description: "Measures whether generated code implements exactly what was requested in the prompt \u2014 no more, no less. Every explicit requirement must be addressed; no speculative additions should appear.",
+    factors: [
+      {key:"f1",name:"Required resources/components present",weight:30,
+       guide:"(items present / items requested) \u00d7 30. Each missing item deducts proportionally."},
+      {key:"f2",name:"No unrequested additions",weight:25,
+       guide:"Start at 25. Deduct 5 per unrequested resource, dependency, or feature added. Min 0."},
+      {key:"f3",name:"Configuration values match specification",weight:20,
+       guide:"(correct config values / total specified values) \u00d7 20. Check SKUs, retention, sizes."},
+      {key:"f4",name:"Output format compliance",weight:15,
+       guide:"File structure, naming, fenced code block labels match instructions. Deduct 3 per deviation."},
+      {key:"f5",name:"Architectural intent preserved",weight:10,
+       guide:"Upstream/downstream integration points match spec. 10 correct, 5 partial, 0 wrong."}
+    ],
+    improvements: [
+      {area:"Scope creep prevention",severity:"HIGH",impact:"Copilot adds extra subnets (S4), firewall rules (S8), and patch schedules (S10). The SCOPE BOUNDARY prompt addition should eliminate this.",pipeline:"stages/build_session.py \u2014 CRITICAL: SCOPE BOUNDARY section"},
+      {area:"Missing resources",severity:"MEDIUM",impact:"Claude Code omits PE resource in some stages. Stronger companion resource injection should fix this.",pipeline:"governance/policies/__init__.py \u2014 resolve_for_stage()"}
+    ]
+  },
+  "B-CNST": {
+    name: "Constraint and Directive Compliance",
+    description: "Measures adherence to explicit NEVER, MUST, and CRITICAL directives in governance policies. NEVER directives are absolute \u2014 any single violation zeroes that directive's score. This is the most governance-critical benchmark.",
+    factors: [
+      {key:"f1",name:"NEVER directive compliance",weight:35,
+       guide:"Binary per directive: any violation = 0 for that directive. (followed / total) \u00d7 35."},
+      {key:"f2",name:"MUST directive compliance",weight:30,
+       guide:"(MUST directives satisfied / total MUST directives) \u00d7 30."},
+      {key:"f3",name:"Conditional rule compliance",weight:15,
+       guide:"(triggered conditions correctly handled / total triggered conditions) \u00d7 15."},
+      {key:"f4",name:"Prohibition override resistance",weight:10,
+       guide:"10 if no contextual cue overrides explicit prohibition. 0 if any overridden."},
+      {key:"f5",name:"Constraint consistency across outputs",weight:10,
+       guide:"Same constraints applied uniformly across all files. 10 consistent, 5 mostly, 0 not."}
+    ],
+    improvements: [
+      {area:"NEVER directive hierarchy",severity:"CRITICAL",impact:"Copilot violated SQL-005 (publicNetworkAccess=Enabled). The DIRECTIVE HIERARCHY prompt fix prevents architecture context from overriding NEVER directives.",pipeline:"stages/build_session.py \u2014 CRITICAL: DIRECTIVE HIERARCHY section"},
+      {area:"Policy override resistance",severity:"HIGH",impact:"Claude Code scores higher because it never lets POC context override NEVER. GHCP needs the same discipline.",pipeline:"agents/builtin/terraform_agent.py \u2014 TERRAFORM_PROMPT"}
+    ]
+  },
+  "B-TECH": {
+    name: "Technical Correctness",
+    description: "Measures whether generated code is syntactically valid, uses correct API versions, and would actually deploy without errors. Covers provider version consistency, reference integrity, and runtime viability.",
+    factors: [
+      {key:"f1",name:"Syntactic validity",weight:25,
+       guide:"Per-file: parseable without errors = full. Any syntax error = 0 for that file. Average across files."},
+      {key:"f2",name:"API/SDK version correctness",weight:25,
+       guide:"(correct versions / total version references) \u00d7 25. Mandatory versions must match exactly."},
+      {key:"f3",name:"Reference integrity",weight:20,
+       guide:"All variables, locals, data sources, outputs resolve. (resolvable / total) \u00d7 20."},
+      {key:"f4",name:"Provider/dependency consistency",weight:15,
+       guide:"Declared provider versions match syntax patterns. 15 if consistent, 0 if v1/v2 mismatch."},
+      {key:"f5",name:"Runtime viability",weight:15,
+       guide:"Reviewer judgment: would terraform apply succeed? 15/10/5/0 scale."}
+    ],
+    improvements: [
+      {area:"azapi v1/v2 mismatch",severity:"CRITICAL",impact:"Claude Code uses v1.x provider with v2.x syntax in Stages 3 and 5. Provider version pinning in prompt should fix.",pipeline:"agents/builtin/terraform_agent.py \u2014 get_system_messages() v2.x semantics"},
+      {area:"jsondecode() on v2.x output",severity:"MEDIUM",impact:"Copilot uses jsondecode() pattern (v1.x) on v2.x provider in Stages 3 and 9. V2.x semantics docs should fix.",pipeline:"agents/builtin/terraform_agent.py \u2014 AZAPI PROVIDER VERSION injection"}
+    ]
+  },
+  "B-SEC": {
+    name: "Security Posture",
+    description: "Measures adherence to security best practices: managed identity over keys, RBAC with least-privilege, encryption at rest/transit, public access controls, and secrets hygiene. No credentials should appear in outputs.",
+    factors: [
+      {key:"f1",name:"Authentication method (MI/RBAC vs keys)",weight:25,
+       guide:"25 for managed identity everywhere. Deduct 10 per connection string, 15 per hardcoded key."},
+      {key:"f2",name:"Secrets hygiene",weight:25,
+       guide:"25 if zero sensitive values in outputs/env/code. Deduct 10 per exposed secret."},
+      {key:"f3",name:"Network exposure controls",weight:20,
+       guide:"20 if public access disabled where mandated. Deduct 10 per public endpoint that should be private."},
+      {key:"f4",name:"Encryption configuration",weight:15,
+       guide:"TLS 1.2+, TDE/SSE enabled, infrastructure encryption. (correct / total) \u00d7 15."},
+      {key:"f5",name:"Least-privilege RBAC scoping",weight:15,
+       guide:"15 if narrowest built-in roles with correct principal separation. Deduct 5 per over-permissive."}
+    ],
+    improvements: [
+      {area:"RBAC principal separation",severity:"HIGH",impact:"Copilot assigns KV Administrator to app MI (Stage 6). Principal separation in constraints.md should fix.",pipeline:"knowledge/constraints.md \u2014 Section 6.4 Principal Separation"},
+      {area:"Public access controls",severity:"HIGH",impact:"Copilot defaults SQL public access to Enabled (Stage 8). DIRECTIVE HIERARCHY fix addresses this.",pipeline:"stages/build_session.py \u2014 DIRECTIVE HIERARCHY"}
+    ]
+  },
+  "B-OPS": {
+    name: "Operational Readiness",
+    description: "Measures whether deploy.sh scripts are complete, production-grade, and operationally useful. Includes argument parsing, pre-flight checks, error handling, post-deployment verification, and output export. This is GHCP's strongest benchmark and Claude Code's weakest.",
+    factors: [
+      {key:"f1",name:"Argument parsing (--dry-run, --destroy, --help)",weight:25,
+       guide:"25 if all three flags present and functional. Deduct 8 per missing flag."},
+      {key:"f2",name:"Error handling (set -euo pipefail, trap, exit codes)",weight:20,
+       guide:"20 if all three present. Deduct 7 per missing element."},
+      {key:"f3",name:"Pre-flight validation",weight:20,
+       guide:"20 if login + tool availability + upstream dependency validation all present. Deduct 7 per missing."},
+      {key:"f4",name:"Post-deployment verification",weight:20,
+       guide:"20 if script verifies resource state via CLI/API after deploy. 10 basic check. 0 absent."},
+      {key:"f5",name:"Output export to JSON",weight:15,
+       guide:"15 if outputs exported to deterministic JSON path. 0 if missing."}
+    ],
+    improvements: [
+      {area:"deploy.sh template enforcement",severity:"CRITICAL",impact:"Claude Code produces ~65-line deploy.sh with no argument parsing across ALL stages. The deploy.sh REQUIREMENTS section with concrete skeleton should fix.",pipeline:"agents/builtin/terraform_agent.py \u2014 CRITICAL: deploy.sh REQUIREMENTS"},
+      {area:"Post-deployment verification",severity:"MEDIUM",impact:"Both tools could improve. Adding per-service az CLI verification commands to knowledge.",pipeline:"knowledge/tools/deploy-scripts.md \u2014 per-service verification"}
+    ]
+  },
+  "B-DEP": {
+    name: "Dependency and Provider Hygiene",
+    description: "Measures whether declared providers and dependencies are minimal, correctly versioned, and consistently used. Penalizes unused providers, version mismatches, and unnecessary dependency surface area.",
+    factors: [
+      {key:"f1",name:"No unnecessary dependencies declared",weight:30,
+       guide:"30 if every declared provider/package is used. Deduct 10 per unused dependency."},
+      {key:"f2",name:"Version pinning consistency",weight:25,
+       guide:"25 if same dependency version across all stages. 0 if version mismatch."},
+      {key:"f3",name:"Dependency-syntax alignment",weight:20,
+       guide:"20 if declared version matches syntax patterns. 0 if v1 syntax with v2 provider."},
+      {key:"f4",name:"Minimal provider surface area",weight:15,
+       guide:"15 if fewest possible providers used. Deduct 5 per eliminable provider."},
+      {key:"f5",name:"Backend configuration consistency",weight:10,
+       guide:"10 if same backend type across all stages. 0 if mixed."}
+    ],
+    improvements: [
+      {area:"Unused azurerm provider",severity:"HIGH",impact:"Copilot includes azurerm in 9+ stages with no azurerm resources. CRITICAL: PROVIDER RESTRICTIONS section should fix.",pipeline:"agents/builtin/terraform_agent.py \u2014 CRITICAL: PROVIDER RESTRICTIONS"},
+      {area:"azapi version consistency",severity:"CRITICAL",impact:"Claude Code uses v1.x in some stages, v2.x in others. Version pinning in prompt should fix.",pipeline:"agents/builtin/terraform_agent.py \u2014 get_system_messages()"},
+      {area:"azurerm resource contamination",severity:"HIGH",impact:"Knowledge files use azurerm_* examples. Migration to azapi patterns needed.",pipeline:"knowledge/services/*.md \u2014 azapi migration"}
+    ]
+  },
+  "B-SCOPE": {
+    name: "Scope Discipline",
+    description: "Measures whether the output stays within the boundaries defined by the input specification. Penalizes unrequested resources, speculative infrastructure, circular dependencies from misplaced companion resources, and dead code.",
+    factors: [
+      {key:"f1",name:"No unrequested resources created",weight:35,
+       guide:"35 if all resources match service list. Deduct 7 per unrequested resource."},
+      {key:"f2",name:"No speculative infrastructure",weight:25,
+       guide:"25 if no resources 'for future use'. Deduct 10 per speculative addition."},
+      {key:"f3",name:"Companion resources match architecture boundary",weight:20,
+       guide:"20 if PE/DNS in correct stage, no circular dependencies. 0 if circular deps created."},
+      {key:"f4",name:"No dead code or unused references",weight:10,
+       guide:"10 if no declared-but-unused remote state, data sources, variables. Deduct 3 per dead ref."},
+      {key:"f5",name:"Variable/output surface proportional",weight:10,
+       guide:"10 if proportional. Deduct 3 per clearly redundant output."}
+    ],
+    improvements: [
+      {area:"Scope boundary enforcement",severity:"HIGH",impact:"Copilot adds extra subnets and firewall rules. CRITICAL: SCOPE BOUNDARY section should prevent.",pipeline:"stages/build_session.py \u2014 CRITICAL: SCOPE BOUNDARY"},
+      {area:"Companion resource architecture",severity:"HIGH",impact:"Claude Code creates PE/DNS in service stages when networking stage handles them. Networking note expansion should fix.",pipeline:"stages/build_session.py \u2014 _get_networking_stage_note()"}
+    ]
+  },
+  "B-QUAL": {
+    name: "Code Quality and Readability",
+    description: "Measures structural quality, file organization, naming conventions, idiomatic patterns, variable validation, and inline documentation. Well-structured code is easier to maintain and extend.",
+    factors: [
+      {key:"f1",name:"File organization",weight:25,
+       guide:"Resources in correct files per spec. 25 if perfect, deduct 5 per misplaced block."},
+      {key:"f2",name:"Naming convention adherence",weight:20,
+       guide:"(correctly named / total) \u00d7 20. Check against prescribed naming pattern."},
+      {key:"f3",name:"Idiomatic patterns",weight:20,
+       guide:"Uses best practices (for_each, locals, map outputs). 20/15/10/5/0 scale."},
+      {key:"f4",name:"Variable validation blocks",weight:15,
+       guide:"15 if critical variables have validation. 10 partial. 0 none."},
+      {key:"f5",name:"Comment quality and design notes",weight:20,
+       guide:"Inline comments explain key decisions. Design notes section present. 20/15/10/5/0 scale."}
+    ],
+    improvements: [
+      {area:"Variable validation",severity:"MEDIUM",impact:"Claude Code rarely includes validation blocks. Copilot does this well already.",pipeline:"agents/builtin/terraform_agent.py \u2014 TERRAFORM_PROMPT code standards"},
+      {area:"Design documentation",severity:"MEDIUM",impact:"Claude Code rarely includes post-code design notes. Copilot does this well already.",pipeline:"agents/builtin/terraform_agent.py \u2014 TERRAFORM_PROMPT"}
+    ]
+  },
+  "B-OUT": {
+    name: "Output Interface Completeness",
+    description: "Measures whether all required outputs are properly defined for downstream consumers. Covers endpoint exports, identity exports, sensitive value handling, and naming consistency across stages.",
+    factors: [
+      {key:"f1",name:"Downstream-referenced values exported",weight:35,
+       guide:"(required outputs present / total required) \u00d7 35. Check against INPUT's downstream list."},
+      {key:"f2",name:"No sensitive values in outputs",weight:20,
+       guide:"20 if zero keys/passwords/connection strings in outputs. 0 if any exposed."},
+      {key:"f3",name:"Output naming consistency",weight:20,
+       guide:"20 if same naming pattern across all stages. Deduct 5 per inconsistency."},
+      {key:"f4",name:"Endpoint/FQDN exports",weight:15,
+       guide:"15 if service endpoints available for app configuration. 0 if missing when needed."},
+      {key:"f5",name:"Identity exports (principal_id, client_id)",weight:10,
+       guide:"10 if exported when RBAC/MI involved. 0 if missing."}
+    ],
+    improvements: [
+      {area:"Output naming standardization",severity:"LOW",impact:"Both tools could be more consistent. Minor issue.",pipeline:"agents/builtin/terraform_agent.py \u2014 OUTPUTS section"}
+    ]
+  },
+  "B-CONS": {
+    name: "Cross-Stage Consistency",
+    description: "Measures whether patterns, conventions, and decisions remain uniform across ALL stages. Provider versions, backend types, tag placement, naming locals, and remote state patterns must be identical everywhere. This is both tools' weakest benchmark.",
+    factors: [
+      {key:"f1",name:"Provider version consistency",weight:25,
+       guide:"25 if identical versions across all stages. 0 if any version differs."},
+      {key:"f2",name:"Backend configuration uniformity",weight:20,
+       guide:"20 if same backend type everywhere. 0 if mixed."},
+      {key:"f3",name:"Tag placement pattern uniformity",weight:20,
+       guide:"20 if tags in same position across all stages. 0 if mixed."},
+      {key:"f4",name:"Naming pattern uniformity",weight:20,
+       guide:"20 if same locals structure across all stages. Deduct 5 per deviation."},
+      {key:"f5",name:"Remote state reference pattern",weight:15,
+       guide:"15 if same mechanism everywhere. 0 if inconsistent."}
+    ],
+    improvements: [
+      {area:"Tag placement uniformity",severity:"CRITICAL",impact:"Copilot places tags inside body{} in 11/14 stages but correctly in 3. Root cause fix (line 36) should make ALL stages consistent.",pipeline:"agents/builtin/terraform_agent.py \u2014 line 36 constraint fix + CRITICAL: TAGS PLACEMENT"},
+      {area:"Provider version pinning",severity:"HIGH",impact:"Claude Code uses v1.x in some stages, v2.x in others. V2.x semantics in version injection should fix.",pipeline:"agents/builtin/terraform_agent.py \u2014 AZAPI PROVIDER VERSION"},
+      {area:"Backend type uniformity",severity:"MEDIUM",impact:"Copilot uses local backend; Claude Code uses azurerm backend. The prompt specifies local backend for POC.",pipeline:"agents/builtin/terraform_agent.py \u2014 BACKEND CONFIGURATION section"}
+    ]
+  },
+  "B-DOC": {
+    name: "Documentation Quality",
+    description: "Measures completeness, accuracy, and actionability of generated documentation. Covers architecture docs, deployment guides, troubleshooting, CI/CD integration, and whether copy-paste commands actually work. GHCP's weakest benchmark due to Stage 14 context loss.",
+    factors: [
+      {key:"f1",name:"Completeness (all required sections present)",weight:25,
+       guide:"(sections present / required sections) \u00d7 25. Check architecture, deployment, troubleshooting."},
+      {key:"f2",name:"Accuracy (resource names, roles match code)",weight:25,
+       guide:"Spot-check 10+ facts against generated code. (correct / checked) \u00d7 25."},
+      {key:"f3",name:"Actionability (commands work if copy-pasted)",weight:20,
+       guide:"(working commands / total commands) \u00d7 20."},
+      {key:"f4",name:"Structural quality (ToC, headings, diagrams)",weight:15,
+       guide:"15 if proper structure. Deduct 3 per structural issue."},
+      {key:"f5",name:"No truncation or context loss",weight:15,
+       guide:"15 if complete. 0 if mid-stream abort or truncation."}
+    ],
+    improvements: [
+      {area:"doc_agent max_tokens",severity:"CRITICAL",impact:"Was 4,096 \u2014 caused Stage 14 truncation. Fixed to 204,800. This single fix should raise GHCP's B-DOC by 25+ points.",pipeline:"agents/builtin/doc_agent.py \u2014 _max_tokens = 204800"},
+      {area:"Documentation agent enrichment",severity:"HIGH",impact:"System prompt now includes completeness requirement and context handling instructions.",pipeline:"agents/builtin/doc_agent.py \u2014 DOCUMENTATION_PROMPT"},
+      {area:"Rich stage context for docs",severity:"MEDIUM",impact:"Adding _build_docs_context() to inject actual stage outputs into the doc prompt.",pipeline:"stages/build_session.py \u2014 _build_docs_context()"}
+    ]
+  },
+  "B-REL": {
+    name: "Response Reliability",
+    description: "Measures whether the AI response is complete, parseable, and free of structural failures. Covers truncation, hallucinated APIs, code block extractability, and token efficiency. Both tools score well here except for Copilot's Stage 14 failure.",
+    factors: [
+      {key:"f1",name:"Response completeness (no truncation)",weight:30,
+       guide:"30 if all requested files present and complete. 0 if any missing or truncated."},
+      {key:"f2",name:"Parseable output (code blocks extractable)",weight:25,
+       guide:"25 if all fenced blocks valid with labels. Deduct 8 per unparseable block."},
+      {key:"f3",name:"No hallucinated functions/APIs",weight:25,
+       guide:"25 if all references exist. Deduct 5 per hallucinated reference."},
+      {key:"f4",name:"Token efficiency",weight:20,
+       guide:"20 if concise and meaningful. Deduct 5 for excessive boilerplate."}
+    ],
+    improvements: [
+      {area:"Context window management",severity:"HIGH",impact:"Copilot lost context on Stage 14. max_tokens fix + continuation recovery should prevent.",pipeline:"agents/builtin/doc_agent.py + stages/build_session.py continuation recovery"}
+    ]
+  },
+  "B-RBAC": {
+    name: "RBAC and Identity Architecture",
+    description: "Measures correctness of identity, role assignment, and principal separation patterns. Includes using the correct RBAC mechanism per service (ARM vs Cosmos native vs SQL T-SQL), deterministic naming, and least-privilege scoping.",
+    factors: [
+      {key:"f1",name:"Correct RBAC mechanism per service",weight:30,
+       guide:"30 if correct mechanism (ARM RBAC, Cosmos sqlRoleAssignments, SQL T-SQL). 0 if wrong layer."},
+      {key:"f2",name:"Deterministic assignment names (uuidv5)",weight:20,
+       guide:"20 if uuidv5() with deterministic seeds. 10 if deterministic other method. 0 if uuid()."},
+      {key:"f3",name:"Principal separation (deployer vs app MI)",weight:20,
+       guide:"20 if admin roles to deployer and data roles to app MI. 0 if admin to app MI."},
+      {key:"f4",name:"Least-privilege role selection",weight:15,
+       guide:"15 if narrowest built-in role. Deduct 5 per over-permissive role."},
+      {key:"f5",name:"principalType annotation",weight:15,
+       guide:"15 if ServicePrincipal for MI, User for humans. 0 if missing or incorrect."}
+    ],
+    improvements: [
+      {area:"Cosmos DB RBAC layer",severity:"CRITICAL",impact:"Claude Code uses azurerm_role_assignment for Cosmos data-plane roles (wrong layer). Documentation in cosmos-db.md should fix.",pipeline:"knowledge/services/cosmos-db.md + knowledge/constraints.md Section 6.5"},
+      {area:"Principal separation",severity:"HIGH",impact:"Copilot assigns KV Admin to app MI. Constraints.md Section 6.4 should fix.",pipeline:"knowledge/constraints.md \u2014 Section 6.4"},
+      {area:"uuidv5 enforcement",severity:"MEDIUM",impact:"Claude Code uses azurerm_role_assignment which auto-generates names. azapi-only enforcement should fix.",pipeline:"agents/builtin/terraform_agent.py \u2014 PROVIDER RESTRICTIONS"}
+    ]
+  },
+  "B-ANTI": {
+    name: "Anti-Pattern Absence",
+    description: "Measures absence of known bad patterns: hardcoded credentials, overly permissive network rules, deprecated syntax, hardcoded upstream resource names, and incomplete scripts. Detected by the anti-pattern scanner post-generation.",
+    factors: [
+      {key:"f1",name:"No credentials in code/config/outputs",weight:25,
+       guide:"25 if zero hardcoded keys, passwords, secrets. 0 if any found."},
+      {key:"f2",name:"No overly permissive network rules",weight:20,
+       guide:"20 if no 0.0.0.0/0, no public access where disabled required. Deduct 10 per violation."},
+      {key:"f3",name:"No deprecated/incorrect syntax patterns",weight:20,
+       guide:"20 if no v1 syntax with v2 provider, no jsondecode on v2. Deduct 5 per occurrence."},
+      {key:"f4",name:"No hardcoded upstream resource names",weight:20,
+       guide:"20 if all cross-stage refs via variables/remote state. 0 if any hardcoded."},
+      {key:"f5",name:"No incomplete/truncated scripts",weight:15,
+       guide:"15 if all scripts complete. 0 if any truncated."}
+    ],
+    improvements: [
+      {area:"New anti-pattern scanner",severity:"HIGH",impact:"Added terraform_structure.yaml with 6 new patterns: azurerm detection, v1.x version, uuid(), jsondecode(), hardcoded names. 39 total checks (was 33).",pipeline:"governance/anti_patterns/terraform_structure.yaml (NEW)"},
+      {area:"Hardcoded name detection",severity:"HIGH",impact:"Claude Code hardcodes queue + ACR names in Stage 13. New completeness.yaml patterns catch ALZ naming hardcodes.",pipeline:"governance/anti_patterns/completeness.yaml \u2014 new patterns"},
+      {area:"Network rule scanning",severity:"MEDIUM",impact:"Copilot creates firewall rules in Stage 8. Existing networking.yaml patterns should catch these.",pipeline:"governance/anti_patterns/networking.yaml"}
+    ]
+  }
+};
+</script>
+
+<!-- ============ RENDERING ENGINE ============ -->
+<script>
+const benchmarkIds = Object.keys(BENCHMARK_DEFS);
+const latest = BENCHMARK_HISTORY[BENCHMARK_HISTORY.length - 1];
+const dates = BENCHMARK_HISTORY.map(r => r.date);
+
+// Build tab navigation
+const tabNav = document.getElementById('tabNav');
+benchmarkIds.forEach(id => {
+  tabNav.innerHTML += `<button class="tab-btn px-3 py-2 text-xs font-medium rounded-t" onclick="showTab('${id}')">${id.replace('B-','')}</button>`;
+});
+
+// Current table (with "View" links to detail tabs)
+const ct = document.getElementById('currentTable');
+benchmarkIds.forEach(id => {
+  const g = latest.ghcp_scores[id], c = latest.comparison_scores[id];
+  const d = g - c, dStr = d > 0 ? `+${d}` : `${d}`;
+  const dCls = d>0?'text-blue-400':d<0?'text-orange-400':'text-gray-500';
+  const w = d>=0
+    ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">GHCP</span>'
+    : '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#7c2d12;color:#fdba74">Claude Code</span>';
+  ct.innerHTML += `<tr>
+    <td class="px-3 py-1.5 font-mono text-purple-300">${id}</td>
+    <td class="px-3 py-1.5">${BENCHMARK_DEFS[id].name}</td>
+    <td class="px-3 py-1.5 text-center ${d>=0?'font-bold text-blue-300':''}">${g}</td>
+    <td class="px-3 py-1.5 text-center ${d<0?'font-bold text-orange-300':''}">${c}</td>
+    <td class="px-3 py-1.5 text-center ${dCls}">${dStr}</td>
+    <td class="px-3 py-1.5 text-center">${w}</td>
+    <td class="px-3 py-1.5 text-center"><button onclick="showTab('${id}')" class="text-purple-400 hover:text-purple-300 underline text-[10px]">View</button></td>
+  </tr>`;
+});
+
+// Run history
+const ht = document.getElementById('historyTable');
+BENCHMARK_HISTORY.forEach(run => {
+  const gAvg = Object.values(run.ghcp_scores).reduce((a,b)=>a+b,0) / benchmarkIds.length;
+  const cAvg = Object.values(run.comparison_scores).reduce((a,b)=>a+b,0) / benchmarkIds.length;
+  const w = gAvg >= cAvg
+    ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">GHCP</span>'
+    : '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#7c2d12;color:#fdba74">Claude Code</span>';
+  ht.innerHTML += `<tr><td class="px-3 py-1.5">${run.date}</td><td class="px-3 py-1.5">${run.model}</td><td class="px-3 py-1.5">${run.project}</td><td class="px-3 py-1.5 text-center text-blue-400 font-bold">${gAvg.toFixed(1)}</td><td class="px-3 py-1.5 text-center text-orange-400 font-bold">${cAvg.toFixed(1)}</td><td class="px-3 py-1.5 text-center">${w}</td></tr>`;
+});
+
+// Aggregate chart
+const ghcpAvgs = BENCHMARK_HISTORY.map(r => Object.values(r.ghcp_scores).reduce((a,b)=>a+b,0)/benchmarkIds.length);
+const compAvgs = BENCHMARK_HISTORY.map(r => Object.values(r.comparison_scores).reduce((a,b)=>a+b,0)/benchmarkIds.length);
+new Chart(document.getElementById('aggregateChart'), {
+  type:'line', data:{labels:dates,datasets:[
+    {label:'GHCP',data:ghcpAvgs,borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,0.1)',fill:true,tension:0.3,pointRadius:6,pointBackgroundColor:'#3b82f6'},
+    {label:'Claude Code',data:compAvgs,borderColor:'#f97316',backgroundColor:'rgba(249,115,22,0.1)',fill:true,tension:0.3,pointRadius:6,pointBackgroundColor:'#f97316'}
+  ]},options:{responsive:true,scales:{y:{min:0,max:100,grid:{color:'rgba(71,85,105,0.3)'},ticks:{color:'#94a3b8'}},x:{grid:{display:false},ticks:{color:'#94a3b8'}}},plugins:{legend:{labels:{color:'#94a3b8'}}}}
+});
+
+// Per-benchmark mini charts on overview
+const bc = document.getElementById('benchCharts');
+benchmarkIds.forEach(id => {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'card rounded-xl p-4 cursor-pointer hover:border-purple-500/50';
+  wrapper.onclick = () => showTab(id);
+  wrapper.innerHTML = `<h3 class="text-xs font-semibold text-gray-300 mb-2">${id}: ${BENCHMARK_DEFS[id].name}</h3><canvas id="chart-${id}" height="100"></canvas>`;
+  bc.appendChild(wrapper);
+  new Chart(document.getElementById(`chart-${id}`), {
+    type:'line',data:{labels:dates,datasets:[
+      {label:'GHCP',data:BENCHMARK_HISTORY.map(r=>r.ghcp_scores[id]),borderColor:'#3b82f6',fill:false,tension:0.3,pointRadius:5,pointBackgroundColor:'#3b82f6'},
+      {label:'Claude Code',data:BENCHMARK_HISTORY.map(r=>r.comparison_scores[id]),borderColor:'#f97316',fill:false,tension:0.3,pointRadius:5,pointBackgroundColor:'#f97316'}
+    ]},options:{responsive:true,scales:{y:{min:0,max:100,grid:{color:'rgba(71,85,105,0.2)'},ticks:{color:'#64748b',font:{size:9}}},x:{display:false}},plugins:{legend:{display:false}}}
+  });
+});
+
+// Variance detection
+if (BENCHMARK_HISTORY.length >= 2) {
+  const prev = BENCHMARK_HISTORY[BENCHMARK_HISTORY.length-2], curr = latest;
+  const variances = [];
+  benchmarkIds.forEach(id => {
+    const gD = curr.ghcp_scores[id]-prev.ghcp_scores[id], cD = curr.comparison_scores[id]-prev.comparison_scores[id];
+    if(Math.abs(gD)>=10) variances.push({id,tool:'GHCP',diff:gD});
+    if(Math.abs(cD)>=10) variances.push({id,tool:'Claude Code',diff:cD});
+  });
+  if(variances.length>0){
+    const vs=document.getElementById('variancesSection');
+    vs.innerHTML=variances.map(v=>`<div class="flex items-center gap-2 text-xs"><span class="font-mono text-purple-300">${v.id}</span><span class="text-gray-400">${v.tool}:</span><span class="${v.diff>0?'text-green-400':'text-red-400'} font-bold">${v.diff>0?'+':''}${v.diff}</span></div>`).join('');
+  }
+}
+
+// ============ GENERATE BENCHMARK DETAIL TABS ============
+benchmarkIds.forEach(id => {
+  const def = BENCHMARK_DEFS[id];
+  const g = latest.ghcp_scores[id], c = latest.comparison_scores[id];
+  const d = g - c;
+  const isGhcp = d >= 0;
+
+  // Get factor scores
+  const gf = latest.ghcp_factors?.[id] || {};
+  const cf = latest.comparison_factors?.[id] || {};
+
+  const div = document.createElement('div');
+  div.className = 'tab-content';
+  div.id = 'tab-' + id;
+
+  // Factor rows for the table
+  const factorRows = def.factors.map(f => {
+    const gv = gf[f.key]||0, cv = cf[f.key]||0;
+    const fd = gv - cv;
+    const fdCls = fd>0?'text-blue-400':fd<0?'text-orange-400':'text-gray-500';
+    const wCls = fd>0?'text-blue-400':fd<0?'text-orange-400':'text-gray-500';
+    const wTxt = fd>0?'GHCP':fd<0?'Claude Code':'Tie';
+    return `<tr class="border-b border-slate-700/50">
+      <td class="px-3 py-2 text-gray-300 font-medium">${f.name}</td>
+      <td class="px-3 py-2 text-center text-gray-500">${f.weight}</td>
+      <td class="px-3 py-2 text-center ${fd>=0?'text-blue-300 font-semibold':''}">${gv}/${f.weight}</td>
+      <td class="px-3 py-2 text-center ${fd<0?'text-orange-300 font-semibold':''}">${cv}/${f.weight}</td>
+      <td class="px-3 py-2 text-center ${wCls} font-semibold">${wTxt}</td>
+    </tr>`;
+  }).join('');
+
+  // Improvement rows
+  const sevColors = {CRITICAL:'sev-critical',HIGH:'sev-high',MEDIUM:'sev-medium',LOW:'sev-low'};
+  const improvementRows = (def.improvements||[]).map(imp => `
+    <div class="border-b border-slate-700/30 pb-3 mb-3 last:border-0 last:pb-0 last:mb-0">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="${sevColors[imp.severity]} text-[10px] font-bold px-1.5 py-0.5 rounded border border-current">${imp.severity}</span>
+        <span class="text-sm font-semibold text-gray-200">${imp.area}</span>
+      </div>
+      <p class="text-xs text-gray-400 mb-1">${imp.impact}</p>
+      <p class="text-[10px] text-gray-500 font-mono">${imp.pipeline}</p>
+    </div>
+  `).join('');
+
+  div.innerHTML = `
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+      <div>
+        <h2 class="text-lg font-bold">${id}: ${def.name}</h2>
+        <p class="text-xs text-gray-400 mt-1 max-w-2xl">${def.description}</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-blue-400 font-bold text-lg">${g}</span>
+        <span class="text-gray-600">vs</span>
+        <span class="text-orange-400 font-bold text-lg">${c}</span>
+        ${isGhcp
+          ? '<span class="text-[10px] px-2 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">GHCP Wins</span>'
+          : '<span class="text-[10px] px-2 py-0.5 rounded-full" style="background:#7c2d12;color:#fdba74">Claude Code Wins</span>'}
+      </div>
+    </div>
+
+    <!-- Score bars -->
+    <div class="card rounded-xl p-4 mb-5">
+      <div class="space-y-2">
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-blue-400 w-16 text-right font-medium">Copilot</span>
+          <div class="flex-1 bg-slate-700 rounded-full h-5 overflow-hidden">
+            <div style="width:${g}%;background:#3b82f6" class="h-full rounded-full flex items-center justify-end pr-2 text-[10px] font-bold text-white">${g}</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-orange-400 w-16 text-right font-medium">Claude</span>
+          <div class="flex-1 bg-slate-700 rounded-full h-5 overflow-hidden">
+            <div style="width:${c}%;background:#f97316" class="h-full rounded-full flex items-center justify-end pr-2 text-[10px] font-bold text-white">${c}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-5 mb-5">
+      <!-- Factor breakdown table -->
+      <div class="md:col-span-2 card rounded-xl overflow-hidden">
+        <div class="px-4 py-2 bg-slate-800 text-xs font-semibold text-gray-300">Sub-Factor Breakdown</div>
+        <table class="w-full text-xs">
+          <thead><tr class="bg-slate-800/50">
+            <th class="px-3 py-2 text-left text-gray-400">Factor</th>
+            <th class="px-3 py-2 text-center text-gray-400">Weight</th>
+            <th class="px-3 py-2 text-center text-blue-400">GHCP</th>
+            <th class="px-3 py-2 text-center text-orange-400">Claude Code</th>
+            <th class="px-3 py-2 text-center text-gray-400">Winner</th>
+          </tr></thead>
+          <tbody>${factorRows}</tbody>
+          <tfoot><tr class="bg-slate-800 font-bold">
+            <td class="px-3 py-2">Total</td>
+            <td class="px-3 py-2 text-center">100</td>
+            <td class="px-3 py-2 text-center text-blue-400">${g}</td>
+            <td class="px-3 py-2 text-center text-orange-400">${c}</td>
+            <td class="px-3 py-2 text-center ${isGhcp?'text-blue-400':'text-orange-400'} font-bold">${isGhcp?'GHCP':'Claude Code'}</td>
+          </tr></tfoot>
+        </table>
+      </div>
+
+      <!-- Factor chart -->
+      <div class="card rounded-xl p-4">
+        <div class="text-xs font-semibold text-gray-300 mb-2">Factor Scores</div>
+        <canvas id="factor-chart-${id}" height="200"></canvas>
+        <div class="mt-3 text-[10px] text-gray-500">
+          <p class="font-semibold text-gray-400 mb-1">How the score is derived:</p>
+          <p>Each sub-factor is scored independently (0 to its weight). The benchmark total is the sum of all factor scores. See the scoring guide in each factor row for exact criteria.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Trend chart -->
+    <div class="card rounded-xl p-4 mb-5">
+      <div class="text-xs font-semibold text-gray-300 mb-2">Score Trend Over Time</div>
+      <canvas id="trend-chart-${id}" height="80"></canvas>
+    </div>
+
+    <!-- Scoring methodology -->
+    <div class="card rounded-xl p-4 mb-5">
+      <div class="text-xs font-semibold text-gray-300 mb-3">Scoring Methodology</div>
+      <div class="space-y-2">
+        ${def.factors.map(f => `
+          <div class="border-b border-slate-700/30 pb-2 mb-2 last:border-0">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold text-purple-300 w-16 flex-shrink-0">Weight: ${f.weight}</span>
+              <span class="text-xs font-medium text-gray-200">${f.name}</span>
+            </div>
+            <p class="text-[10px] text-gray-400 mt-1 ml-[4.5rem]">${f.guide}</p>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <!-- Improvement areas -->
+    ${improvementRows ? `
+    <div class="card rounded-xl p-4">
+      <div class="text-xs font-semibold text-gray-300 mb-3">Areas Needing Improvement</div>
+      ${improvementRows}
+    </div>` : ''}
+  `;
+
+  document.querySelector('main').appendChild(div);
+
+  // Factor bar chart (horizontal)
+  setTimeout(() => {
+    const fLabels = def.factors.map(f => f.name.length > 25 ? f.name.substring(0,25)+'...' : f.name);
+    const fWeights = def.factors.map(f => f.weight);
+    const fGhcp = def.factors.map(f => gf[f.key]||0);
+    const fComp = def.factors.map(f => cf[f.key]||0);
+    new Chart(document.getElementById(`factor-chart-${id}`), {
+      type:'bar',
+      data:{labels:fLabels,datasets:[
+        {label:'GHCP',data:fGhcp,backgroundColor:'rgba(59,130,246,0.7)',borderColor:'#3b82f6',borderWidth:1},
+        {label:'Claude Code',data:fComp,backgroundColor:'rgba(249,115,22,0.7)',borderColor:'#f97316',borderWidth:1},
+        {label:'Max',data:fWeights,backgroundColor:'rgba(71,85,105,0.2)',borderColor:'rgba(71,85,105,0.4)',borderWidth:1}
+      ]},
+      options:{indexAxis:'y',responsive:true,scales:{
+        x:{min:0,max:35,grid:{color:'rgba(71,85,105,0.2)'},ticks:{color:'#64748b',font:{size:8}}},
+        y:{grid:{display:false},ticks:{color:'#94a3b8',font:{size:8}}}
+      },plugins:{legend:{labels:{color:'#94a3b8',font:{size:9}}}},barPercentage:0.8,categoryPercentage:0.85}
+    });
+
+    // Trend line chart
+    new Chart(document.getElementById(`trend-chart-${id}`), {
+      type:'line',data:{labels:dates,datasets:[
+        {label:'GHCP',data:BENCHMARK_HISTORY.map(r=>r.ghcp_scores[id]),borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,0.1)',fill:true,tension:0.3,pointRadius:6,pointBackgroundColor:'#3b82f6'},
+        {label:'Claude Code',data:BENCHMARK_HISTORY.map(r=>r.comparison_scores[id]),borderColor:'#f97316',backgroundColor:'rgba(249,115,22,0.1)',fill:true,tension:0.3,pointRadius:6,pointBackgroundColor:'#f97316'}
+      ]},options:{responsive:true,scales:{y:{min:0,max:100,grid:{color:'rgba(71,85,105,0.2)'},ticks:{color:'#64748b'}},x:{grid:{display:false},ticks:{color:'#94a3b8'}}},plugins:{legend:{labels:{color:'#94a3b8'}}}}
+    });
+  }, 100);
+});
+
+// Tab switching
+function showTab(id) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  const targetId = id === 'overview' ? 'tab-overview' : 'tab-' + id;
+  document.getElementById(targetId).classList.add('active');
+  const btns = document.querySelectorAll('.tab-btn');
+  if (id === 'overview') { btns[0].classList.add('active'); }
+  else {
+    const idx = benchmarkIds.indexOf(id);
+    if (idx >= 0 && btns[idx+1]) btns[idx+1].classList.add('active');
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,121 @@
+kind: policy
+domain: performance
+description: Governance policies for Compute Optimization
+last_updated: '2026-03-27'
+rules:
+- id: WAF-PERF-COMP-001
+  severity: required
+  description: Define explicit CPU and memory resource limits for Container Apps — prevent unbounded resource consumption
+    and noisy neighbor issues
+  rationale: Containers without resource limits can consume all available CPU/memory, starving co-located containers and causing
+    OOM kills
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services:
+    - Microsoft.App/containerApps
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.Web/sites
+    - Microsoft.Compute/virtualMachines
+- id: WAF-PERF-COMP-002
+  severity: recommended
+  description: Configure App Service per-app scaling and deployment slots for density optimization and zero-downtime deployments
+  rationale: Per-app scaling prevents a single app from consuming all plan capacity; slots enable blue-green deployments without
+    downtime
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  targets:
+  - services:
+    - Microsoft.App/containerApps
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.Web/sites
+    - Microsoft.Compute/virtualMachines
+- id: WAF-PERF-COMP-003
+  severity: required
+  description: Define Kubernetes pod resource requests and limits for AKS workloads — prevent scheduling issues and resource
+    contention
+  rationale: Pods without requests cannot be scheduled efficiently; pods without limits can starve other workloads. Requests
+    drive scheduling, limits prevent starvation
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services:
+    - Microsoft.App/containerApps
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.Web/sites
+    - Microsoft.Compute/virtualMachines
+- id: WAF-PERF-COMP-004
+  severity: required
+  description: Configure Azure Functions timeout, concurrency, and batching settings in host.json
+  rationale: Default Function settings are not optimized for production; incorrect timeout causes failures, incorrect concurrency
+    causes throttling or resource exhaustion
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services:
+    - Microsoft.App/containerApps
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.Web/sites
+    - Microsoft.Compute/virtualMachines
+- id: WAF-PERF-COMP-005
+  severity: required
+  description: Offload long-running operations to asynchronous processing with queues and background workers
+  rationale: Synchronous processing of operations > 5 seconds blocks threads, degrades UX, and causes timeout failures. Async
+    processing decouples producers from consumers
+  applies_to:
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.App/containerApps
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.Web/sites
+    - Microsoft.Compute/virtualMachines
+patterns:
+- name: Right-sized container resources
+  description: 'Define CPU/memory based on workload type: API (0.5 CPU/1Gi), worker (0.25 CPU/0.5Gi), data processing (1.0
+    CPU/2Gi)'
+- name: Async request-reply pattern
+  description: API returns 202 Accepted with status URL; background worker processes via Service Bus; status endpoint returns
+    progress
+anti_patterns:
+- description: Do not run long-running operations in HTTP request handlers
+  instead: Enqueue to Service Bus and process asynchronously; return 202 Accepted with a status URL
+- description: Do not deploy containers or pods without resource limits
+  instead: Define explicit CPU and memory requests/limits based on workload profiling
+- description: Do not deploy directly to production App Service slot
+  instead: Deploy to staging slot, warm up, then swap to production for zero-downtime deployment
+- description: Do not use default Azure Functions host.json settings
+  instead: Configure timeout, concurrency, batching, and sampling based on workload requirements
+references:
+- title: Container Apps resource management
+  url: https://learn.microsoft.com/azure/container-apps/containers
+- title: AKS resource management
+  url: https://learn.microsoft.com/azure/aks/developer-best-practices-resource-management
+- title: App Service deployment slots
+  url: https://learn.microsoft.com/azure/app-service/deploy-staging-slots
+- title: Azure Functions host.json reference
+  url: https://learn.microsoft.com/azure/azure-functions/functions-host-json
+- title: Async request-reply pattern
+  url: https://learn.microsoft.com/azure/architecture/patterns/async-request-reply

@@ -405,7 +405,7 @@ az prototype deploy [--stage]
                     [--rollback-info]
                     [--generate-scripts]
                     [--script-type {container_app, function, webapp}]
-                    [--script-resource-group]
+                    [--script-rg]
                     [--script-registry]
 ```
 
@@ -651,7 +651,7 @@ Azure deployment target type for `--generate-scripts`.
 | Default value: | `webapp` |
 | Accepted values: | `container_app`, `function`, `webapp` |
 
-`--script-resource-group`
+`--script-rg`
 
 Default resource group name for `--generate-scripts`.
 

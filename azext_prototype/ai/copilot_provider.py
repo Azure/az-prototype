@@ -28,7 +28,53 @@ from knack.util import CLIError
 from azext_prototype.ai.copilot_auth import (
     get_copilot_token,
 )
-from azext_prototype.ai.provider import AIMessage, AIProvider, AIResponse, ToolCall
+from azext_prototype.ai.provider import (
+    AIMessage,
+    AIProvider,
+    AIResponse,
+    ToolCall,
+    messages_to_dicts,
+)
+
+
+class CopilotTimeoutError(CLIError):
+    """Raised when the Copilot API request times out.
+
+    Extends ``CLIError`` so it propagates cleanly through the Azure CLI
+    error handling, but can be caught specifically by retry logic in the
+    build session.
+    """
+
+
+class CopilotPromptTooLargeError(CLIError):
+    """Raised when the prompt exceeds the Copilot API's token limit.
+
+    The Copilot API enforces a model-level prompt token cap (typically
+    168,000 tokens) that is lower than the model's native context window.
+    Callers can catch this and truncate/chunk the prompt before retrying.
+
+    Attributes:
+        token_count: Number of tokens the prompt contained.
+        token_limit: Maximum tokens the API accepts.
+    """
+
+    def __init__(self, message: str, token_count: int = 0, token_limit: int = 0):
+        super().__init__(message)
+        self.token_count = token_count
+        self.token_limit = token_limit
+
+
+class CopilotRateLimitError(CLIError):
+    """Raised when the Copilot API returns HTTP 429 (rate limited).
+
+    Attributes:
+        retry_after: Seconds to wait before retrying (from Retry-After header).
+    """
+
+    def __init__(self, message: str, retry_after: int = 0):
+        super().__init__(message)
+        self.retry_after = retry_after
+
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +90,10 @@ _COMPLETIONS_URL = f"{_BASE_URL}/chat/completions"
 _MODELS_URL = f"{_BASE_URL}/models"
 
 # Default request timeout in seconds.  Architecture generation and
-# large prompts can take several minutes; 5 minutes is a safe default.
-_DEFAULT_TIMEOUT = 300
+# large prompts can take several minutes; 10 minutes is a safe default.
+# The discovery system prompt alone is ~69KB (governance + templates +
+# architect context), and QA remediation prompts can reach 235KB+.
+_DEFAULT_TIMEOUT = 600
 
 
 class CopilotProvider(AIProvider):
@@ -95,26 +143,6 @@ class CopilotProvider(AIProvider):
             "X-Request-Id": str(uuid.uuid4()),
         }
 
-    @staticmethod
-    def _messages_to_dicts(messages: list[AIMessage]) -> list[dict[str, Any]]:
-        """Convert ``AIMessage`` list to OpenAI-style message dicts."""
-        result = []
-        for m in messages:
-            msg: dict[str, Any] = {"role": m.role, "content": m.content}
-            if m.tool_calls:
-                msg["tool_calls"] = [
-                    {
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {"name": tc.name, "arguments": tc.arguments},
-                    }
-                    for tc in m.tool_calls
-                ]
-            if m.tool_call_id:
-                msg["tool_call_id"] = m.tool_call_id
-            result.append(msg)
-        return result
-
     # ------------------------------------------------------------------
     # AIProvider interface
     # ------------------------------------------------------------------
@@ -132,7 +160,7 @@ class CopilotProvider(AIProvider):
         target_model = model or self._model
         payload: dict[str, Any] = {
             "model": target_model,
-            "messages": self._messages_to_dicts(messages),
+            "messages": messages_to_dicts(messages, filter_empty=True),
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
@@ -155,6 +183,21 @@ class CopilotProvider(AIProvider):
             prompt_chars,
         )
 
+        from azext_prototype.debug_log import debug as _dbg
+
+        _dbg(
+            "CopilotProvider.chat",
+            "Sending request",
+            model=target_model,
+            messages=len(messages),
+            prompt_chars=prompt_chars,
+            max_tokens=max_tokens,
+            timeout=self._timeout,
+        )
+
+        import time as _time
+
+        _t0 = _time.perf_counter()
         try:
             resp = requests.post(
                 _COMPLETIONS_URL,
@@ -163,13 +206,22 @@ class CopilotProvider(AIProvider):
                 timeout=self._timeout,
             )
         except requests.Timeout:
-            raise CLIError(
-                f"Copilot API timed out after {self._timeout}s.\n"
-                "For very large prompts, increase the timeout:\n"
-                "  set COPILOT_TIMEOUT=600"
-            )
+            elapsed = _time.perf_counter() - _t0
+            _dbg("CopilotProvider.chat", "TIMEOUT", elapsed_s=f"{elapsed:.1f}", timeout=self._timeout)
+            raise CopilotTimeoutError(f"Copilot API timed out after {self._timeout}s.")
         except requests.RequestException as exc:
             raise CLIError(f"Failed to reach Copilot API: {exc}") from exc
+
+        _elapsed = _time.perf_counter() - _t0
+        request_id = resp.headers.get("x-request-id", "") or resp.headers.get("x-github-request-id", "")
+        _dbg(
+            "CopilotProvider.chat",
+            "Response received",
+            elapsed_s=f"{_elapsed:.1f}",
+            status=resp.status_code,
+            response_chars=len(resp.text),
+            request_id=request_id,
+        )
 
         # 401 → token may be invalid or revoked; retry once
         if resp.status_code == 401:
@@ -183,6 +235,26 @@ class CopilotProvider(AIProvider):
                 )
             except requests.RequestException as exc:
                 raise CLIError(f"Copilot API retry failed: {exc}") from exc
+            request_id = resp.headers.get("x-request-id", "")
+
+        # 429 → rate limited; extract Retry-After header
+        if resp.status_code == 429:
+            retry_after = 0
+            ra_header = resp.headers.get("Retry-After", resp.headers.get("retry-after", ""))
+            try:
+                retry_after = int(ra_header)
+            except (ValueError, TypeError):
+                retry_after = 60  # Default if header missing or unparseable
+            _dbg(
+                "CopilotProvider.chat",
+                "RATE_LIMITED",
+                retry_after=retry_after,
+                request_id=request_id,
+            )
+            raise CopilotRateLimitError(
+                f"Copilot API rate limited (HTTP 429). Retry after {retry_after}s.",
+                retry_after=retry_after,
+            )
 
         if resp.status_code != 200:
             body = ""
@@ -190,10 +262,34 @@ class CopilotProvider(AIProvider):
                 body = resp.text[:500]
             except Exception:
                 pass
-            raise CLIError(
-                f"Copilot API error (HTTP {resp.status_code}):\n{body}\n\n"
-                "Ensure you have a valid GitHub Copilot Business or Enterprise license."
-            )
+
+            # Parse structured error for specific handling
+            error_code = ""
+            try:
+                err_data = resp.json()
+                error_obj = err_data.get("error", {})
+                error_code = error_obj.get("code", "")
+            except Exception:
+                pass
+
+            if error_code == "model_max_prompt_tokens_exceeded":
+                # Extract token counts from the error message
+                import re as _re
+
+                token_count = 0
+                token_limit = 0
+                match = _re.search(r"(\d+)\s+exceeds the limit of\s+(\d+)", body)
+                if match:
+                    token_count = int(match.group(1))
+                    token_limit = int(match.group(2))
+                raise CopilotPromptTooLargeError(
+                    f"Prompt too large: {token_count:,} tokens exceeds "
+                    f"the Copilot API limit of {token_limit:,} tokens.",
+                    token_count=token_count,
+                    token_limit=token_limit,
+                )
+
+            raise CLIError(f"Copilot API error (HTTP {resp.status_code}):\n{body}")
 
         try:
             data = resp.json()
@@ -223,12 +319,32 @@ class CopilotProvider(AIProvider):
 
         usage = data.get("usage", {})
 
+        # Capture PRU (Premium Request Units) — may be in usage body or response headers
+        pru = usage.get("premium_request_units") or usage.get("pru") or usage.get("copilot_premium_request_units")
+        if pru is None:
+            pru_header = resp.headers.get("x-github-copilot-pru") or resp.headers.get("x-copilot-pru")
+            if pru_header:
+                try:
+                    pru = int(pru_header)
+                except (ValueError, TypeError):
+                    pass
+
+        # Log response headers in debug mode for PRU field discovery
+        _dbg(
+            "CopilotProvider.chat",
+            "Response usage and headers",
+            usage_keys=list(usage.keys()),
+            finish_reason=finish,
+            pru=pru,
+        )
+
         return AIResponse(
             content=content,
             model=target_model,
             usage={
                 "prompt_tokens": usage.get("prompt_tokens", 0),
                 "completion_tokens": usage.get("completion_tokens", 0),
+                "_copilot": True,  # Signals TokenTracker to compute PRUs
             },
             finish_reason=finish,
             tool_calls=tool_calls_data,
@@ -245,7 +361,7 @@ class CopilotProvider(AIProvider):
         target_model = model or self._model
         payload: dict[str, Any] = {
             "model": target_model,
-            "messages": self._messages_to_dicts(messages),
+            "messages": messages_to_dicts(messages, filter_empty=True),
             "temperature": temperature,
             "max_tokens": max_tokens,
             "stream": True,
@@ -264,7 +380,7 @@ class CopilotProvider(AIProvider):
             )
             resp.raise_for_status()
         except requests.Timeout:
-            raise CLIError(f"Copilot streaming timed out after {self._timeout}s.")
+            raise CopilotTimeoutError(f"Copilot streaming timed out after {self._timeout}s.")
         except requests.RequestException as exc:
             raise CLIError(f"Copilot streaming request failed: {exc}") from exc
 
@@ -317,6 +433,7 @@ class CopilotProvider(AIProvider):
         return [
             {"id": "claude-sonnet-4", "name": "Claude Sonnet 4"},
             {"id": "claude-sonnet-4.5", "name": "Claude Sonnet 4.5"},
+            {"id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6"},
             {"id": "gpt-4.1", "name": "GPT-4.1"},
             {"id": "gpt-5-mini", "name": "GPT-5 Mini"},
             {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro"},

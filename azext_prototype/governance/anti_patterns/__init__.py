@@ -26,7 +26,8 @@ Each YAML file follows the schema::
     domain: "<domain name>"
     description: "<what this domain covers>"
     patterns:
-      - search_patterns: [<substrings to look for, case-insensitive>]
+      - id: "<ANTI-DOMAIN-NNN>"
+        search_patterns: [<substrings to look for, case-insensitive>]
         safe_patterns:   [<substrings that exempt the match>]
         warning_message: "<human-readable warning>"
 """
@@ -37,7 +38,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import yaml
+from azext_prototype.governance import safe_load_yaml
 
 logger = logging.getLogger(__name__)
 
@@ -51,10 +52,16 @@ _cache: list["AntiPatternCheck"] | None = None
 class AntiPatternCheck:
     """A single anti-pattern detection rule."""
 
+    id: str
     domain: str
     search_patterns: list[str] = field(default_factory=list)
     safe_patterns: list[str] = field(default_factory=list)
+    correct_patterns: list[str] = field(default_factory=list)
     warning_message: str = ""
+    description: str = ""
+    rationale: str = ""
+    applies_to: list[str] = field(default_factory=list)  # agent names
+    targets: list = field(default_factory=list)  # [{"services": [...], "search_patterns": [...], ...}]
 
 
 def load(directory: Path | None = None) -> list[AntiPatternCheck]:
@@ -76,30 +83,55 @@ def load(directory: Path | None = None) -> list[AntiPatternCheck]:
         return _cache
 
     for yaml_file in sorted(target.glob("*.yaml")):
-        try:
-            data = yaml.safe_load(yaml_file.read_text(encoding="utf-8")) or {}
-        except (OSError, yaml.YAMLError) as exc:
-            logger.warning("Could not load anti-pattern file %s: %s", yaml_file.name, exc)
-            continue
-
+        data = safe_load_yaml(yaml_file)
         if not isinstance(data, dict):
             continue
 
         domain = data.get("domain", yaml_file.stem)
-        for entry in data.get("patterns", []):
+        patterns_list = data.get("patterns", [])
+
+        for idx, entry in enumerate(patterns_list, 1):
             if not isinstance(entry, dict):
                 continue
-            search = entry.get("search_patterns", [])
-            safe = entry.get("safe_patterns", [])
+
             message = entry.get("warning_message", "")
+            check_id = entry.get("id", f"{domain.upper()}-{idx:03d}")
+
+            check_applies_to = entry.get("applies_to", [])
+            if not isinstance(check_applies_to, list):
+                check_applies_to = []
+
+            targets_raw = entry.get("targets", [])
+            if isinstance(targets_raw, dict):
+                targets_raw = [targets_raw]
+            if not isinstance(targets_raw, list):
+                targets_raw = []
+
+            # Aggregate search/safe/correct across all target entries
+            search: list[str] = []
+            safe: list[str] = []
+            correct: list[str] = []
+            for t in targets_raw:
+                if isinstance(t, dict):
+                    search.extend(t.get("search_patterns", []))
+                    safe.extend(t.get("safe_patterns", []))
+                    correct.extend(t.get("correct_patterns", []))
+
             if not search or not message:
                 continue
+
             checks.append(
                 AntiPatternCheck(
+                    id=check_id,
                     domain=domain,
                     search_patterns=[s.lower() for s in search],
                     safe_patterns=[s.lower() for s in safe],
+                    correct_patterns=correct,
                     warning_message=message,
+                    description=str(entry.get("description", "")),
+                    rationale=str(entry.get("rationale", "")),
+                    applies_to=check_applies_to,
+                    targets=targets_raw,
                 )
             )
 
@@ -107,22 +139,94 @@ def load(directory: Path | None = None) -> list[AntiPatternCheck]:
     return _cache
 
 
-def scan(text: str) -> list[str]:
+def scan(
+    text: str,
+    iac_tool: str | None = None,
+    agent_name: str | None = None,
+    services: list[str] | None = None,
+) -> list[str]:
     """Scan *text* for anti-pattern matches.
+
+    Parameters
+    ----------
+    text:
+        The AI-generated output to scan.
+    iac_tool:
+        If provided (e.g., ``"terraform"`` or ``"bicep"``), skip checks
+        whose ``applies_to`` list is non-empty and does not contain
+        this tool.  Backward compatible — for new format files, use
+        *agent_name* instead.
+    agent_name:
+        If provided, skip checks whose ``applies_to`` list is non-empty
+        and does not contain this agent name.
+    services:
+        If provided, a list of ARM resource type namespaces (e.g.,
+        ``["Microsoft.KeyVault/vaults"]``).  Checks whose
+        ``targets[].services`` list specific namespaces that don't
+        overlap with *services* are skipped.  Checks with no service
+        targeting (structural checks) run unconditionally.
 
     Returns a list of human-readable warning strings (empty = clean).
     """
     checks = load()
     warnings: list[str] = []
-    lower = text.lower()
+
+    # Strip design notes — these explain WHY choices were made and contain
+    # terms (e.g., "InstrumentationKey", "Blob Delegator") that trigger
+    # false positives when scanned out of context.
+    _DESIGN_MARKERS = (
+        "## Key Design Decisions",
+        "## Design Notes",
+        "## Key Design Notes",
+        "## Design Decisions",
+    )
+    scan_text = text
+    for marker in _DESIGN_MARKERS:
+        idx = scan_text.find(marker)
+        if idx >= 0:
+            scan_text = scan_text[:idx]
+            break
+
+    lower = scan_text.lower()
+
+    # Map iac_tool shorthand to agent name for filtering
+    _TOOL_TO_AGENT = {"terraform": "terraform-agent", "bicep": "bicep-agent"}
+    effective_agent = agent_name or _TOOL_TO_AGENT.get(iac_tool or "", "")
+
+    # Build service namespace set for filtering
+    svc_set = {s.lower() for s in services} if services else None
 
     for check in checks:
+        # Skip checks not applicable to this agent
+        if check.applies_to and effective_agent and effective_agent not in check.applies_to:
+            continue
+
+        # Skip checks not applicable to this stage's services
+        if svc_set is not None:
+            check_services: set[str] = set()
+            for t in check.targets:
+                if isinstance(t, dict):
+                    check_services.update(s.lower() for s in t.get("services", []))
+            # Checks with specific services that don't overlap → skip
+            if check_services and not (check_services & svc_set):
+                continue
+
         for pattern in check.search_patterns:
-            if pattern in lower:
+            # "!" prefix = absence check — fire if pattern is NOT found.
+            # Only runs when services context is provided (absence checks
+            # are meaningless without knowing which service is in scope).
+            if pattern.startswith("!"):
+                if svc_set is None:
+                    continue  # skip absence checks without service context
+                absent_term = pattern[1:]
+                if absent_term not in lower:
+                    warnings.append(f"[{check.id}] {check.warning_message}")
+                    break
+            elif pattern in lower:
                 # Check safe patterns — if any match, skip this check
                 if check.safe_patterns and any(s in lower for s in check.safe_patterns):
                     continue
-                warnings.append(check.warning_message)
+                warnings.append(f"[{check.id}] {check.warning_message}")
                 break  # one match per check is enough
 
     return warnings

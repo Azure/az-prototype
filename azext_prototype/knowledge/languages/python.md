@@ -662,3 +662,68 @@ markers = [
     "integration: marks tests requiring live Azure resources",
 ]
 ```
+
+## Common Pitfalls
+
+### NEVER instantiate clients at module level
+```python
+# WRONG — fails at import time if env vars are missing
+engine = create_engine(os.environ["DATABASE_URL"])  # crashes on import
+
+# CORRECT — use FastAPI lifespan or dependency injection
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.engine = create_engine(os.environ["DATABASE_URL"])
+    yield
+    app.state.engine.dispose()
+```
+
+### NEVER use mutable default parameters for service instances
+```python
+# WRONG — service instance shared across all calls, created at function definition time
+def get_orders(service: OrderService = OrderService()):
+    return service.list()
+
+# CORRECT — use FastAPI Depends()
+def get_orders(service: OrderService = Depends(get_order_service)):
+    return service.list()
+```
+
+### NEVER use `hmac.new` — it does not exist
+```python
+# WRONG — hmac.new is not a Python function
+signature = hmac.new(key, msg, hashlib.sha256).hexdigest()
+
+# CORRECT — use hmac.new → hmac.HMAC or the shorthand hmac.digest
+signature = hmac.HMAC(key, msg, hashlib.sha256).hexdigest()
+# Or for one-shot:
+signature = hmac.digest(key, msg, "sha256").hex()
+```
+
+### Use Protocol classes for interfaces
+```python
+# Define contracts between sub-layers using Protocol
+from typing import Protocol
+
+class OrderRepository(Protocol):
+    async def get(self, order_id: str) -> Order | None: ...
+    async def save(self, order: Order) -> None: ...
+
+# Implementation depends on the protocol, not the concrete class
+class OrderService:
+    def __init__(self, repo: OrderRepository) -> None:
+        self._repo = repo
+```
+
+### Pin dependencies with version ranges
+```
+# WRONG — unpinned, breaks on major version changes
+fastapi
+uvicorn
+azure-identity
+
+# CORRECT — pinned major version
+fastapi>=0.115,<1.0
+uvicorn>=0.32,<1.0
+azure-identity>=1.19,<2.0
+```

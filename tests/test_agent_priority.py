@@ -16,15 +16,13 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from azext_prototype.agents.base import AgentCapability, BaseAgent
 from azext_prototype.agents.registry import AgentRegistry
-
 
 # ======================================================================
 # Helpers
 # ======================================================================
+
 
 def _make_agent(name: str, capabilities: list[AgentCapability], keywords: list[str] | None = None) -> BaseAgent:
     """Create a minimal BaseAgent for testing."""
@@ -49,28 +47,29 @@ def _populated_registry() -> AgentRegistry:
     r = AgentRegistry()
 
     agents = [
-        _make_agent("cloud-architect", [AgentCapability.ARCHITECT, AgentCapability.COORDINATE],
-                     ["architecture", "design", "multi-service"]),
-        _make_agent("biz-analyst", [AgentCapability.BIZ_ANALYSIS, AgentCapability.ANALYZE],
-                     ["requirements", "stakeholder", "discover"]),
-        _make_agent("project-manager", [AgentCapability.BACKLOG_GENERATION, AgentCapability.COORDINATE],
-                     ["scope", "backlog", "sprint", "coordinate"]),
-        _make_agent("terraform-agent", [AgentCapability.TERRAFORM],
-                     ["terraform", "module", "hcl"]),
-        _make_agent("bicep-agent", [AgentCapability.BICEP],
-                     ["bicep", "arm", "template"]),
-        _make_agent("app-developer", [AgentCapability.DEVELOP],
-                     ["application", "api", "code", "develop"]),
-        _make_agent("qa-engineer", [AgentCapability.QA],
-                     ["error", "bug", "diagnose", "troubleshoot"]),
-        _make_agent("cost-analyst", [AgentCapability.COST_ANALYSIS],
-                     ["cost", "pricing", "budget", "estimate"]),
-        _make_agent("doc-agent", [AgentCapability.DOCUMENT],
-                     ["document", "readme", "guide", "docs"]),
-        _make_agent("security-reviewer", [AgentCapability.SECURITY_REVIEW],
-                     ["security", "vulnerability", "scan"]),
-        _make_agent("monitoring-agent", [AgentCapability.MONITORING],
-                     ["monitoring", "observability", "alerts"]),
+        _make_agent(
+            "cloud-architect",
+            [AgentCapability.ARCHITECT, AgentCapability.COORDINATE],
+            ["architecture", "design", "multi-service"],
+        ),
+        _make_agent(
+            "biz-analyst",
+            [AgentCapability.BIZ_ANALYSIS, AgentCapability.ANALYZE],
+            ["requirements", "stakeholder", "discover"],
+        ),
+        _make_agent(
+            "project-manager",
+            [AgentCapability.BACKLOG_GENERATION, AgentCapability.COORDINATE],
+            ["scope", "backlog", "sprint", "coordinate"],
+        ),
+        _make_agent("terraform-agent", [AgentCapability.TERRAFORM], ["terraform", "module", "hcl"]),
+        _make_agent("bicep-agent", [AgentCapability.BICEP], ["bicep", "arm", "template"]),
+        _make_agent("app-developer", [AgentCapability.DEVELOP], ["application", "api", "code", "develop"]),
+        _make_agent("qa-engineer", [AgentCapability.QA], ["error", "bug", "diagnose", "troubleshoot"]),
+        _make_agent("cost-analyst", [AgentCapability.COST_ANALYSIS], ["cost", "pricing", "budget", "estimate"]),
+        _make_agent("doc-agent", [AgentCapability.DOCUMENT], ["document", "readme", "guide", "docs"]),
+        _make_agent("security-reviewer", [AgentCapability.SECURITY_REVIEW], ["security", "vulnerability", "scan"]),
+        _make_agent("monitoring-agent", [AgentCapability.MONITORING], ["monitoring", "observability", "alerts"]),
     ]
 
     for a in agents:
@@ -82,6 +81,7 @@ def _populated_registry() -> AgentRegistry:
 # ======================================================================
 # Priority level routing tests
 # ======================================================================
+
 
 class TestPriorityLevelRouting:
     """Each priority level routes to the correct agent."""
@@ -181,6 +181,7 @@ class TestPriorityLevelRouting:
 # Priority ordering tests
 # ======================================================================
 
+
 class TestPriorityOrdering:
     """Error signals should take precedence over other signals."""
 
@@ -229,6 +230,7 @@ class TestPriorityOrdering:
 # Explicit task_type override tests
 # ======================================================================
 
+
 class TestExplicitTaskType:
     """Explicit task_type parameter overrides keyword detection."""
 
@@ -263,6 +265,7 @@ class TestExplicitTaskType:
 # ======================================================================
 # Services parameter tests
 # ======================================================================
+
 
 class TestServicesParameter:
     """Service list drives single-service vs multi-service routing."""
@@ -308,6 +311,7 @@ class TestServicesParameter:
 # Fallback tests
 # ======================================================================
 
+
 class TestFallback:
     """Test fallback paths when no priority signal matches."""
 
@@ -336,6 +340,7 @@ class TestFallback:
 # ======================================================================
 # Custom/override agent tests
 # ======================================================================
+
 
 class TestCustomOverrideAgents:
     """Custom and override agents are still respected."""
@@ -373,6 +378,7 @@ class TestCustomOverrideAgents:
 # find_best_for_task regression tests
 # ======================================================================
 
+
 class TestFindBestForTaskRegression:
     """Ensure find_best_for_task() is unchanged."""
 
@@ -401,6 +407,7 @@ class TestFindBestForTaskRegression:
 # ======================================================================
 # Orchestrator auto-assign integration tests
 # ======================================================================
+
 
 class TestOrchestratorAutoAssign:
     """Test that orchestrator auto-assignment uses find_agent_for_task."""

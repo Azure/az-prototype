@@ -1,0 +1,246 @@
+kind: policy
+domain: azure-networking
+description: Governance policies for Network Interface
+last_updated: '2026-03-27'
+rules:
+- id: AZ-NIC-001
+  severity: required
+  description: Associate every NIC with a Network Security Group
+  rationale: NICs without NSGs allow all inbound and outbound traffic by default
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  companion_resources:
+  - type: Microsoft.Network/networkSecurityGroups@2023-04-01
+    name: nsg-resource
+    description: NSG with least-privilege rules
+  - type: Microsoft.Network/virtualNetworks/subnets@2024-01-01
+    name: snet-resource
+    description: Target subnet
+  targets:
+  - services:
+    - Microsoft.Network/networkInterfaces
+    terraform_pattern: |
+      resource "azapi_resource" "nic" {
+        type      = "Microsoft.Network/networkInterfaces@2024-01-01"
+        name      = var.nic_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            ipConfigurations = [
+              {
+                name = "ipconfig1"
+                properties = {
+                  privateIPAllocationMethod = "Dynamic"
+                  subnet = {
+                    id = var.subnet_id
+                  }
+                }
+              }
+            ]
+            networkSecurityGroup = {
+              id = var.nsg_id
+            }
+            enableAcceleratedNetworking = true
+          }
+        }
+      }
+    bicep_pattern: |
+      resource nic 'Microsoft.Network/networkInterfaces@2024-01-01' = {
+        name: nicName
+        location: location
+        properties: {
+          ipConfigurations: [
+            {
+              name: 'ipconfig1'
+              properties: {
+                privateIPAllocationMethod: 'Dynamic'
+                subnet: {
+                  id: subnetId
+                }
+              }
+            }
+          ]
+          networkSecurityGroup: {
+            id: nsgId
+          }
+          enableAcceleratedNetworking: true
+        }
+      }
+    prohibitions:
+    - Do not deploy NICs without NSG association
+    - Do not associate public IPs directly to NICs — use Bastion or internal LB
+- id: AZ-NIC-002
+  severity: required
+  description: Do not assign public IP addresses directly to network interfaces
+  rationale: Direct public IP assignment bypasses centralized ingress controls and exposes the VM to the internet
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - security-reviewer
+  companion_resources:
+  - type: Microsoft.Network/bastionHosts@2023-04-01
+    name: bas-mgmt
+    description: For management access instead of public IPs
+  - type: Microsoft.Network/loadBalancers@2023-04-01
+    name: lb
+    description: For application traffic instead of public IPs
+  targets:
+  - services:
+    - Microsoft.Network/networkInterfaces
+    terraform_pattern: |
+      # ipConfigurations should NOT include publicIPAddress
+      resource "azapi_resource" "nic_internal" {
+        type      = "Microsoft.Network/networkInterfaces@2024-01-01"
+        name      = var.nic_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            ipConfigurations = [
+              {
+                name = "ipconfig1"
+                properties = {
+                  privateIPAllocationMethod = "Dynamic"
+                  subnet = {
+                    id = var.subnet_id
+                  }
+                }
+              }
+            ]
+            networkSecurityGroup = {
+              id = var.nsg_id
+            }
+          }
+        }
+      }
+    bicep_pattern: |
+      // ipConfigurations should NOT include publicIPAddress
+      resource nicInternal 'Microsoft.Network/networkInterfaces@2024-01-01' = {
+        name: nicName
+        location: location
+        properties: {
+          ipConfigurations: [
+            {
+              name: 'ipconfig1'
+              properties: {
+                privateIPAllocationMethod: 'Dynamic'
+                subnet: {
+                  id: subnetId
+                }
+              }
+            }
+          ]
+          networkSecurityGroup: {
+            id: nsgId
+          }
+        }
+      }
+    prohibitions:
+    - Do not add publicIPAddress to ipConfigurations
+    - Do not create NICs with open NSG rules allowing RDP (3389) or SSH (22) from Internet
+- id: AZ-NIC-003
+  severity: recommended
+  description: Enable accelerated networking on supported VM sizes
+  rationale: Accelerated networking provides up to 30Gbps throughput and lower latency via SR-IOV
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  companion_resources: []
+  targets:
+  - services:
+    - Microsoft.Network/networkInterfaces
+    terraform_pattern: |
+      # Set enableAcceleratedNetworking = true in NIC properties
+      # See NIC-001 terraform_pattern for full example
+      # Supported on most D/E/F/M-series VMs with 4+ vCPUs
+    bicep_pattern: |
+      // Set enableAcceleratedNetworking: true in NIC properties
+      // See NIC-001 bicep_pattern for full example
+      // Supported on most D/E/F/M-series VMs with 4+ vCPUs
+    prohibitions:
+    - Do not enable accelerated networking on unsupported VM sizes — deployment will fail
+- id: AZ-NIC-004
+  severity: recommended
+  description: Use static private IP allocation for infrastructure VMs (domain controllers, DNS servers)
+  rationale: Dynamic IPs can change on deallocation, breaking dependent services
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  companion_resources: []
+  targets:
+  - services:
+    - Microsoft.Network/networkInterfaces
+    terraform_pattern: |
+      resource "azapi_resource" "nic_static" {
+        type      = "Microsoft.Network/networkInterfaces@2024-01-01"
+        name      = var.nic_name
+        location  = var.location
+        parent_id = var.resource_group_id
+        body = {
+          properties = {
+            ipConfigurations = [
+              {
+                name = "ipconfig1"
+                properties = {
+                  privateIPAllocationMethod = "Static"
+                  privateIPAddress          = var.static_ip
+                  subnet = {
+                    id = var.subnet_id
+                  }
+                }
+              }
+            ]
+            networkSecurityGroup = {
+              id = var.nsg_id
+            }
+            enableAcceleratedNetworking = true
+          }
+        }
+      }
+    bicep_pattern: |
+      resource nicStatic 'Microsoft.Network/networkInterfaces@2024-01-01' = {
+        name: nicName
+        location: location
+        properties: {
+          ipConfigurations: [
+            {
+              name: 'ipconfig1'
+              properties: {
+                privateIPAllocationMethod: 'Static'
+                privateIPAddress: staticIp
+                subnet: {
+                  id: subnetId
+                }
+              }
+            }
+          ]
+          networkSecurityGroup: {
+            id: nsgId
+          }
+          enableAcceleratedNetworking: true
+        }
+      }
+    prohibitions:
+    - Do not use static IPs outside the subnet address range
+    - Do not hardcode IP addresses — use variables or parameters
+patterns:
+- name: Network interface with NSG and accelerated networking
+  description: Production NIC with mandatory NSG, no public IP, and accelerated networking
+  example: |
+    # See NIC-001 through NIC-004 for complete azapi_resource patterns
+anti_patterns:
+- description: Do not deploy NICs without a Network Security Group
+  instead: Always associate an NSG with every NIC or its subnet
+- description: Do not assign public IP addresses to NICs
+  instead: Use Azure Bastion for management and internal load balancers for application access
+references:
+- title: Network interface overview
+  url: https://learn.microsoft.com/azure/virtual-network/virtual-network-network-interface
+- title: Accelerated networking
+  url: https://learn.microsoft.com/azure/virtual-network/accelerated-networking-overview

@@ -1,70 +1,233 @@
-# Anti-pattern detection — Completeness domain
-#
-# Detects structural gaps, incomplete scripts, and missing companion
-# resources in AI-generated output.  These patterns catch issues that
-# indicate the generated code is not deployment-ready.
-
+kind: anti-pattern
 domain: completeness
 description: Structural gaps, incomplete scripts, and missing companion resources
-
+last_updated: '2026-04-04'
 patterns:
-  - search_patterns:
-      - "local_authentication_disabled = true"
-      - "local_auth_disabled = true"
-      - "disableLocalAuth: true"
-      - "shared_access_key_enabled = false"
-      - "allowSharedKeyAccess: false"
+- id: ANTI-COMP-001
+  description: Detects local auth disabled without a companion managed identity and role assignment
+  rationale: Disabling local auth without providing an alternative identity causes authentication failures at runtime.
+  warning_message: Local auth disabled but no managed identity or role assignment detected — include both when disabling local
+    auth.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.Storage/storageAccounts
+    - Microsoft.ServiceBus/namespaces
+    - Microsoft.EventHub/namespaces
+    - Microsoft.CognitiveServices/accounts
+    - Microsoft.ContainerRegistry/registries
+    - Microsoft.OperationalInsights/workspaces
+    search_patterns:
+    - local_authentication_disabled = true
+    - local_auth_disabled = true
+    - 'disableLocalAuth: true'
+    - shared_access_key_enabled = false
+    - 'allowSharedKeyAccess: false'
     safe_patterns:
-      - "azurerm_user_assigned_identity"
-      - "azurerm_role_assignment"
-      - "azurerm_cosmosdb_sql_role_assignment"
-      - "Microsoft.ManagedIdentity/userAssignedIdentities"
-      - "roleAssignments"
-      - "user_assigned_identity"
-    warning_message: "Local/key-based authentication is disabled but no managed identity or RBAC role assignment found in the same stage. Applications will be unable to authenticate."
-
-  - search_patterns:
-      - "echo -e \"${YELLOW}"
-      - "echo -e \"${RED}"
-      - "echo -e \"${GREEN}"
-      - "echo \""
+    - azurerm_user_assigned_identity
+    - azurerm_role_assignment
+    - Microsoft.ManagedIdentity/userAssignedIdentities
+    - roleAssignments
+    - user_assigned_identity
+    correct_patterns:
+    - Microsoft.ManagedIdentity/userAssignedIdentities
+    - Microsoft.Authorization/roleAssignments
+    - '# Include managed identity AND role assignment when disabling local auth'
+- id: ANTI-COMP-002
+  description: Detects lowercase color variable names in deploy.sh scripts (should be UPPERCASE)
+  rationale: Bash convention uses UPPERCASE for constants; lowercase color variables conflict with common variable names.
+  warning_message: Deploy script uses lowercase color variables — use UPPERCASE (YELLOW, RED, GREEN, NC).
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services: []
+    search_patterns:
+    - echo -e "${yellow}
+    - echo -e "${red}
+    - echo -e "${green}
     safe_patterns:
-      - "echo \"\""
-    warning_message: "Possible incomplete echo statement in deploy script — verify all strings are properly closed."
-
-  - search_patterns:
-      - "terraform_remote_state"
-    safe_patterns: []
-    warning_message: ""
-
-  - search_patterns:
-      - "data \"azurerm_resource_group\""
-      - "data \"azurerm_log_analytics_workspace\""
-      - "data \"azurerm_key_vault\""
+    - ${NC}
+    - ${YELLOW}
+    - ${RED}
+    - ${GREEN}
+    correct_patterns:
+    - echo -e "${YELLOW}message${NC}"
+    - echo -e "${RED}message${NC}"
+    - echo -e "${GREEN}message${NC}"
+- id: ANTI-COMP-003
+  description: Detects azurerm data source lookups that should use terraform_remote_state or input variables
+  rationale: azurerm data sources require the azurerm provider which is not used in this project — use remote state or variables
+    instead.
+  warning_message: azurerm data source detected — use terraform_remote_state or input variables to reference prior-stage resources.
+  applies_to:
+  - terraform-agent
+  targets:
+  - services: []
+    search_patterns:
+    - data "azurerm_resource_group"
+    - data "azurerm_log_analytics_workspace"
+    - data "azurerm_key_vault"
+    - data "azurerm_storage_account"
+    - data "azurerm_container_registry"
     safe_patterns:
-      - "terraform_remote_state"
-      - "data.terraform_remote_state"
-      - "var."
-    warning_message: "Data source references existing resource by hardcoded name — use terraform_remote_state or variables to reference resources from prior stages."
-
-  - search_patterns:
-      - "versions.tf"
+    - terraform_remote_state
+    - data.terraform_remote_state
+    - var.
+    correct_patterns:
+    - data.terraform_remote_state.stage_name.outputs.resource_id
+    - var.resource_group_name
+    - '# Reference prior-stage resources via remote state or input variables'
+- id: ANTI-COMP-004
+  description: Detects versions.tf file which conflicts with the providers.tf convention
+  rationale: This project consolidates terraform {}, required_providers, and backend into providers.tf — a separate versions.tf
+    causes confusion.
+  warning_message: versions.tf detected — consolidate terraform {}, required_providers, and backend into providers.tf only.
+  applies_to:
+  - terraform-agent
+  targets:
+  - services: []
+    search_patterns:
+    - versions.tf
     safe_patterns:
-      - "providers.tf"
-    warning_message: "Terraform config uses versions.tf — this WILL cause deployment failure. Provider configuration (terraform {}, required_providers, backend) must be in providers.tf only. Using both files causes duplicate required_providers blocks that break terraform init. Remove versions.tf and consolidate into providers.tf."
-
-  - search_patterns:
-      - "var.tfstate_storage_account"
-      - "var.backend_storage_account"
-      - "var.state_storage_account"
-    safe_patterns: []
-    warning_message: "Backend config uses variable references — Terraform does not support variables in backend blocks. Use literal values or omit the backend to use local state."
-
-  - search_patterns:
-      - "storage_account_name = \"\""
-      - "container_name = \"\""
-      - "key = \"\""
-      - "resource_group_name = \"\""
+    - providers.tf
+    correct_patterns:
+    - providers.tf
+    - '# Consolidate terraform {}, required_providers, and backend into providers.tf only'
+- id: ANTI-COMP-005
+  description: Detects variables used in Terraform backend blocks which do not support variable interpolation
+  rationale: Terraform backend configuration blocks cannot use variables, locals, or data sources — only literal values are
+    supported.
+  warning_message: Variable reference in backend block — backend blocks only support literal values, not variables.
+  applies_to:
+  - terraform-agent
+  targets:
+  - services: []
+    search_patterns:
+    - var.tfstate_storage_account
+    - var.backend_storage_account
+    - var.state_storage_account
+    correct_patterns:
+    - storage_account_name = "mystorageaccount"
+    - '# Use literal values in backend blocks — variables are not supported'
+    - backend "local" {}
+- id: ANTI-COMP-006
+  description: Detects empty string values in Terraform backend configuration
+  rationale: Empty backend configuration values cause Terraform init failures or silent fallback to defaults.
+  warning_message: Empty backend configuration values detected — provide literal values or use local backend.
+  applies_to:
+  - terraform-agent
+  targets:
+  - services: []
+    search_patterns:
+    - storage_account_name = ""
+    - container_name = ""
+    - key = ""
+    - resource_group_name = ""
     safe_patterns:
-      - "backend \"local\""
-    warning_message: "Backend config has empty required fields — terraform init will fail. Either provide literal values or omit the backend block to use local state."
+    - backend "local"
+    correct_patterns:
+    - storage_account_name = "tfstate12345"
+    - container_name = "tfstate"
+    - key = "stage-name.tfstate"
+    - backend "local" {}
+- id: ANTI-COMP-007
+  description: Detects hardcoded resource names using naming convention prefixes instead of variables
+  rationale: Hardcoded names with zone prefixes (zd-, pm-, pc-) break when naming conventions change or resources are reused
+    across environments.
+  warning_message: Hardcoded resource name with naming convention prefix detected — use variables or remote state outputs.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services: []
+    search_patterns:
+    - queueName = "zd-
+    - queueName = "pi-
+    - queueName = "pm-
+    - queueName = "pc-
+    - name = "zdacr
+    - name = "zdst
+    - resource_group_name = "zd-rg-
+    - resource_group_name = "pi-rg-
+    - resource_group_name = "pm-rg-
+    safe_patterns:
+    - var.
+    - local.
+    - data.terraform_remote_state
+    - data.azapi_resource
+    correct_patterns:
+    - data.terraform_remote_state.stage.outputs.queue_name
+    - var.resource_group_name
+    - local.resource_group_name
+- id: ANTI-COMP-008
+  description: Detects Storage Blob Delegator role which only grants delegation key access, not blob data access
+  rationale: Storage Blob Delegator only grants User Delegation Key access — applications need Storage Blob Data Contributor
+    for actual blob read/write.
+  warning_message: Storage Blob Delegator role detected — use Storage Blob Data Contributor (ba92f5b4) for blob data access.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.Storage/storageAccounts
+    search_patterns:
+    - storage blob delegator
+    safe_patterns:
+    - storage blob data contributor
+    - storage blob data reader
+    correct_patterns:
+    - Storage Blob Data Contributor
+    - '# ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+- id: ANTI-COMP-009
+  description: Detects non-existent capacityMode property on Cosmos DB — use capabilities instead
+  rationale: The Cosmos DB ARM schema does not have a capacityMode property. Setting it is silently ignored and serverless
+    mode is not activated.
+  warning_message: capacityMode does not exist in Cosmos DB ARM schema — use capabilities = [{ name = "EnableServerless" }]
+    instead.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.DocumentDB/databaseAccounts
+    search_patterns:
+    - capacitymode = "serverless"
+    - capacitymode
+    safe_patterns:
+    - enableserverless
+    correct_patterns:
+    - capabilities = [{ name = "EnableServerless" }]
+- id: ANTI-COMP-010
+  description: Detects string interpolation for blob service diagnostic settings parent_id instead of a child resource reference
+  rationale: String interpolation for ARM child resource IDs is fragile and breaks when the resource ID format changes.
+  warning_message: Use an azapi_resource for blobServices/default and reference its .id for diagnostic settings parent_id.
+  applies_to:
+  - terraform-agent
+  targets:
+  - services:
+    - Microsoft.Storage/storageAccounts
+    search_patterns:
+    - /blobservices/default
+    safe_patterns:
+    - azapi_resource
+    - blob_service
+    correct_patterns:
+    - parent_id = azapi_resource.blob_service.id
+- id: ANTI-COMP-011
+  description: Detects azapi_resource blocks that may be missing parent_id — required on every azapi_resource
+  rationale: The azapi provider requires parent_id on all resources. Omitting it causes terraform plan failure.
+    For resource groups, parent_id is /subscriptions/${var.subscription_id}. For child resources, parent_id
+    is the parent resource ID.
+  warning_message: azapi_resource may be missing parent_id — every azapi_resource MUST have parent_id set.
+  applies_to:
+  - terraform-agent
+  targets:
+  - services:
+    - Microsoft.Resources/resourceGroups
+    search_patterns:
+    - '!parent_id'
+    correct_patterns:
+    - parent_id = "/subscriptions/${var.subscription_id}"

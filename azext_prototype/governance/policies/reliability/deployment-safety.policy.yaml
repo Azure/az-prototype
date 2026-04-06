@@ -1,0 +1,246 @@
+kind: policy
+domain: reliability
+description: Governance policies for Deployment Safety
+last_updated: '2026-03-27'
+rules:
+- id: WAF-REL-DEPLOY-001
+  severity: required
+  description: Implement blue-green or canary deployment for ALL production services.  App Service MUST use deployment slots
+    (staging slot with auto-swap or manual swap).  Container Apps MUST use revision- based traffic splitting (route percentage
+    of traffic to new revision).  AKS MUST use rolling update strategy with max surge and max unavailable.  Functions MUST
+    use deployment slots for premium/dedicated plans.  NEVER deploy directly to production without a staging phase.
+  rationale: 'Direct-to-production deployments are the #1 cause of production incidents.  Blue-green deployment enables zero-downtime
+    releases with instant rollback.  Canary deployment validates changes with a subset of traffic before full rollout.  Without
+    staging, a bad deploy takes down 100% of users immediately.'
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  companion_resources:
+  - type: Microsoft.Web/sites/slots@2023-12-01
+    name: app
+    description: Staging deployment slot for App Service blue-green deployment
+  - type: Microsoft.Insights/diagnosticSettings@2021-05-01-preview
+    name: diag-resource
+    description: Diagnostic settings for deployment slot swap events and health check logs
+  targets:
+  - services:
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.ContainerRegistry/registries
+    - Microsoft.Compute/virtualMachines
+    - Microsoft.Compute/virtualMachineScaleSets
+- id: WAF-REL-DEPLOY-002
+  severity: required
+  description: Validate application health BEFORE shifting production traffic to a new deployment.  App Service slots MUST
+    pass health check validation before swap.  Container Apps canary revisions MUST pass readiness probes before receiving
+    traffic.  AKS deployments MUST have readiness probes that validate application health including downstream dependencies.  Health
+    validation MUST check database connectivity, cache availability, and external API reachability — not just HTTP 200 from
+    the root endpoint.
+  rationale: Deploying code that passes build/test but fails at runtime (wrong connection strings, missing config, incompatible
+    schema) is a common failure mode.  Health gates catch these failures before they affect users.  Without gates, the first
+    sign of failure is user-facing errors.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services:
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.ContainerRegistry/registries
+    - Microsoft.Compute/virtualMachines
+    - Microsoft.Compute/virtualMachineScaleSets
+- id: WAF-REL-DEPLOY-003
+  severity: required
+  description: Ensure every production deployment has a tested rollback path. App Service MUST be able to swap back to the
+    previous slot. Container Apps MUST be able to shift 100% traffic back to the previous revision.  AKS MUST have previous
+    deployment revision history preserved.  Container Registry MUST retain previous image versions.  Terraform state MUST
+    be stored remotely with versioning to enable state rollback.  Rollback MUST be executable within 5 minutes.
+  rationale: Rollback is the emergency brake for deployments.  If a deployment causes issues that health checks miss (performance
+    degradation, data corruption, business logic bugs), rollback is the only way to restore service quickly.  Without rollback,
+    the only option is a forward fix under pressure.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  companion_resources:
+  - type: Microsoft.ContainerRegistry/registries@2023-07-01
+    name: acr
+    description: Container Registry with retention policy for image version history
+  - type: Microsoft.Storage/storageAccounts@2023-05-01
+    name: st-data
+    description: Storage account with versioning for Terraform state rollback
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: Storage Blob Data Contributor
+    description: RBAC for state storage — Storage Blob Data Contributor for deployment identity
+  targets:
+  - services:
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.ContainerRegistry/registries
+    - Microsoft.Compute/virtualMachines
+    - Microsoft.Compute/virtualMachineScaleSets
+- id: WAF-REL-DEPLOY-004
+  severity: required
+  description: ALL infrastructure MUST be defined as code (Terraform or Bicep). NEVER make manual changes to production infrastructure
+    — all changes must go through the IaC pipeline.  Terraform state MUST be stored in a remote backend (Azure Storage) with
+    locking (Azure Blob lease).  Enable drift detection to identify manual changes.  Use separate state files per environment
+    (dev, staging, production) to isolate blast radius.
+  rationale: Manual infrastructure changes are untraceable, unreproducible, and un-reviewable.  IaC provides version control,
+    peer review, audit trail, and reproducible environments.  Remote state with locking prevents concurrent modifications
+    that corrupt state.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  targets:
+  - services:
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.ContainerRegistry/registries
+    - Microsoft.Compute/virtualMachines
+    - Microsoft.Compute/virtualMachineScaleSets
+- id: WAF-REL-DEPLOY-005
+  severity: required
+  description: Use immutable infrastructure patterns for ALL containerized workloads.  Container images MUST be versioned
+    with unique tags (git SHA, build number, or semantic version) — NEVER use mutable tags like 'latest'.  Images MUST be
+    built once and promoted through environments (dev -> staging -> production) without rebuilding.  NEVER modify running
+    containers in place — deploy new immutable images.  ACR MUST have content trust and image quarantine for production images.
+  rationale: Mutable infrastructure (in-place updates, SSH patches, config changes on running servers) causes configuration
+    drift, makes debugging impossible, and prevents reliable rollback.  Immutable infrastructure ensures every deployment
+    is reproducible and traceable to a specific build artifact.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  companion_resources:
+  - type: Microsoft.ContainerRegistry/registries@2023-07-01
+    name: acr
+    description: Container Registry with Premium SKU for content trust, quarantine, and retention policies
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: role-assignment
+    description: AcrPush role for CI/CD identity, AcrPull role for application identity
+  - type: Microsoft.Network/privateEndpoints@2023-11-01
+    name: pe-resource
+    description: 'Private endpoint for Container Registry (groupId: registry)'
+  targets:
+  - services:
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.ContainerRegistry/registries
+    - Microsoft.Compute/virtualMachines
+    - Microsoft.Compute/virtualMachineScaleSets
+patterns:
+- name: Slot swap deployment script
+  description: Deploy to staging slot, validate health, swap to production, and provide rollback capability in a single deploy.sh
+    script.
+  example: |
+    #!/bin/bash
+    set -euo pipefail
+
+    RESOURCE_GROUP="${RESOURCE_GROUP}"
+    APP_NAME="${APP_NAME}"
+    STAGING_URL="https://${APP_NAME}-staging.azurewebsites.net"
+
+    # 1. Deploy to staging slot
+    echo "Deploying to staging slot..."
+    az webapp deploy -g "$RESOURCE_GROUP" -n "$APP_NAME" -s staging \
+        --src-path ./dist/app.zip --type zip
+
+    # 2. Warm up staging slot
+    echo "Warming up staging..."
+    curl -s -o /dev/null "${STAGING_URL}/healthz" || true
+    sleep 10
+
+    # 3. Validate health
+    echo "Validating staging health..."
+    STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${STAGING_URL}/healthz")
+    if [ "$STATUS" != "200" ]; then
+        echo "ERROR: Staging health check failed (HTTP $STATUS). Aborting."
+        exit 1
+    fi
+
+    # 4. Swap to production
+    echo "Swapping staging to production..."
+    az webapp deployment slot swap -g "$RESOURCE_GROUP" -n "$APP_NAME" \
+        -s staging --target-slot production
+
+    echo "Deployment complete. To rollback: swap staging back to production."
+- name: Container Apps canary deployment script
+  description: Deploy a new Container App revision with canary traffic splitting, validate, then shift all traffic.
+  example: |
+    #!/bin/bash
+    set -euo pipefail
+
+    RESOURCE_GROUP="${RESOURCE_GROUP}"
+    APP_NAME="${APP_NAME}"
+    IMAGE="${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}"
+
+    # 1. Deploy new revision (receives 0% traffic initially)
+    echo "Deploying new revision..."
+    az containerapp update -g "$RESOURCE_GROUP" -n "$APP_NAME" \
+        --image "$IMAGE" --revision-suffix "${IMAGE_TAG}"
+
+    NEW_REVISION="${APP_NAME}--${IMAGE_TAG}"
+
+    # 2. Send 10% canary traffic
+    echo "Routing 10% canary traffic to ${NEW_REVISION}..."
+    STABLE=$(az containerapp revision list -g "$RESOURCE_GROUP" -n "$APP_NAME" \
+        --query "[?properties.active && name!='${NEW_REVISION}'].name | [0]" -o tsv)
+    az containerapp ingress traffic set -g "$RESOURCE_GROUP" -n "$APP_NAME" \
+        --revision-weight "${STABLE}=90" "${NEW_REVISION}=10"
+
+    # 3. Monitor canary (check error rate, latency)
+    echo "Monitoring canary for 5 minutes..."
+    sleep 300
+
+    # 4. Promote to 100%
+    echo "Promoting ${NEW_REVISION} to 100% traffic..."
+    az containerapp ingress traffic set -g "$RESOURCE_GROUP" -n "$APP_NAME" \
+        --revision-weight "${NEW_REVISION}=100"
+
+    echo "Deployment complete."
+anti_patterns:
+- description: Deploying directly to production without a staging phase
+  instead: Use deployment slots (App Service), revision traffic splitting (Container Apps), or rolling updates (AKS)
+- description: Using mutable image tags like 'latest' in production
+  instead: Tag images with immutable identifiers (git SHA, build number, semantic version)
+- description: Making manual changes to production infrastructure
+  instead: Define all infrastructure as code and apply changes through CI/CD pipelines
+- description: Storing Terraform state locally
+  instead: Use Azure Storage remote backend with versioning, locking, and Entra ID authentication
+- description: Deploying without rollback capability
+  instead: Ensure every deployment has a tested rollback path executable within 5 minutes
+- description: Rebuilding container images for each environment
+  instead: Build once, promote the same image artifact through dev, staging, production
+references:
+- title: Azure Well-Architected Framework — Keep it simple
+  url: https://learn.microsoft.com/azure/well-architected/reliability/simplify
+- title: App Service deployment slots
+  url: https://learn.microsoft.com/azure/app-service/deploy-staging-slots
+- title: Container Apps traffic splitting
+  url: https://learn.microsoft.com/azure/container-apps/traffic-splitting
+- title: Terraform remote state in Azure
+  url: https://learn.microsoft.com/azure/developer/terraform/store-state-in-azure-storage
+- title: Immutable infrastructure pattern
+  url: https://learn.microsoft.com/azure/architecture/guide/design-principles/immutable-infrastructure
+- title: Blue-green deployment pattern
+  url: https://learn.microsoft.com/azure/architecture/example-scenario/blue-green-spring/blue-green-spring

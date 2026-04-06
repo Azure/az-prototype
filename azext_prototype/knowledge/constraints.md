@@ -62,16 +62,16 @@ Use Key Vault references in App Service and Container Apps configuration instead
 
 All data and backend services should use private endpoints to eliminate public internet exposure for the data plane.
 
-#### POC Relaxation
+Unless told otherwise by the user (via discovery directives or custom policies), all environments — including POC — should disable public network access and use private endpoints.
 
-For POC/prototype environments, private endpoints are **recommended but not mandatory**. Public endpoints are acceptable for rapid prototyping to reduce complexity and setup time. When public endpoints are used:
+**CRITICAL — ARCHITECTURE BOUNDARY: A dedicated Networking stage creates ALL private endpoints, private DNS zones, DNS zone links, and DNS zone groups for the entire deployment.** Non-networking stages MUST NOT create these resources. Instead, non-networking stages should:
 
-- Flag private endpoint configuration as a **production backlog item**
-- Document which services are publicly exposed
-- Ensure service firewalls restrict access to known IP ranges where possible
-- Never set firewall rules to `0.0.0.0/0` or `0.0.0.0-255.255.255.255`
+- Set `publicNetworkAccess = "Disabled"` on their resources
+- Do NOT create `azapi_resource` blocks for private endpoints or DNS zone groups
+- Do NOT reference the networking stage via `terraform_remote_state` for PE subnet/DNS IDs
+- Do NOT include `private-endpoint.tf` or PE-related variables (`subnet_id`, `private_dns_zone_id`, `enable_private_endpoint`)
 
-For production readiness, all services in the private endpoint reference table below must use private endpoints.
+The networking stage discovers which services need private endpoints from the deployment plan and creates all PE + DNS resources in one place. Service-specific knowledge files may show PE patterns for reference, but those patterns belong ONLY in the networking stage.
 
 ### 2.2 VNET Integration
 
@@ -81,9 +81,7 @@ When the architecture includes Container Apps, App Service, or Functions:
 - Use NSGs to restrict traffic between subnets to only required ports
 - Enable diagnostic logging on NSGs for traffic auditing
 
-#### POC Relaxation
-
-For POCs, VNET integration is **recommended but not mandatory**. If omitted, document it as a production backlog item. Container Apps Environment without VNET integration is acceptable for prototyping.
+Unless told otherwise by the user, all compute services should deploy in a VNET-integrated subnet.
 
 ### 2.3 Connectivity Pattern (Production Target)
 
@@ -105,6 +103,35 @@ The following resources legitimately require public IP addresses or public ingre
 | Container Apps (external ingress) | When no APIM gateway is present (POC only) |
 
 All other services should be internal-only.
+
+### 2.5 ARM Property Placement — `disableLocalAuth`
+
+Many Azure services support `disableLocalAuth` to enforce Entra-only authentication. This property MUST be placed directly under `properties`, NEVER nested inside `properties.features`:
+
+```hcl
+# CORRECT — disableLocalAuth at properties root
+body = {
+  properties = {
+    disableLocalAuth = true
+    features = {
+      enableLogAccessUsingOnlyResourcePermissions = true
+    }
+  }
+}
+```
+
+```hcl
+# WRONG — ARM silently drops disableLocalAuth when nested under features
+body = {
+  properties = {
+    features = {
+      disableLocalAuth = true    # SILENTLY IGNORED — local auth stays enabled
+    }
+  }
+}
+```
+
+This applies to: Log Analytics, Service Bus, Event Hubs, Azure OpenAI, Cognitive Services, Container Registry, and any other service with `disableLocalAuth`.
 
 ---
 
@@ -215,6 +242,29 @@ All Azure resources must include these tags:
 - Prefer built-in roles over custom role definitions
 - Document every role assignment with its justification
 
+### 6.4 CRITICAL: Principal Separation (MANDATORY)
+
+Administrative roles MUST be assigned to the deploying identity (human or CI/CD
+service principal), NOT to the application managed identity:
+
+| Role Type | Assign To | Examples |
+|-----------|-----------|---------|
+| Administrative (Key Vault Administrator, Owner, Contributor) | Deploying user/SPN via `var.deployer_object_id` | Break-glass access, secret rotation, infrastructure management |
+| Data-plane read/write (Secrets User, Data Contributor, Blob Data Contributor) | Application managed identity (Stage 1) | Runtime access for the application |
+| Data-plane read-only (Secrets Reader, Data Reader) | Application managed identity (Stage 1) | Read-only service accounts |
+
+The deploying user's object ID comes from `var.deployer_object_id` or the current
+Azure CLI account context. The application identity's principal ID comes from the
+managed identity resource created in Stage 1 (via terraform_remote_state).
+
+### 6.5 Cosmos DB Data-Plane RBAC (CRITICAL)
+
+Cosmos DB's built-in data roles (`00000000-0000-0000-0000-000000000001` Data Reader,
+`00000000-0000-0000-0000-000000000002` Data Contributor) are **data-plane RBAC** roles.
+They MUST be assigned via `Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments`,
+NOT via `Microsoft.Authorization/roleAssignments`. Using ARM RBAC (roleAssignments)
+for these roles will silently fail — the application will not have data access.
+
 ---
 
 ## 7. Private Endpoint Reference
@@ -280,9 +330,9 @@ This section clearly delineates what is acceptable in a POC versus what must be 
 | Area | POC Acceptable | Production Required |
 |------|---------------|-------------------|
 | **Authentication** | Managed identity (same as production) | Managed identity (no relaxation) |
-| **Network isolation** | Public endpoints with service firewalls | Private endpoints for all data services |
-| **VNET integration** | Optional; Container Apps external ingress OK | Mandatory; VNET-integrated environments with NSGs |
-| **Private DNS zones** | Not required | Required for all private endpoints |
+| **Network isolation** | Private endpoints (unless user overrides) | Private endpoints for all data services |
+| **VNET integration** | VNET-integrated (unless user overrides) | Mandatory; VNET-integrated environments with NSGs |
+| **Private DNS zones** | Required for private endpoints | Required for all private endpoints |
 | **SKUs** | Free / dev-test / consumption tiers | Production-appropriate SKUs with SLAs |
 | **Redundancy** | Locally redundant (LRS), single region | Zone-redundant or geo-redundant as needed |
 | **Backup** | Default backup policies | Custom retention policies, tested restore procedures |
@@ -299,7 +349,7 @@ This section clearly delineates what is acceptable in a POC versus what must be 
 
 ### What POCs Must Still Enforce
 
-Even in a prototype, these constraints are **non-negotiable**:
+Even in a prototype, these constraints are **non-negotiable** (unless the user explicitly overrides via discovery directives or custom policies):
 
 1. **Managed identity** for all service-to-service authentication
 2. **No hardcoded secrets** in code, config, or environment variables
@@ -309,6 +359,8 @@ Even in a prototype, these constraints are **non-negotiable**:
 6. **Entra-only auth** for databases (no SQL auth)
 7. **Resource tagging** on all resources
 8. **Naming conventions** followed consistently
+9. **Private endpoints** with publicNetworkAccess disabled on all PaaS services
+10. **VNET integration** for all compute services
 
 ### Production Backlog Items
 
@@ -324,7 +376,43 @@ When a POC takes an acceptable shortcut, agents must:
 
 ---
 
-## 10. Direct Execution Policy
+## 10. Taxonomy: Layer → Capability → Component → Resource
+
+All services and stages follow a four-level hierarchy. The canonical source of truth is `knowledge/taxonomy.yaml`. Layer definition files in `knowledge/layers/` document boundaries and ownership.
+
+### Four-Level Hierarchy
+
+| Level | Stage Field | Service Field | Purpose |
+|-------|------------|---------------|---------|
+| **Layer** | `stage.layer` | — | Top-level architectural boundary |
+| **Capability** | `stage.capability` | — | Sub-classification within a layer |
+| **Component** | — | `service.component` | Functional role within a capability |
+| **Resource** | — | `service.resource_type` | Azure resource type or code artifact |
+
+### Layers and Capabilities
+
+| Layer | Owner | Capabilities |
+|-------|-------|-------------|
+| **Core** | `cloud-architect` | `identity`, `observability` |
+| **Infrastructure** | `infrastructure-architect` | `core-networking`, `compute`, `security`, `ai-services`, `supporting` |
+| **Data** | `data-architect` | `data-services`, `storage-services`, `messaging` |
+| **Application** | `application-architect` | `presentation`, `domain`, `data-access`, `background` |
+| **Docs** | `doc-agent` | `documentation` |
+
+### Service Placement Rules
+
+- **Infrastructure provisions, Application consumes.** Infrastructure layer creates the Azure resource (e.g., Service Bus namespace via IaC). Application layer creates the code that uses it (e.g., `IMessageSender` interface). Data layer owns the data model (schemas, indexes, partition keys).
+- **Networking is centralized.** All private endpoints, DNS zones, and VNet resources belong in a single Networking stage (capability: `core-networking`) within the Infrastructure layer.
+- **Core deploys first.** Identity and observability must exist before any other layer can configure RBAC or diagnostics.
+- **Data deploys before Application.** Application code depends on data service endpoints being available.
+- **1:1 stage-to-capability.** Each stage has exactly one capability. Multiple stages can share the same capability.
+- **Key Vault is Infrastructure/Security.** Not Data layer — it's `infra` / `security` / `secrets-management`.
+- **APIM is Infrastructure/Core Networking.** It's an API-level ingress controller — `infra` / `core-networking` / `api-gateway`.
+- **IoT Hub and Event Grid are Data/Messaging.** Data ingestion and event routing — `data` / `messaging`.
+
+---
+
+## 11. Direct Execution Policy
 
 This extension **executes deployment commands directly** (`terraform apply`, `az deployment group create`, etc.) rather than generating commands for a human to run.
 

@@ -94,7 +94,7 @@ class TestTaskItem:
 async def test_app_mounts():
     """The app should mount all four panels without errors."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         # All four widget types should be queryable
         assert app.query_one("#console-view", ConsoleView)
         assert app.query_one("#task-tree", TaskTree)
@@ -106,7 +106,7 @@ async def test_app_mounts():
 async def test_console_view_write_text():
     """ConsoleView should accept text writes."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         cv = app.console_view
         cv.write_text("Hello, TUI!")
         cv.write_success("It worked")
@@ -122,7 +122,7 @@ async def test_console_view_write_text():
 async def test_console_view_agent_response():
     """ConsoleView should render markdown agent responses."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         app.console_view.write_agent_response("# Hello\n\nThis is **bold**.")
 
 
@@ -130,7 +130,7 @@ async def test_console_view_agent_response():
 async def test_task_tree_roots():
     """TaskTree should show 4 root nodes on mount."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         tree = app.task_tree
         # Root should have 4 children (Init, Design, Build, Deploy)
         assert len(tree.root.children) == 4
@@ -140,7 +140,7 @@ async def test_task_tree_roots():
 async def test_task_tree_update():
     """TaskTree should update status labels."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         tree = app.task_tree
         tree.update_task("init", TaskStatus.COMPLETED)
         item = tree.store.get("init")
@@ -151,7 +151,7 @@ async def test_task_tree_update():
 async def test_task_tree_add_child():
     """TaskTree should add and display sub-tasks."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         tree = app.task_tree
         child = TaskItem(id="design-discovery", label="Discovery conversation")
         tree.add_task("design", child)
@@ -168,7 +168,7 @@ async def test_task_tree_add_section():
     automatically when its first child is added.
     """
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         tree = app.task_tree
         section = TaskItem(id="design-section-arch", label="Architecture")
         tree.add_section("design", section)
@@ -189,7 +189,7 @@ async def test_task_tree_add_section():
 async def test_info_bar_updates():
     """InfoBar should update assist and status text."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         app.info_bar.update_assist("Press Enter to continue")
         app.info_bar.update_status("1,200 tokens")
         # No exception = success
@@ -199,7 +199,7 @@ async def test_info_bar_updates():
 async def test_prompt_input_disable():
     """PromptInput should be disabled by default."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         prompt = app.prompt_input
         assert prompt._enabled is False
         assert prompt.read_only is True
@@ -209,7 +209,7 @@ async def test_prompt_input_disable():
 async def test_prompt_input_enable():
     """PromptInput should allow enabling for input."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         prompt = app.prompt_input
         prompt.enable()
         assert prompt._enabled is True
@@ -220,7 +220,7 @@ async def test_prompt_input_enable():
 async def test_file_list():
     """ConsoleView should render file lists."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         app.console_view.write_file_list(["main.tf", "variables.tf"], success=True)
         app.console_view.write_file_list(["broken.tf"], success=False)
 
@@ -234,7 +234,7 @@ async def test_file_list():
 async def test_console_view_write_markup():
     """write_markup should accept Rich markup without error."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         app.console_view.write_markup("[success]✓[/success] All good")
         app.console_view.write_markup("[info]→[/info] Starting session")
         # No exception = success
@@ -244,7 +244,7 @@ async def test_console_view_write_markup():
 async def test_console_view_write_markup_invalid_falls_back():
     """write_markup with invalid markup should fall back to plain text."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         # This has an unclosed tag — should not raise
         app.console_view.write_markup("[invalid_tag_that_wont_parse")
 
@@ -258,7 +258,7 @@ async def test_console_view_write_markup_invalid_falls_back():
 async def test_prompt_input_allow_empty():
     """PromptInput with allow_empty=True should submit empty string."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         prompt = app.prompt_input
         prompt.enable(allow_empty=True)
         assert prompt._allow_empty is True
@@ -269,7 +269,7 @@ async def test_prompt_input_allow_empty():
 async def test_prompt_input_default_no_allow_empty():
     """PromptInput defaults to allow_empty=False."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         prompt = app.prompt_input
         prompt.enable()
         assert prompt._allow_empty is False
@@ -279,7 +279,7 @@ async def test_prompt_input_default_no_allow_empty():
 async def test_prompt_input_input_mode():
     """In input mode (default), text has '> ' prefix and placeholder is empty."""
     app = PrototypeApp()
-    async with app.run_test() as pilot:
+    async with app.run_test() as pilot:  # noqa: F841
         prompt = app.prompt_input
         prompt.enable()
         assert prompt._allow_empty is False

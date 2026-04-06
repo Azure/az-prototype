@@ -9,7 +9,6 @@ import hashlib
 import json
 import logging
 import os
-import signal
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -29,7 +28,7 @@ def _quiet_output(fn):
     """Suppress Azure CLI's automatic JSON serialization of return values.
 
     Most commands print formatted output via the console module.  The dict
-    they return is then *also* serialised by Azure CLI as JSON, which is
+    they return is then *also* serialized by Azure CLI as JSON, which is
     extremely noisy for interactive workflows.
 
     This decorator swallows the return value (returning ``None`` so Azure
@@ -232,6 +231,12 @@ def _prepare_command(project_dir: str | None = None):
         (project_dir, config, registry, agent_context)
     """
     project_dir = project_dir or _get_project_dir()
+
+    # Initialize debug logging if DEBUG_PROTOTYPE=true
+    from azext_prototype.debug_log import init_debug_log, log_session_start
+
+    init_debug_log(project_dir)
+
     config = _load_config(project_dir)
 
     # Validate external tool versions before proceeding
@@ -241,6 +246,15 @@ def _prepare_command(project_dir: str | None = None):
     registry = _build_registry(config, project_dir)
     mcp_manager = _build_mcp_manager(config, project_dir)
     agent_context = _build_context(config, project_dir, mcp_manager=mcp_manager)
+
+    # Log session context for debug
+    log_session_start(
+        project_dir=project_dir,
+        ai_provider=config.get("ai.provider", ""),
+        model=config.get("ai.model", ""),
+        iac_tool=iac_tool or "",
+    )
+
     return project_dir, config, registry, agent_context
 
 
@@ -391,22 +405,11 @@ def prototype_init(
 
 
 def _run_tui(app) -> None:
-    """Run a Textual app with clean Ctrl+C handling.
-
-    Suppresses SIGINT during the Textual run so that Ctrl+C is handled
-    exclusively as a key event by the Textual binding (``ctrl+c`` →
-    ``action_quit``).  This prevents ``KeyboardInterrupt`` from
-    propagating to the Azure CLI framework and, on Windows, eliminates
-    the "Terminate batch job (Y/N)?" prompt from ``az.cmd``.
-    """
-    prev = signal.getsignal(signal.SIGINT)
+    """Run a Textual app, suppressing KeyboardInterrupt on exit."""
     try:
-        signal.signal(signal.SIGINT, lambda *_: None)
         app.run()
-    except KeyboardInterrupt:
-        pass  # clean exit
-    finally:
-        signal.signal(signal.SIGINT, prev)
+    except (KeyboardInterrupt, SystemExit):
+        pass
 
 
 @_quiet_output
@@ -553,6 +556,24 @@ def prototype_build(cmd, scope="all", dry_run=False, status=False, reset=False, 
     stage = BuildStage()
     _check_guards(stage)
 
+    # Launch TUI for interactive builds (same pattern as design stage).
+    # Skip TUI for dry-run, --json, or non-interactive (e.g. tests).
+    import sys
+
+    if not dry_run and not json_output and sys.stdout.isatty():
+        from azext_prototype.ui.app import PrototypeApp
+
+        stage_kwargs = {"scope": scope, "reset": reset, "auto_accept": auto_accept}
+
+        app = PrototypeApp(
+            start_stage="build",
+            project_dir=project_dir,
+            stage_kwargs=stage_kwargs,
+        )
+        _run_tui(app)
+        return {"status": "completed"}
+
+    # Non-TUI path: dry-run, --json, or non-interactive
     try:
         result = stage.execute(
             agent_context,
@@ -689,6 +710,32 @@ def prototype_deploy(
     deploy_stage = DeployStage()
     _check_guards(deploy_stage)
 
+    # Launch TUI for interactive deploys (same pattern as design/build).
+    # Skip TUI for dry-run, single-stage, --json, or non-interactive.
+    import sys
+
+    if not dry_run and stage is None and not json_output and sys.stdout.isatty():
+        from azext_prototype.ui.app import PrototypeApp
+
+        stage_kwargs = {
+            "force": force,
+            "reset": reset,
+            "subscription": subscription,
+            "tenant": tenant,
+        }
+        if service_principal:
+            stage_kwargs["client_id"] = sp_client_id
+            stage_kwargs["client_secret"] = sp_secret
+
+        app = PrototypeApp(
+            start_stage="deploy",
+            project_dir=project_dir,
+            stage_kwargs=stage_kwargs,
+        )
+        _run_tui(app)
+        return {"status": "completed"}
+
+    # Non-interactive: dry-run or single-stage deploy
     try:
         return deploy_stage.execute(
             agent_context,
@@ -814,6 +861,75 @@ def _deploy_generate_scripts(
 
     console.print_dim(f"{len(generated)} script(s) generated")
     return {"status": "generated", "scripts": generated, "deploy_type": deploy_type}
+
+
+@track("prototype validate")
+def prototype_validate(
+    cmd,
+    all_areas=False,
+    policies=False,
+    anti_patterns=False,
+    standards=False,
+    workloads=False,
+    strict=False,
+    json_output=False,
+):
+    """Validate governance YAML files (policies, anti-patterns, standards, workloads)."""
+    from azext_prototype.governance.validate import (
+        validate_anti_patterns,
+        validate_policies,
+        validate_standards,
+        validate_workloads,
+    )
+
+    # Default to --all if no specific flags
+    if not all_areas and not policies and not anti_patterns and not standards and not workloads:
+        all_areas = True
+
+    errors = []
+    areas = []
+
+    if all_areas or policies:
+        areas.append("policies")
+        errors.extend(validate_policies())
+
+    if all_areas or anti_patterns:
+        areas.append("anti-patterns")
+        errors.extend(validate_anti_patterns())
+
+    if all_areas or standards:
+        areas.append("standards")
+        errors.extend(validate_standards())
+
+    if all_areas or workloads:
+        areas.append("workloads")
+        errors.extend(validate_workloads())
+
+    actual_errors = [e for e in errors if e.severity == "error"]
+    warnings = [e for e in errors if e.severity == "warning"]
+
+    if json_output:
+        return {
+            "areas": areas,
+            "errors": [{"file": e.file, "message": e.message, "severity": e.severity} for e in errors],
+            "error_count": len(actual_errors),
+            "warning_count": len(warnings),
+            "valid": len(actual_errors) == 0 and (not strict or len(warnings) == 0),
+        }
+
+    print(f"Validating: {', '.join(areas)}")
+
+    if not errors:
+        print("All governance files are valid.")
+        return
+
+    for err in errors:
+        print(str(err))
+
+    print(f"\n{len(actual_errors)} error(s), {len(warnings)} warning(s)")
+
+    if actual_errors or (strict and warnings):
+        raise CLIError(f"Governance validation failed: {len(actual_errors)} error(s), {len(warnings)} warning(s)")
 
 
 @_quiet_output
@@ -2458,7 +2574,7 @@ def _load_speckit_context(project_dir: str) -> str:
                     )
                     rows.append(
                         f"| {st.get('stage', '?')} | {st.get('name', '?')} "
-                        f"| {st.get('category', '?')} | {st.get('status', '?')} "
+                        f"| {st.get('capability', '?')} | {st.get('status', '?')} "
                         f"| {svcs} |"
                     )
                 sections.append("## Build Stages\n" + "\n".join(rows))

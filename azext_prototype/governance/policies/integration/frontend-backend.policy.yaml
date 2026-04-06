@@ -1,0 +1,129 @@
+kind: policy
+domain: integration
+description: Governance policies for Frontend Backend
+last_updated: '2026-03-27'
+rules:
+- id: CC-INT-FB-001
+  severity: required
+  description: Configure Static Web App with linked backend API for managed API routing and authentication passthrough
+  rationale: Linked backends provide managed routing from SWA to API backends; authentication context is automatically forwarded
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - csharp-developer
+  - python-developer
+  companion_resources:
+  - type: Microsoft.Web/staticSites/linkedBackends@2023-12-01
+    name: api-backend
+    description: Linked backend routing /api/* requests from SWA to Container App or Functions
+  - type: Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31
+    name: id-api
+    description: User-assigned managed identity for the API backend
+  template_check:
+    when_services_present:
+    - static-web-apps
+    - container-apps
+    require_config:
+    - linked_backend
+    severity: warning
+    error_message: Static Web App + Container Apps template should use linked backend for API routing
+  targets:
+  - services:
+    - Microsoft.Web/staticSites
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+    - Microsoft.Network/frontDoors
+- id: CC-INT-FB-002
+  severity: required
+  description: Configure CORS with explicit allowed origins on all API backends serving browser-based frontends
+  rationale: CORS misconfiguration either blocks legitimate frontends or exposes APIs to cross-origin attacks
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services:
+    - Microsoft.Web/staticSites
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+    - Microsoft.Network/frontDoors
+- id: CC-INT-FB-003
+  severity: required
+  description: Configure Azure Front Door or CDN with origin groups for frontend + API backend routing
+  rationale: Front Door provides global load balancing, WAF protection, and edge caching; origin groups separate static and
+    API traffic
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  companion_resources:
+  - type: Microsoft.Cdn/profiles/originGroups@2024-02-01
+    name: og-frontend
+    description: Origin group for static frontend with health probes
+  - type: Microsoft.Cdn/profiles/afdEndpoints/routes@2024-02-01
+    name: route-frontend
+    description: Route for /* to frontend origin group with caching enabled
+  - type: Microsoft.Cdn/profiles/securityPolicies@2024-02-01
+    name: waf-policy
+    description: WAF security policy applied to the Front Door endpoint
+  targets:
+  - services:
+    - Microsoft.Web/staticSites
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+    - Microsoft.Network/frontDoors
+- id: CC-INT-FB-004
+  severity: required
+  description: Configure authentication using Easy Auth (App Service/Functions) or MSAL (SPA) with Entra ID
+  rationale: Authentication must be enforced at the platform or application level; Easy Auth handles token validation without
+    application code changes
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - csharp-developer
+  - python-developer
+  companion_resources:
+  - type: Microsoft.Web/sites/config@2023-12-01
+    name: authsettingsV2
+    description: Easy Auth v2 configuration for App Service with Entra ID provider
+  - type: Microsoft.Web/staticSites/config@2023-12-01
+    name: appsettings
+    description: SWA app settings containing auth client ID and Key Vault-backed client secret
+  targets:
+  - services:
+    - Microsoft.Web/staticSites
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+    - Microsoft.Network/frontDoors
+patterns:
+- name: SWA with linked Container App backend
+  description: Static Web App routing /api/* to Container App via linked backend with auth passthrough
+- name: Front Door with split frontend/API routing
+  description: Front Door with separate origin groups for SWA frontend (cached) and API backend (uncached, private link)
+- name: Easy Auth with Entra ID
+  description: Platform-level authentication via Easy Auth v2 with Entra ID OpenID Connect provider
+anti_patterns:
+- description: Do not serve APIs without CORS restrictions from browser-based frontends
+  instead: Configure explicit allowed origins matching the frontend domain
+- description: Do not expose backend services directly without CDN or gateway
+  instead: Use Front Door or SWA linked backend for frontend-to-API routing
+- description: Do not use default GitHub auth for enterprise applications
+  instead: Configure custom Entra ID authentication via Easy Auth or MSAL
+references:
+- title: Static Web Apps linked backends
+  url: https://learn.microsoft.com/azure/static-web-apps/apis-container-apps
+- title: Front Door origin groups
+  url: https://learn.microsoft.com/azure/frontdoor/origin
+- title: App Service Easy Auth
+  url: https://learn.microsoft.com/azure/app-service/overview-authentication-authorization
+- title: Static Web Apps custom authentication
+  url: https://learn.microsoft.com/azure/static-web-apps/authentication-custom
+- title: Container Apps CORS policy
+  url: https://learn.microsoft.com/azure/container-apps/cors

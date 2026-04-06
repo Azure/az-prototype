@@ -13,7 +13,8 @@ Directory layout::
     ├── services/                # Per-Azure-service knowledge files
     ├── tools/                   # IaC tool patterns (terraform, bicep, deploy-scripts)
     ├── languages/               # Language-specific patterns (python, csharp, nodejs, auth)
-    └── roles/                   # Agent role templates (architect, infrastructure, developer, analyst)
+    ├── roles/                   # Agent role templates (architect, infrastructure, developer, analyst)
+    └── layers/                  # Layer definitions (core, infrastructure, data, application)
 
 Usage::
 
@@ -70,8 +71,88 @@ class KnowledgeLoader:
     # ------------------------------------------------------------------
 
     def load_service(self, service_name: str) -> str:
-        """Load a service knowledge file (e.g. ``cosmos-db``)."""
-        return self._read_md("services", f"{service_name}.md")
+        """Load a service knowledge file by name or ARM namespace.
+
+        Resolution order:
+        1. ARM namespace match via frontmatter (e.g., ``Microsoft.Sql/servers``)
+        2. Friendly name from service registry
+        3. Exact filename match
+        4. Static mapping table (legacy deployment plan names)
+        5. Suffix stripping heuristic
+        """
+        # 1. Try ARM namespace resolution via frontmatter index
+        namespace_index = self._build_namespace_index()
+        if service_name in namespace_index:
+            return self._read_md("services", namespace_index[service_name])
+
+        # 2. Try friendly_name from service registry
+        friendly_index = self._build_friendly_index()
+        if service_name in friendly_index:
+            return self._read_md("services", friendly_index[service_name])
+
+        # 3-5. Legacy resolution
+        resolved = self._resolve_service_file(service_name)
+        return self._read_md("services", f"{resolved}.md")
+
+    def _build_namespace_index(self) -> dict[str, str]:
+        """Build a mapping of ARM namespace → filename from frontmatter.
+
+        Cached after first call.
+        """
+        if hasattr(self, "_ns_index"):
+            return self._ns_index
+
+        index: dict[str, str] = {}
+        services_dir = self._dir / "services"
+        if not services_dir.is_dir():
+            self._ns_index = index
+            return index
+
+        for md_file in services_dir.glob("*.md"):
+            try:
+                content = md_file.read_text(encoding="utf-8")
+                if not content.startswith("---\n"):
+                    continue
+                # Parse frontmatter
+                end = content.index("---", 4)
+                frontmatter = content[4:end]
+                for line in frontmatter.splitlines():
+                    if line.startswith("service_namespace:"):
+                        ns = line.split(":", 1)[1].strip()
+                        index[ns] = md_file.name
+                        break
+            except (ValueError, OSError):
+                continue
+
+        self._ns_index = index
+        return index
+
+    def _build_friendly_index(self) -> dict[str, str]:
+        """Build a mapping of friendly_name → filename from service registry.
+
+        Cached after first call.
+        """
+        if hasattr(self, "_fn_index"):
+            return self._fn_index
+
+        index: dict[str, str] = {}
+        try:
+            registry = self.load_service_registry()
+            if isinstance(registry, dict):
+                services = registry.get("services", registry)
+                for ns_key, svc in services.items():
+                    if isinstance(svc, dict):
+                        fn = svc.get("friendly_name", "")
+                        if fn:
+                            # Find the knowledge file for this namespace
+                            ns_index = self._build_namespace_index()
+                            if ns_key in ns_index:
+                                index[fn] = ns_index[ns_key]
+        except Exception:
+            pass
+
+        self._fn_index = index
+        return index
 
     def load_tool(self, tool_name: str) -> str:
         """Load a tool pattern file (e.g. ``terraform``)."""
@@ -84,6 +165,14 @@ class KnowledgeLoader:
     def load_role(self, role_name: str) -> str:
         """Load a role template file (e.g. ``architect``)."""
         return self._read_md("roles", f"{role_name}.md")
+
+    def load_layer(self, layer_name: str) -> str:
+        """Load a layer definition file (e.g. ``infrastructure``).
+
+        Valid layer names: ``core``, ``infrastructure``, ``data``,
+        ``application``.
+        """
+        return self._read_md("layers", f"{layer_name}.md")
 
     def load_constraints(self) -> str:
         """Load the shared constraints document."""
@@ -119,6 +208,7 @@ class KnowledgeLoader:
         tool: str | None = None,
         language: str | None = None,
         role: str | None = None,
+        layer: str | None = None,
         include_constraints: bool = True,
         include_service_registry: bool = False,
         mode: str = "poc",
@@ -129,15 +219,19 @@ class KnowledgeLoader:
         respecting the token budget.  Files are added in priority order:
 
         1. Role template (highest priority — defines the agent's identity)
-        2. Constraints (shared rules all agents must follow)
-        3. Tool patterns (IaC-specific patterns)
-        4. Language patterns (language-specific patterns)
-        5. Service knowledge files (per-service, loaded in order given)
-        6. Service registry entries (raw reference data, lowest priority)
+        2. Layer definition (service boundaries and ownership)
+        3. Constraints (shared rules all agents must follow)
+        4. Tool patterns (IaC-specific patterns)
+        5. Language patterns (language-specific patterns)
+        6. Service knowledge files (per-service, loaded in order given)
+        7. Service registry entries (raw reference data, lowest priority)
 
         If the budget is exceeded, lower-priority content is truncated.
 
         Args:
+            layer: Layer name (``core``, ``infrastructure``, ``data``,
+                ``application``).  When provided, the layer definition
+                file is included so the agent knows its boundaries.
             mode: Content filtering mode.  ``"poc"`` (default) strips
                 ``## Production Backlog Items`` sections from service
                 files.  ``"production"`` or ``"all"`` keep everything.
@@ -152,6 +246,11 @@ class KnowledgeLoader:
             if content:
                 sections.append((f"ROLE: {role}", content))
 
+        if layer:
+            content = self.load_layer(layer)
+            if content:
+                sections.append((f"LAYER: {layer}", content))
+
         if include_constraints:
             content = self.load_constraints()
             if content:
@@ -161,6 +260,11 @@ class KnowledgeLoader:
             content = self.load_tool(tool)
             if content:
                 sections.append((f"TOOL PATTERNS: {tool}", content))
+            # Load azapi provider knowledge alongside terraform
+            if tool == "terraform":
+                azapi = self.load_tool("azapi-provider")
+                if azapi:
+                    sections.append(("TOOL PATTERNS: azapi-provider", azapi))
 
         if language:
             content = self.load_language(language)
@@ -240,9 +344,102 @@ class KnowledgeLoader:
         """List available role template file names."""
         return self._list_dir("roles")
 
+    def list_layers(self) -> list[str]:
+        """List available layer definition file names."""
+        return self._list_dir("layers")
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    # Map deployment plan service names to knowledge file names.
+    # The plan uses computed names (e.g., "cosmos-account") but knowledge
+    # files use canonical short names (e.g., "cosmos-db").
+    _SERVICE_FILE_MAP: dict[str, str] = {
+        # Cosmos DB
+        "cosmos-account": "cosmos-db",
+        "cosmos-database": "cosmos-db",
+        "cosmos-container": "cosmos-db",
+        "cosmos-rbac": "cosmos-db",
+        # Azure SQL
+        "sql-server": "azure-sql",
+        "sql-database": "azure-sql",
+        "sql-rbac": "azure-sql",
+        # Container Apps
+        "container-app-api": "container-apps",
+        "container-app-worker": "container-apps",
+        "container-apps-environment": "container-apps",
+        # Log Analytics / App Insights
+        "log-analytics-workspace": "log-analytics",
+        "application-insights": "app-insights",
+        # Managed Identity
+        "worker-managed-identity": "managed-identity",
+        # Storage
+        "storage-container-attachments": "storage-account",
+        "storage-rbac": "storage-account",
+        # Service Bus
+        "servicebus-namespace": "service-bus",
+        "servicebus-queue-board-events": "service-bus",
+        "servicebus-rbac": "service-bus",
+        # SignalR
+        "signalr-service": "signalr",
+        "signalr-connection-string-secret": "signalr",
+        # Redis
+        "redis-connection-string-secret": "redis-cache",
+        # Key Vault
+        "key-vault-rbac": "key-vault",
+        # Networking
+        "subnet-aca": "virtual-network",
+        "subnet-pe": "virtual-network",
+        "nsg-aca": "virtual-network",
+        "nsg-pe": "virtual-network",
+        "private-dns-zones": "dns-zones",
+        # RBAC suffixes
+        "api-keyvault-rbac": "key-vault",
+        "api-servicebus-rbac": "service-bus",
+        "api-storage-rbac": "storage-account",
+        "api-acr-rbac": "container-registry",
+        "worker-servicebus-rbac": "service-bus",
+        "worker-cosmos-rbac": "cosmos-db",
+        "worker-storage-rbac": "storage-account",
+        "worker-keyvault-rbac": "key-vault",
+        "worker-acr-rbac": "container-registry",
+        # Monitoring
+        "monitor-action-group": "action-groups",
+        "alert-dlq-depth": "action-groups",
+        "alert-api-latency": "action-groups",
+        "alert-async-job-latency": "action-groups",
+        "alert-error-rate": "action-groups",
+    }
+
+    def _resolve_service_file(self, service_name: str) -> str:
+        """Resolve a deployment plan service name to a knowledge file name.
+
+        1. Exact match (file exists)
+        2. Static mapping table
+        3. Strip common suffixes (-account, -rbac, -namespace, etc.)
+        """
+        # 1. Exact match
+        if (self._dir / "services" / f"{service_name}.md").exists():
+            return service_name
+
+        # 2. Static mapping
+        mapped = self._SERVICE_FILE_MAP.get(service_name)
+        if mapped:
+            return mapped
+
+        # 3. Strip suffixes and retry
+        for suffix in ("-account", "-rbac", "-namespace", "-database", "-service", "-workspace"):
+            stripped = service_name.removesuffix(suffix)
+            if stripped != service_name and (self._dir / "services" / f"{stripped}.md").exists():
+                return stripped
+
+        # 4. Try prefix match (e.g., "cosmos-container-audit-log" → "cosmos-db")
+        for key, val in self._SERVICE_FILE_MAP.items():
+            if service_name.startswith(key.split("-")[0] + "-"):
+                return val
+
+        return service_name  # fallback to original (will 404 gracefully)
 
     def _read_md(self, subdir: str, filename: str) -> str:
         """Read a markdown file, returning empty string on missing/error."""

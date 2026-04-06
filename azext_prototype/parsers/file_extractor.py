@@ -4,7 +4,7 @@ AI agents commonly embed generated files inside fenced code blocks that use
 the filename (with optional language hint) as the info-string:
 
     ```main.tf
-    resource "azurerm_resource_group" "rg" { ... }
+    resource "azapi_resource" "rg" { ... }
     ```
 
     ```python:src/app.py
@@ -62,11 +62,11 @@ def parse_file_blocks(content: str) -> dict[str, str]:
     --------
     >>> text = '''Here is the code:
     ... ```main.tf
-    ... resource "azurerm_resource_group" "rg" {}
+    ... resource "azapi_resource" "rg" {}
     ... ```
     ... '''
     >>> parse_file_blocks(text)
-    {'main.tf': 'resource "azurerm_resource_group" "rg" {}'}
+    {'main.tf': 'resource "azapi_resource" "rg" {}'}
     """
     files: dict[str, str] = {}
     lines = content.split("\n")

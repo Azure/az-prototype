@@ -3,21 +3,19 @@
 from __future__ import annotations
 
 import base64
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from azext_prototype.parsers.binary_reader import (
+    MAX_IMAGE_SIZE,
+    MAX_IMAGES_PER_DIR,
     EmbeddedImage,
     FileCategory,
     ReadResult,
     classify_file,
     read_file,
-    MAX_IMAGE_SIZE,
-    MAX_IMAGES_PER_DIR,
 )
-
 
 # ------------------------------------------------------------------ #
 # classify_file
@@ -27,27 +25,33 @@ from azext_prototype.parsers.binary_reader import (
 class TestClassifyFile:
     """Extension-based file classification."""
 
-    @pytest.mark.parametrize("ext,expected", [
-        (".jpg", FileCategory.IMAGE),
-        (".jpeg", FileCategory.IMAGE),
-        (".png", FileCategory.IMAGE),
-        (".gif", FileCategory.IMAGE),
-        (".webp", FileCategory.IMAGE),
-        (".bmp", FileCategory.IMAGE),
-        (".tiff", FileCategory.IMAGE),
-        (".tif", FileCategory.IMAGE),
-    ])
+    @pytest.mark.parametrize(
+        "ext,expected",
+        [
+            (".jpg", FileCategory.IMAGE),
+            (".jpeg", FileCategory.IMAGE),
+            (".png", FileCategory.IMAGE),
+            (".gif", FileCategory.IMAGE),
+            (".webp", FileCategory.IMAGE),
+            (".bmp", FileCategory.IMAGE),
+            (".tiff", FileCategory.IMAGE),
+            (".tif", FileCategory.IMAGE),
+        ],
+    )
     def test_image_extensions(self, tmp_path, ext, expected):
         p = tmp_path / f"file{ext}"
         p.touch()
         assert classify_file(p) == expected
 
-    @pytest.mark.parametrize("ext,expected", [
-        (".pdf", FileCategory.DOCUMENT),
-        (".docx", FileCategory.DOCUMENT),
-        (".pptx", FileCategory.DOCUMENT),
-        (".xlsx", FileCategory.DOCUMENT),
-    ])
+    @pytest.mark.parametrize(
+        "ext,expected",
+        [
+            (".pdf", FileCategory.DOCUMENT),
+            (".docx", FileCategory.DOCUMENT),
+            (".pptx", FileCategory.DOCUMENT),
+            (".xlsx", FileCategory.DOCUMENT),
+        ],
+    )
     def test_document_extensions(self, tmp_path, ext, expected):
         p = tmp_path / f"file{ext}"
         p.touch()
@@ -223,10 +227,11 @@ class TestReadDOCX:
 
     def test_read_docx_with_image(self, tmp_path):
         """DOCX with an embedded image extracts both text and image."""
+        import io
+
         from docx import Document
         from docx.shared import Inches
         from PIL import Image as PILImage
-        import io
 
         # Create a proper PNG via Pillow (python-docx validates PNG structure)
         img_buf = io.BytesIO()
@@ -269,7 +274,6 @@ class TestReadPPTX:
     def test_read_pptx_text(self, tmp_path):
         """Create a PPTX with text and verify extraction."""
         from pptx import Presentation
-        from pptx.util import Inches
 
         prs = Presentation()
         slide = prs.slides.add_slide(prs.slide_layouts[1])  # title + content
@@ -287,10 +291,11 @@ class TestReadPPTX:
 
     def test_read_pptx_with_image(self, tmp_path):
         """PPTX with an embedded image extracts both text and image."""
+        import io
+
+        from PIL import Image as PILImage
         from pptx import Presentation
         from pptx.util import Inches
-        from PIL import Image as PILImage
-        import io
 
         img_buf = io.BytesIO()
         PILImage.new("RGB", (10, 10), color="blue").save(img_buf, format="PNG")

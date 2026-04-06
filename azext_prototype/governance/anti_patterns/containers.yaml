@@ -1,27 +1,89 @@
-# Anti-pattern detection — Containers domain
-#
-# Detects insecure container and registry configurations in
-# AI-generated output.
-
+kind: anti-pattern
 domain: containers
 description: Container Apps, ACR, and container runtime configuration detection
-
+last_updated: '2026-04-04'
 patterns:
-  - search_patterns:
-      - "environment_variable"
-      - "env_var"
+- id: ANTI-CONT-001
+  description: Detects secrets passed as plain environment variables instead of Key Vault secret references
+  rationale: Plain environment variables expose secrets in Container App revision metadata and ARM deployment history.
+  warning_message: Secret in environment variable — use Key Vault references with managed identity instead.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.App/containerApps
+    - Microsoft.Web/sites
+    search_patterns:
+    - environment_variable
+    - env_var
     safe_patterns:
-      - "key vault"
-      - "keyvault"
-      - "managed identity"
-      - "secret_ref"
-      - "secretref"
-    warning_message: "Secrets in environment variables detected — use Key Vault references with managed identity instead."
-
-  - search_patterns:
-      - "admin_user_enabled = true"
-      - "acrpush"
+    - key vault
+    - keyvault
+    - managed identity
+    - secret_ref
+    - secretref
+    - secretRef
+    - keyVaultUrl
+    correct_patterns:
+    - secretRef
+    - '# Use Key Vault references with managed identity'
+- id: ANTI-CONT-002
+  description: Detects container registry admin user enabled instead of managed identity with AcrPull
+  rationale: Admin credentials are shared secrets that cannot be scoped per-service; managed identity with AcrPull provides
+    per-identity audit.
+  warning_message: Container registry admin user enabled — disable admin and use managed identity with AcrPull role.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.ContainerRegistry/registries
+    search_patterns:
+    - admin_user_enabled = true
+    - adminUserEnabled = true
+    correct_patterns:
+    - admin_user_enabled = false
+    - adminUserEnabled = false
+    - '# Use managed identity with AcrPull role assignment'
+- id: ANTI-CONT-003
+  description: Detects Container App without UserAssigned managed identity for ACR image pull
+  rationale: SystemAssigned identity alone causes image pull failures on first provision because the identity doesn't exist
+    when ACR pull is attempted.
+  warning_message: Container App needs UserAssigned identity (or SystemAssigned,UserAssigned) for ACR image pull — SystemAssigned
+    alone fails on first deploy.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.App/containerApps
+    search_patterns:
+    - microsoft.app/containerapps
     safe_patterns:
-      - "managed identity"
-      - "acrpull"
-    warning_message: "Container registry admin credentials detected — use managed identity with AcrPull role assignment."
+    - userassignedidentities
+    - systemassigned, userassigned
+    correct_patterns:
+    - type = "SystemAssigned, UserAssigned"
+    - identity.userAssignedIdentities
+- id: ANTI-CONT-004
+  description: Detects latest tag on container images instead of immutable version or SHA tags
+  rationale: The :latest tag is mutable and non-deterministic — different nodes may pull different images, causing inconsistent
+    behavior.
+  warning_message: Container image uses :latest tag — use a specific version tag or SHA digest for reproducible deployments.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.App/containerApps
+    - Microsoft.ContainerRegistry/registries
+    search_patterns:
+    - :latest
+    - image:latest
+    safe_patterns:
+    - '# placeholder, will be updated by CI/CD'
+    - :${var.
+    correct_patterns:
+    - image = "myregistry.azurecr.io/myapp:v1.2.3"
+    - image = "myregistry.azurecr.io/myapp@sha256:abc123"

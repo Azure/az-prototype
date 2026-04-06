@@ -1,12 +1,12 @@
 """Tests for azext_prototype.auth — GitHub auth and Copilot license."""
 
-import pytest
 from unittest.mock import MagicMock, patch
 
+import pytest
 from knack.util import CLIError
 
-from azext_prototype.auth.github_auth import GitHubAuthManager
 from azext_prototype.auth.copilot_license import CopilotLicenseValidator
+from azext_prototype.auth.github_auth import GitHubAuthManager
 
 
 class TestGitHubAuthManager:

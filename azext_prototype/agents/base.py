@@ -17,7 +17,14 @@ class AgentCapability(str, Enum):
     """Capabilities an agent can declare."""
 
     ARCHITECT = "architect"
+    INFRASTRUCTURE_ARCHITECT = "infrastructure_architect"
+    DATA_ARCHITECT = "data_architect"
+    APPLICATION_ARCHITECT = "application_architect"
+    SECURITY_ARCHITECT = "security_architect"
     DEVELOP = "develop"
+    DEVELOP_CSHARP = "develop_csharp"
+    DEVELOP_PYTHON = "develop_python"
+    DEVELOP_REACT = "develop_react"
     TERRAFORM = "terraform"
     BICEP = "bicep"
     ANALYZE = "analyze"
@@ -31,6 +38,8 @@ class AgentCapability(str, Enum):
     BACKLOG_GENERATION = "backlog_generation"
     SECURITY_REVIEW = "security_review"
     MONITORING = "monitoring"
+    GOVERNANCE = "governance"
+    ADVISORY = "advisory"
 
 
 @dataclass
@@ -46,11 +55,16 @@ class AgentContract:
             Missing inputs are warnings (agent may still run with reduced context).
         outputs: Artifact keys this agent produces (added to ``AgentContext.artifacts``).
         delegates_to: Agent names this agent may delegate sub-tasks to.
+        sub_layers: Application sub-layers this agent can generate code for.
+            Valid values: ``presentation``, ``api``, ``business-logic``,
+            ``data-access``, ``background``.  Empty list means the agent
+            does not participate in sub-layer delegation.
     """
 
     inputs: list[str] = field(default_factory=list)
     outputs: list[str] = field(default_factory=list)
     delegates_to: list[str] = field(default_factory=list)
+    sub_layers: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -187,21 +201,7 @@ class BaseAgent:
         if self._enable_web_search and self._SEARCH_PATTERN.search(response.content):
             response = self._resolve_searches(response, messages, context)
 
-        # Post-response governance check
-        warnings = self.validate_response(response.content)
-        if warnings:
-            for w in warnings:
-                logger.warning("Governance: %s", w)
-            # Append warnings as a note in the response
-            warning_block = "\n\n---\n" "**Governance warnings:**\n" + "\n".join(f"- {w}" for w in warnings)
-            response = AIResponse(
-                content=response.content + warning_block,
-                model=response.model,
-                usage=response.usage,
-                finish_reason=response.finish_reason,
-            )
-
-        return response
+        return self._apply_governance_check(response, context)
 
     def can_handle(self, task_description: str) -> float:
         """Score how well this agent can handle a task (0.0 to 1.0).
@@ -247,29 +247,40 @@ class BaseAgent:
         # Inject governance context
         if self._governance_aware:
             governance_text = self._get_governance_text()
-            if governance_text:
+            if governance_text and governance_text.strip():
                 messages.append(AIMessage(role="system", content=governance_text))
 
         # Inject design standards
         if self._include_standards:
             standards_text = self._get_standards_text()
-            if standards_text:
+            if standards_text and standards_text.strip():
                 messages.append(AIMessage(role="system", content=standards_text))
 
         # Inject knowledge context
         if self._knowledge_role or self._knowledge_tools or self._knowledge_languages:
             knowledge_text = self._get_knowledge_text()
-            if knowledge_text:
+            if knowledge_text and knowledge_text.strip():
                 messages.append(AIMessage(role="system", content=knowledge_text))
 
         return messages
 
-    def validate_response(self, response_text: str) -> list[str]:
+    def validate_response(
+        self,
+        response_text: str,
+        iac_tool: str | None = None,
+        services: list[str] | None = None,
+    ) -> list[str]:
         """Check AI output for obvious governance violations.
 
         Returns a list of warning strings (empty = clean).  Called
         automatically by the default ``execute()`` implementation.
         Subclasses with custom ``execute()`` should call this too.
+
+        Parameters
+        ----------
+        services:
+            ARM resource type namespaces for the current stage.
+            Filters anti-pattern checks by ``targets.services``.
         """
         if not self._governance_aware:
             return []
@@ -277,12 +288,50 @@ class BaseAgent:
             from azext_prototype.agents.governance import GovernanceContext
 
             ctx = GovernanceContext()
-            return ctx.check_response_for_violations(self.name, response_text)
+            return ctx.check_response_for_violations(self.name, response_text, iac_tool=iac_tool, services=services)
         except Exception:  # pragma: no cover — never let validation break the agent
             return []
 
+    def _apply_governance_check(self, response: AIResponse, context: AgentContext) -> AIResponse:
+        """Post-response governance check. Appends warnings if found.
+
+        Call this at the end of custom ``execute()`` overrides to
+        avoid duplicating the governance warning block.
+        """
+        iac_tool = context.project_config.get("project", {}).get("iac_tool") if context.project_config else None
+        warnings = self.validate_response(response.content, iac_tool=iac_tool, services=None)
+        if warnings:
+            for w in warnings:
+                logger.warning("Governance: %s", w)
+            warning_block = "\n\n---\n**Governance warnings:**\n" + "\n".join(f"- {w}" for w in warnings)
+            return AIResponse(
+                content=response.content + warning_block,
+                model=response.model,
+                usage=response.usage,
+                finish_reason=response.finish_reason,
+            )
+        return response
+
+    def set_governor_brief(self, brief_text: str) -> None:
+        """Set a governor-produced policy brief for this agent.
+
+        When set, ``get_system_messages()`` uses this concise brief
+        (~1-2KB) instead of the full governance text (~40KB+).
+        Call with an empty string to revert to full governance.
+        """
+        self._governor_brief = brief_text
+
     def _get_governance_text(self) -> str:
-        """Return formatted governance text for system messages."""
+        """Return formatted governance text for system messages.
+
+        If a governor brief has been set via ``set_governor_brief()``,
+        returns that instead of the full policy/template dump.
+        """
+        # Prefer governor brief if available
+        brief = getattr(self, "_governor_brief", "")
+        if brief:
+            return brief
+
         try:
             from azext_prototype.agents.governance import GovernanceContext
 
@@ -303,13 +352,24 @@ class BaseAgent:
         except Exception:  # pragma: no cover — never let standards break the agent
             return ""
 
+    def set_knowledge_override(self, text: str) -> None:
+        """Set stage-specific knowledge to replace the generic composition.
+
+        When set, ``_get_knowledge_text()`` returns this text instead of
+        composing from ``_knowledge_role`` / ``_knowledge_tools``.
+        Call with an empty string to revert to default composition.
+        """
+        self._knowledge_override = text
+
     def _get_knowledge_text(self) -> str:
         """Return composed knowledge context for system messages.
 
-        Uses ``_knowledge_role``, ``_knowledge_tools``, and
-        ``_knowledge_languages`` to compose context from the knowledge
-        directory via :class:`KnowledgeLoader`.
+        If a knowledge override has been set via ``set_knowledge_override()``,
+        returns that instead of composing from role/tool/language declarations.
         """
+        override = getattr(self, "_knowledge_override", "")
+        if override:
+            return override
         try:
             from azext_prototype.knowledge import KnowledgeLoader
 

@@ -1,0 +1,202 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Governance Policy",
+  "description": "Schema for .policy.yaml governance files. All policies share the unified top-level metadata (kind, domain, description, last_updated) and contain a rules array.",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["policy"],
+      "description": "Governance kind. Must be 'policy'."
+    },
+    "domain": {
+      "type": "string",
+      "description": "Policy domain (e.g. 'azure-data', 'security', 'cost')."
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of this policy file."
+    },
+    "last_updated": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "Date the policy was last updated (YYYY-MM-DD)."
+    },
+    "rules": {
+      "type": "array",
+      "description": "Governance rules agents must follow.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique rule identifier (e.g. 'AZ-SQL-001')."
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["required", "recommended", "optional"],
+            "description": "Rule severity level."
+          },
+          "description": {
+            "type": "string",
+            "description": "What the rule requires."
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Why this rule exists."
+          },
+          "warning_message": {
+            "type": "string",
+            "description": "Human-readable warning shown when rule is violated."
+          },
+          "applies_to": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Agent names this rule applies to (e.g. ['terraform-agent', 'bicep-agent'])."
+          },
+          "targets": {
+            "type": "array",
+            "description": "Service targets and implementation patterns. Each entry specifies services and patterns.",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "properties": {
+                "services": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "ARM resource type namespaces (e.g. ['Microsoft.Sql/servers'])."
+                },
+                "terraform_pattern": {
+                  "type": "string",
+                  "description": "Terraform code pattern (optional — only for infrastructure agents)."
+                },
+                "bicep_pattern": {
+                  "type": "string",
+                  "description": "Bicep code pattern (optional — only for infrastructure agents)."
+                },
+                "csharp_pattern": {
+                  "type": "string",
+                  "description": "C# code pattern (optional — only for csharp-developer)."
+                },
+                "python_pattern": {
+                  "type": "string",
+                  "description": "Python code pattern (optional — only for python-developer)."
+                },
+                "react_pattern": {
+                  "type": "string",
+                  "description": "React/TypeScript code pattern (optional — only for react-developer)."
+                },
+                "prohibitions": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "Things the agent must NEVER generate for these services."
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "companion_resources": {
+            "type": "array",
+            "description": "Resources that MUST be created alongside the primary resource.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string" },
+                "name": { "type": "string" },
+                "description": { "type": "string" },
+                "terraform_pattern": { "type": "string" },
+                "bicep_pattern": { "type": "string" }
+              },
+              "required": ["type", "name", "description"],
+              "additionalProperties": false
+            }
+          },
+          "prohibitions": {
+            "type": "array",
+            "description": "Explicit list of things the agent must NEVER generate.",
+            "items": { "type": "string" }
+          },
+          "template_check": {
+            "type": "object",
+            "description": "Optional automated compliance check applied to workload templates.",
+            "properties": {
+              "scope": {
+                "oneOf": [
+                  { "type": "string" },
+                  { "type": "array", "items": { "type": "string" } }
+                ]
+              },
+              "require_config": {
+                "oneOf": [
+                  { "type": "string" },
+                  { "type": "array", "items": { "type": "string" } }
+                ]
+              },
+              "require_config_value": { "type": "object", "additionalProperties": true },
+              "reject_config_value": { "type": "object", "additionalProperties": true },
+              "require_service": {
+                "oneOf": [
+                  { "type": "string" },
+                  { "type": "array", "items": { "type": "string" } }
+                ]
+              },
+              "when_services_present": {
+                "oneOf": [
+                  { "type": "string" },
+                  { "type": "array", "items": { "type": "string" } }
+                ]
+              },
+              "severity": { "type": "string", "enum": ["error", "warning"] },
+              "error_message": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": ["id", "severity", "description"]
+      }
+    },
+    "patterns": {
+      "type": "array",
+      "description": "Implementation patterns agents should generate.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "example": { "type": "string" }
+        },
+        "required": ["name", "description"],
+        "additionalProperties": false
+      }
+    },
+    "anti_patterns": {
+      "type": "array",
+      "description": "Inline anti-patterns agents must avoid (lightweight, policy-scoped).",
+      "items": {
+        "type": "object",
+        "properties": {
+          "description": { "type": "string" },
+          "instead": { "type": "string" }
+        },
+        "required": ["description"],
+        "additionalProperties": false
+      }
+    },
+    "references": {
+      "type": "array",
+      "description": "Documentation references.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "url": { "type": "string", "format": "uri" }
+        },
+        "required": ["title", "url"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["kind", "domain", "description", "last_updated", "rules"],
+  "additionalProperties": false
+}

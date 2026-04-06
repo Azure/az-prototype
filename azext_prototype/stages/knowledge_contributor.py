@@ -22,6 +22,65 @@ _DEFAULT_REPO = "Azure/az-prototype"
 
 
 # ======================================================================
+# File path resolution
+# ======================================================================
+
+
+def _namespace_to_filename(namespace: str) -> str:
+    """Convert an ARM namespace to a knowledge file name.
+
+    ``Microsoft.Sql/servers/databases`` → ``azure-sql-database``
+    ``Microsoft.App/containerApps`` → ``container-apps``
+
+    Falls back to a hyphenated lowercase version of the namespace.
+    """
+    if not namespace:
+        return "unknown"
+    # Strip Microsoft. prefix, lowercase, replace / and . with hyphens
+    name = namespace.replace("Microsoft.", "").lower()
+    name = name.replace("/", "-").replace(".", "-")
+    # Clean up double hyphens
+    while "--" in name:
+        name = name.replace("--", "-")
+    return name.strip("-")
+
+
+def _resolve_knowledge_file_path(namespace: str, service: str) -> str:
+    """Resolve the knowledge file path for a service.
+
+    Checks if a file exists for the namespace first, then falls back
+    to the friendly service name. If neither exists, generates a path
+    from the namespace for new-service contributions.
+    """
+    from pathlib import Path
+
+    knowledge_dir = Path(__file__).resolve().parent.parent / "knowledge" / "services"
+
+    # 1. Try namespace-based file
+    if namespace:
+        # Check if KnowledgeLoader can resolve it
+        try:
+            from azext_prototype.knowledge import KnowledgeLoader
+
+            loader = KnowledgeLoader()
+            ns_index = loader._build_namespace_index()
+            if namespace in ns_index:
+                return f"knowledge/services/{ns_index[namespace]}"
+        except Exception:
+            pass
+
+        # Generate a filename from the namespace for new services
+        generated = _namespace_to_filename(namespace)
+        return f"knowledge/services/{generated}.md"
+
+    # 2. Fall back to friendly name
+    if service and (knowledge_dir / f"{service}.md").exists():
+        return f"knowledge/services/{service}.md"
+
+    return f"knowledge/services/{service or 'unknown'}.md"
+
+
+# ======================================================================
 # Gap Detection
 # ======================================================================
 
@@ -33,20 +92,21 @@ def check_knowledge_gap(finding: dict, knowledge_loader: Any) -> bool:
     covered by the relevant service knowledge file.  Returns ``False``
     if the content already exists or the finding is empty.
 
-    Uses a substring match on the first 80 characters of the finding's
-    ``context`` field against the loaded service file content.
+    Resolves by ``service_namespace`` (ARM resource type) first, then
+    falls back to ``service`` (friendly name).
     """
     if not finding:
         return False
 
-    service = finding.get("service", "")
+    # Prefer namespace for resolution
+    service_id = finding.get("service_namespace") or finding.get("service", "")
     context = finding.get("context", "")
-    if not service or not context:
+    if not service_id or not context:
         return False
 
-    # Load the service knowledge file
+    # Load the service knowledge file (KnowledgeLoader resolves by namespace first)
     try:
-        content = knowledge_loader.load_service(service)
+        content = knowledge_loader.load_service(service_id)
     except Exception:
         content = ""
 
@@ -70,9 +130,10 @@ def check_knowledge_gap(finding: dict, knowledge_loader: Any) -> bool:
 def format_contribution_title(finding: dict) -> str:
     """Format a finding as a GitHub Issue title.
 
-    Produces ``"[Knowledge] {service}: {context[:60]}"``.
+    Produces ``"[Knowledge] {namespace or service}: {context[:60]}"``.
     """
-    service = finding.get("service", "unknown")
+    namespace = finding.get("service_namespace", "")
+    service = namespace or finding.get("service", "unknown")
     context = finding.get("context", "") or finding.get("description", "")
     if not context:
         context = "Knowledge contribution"
@@ -86,25 +147,43 @@ def format_contribution_body(finding: dict) -> str:
     """Format a finding as a structured GitHub Issue body.
 
     Produces markdown matching the knowledge-contribution issue template
-    with Type, File, Section, Context, Rationale, Content to Add, and
-    Source sections.
+    with Type, Namespace, File, Section, Context, Rationale, Content to Add,
+    and Source sections.
+
+    For new-service findings, includes the full 8-section template that
+    the knowledge file must contain.
     """
     contribution_type = finding.get("type", "Pitfall")
     service = finding.get("service", "unknown")
-    file_path = finding.get("file", f"knowledge/services/{service}.md")
+    namespace = finding.get("service_namespace", "")
+    file_path = finding.get("file", "")
+    if not file_path:
+        file_path = _resolve_knowledge_file_path(namespace, service)
     section = finding.get("section", "")
     context = finding.get("context", "")
     rationale = finding.get("rationale", context)
     content = finding.get("content", "")
     source = finding.get("source", "QA diagnosis")
 
+    # Check if the file exists — if not, this is a new service contribution
+    from pathlib import Path
+
+    project_root = Path(__file__).resolve().parent.parent
+    file_exists = (project_root / file_path).exists() if file_path else False
+    if not file_exists and contribution_type == "Pitfall":
+        contribution_type = "New service"
+
     lines: list[str] = []
     lines.append("## Knowledge Contribution")
     lines.append("")
     lines.append(f"**Type:** {contribution_type}")
+    if namespace:
+        lines.append(f"**Service Namespace:** `{namespace}`")
     lines.append(f"**File:** `{file_path}`")
+    if not file_exists:
+        lines.append("**Status:** NEW FILE — this knowledge file does not exist yet and must be created")
     if section:
-        lines.append(f"**Section:** {section}")
+        lines.append(f"**Section to update:** {section}")
     lines.append("")
     lines.append("### Context")
     lines.append(context or "No context provided.")
@@ -123,12 +202,34 @@ def format_contribution_body(finding: dict) -> str:
     lines.append("### Source")
     lines.append(source)
 
+    # For new services, include the required file template
+    if contribution_type == "New service":
+        lines.append("")
+        lines.append("### Required Knowledge File Sections")
+        lines.append("The new knowledge file MUST include ALL of these sections:")
+        lines.append("1. **Description** (one-line summary)")
+        lines.append("2. **When to Use** (scenarios and selection criteria)")
+        lines.append("3. **POC Defaults** (default SKU, tier, configuration)")
+        lines.append("4. **Terraform Patterns** (azapi_resource with RBAC)")
+        lines.append("5. **Bicep Patterns** (ARM template resources)")
+        lines.append("6. **Application Code** (Python, C#, Node.js — where applicable)")
+        lines.append("7. **Common Pitfalls** (deployment failures, misconfigurations)")
+        lines.append("8. **Production Backlog Items** (what changes for production)")
+
     return "\n".join(lines)
 
 
 # ======================================================================
 # Submission
 # ======================================================================
+
+
+def _run_gh_issue_create(title: str, body: str, repo: str, labels: list[str]) -> subprocess.CompletedProcess:
+    """Run ``gh issue create`` with the given labels."""
+    cmd = ["gh", "issue", "create", "--title", title, "--body", body, "--repo", repo]
+    for label in labels:
+        cmd.extend(["--label", label])
+    return subprocess.run(cmd, capture_output=True, text=True, check=False)
 
 
 def submit_contribution(
@@ -165,35 +266,25 @@ def submit_contribution(
     type_label = type_label_map.get(contribution_type, "pitfall")
     labels.append(type_label)
 
-    cmd = [
-        "gh",
-        "issue",
-        "create",
-        "--title",
-        title,
-        "--body",
-        body,
-        "--repo",
-        repo,
-    ]
-    for label in labels:
-        cmd.extend(["--label", label])
+    from azext_prototype.debug_log import log_flow
 
-    logger.info("Creating knowledge contribution issue: %s", title)
+    log_flow("knowledge_contributor.submit", "Creating issue", title=title, repo=repo, labels=labels)
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        result = _run_gh_issue_create(title, body, repo, labels)
         if result.returncode != 0:
             error = result.stderr.strip() or result.stdout.strip()
-            logger.error("gh issue create failed: %s", error)
-            return {"error": error}
+            log_flow("knowledge_contributor.submit", "Failed with labels, retrying with fallback", error=error)
+
+            # Retry with fallback labels — service label might not exist
+            result = _run_gh_issue_create(title, body, repo, ["knowledge-contribution", "new-service"])
+            if result.returncode != 0:
+                error = result.stderr.strip() or result.stdout.strip()
+                log_flow("knowledge_contributor.submit", "Fallback also failed", error=error)
+                return {"error": error}
 
         url = result.stdout.strip()
         number = url.rstrip("/").rsplit("/", 1)[-1] if url else ""
+        log_flow("knowledge_contributor.submit", "Issue created", url=url, number=number)
         return {"url": url, "number": number}
 
     except FileNotFoundError:
@@ -208,12 +299,25 @@ def submit_contribution(
 def build_finding_from_qa(
     qa_content: str,
     service: str = "unknown",
+    service_namespace: str = "",
     source: str = "QA diagnosis",
+    section: str = "",
 ) -> dict:
     """Convert raw QA text into a finding dict.
 
     Extracts a reasonable context snippet from the QA response and
     packages it as a finding suitable for ``submit_contribution()``.
+
+    Parameters
+    ----------
+    service:
+        Friendly service name (e.g., ``cosmos-db``).
+    service_namespace:
+        ARM resource type namespace (e.g., ``Microsoft.DocumentDB/databaseAccounts``).
+        Preferred over ``service`` for file resolution.
+    section:
+        Which of the 8 knowledge sections needs updating (e.g.,
+        ``"Common Pitfalls"``, ``"Terraform Patterns"``).
     """
     # Use the first 500 chars as context, first 200 as content
     context = qa_content[:500].strip() if qa_content else ""
@@ -221,9 +325,10 @@ def build_finding_from_qa(
 
     return {
         "service": service,
+        "service_namespace": service_namespace,
         "type": "Pitfall",
-        "file": f"knowledge/services/{service}.md",
-        "section": "",
+        "file": _resolve_knowledge_file_path(service_namespace, service),
+        "section": section,
         "context": context,
         "rationale": context,
         "content": content,
@@ -251,15 +356,23 @@ def submit_if_gap(
     Returns the submission result dict or ``None`` if no gap or on error.
     """
     try:
+        from azext_prototype.debug_log import log_flow
+
         if not check_knowledge_gap(finding, loader):
+            log_flow("knowledge_contributor.submit_if_gap", "No gap detected, skipping", service=finding.get("service"))
             return None
 
+        log_flow("knowledge_contributor.submit_if_gap", "Gap detected, submitting", service=finding.get("service"))
         result = submit_contribution(finding, repo=repo)
 
         if result.get("url") and print_fn:
             print_fn(f"  Knowledge contribution submitted: {result['url']}")
+        elif result.get("error"):
+            log_flow("knowledge_contributor.submit_if_gap", "Submission failed", error=result["error"])
 
         return result
-    except Exception:
-        logger.debug("Knowledge contribution failed silently", exc_info=True)
+    except Exception as exc:
+        from azext_prototype.debug_log import log_error
+
+        log_error("knowledge_contributor.submit_if_gap", exc)
         return None

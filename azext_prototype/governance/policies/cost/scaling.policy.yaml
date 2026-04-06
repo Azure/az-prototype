@@ -1,0 +1,123 @@
+kind: policy
+domain: cost
+description: Governance policies for Scaling
+last_updated: '2026-03-27'
+rules:
+- id: WAF-COST-SCALE-001
+  severity: required
+  description: Configure App Service autoscale with CPU-based rules — scale out at >70%, scale in at <30%, with cooldown periods
+  rationale: Autoscale prevents both over-provisioning (cost waste) and under-provisioning (performance degradation). Cooldown
+    prevents flapping
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
+  targets:
+  - services:
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+    - Microsoft.Compute/virtualMachines
+    - Microsoft.Compute/virtualMachineScaleSets
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Sql/servers/databases
+    - Microsoft.ContainerService/managedClusters
+- id: WAF-COST-SCALE-002
+  severity: required
+  description: Configure Container Apps scaling rules with appropriate min/max replicas and HTTP/custom scaling triggers
+  rationale: Container Apps scaling is per-app; proper configuration prevents idle costs in dev and ensures availability in
+    production
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
+  targets:
+  - services:
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+    - Microsoft.Compute/virtualMachines
+    - Microsoft.Compute/virtualMachineScaleSets
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Sql/servers/databases
+    - Microsoft.ContainerService/managedClusters
+- id: WAF-COST-SCALE-003
+  severity: required
+  description: Configure VMSS autoscale profiles with CPU-based rules and scheduled profiles for predictable workloads
+  rationale: VMSS without autoscale runs at fixed capacity; autoscale adapts to demand and reduces off-hours costs
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
+  targets:
+  - services:
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+    - Microsoft.Compute/virtualMachines
+    - Microsoft.Compute/virtualMachineScaleSets
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Sql/servers/databases
+    - Microsoft.ContainerService/managedClusters
+- id: WAF-COST-SCALE-004
+  severity: required
+  description: Configure database autoscale — Cosmos DB autoscale maxThroughput for production, SQL elastic pools for multi-database
+    workloads
+  rationale: Database scaling directly impacts both cost and performance; autoscale prevents over-provisioning while handling
+    spikes
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
+  targets:
+  - services:
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+    - Microsoft.Compute/virtualMachines
+    - Microsoft.Compute/virtualMachineScaleSets
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Sql/servers/databases
+    - Microsoft.ContainerService/managedClusters
+- id: WAF-COST-SCALE-005
+  severity: required
+  description: Configure AKS cluster autoscaler with appropriate node pool settings — spot nodes for dev, on-demand for production
+  rationale: AKS cluster autoscaler adjusts node count automatically; spot VMs provide up to 90% savings for interruptible
+    workloads
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - cost-analyst
+  targets:
+  - services:
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+    - Microsoft.Compute/virtualMachines
+    - Microsoft.Compute/virtualMachineScaleSets
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Sql/servers/databases
+    - Microsoft.ContainerService/managedClusters
+patterns:
+- name: Environment-aware autoscale configuration
+  description: Dev/POC uses aggressive scale-down with low maximums; production uses higher minimums with zone-redundant capacity
+- name: Spot VM cost optimization
+  description: Use spot VMs for interruptible workloads in dev/POC to achieve up to 90% cost savings
+anti_patterns:
+- description: Do not deploy compute resources with fixed instance counts
+  instead: Configure autoscale with appropriate min/max and metrics-based scaling rules
+- description: Do not use the same scale configuration for dev and production
+  instead: Use lower minimums, lower maximums, and scale-to-zero where possible in dev
+- description: Do not scale on a single metric
+  instead: Use CPU as the primary trigger; add memory, queue depth, or HTTP connections as secondary triggers
+references:
+- title: Azure Autoscale overview
+  url: https://learn.microsoft.com/azure/azure-monitor/autoscale/autoscale-overview
+- title: Container Apps scaling
+  url: https://learn.microsoft.com/azure/container-apps/scale-app
+- title: AKS cluster autoscaler
+  url: https://learn.microsoft.com/azure/aks/cluster-autoscaler
+- title: Cosmos DB autoscale throughput
+  url: https://learn.microsoft.com/azure/cosmos-db/provision-throughput-autoscale
+- title: SQL elastic pools
+  url: https://learn.microsoft.com/azure/azure-sql/database/elastic-pool-overview

@@ -1,24 +1,45 @@
-# Anti-pattern detection — Storage domain
-#
-# Detects insecure storage and data service configurations in
-# AI-generated output.
-
+kind: anti-pattern
 domain: storage
-description: Storage account, Cosmos DB, and data service configuration detection
-
+description: Storage account access and data exposure detection
+last_updated: '2026-04-04'
 patterns:
-  - search_patterns:
-      - "account-level keys"
-      - "account_key_enabled"
-      - "shared_key_access = true"
+- id: ANTI-STOR-001
+  description: Detects shared key access enabled on storage accounts instead of Entra ID RBAC
+  rationale: Shared key authentication is a legacy pattern that bypasses Entra ID conditional access, PIM, and per-identity
+    audit trails.
+  warning_message: Storage account shared key access enabled — disable shared key and use Entra ID RBAC with managed identity.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.Storage/storageAccounts
+    search_patterns:
+    - account-level keys
+    - account_key_enabled
+    - shared_key_access = true
     safe_patterns:
-      - "do not use account-level keys"
-      - "disable shared key"
-    warning_message: "Account-level key access detected — use Microsoft Entra RBAC with managed identity instead."
-
-  - search_patterns:
-      - "allow_blob_public_access = true"
-      - "public_access = \"blob\""
-      - "public_access = \"container\""
-    safe_patterns: []
-    warning_message: "Public blob access enabled — disable public access and use SAS tokens or managed identity."
+    - do not use account-level keys
+    - disable shared key
+    correct_patterns:
+    - shared_access_key_enabled = false
+    - allowSharedKeyAccess = false
+    - '# Use Microsoft Entra RBAC with managed identity'
+- id: ANTI-STOR-002
+  description: Detects blob public access enabled on storage containers
+  rationale: Public blob access allows anonymous internet users to read container contents without any authentication.
+  warning_message: Blob public access enabled — set allowBlobPublicAccess = false.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.Storage/storageAccounts
+    search_patterns:
+    - allow_blob_public_access = true
+    - public_access = "blob"
+    - public_access = "container"
+    correct_patterns:
+    - allow_blob_public_access = false
+    - allowBlobPublicAccess = false
+    - public_access = "none"

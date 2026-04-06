@@ -1,3 +1,10 @@
+---
+service_namespace: Microsoft.Insights/components
+display_name: Application Insights
+depends_on:
+  - Microsoft.OperationalInsights/workspaces
+---
+
 # Application Insights
 > Application performance monitoring (APM) service that provides deep observability into application behavior, including request tracing, dependency tracking, exception logging, and live metrics.
 
@@ -30,14 +37,24 @@
 ### Basic Resource
 
 ```hcl
-resource "azurerm_application_insights" "this" {
-  name                = var.name
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  workspace_id        = var.log_analytics_workspace_id  # REQUIRED for workspace-based
-  application_type    = "web"
+resource "azapi_resource" "app_insights" {
+  type      = "Microsoft.Insights/components@2020-02-02"
+  name      = var.name
+  location  = var.location
+  parent_id = var.resource_group_id
+
+  body = {
+    kind = "web"
+    properties = {
+      Application_Type    = "web"
+      WorkspaceResourceId = var.log_analytics_workspace_id  # REQUIRED for workspace-based
+      IngestionMode       = "LogAnalytics"
+    }
+  }
 
   tags = var.tags
+
+  response_export_values = ["properties.ConnectionString", "properties.InstrumentationKey", "properties.AppId"]
 }
 ```
 
@@ -46,22 +63,22 @@ resource "azurerm_application_insights" "this" {
 ```hcl
 output "id" {
   description = "Application Insights resource ID"
-  value       = azurerm_application_insights.this.id
+  value       = azapi_resource.app_insights.id
 }
 
 output "instrumentation_key" {
   description = "Instrumentation key (not a secret)"
-  value       = azurerm_application_insights.this.instrumentation_key
+  value       = azapi_resource.app_insights.output.properties.InstrumentationKey
 }
 
 output "connection_string" {
   description = "Connection string for SDK configuration (not a secret)"
-  value       = azurerm_application_insights.this.connection_string
+  value       = azapi_resource.app_insights.output.properties.ConnectionString
 }
 
 output "app_id" {
   description = "Application Insights application ID (for API queries)"
-  value       = azurerm_application_insights.this.app_id
+  value       = azapi_resource.app_insights.output.properties.AppId
 }
 ```
 
@@ -69,41 +86,46 @@ output "app_id" {
 
 ```hcl
 # Pass connection string to App Service via app_settings
-resource "azurerm_linux_web_app" "this" {
-  # ... other config ...
-
-  app_settings = {
-    "APPLICATIONINSIGHTS_CONNECTION_STRING" = azurerm_application_insights.this.connection_string
-    "ApplicationInsightsAgent_EXTENSION_VERSION" = "~3"  # Auto-instrumentation for .NET
-  }
-}
-
-# Pass connection string to Function App via app_settings
-resource "azurerm_linux_function_app" "this" {
-  # ... other config ...
-
-  app_settings = {
-    "APPLICATIONINSIGHTS_CONNECTION_STRING" = azurerm_application_insights.this.connection_string
-    "APPINSIGHTS_INSTRUMENTATIONKEY"        = azurerm_application_insights.this.instrumentation_key
-  }
-}
+# (include these in the siteConfig.appSettings array of the azapi_resource for Microsoft.Web/sites)
+#
+# { name = "APPLICATIONINSIGHTS_CONNECTION_STRING", value = azapi_resource.app_insights.output.properties.ConnectionString }
+# { name = "ApplicationInsightsAgent_EXTENSION_VERSION", value = "~3" }  # Auto-instrumentation for .NET
+#
+# For Function Apps, also include:
+# { name = "APPINSIGHTS_INSTRUMENTATIONKEY", value = azapi_resource.app_insights.output.properties.InstrumentationKey }
 ```
 
 ### RBAC Assignment
 
 ```hcl
 # Grant read access to telemetry data
-resource "azurerm_role_assignment" "reader" {
-  scope                = azurerm_application_insights.this.id
-  role_definition_name = "Application Insights Component Reader"
-  principal_id         = var.reader_principal_id
+resource "azapi_resource" "reader_role" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.app_insights.id}${var.reader_principal_id}reader")
+  parent_id = azapi_resource.app_insights.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/aa49f09b-42d2-4ee6-8548-4c9c6fd4acbb"  # Application Insights Component Reader
+      principalId      = var.reader_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 
 # Grant contributor access for managing settings
-resource "azurerm_role_assignment" "contributor" {
-  scope                = azurerm_application_insights.this.id
-  role_definition_name = "Application Insights Component Contributor"
-  principal_id         = var.admin_principal_id
+resource "azapi_resource" "contributor_role" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = uuidv5("oid", "${azapi_resource.app_insights.id}${var.admin_principal_id}contributor")
+  parent_id = azapi_resource.app_insights.id
+
+  body = {
+    properties = {
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/ae349356-3a1b-4a5e-921d-050484c6347e"  # Application Insights Component Contributor
+      principalId      = var.admin_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 ```
 
@@ -114,7 +136,7 @@ resource "azurerm_role_assignment" "contributor" {
 # Private access is achieved via Azure Monitor Private Link Scope (AMPLS),
 # which is shared with Log Analytics.
 # See log-analytics.md for the AMPLS pattern.
-# For POC, public ingestion endpoints are acceptable.
+# Unless told otherwise, public access is disabled per governance policy — use AMPLS for private ingestion.
 ```
 
 ## Bicep Patterns

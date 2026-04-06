@@ -30,7 +30,7 @@ class QAEngineerAgent(BaseAgent):
     """Analyze errors, apply fixes, and guide redeployment."""
 
     _temperature = 0.2
-    _max_tokens = 8192
+    _max_tokens = 102400
     _enable_web_search = True
     _include_templates = False
     _include_standards = False
@@ -160,19 +160,7 @@ class QAEngineerAgent(BaseAgent):
                 usage=usage,
                 finish_reason=choice.finish_reason or "stop",
             )
-            # Post-response governance check
-            warnings = self.validate_response(result.content)
-            if warnings:
-                for w in warnings:
-                    logger.warning("Governance: %s", w)
-                block = "\n\n---\n⚠ **Governance warnings:**\n" + "\n".join(f"- {w}" for w in warnings)
-                result = AIResponse(
-                    content=result.content + block,
-                    model=result.model,
-                    usage=result.usage,
-                    finish_reason=result.finish_reason,
-                )
-            return result
+            return self._apply_governance_check(result, context)
         except Exception as e:
             logger.warning("Vision-based analysis failed, falling back to text: %s", e)
             messages.append(
@@ -263,12 +251,86 @@ Classify each failure as CRITICAL (must fix before deploy) or WARNING (should fi
 - [ ] All referenced variables are defined in variables.tf
 - [ ] All referenced locals are defined in locals.tf
 - [ ] Application code includes all referenced classes/models/DTOs
+- [ ] Every azapi_resource whose `.output.properties` is referenced in
+      outputs.tf MUST have `response_export_values = ["*"]` declared
+- [ ] No .tf file is empty or contains only comments (dead files)
 
 ### 7. Terraform File Structure
 - [ ] Every stage has exactly ONE file containing the terraform {} block (providers.tf, NOT versions.tf)
-- [ ] No .tf file is trivially empty or contains only closing braces
+- [ ] providers.tf includes `required_version = ">= 1.9.0"`
 - [ ] main.tf does NOT contain terraform {} or provider {} blocks
 - [ ] All .tf files are syntactically valid HCL (properly opened/closed blocks)
+- [ ] Backend `backend "local" {}` is acceptable — each stage uses default `terraform.tfstate`
+      in its own directory. Do NOT flag empty backend or `terraform.tfstate` as an issue.
+
+### 8. CRITICAL: Scope Compliance
+- [ ] No resources created that are not listed in "Services in This Stage"
+- [ ] No additional subnets beyond what INPUT specifies
+- [ ] No firewall rules unless explicitly required by MANDATORY RESOURCE POLICY
+- [ ] Companion resources (PE, DNS, diagnostics) only from MANDATORY RESOURCE POLICIES
+- [ ] No azurerm_* resources — all resources MUST use azapi_resource
+- [ ] Tags placed as top-level attribute on azapi_resource, NOT inside body{}
+- [ ] `provider "azapi" {}` MUST be empty — do NOT add subscription_id or tenant_id.
+      The az CLI context provides these. An empty provider block is CORRECT.
+- [ ] `subscription_id` and `tenant_id` variables are EXPECTED in every stage even if
+      not directly referenced in .tf resources. They are used by deploy.sh (az account set),
+      by locals.tf (ARM resource ID construction), and by parent_id on resource groups.
+      Do NOT flag these as unused — they are infrastructure variables, not dead code.
+
+### 9. Networking Stage
+- [ ] No placeholder private endpoints — PEs belong in service stages
+- [ ] NSGs must **NOT** have diagnostic settings resources (no log or metric categories)
+- [ ] VNet diagnostic settings use **ONLY** `AllMetrics` category, **NOT** `allLogs`
+- [ ] Diagnostic settings resources must **NOT** have `tags` attribute (extension resources)
+- [ ] Private DNS zone names are exact Azure FQDNs (e.g., `privatelink.vaultcore.azure.net`)
+- [ ] Private endpoints **NOT** created in networking stage — only subnet IDs and
+      DNS zone IDs are exported for downstream stages
+- [ ] `disableLocalAuth` is a top-level property under `properties`, **NOT** inside `features`
+
+### 10. Output Consistency
+- [ ] Cross-stage references use the **exact** output key names listed in the
+      "Previously Generated Stages" section — do **NOT** flag keys as "non-standard"
+      if they match what the upstream stage _actually_ exports
+- [ ] Remote state variable defaults use relative paths: `../stage-N-name/terraform.tfstate`
+- [ ] **NO** unused `terraform_remote_state` data sources — every data source
+      **MUST** have at least one output referenced in locals or resources
+- [ ] **NO** unused variables for state paths — if the data source is removed,
+      the corresponding variable **MUST** also be removed
+
+### 11. Container Apps
+- [ ] Identity model uses UAMI for ACR pull (**NOT** SystemAssigned alone)
+- [ ] Identity block includes `UserAssigned` or `SystemAssigned, UserAssigned`
+      with the UAMI in `userAssignedIdentities`
+- [ ] No circular `depends_on` between container app and its RBAC assignments
+- [ ] `AZURE_CLIENT_ID` env var set when multiple identities are attached
+- [ ] Cosmos DB `sqlRoleAssignments` uses correct API version (check service registry)
+
+### 12. ARM Schema Correctness
+- [ ] Cosmos DB serverless uses `capabilities = [{ name = "EnableServerless" }]`,
+      **NOT** `capacityMode = "Serverless"` (property does not exist in ARM schema)
+- [ ] Cosmos DB serverless uses `Continuous` backup, **NOT** `Periodic`
+- [ ] `disableLocalAuth` is at `properties` level, **NOT** inside `properties.features`
+- [ ] Blob storage diagnostics target an explicit blob service child resource,
+      **NOT** string interpolation on the storage account ID
+- [ ] RBAC assignments for the worker identity (Stage 1) are **unconditional**
+      (no `count`). The worker identity exists before any service stage runs.
+
+### 13. Application Code (app stages only)
+- [ ] Application source code is syntactically correct and complete
+- [ ] All referenced packages/dependencies listed in manifest (requirements.txt,
+      package.json, .csproj)
+- [ ] No hardcoded secrets or connection strings — use `DefaultAzureCredential`
+- [ ] No `deploy.sh` or IaC files generated (deployment is manual,
+      instructions in the deployment guide)
+- [ ] `Dockerfile` is acceptable for containerized apps
+- [ ] `.env.example` lists all required environment variables
+
+### 14. Documentation (docs stages only)
+- [ ] Architecture document covers **all** generated stages
+- [ ] Deployment guide has step-by-step instructions for **every** stage
+- [ ] Resource names match actual generated infrastructure (not placeholders)
+- [ ] No placeholder or TODO sections
+- [ ] No `deploy.sh` or executable scripts generated
 
 ## Output Format
 
@@ -292,6 +354,11 @@ Name of the agent that should apply this fix.
 1. `az prototype build --scope <scope>`
 2. `az prototype deploy --scope <scope> [--stage N]`
 
+IMPORTANT: Only flag issues that would cause a deployment failure (invalid ARM
+resource types, wrong properties, broken scripts) or violate MANDATORY policies.
+Do NOT request removal of resources listed in the architecture plan's "Services
+in This Stage" unless the resource would cause an ARM error at deploy time.
+
 If the error is ambiguous or more context is needed, ask specific follow-up
 questions and list what additional information would help.
 
@@ -300,4 +367,25 @@ SDK version, or configuration option, emit [SEARCH: your query] in your response
 The framework will fetch relevant Microsoft Learn documentation and re-invoke you
 with the results. Use at most 2 search markers per response. Only search when your
 built-in knowledge is insufficient.
+
+## Verdict
+
+After completing your review, you MUST end your response with exactly one of:
+
+    VERDICT: PASS
+
+or
+
+    VERDICT: FAIL
+
+**CRITICAL RULE:** VERDICT: FAIL requires at least one issue with severity **CRITICAL**.
+If all remaining issues are **WARNING** severity, you MUST return VERDICT: PASS.
+WARNINGs are informational — they do NOT block the build. Only CRITICALs block.
+
+Do NOT return VERDICT: FAIL for:
+- Policy template deviations that don't cause deployment failures (WARNING)
+- Naming convention preferences (WARNING)
+- Minor formatting differences (WARNING)
+
+This verdict line must appear on its own line at the very end of your response.
 """

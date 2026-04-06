@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock
 
 from azext_prototype.ai.provider import AIResponse
@@ -11,14 +10,12 @@ from azext_prototype.stages.intent import (
     IntentClassifier,
     IntentKind,
     IntentPattern,
-    IntentResult,
     build_backlog_classifier,
     build_build_classifier,
     build_deploy_classifier,
     build_discovery_classifier,
     read_files_for_session,
 )
-
 
 # ======================================================================
 # Helpers
@@ -91,11 +88,13 @@ class TestIntentClassifier:
         """When AI returns unparseable JSON, fall through to keyword scoring."""
         c = _make_classifier_with_ai("This is not JSON at all")
         # Register a keyword pattern that will match (keyword + phrase = 0.6)
-        c.register(IntentPattern(
-            command="/open",
-            keywords=["open"],
-            phrases=["open items"],
-        ))
+        c.register(
+            IntentPattern(
+                command="/open",
+                keywords=["open"],
+                phrases=["open items"],
+            )
+        )
         result = c.classify("what are the open items")
         assert result.kind == IntentKind.COMMAND
         assert result.command == "/open"
@@ -104,45 +103,53 @@ class TestIntentClassifier:
         """When no AI provider, keyword fallback runs."""
         c = IntentClassifier()  # No AI provider
         c.add_command_def(CommandDef("/open", "Show open items"))
-        c.register(IntentPattern(
-            command="/open",
-            keywords=["open"],
-            phrases=["open items"],
-        ))
+        c.register(
+            IntentPattern(
+                command="/open",
+                keywords=["open"],
+                phrases=["open items"],
+            )
+        )
         result = c.classify("what are the open items")
         assert result.kind == IntentKind.COMMAND
         assert result.command == "/open"
 
     def test_keyword_matching_triggers_command(self):
         c = IntentClassifier()
-        c.register(IntentPattern(
-            command="/status",
-            keywords=["status"],
-            phrases=["build status"],
-        ))
+        c.register(
+            IntentPattern(
+                command="/status",
+                keywords=["status"],
+                phrases=["build status"],
+            )
+        )
         result = c.classify("what's the build status")
         assert result.kind == IntentKind.COMMAND
         assert result.command == "/status"
 
     def test_below_threshold_conversational(self):
         c = IntentClassifier()
-        c.register(IntentPattern(
-            command="/deploy",
-            keywords=[],
-            phrases=["deploy stage"],
-            min_confidence=0.5,
-        ))
+        c.register(
+            IntentPattern(
+                command="/deploy",
+                keywords=[],
+                phrases=["deploy stage"],
+                min_confidence=0.5,
+            )
+        )
         # "the" keyword alone shouldn't match
         result = c.classify("I like the architecture")
         assert result.kind == IntentKind.CONVERSATIONAL
 
     def test_phrase_outscores_keyword(self):
         c = IntentClassifier()
-        c.register(IntentPattern(
-            command="/files",
-            keywords=["files"],
-            phrases=["generated files"],
-        ))
+        c.register(
+            IntentPattern(
+                command="/files",
+                keywords=["files"],
+                phrases=["generated files"],
+            )
+        )
         result = c.classify("show me the generated files")
         # phrase(0.4) + keyword(0.2) = 0.6 > 0.5 threshold
         assert result.kind == IntentKind.COMMAND
@@ -151,11 +158,13 @@ class TestIntentClassifier:
 
     def test_regex_match_extracts_args(self):
         c = IntentClassifier()
-        c.register(IntentPattern(
-            command="/deploy",
-            regex_patterns=[r"deploy\s+(?:stage\s+)?\d+"],
-            arg_extractor=lambda t: " ".join(__import__("re").findall(r"\d+", t)),
-        ))
+        c.register(
+            IntentPattern(
+                command="/deploy",
+                regex_patterns=[r"deploy\s+(?:stage\s+)?\d+"],
+                arg_extractor=lambda t: " ".join(__import__("re").findall(r"\d+", t)),
+            )
+        )
         result = c.classify("deploy stage 3")
         assert result.kind == IntentKind.COMMAND
         assert result.command == "/deploy"
@@ -200,11 +209,13 @@ class TestIntentClassifier:
         provider.chat.side_effect = ConnectionError("timeout")
         c = IntentClassifier(ai_provider=provider)
         c.add_command_def(CommandDef("/open", "Show open items"))
-        c.register(IntentPattern(
-            command="/open",
-            keywords=["open"],
-            phrases=["open items"],
-        ))
+        c.register(
+            IntentPattern(
+                command="/open",
+                keywords=["open"],
+                phrases=["open items"],
+            )
+        )
         result = c.classify("what are the open items")
         assert result.kind == IntentKind.COMMAND
         assert result.command == "/open"

@@ -200,9 +200,14 @@ class TestCAFAbbreviations:
 
     def test_core_resource_types(self):
         expected_types = [
-            "resource_group", "storage_account", "app_service",
-            "key_vault", "cosmos_db", "sql_server",
-            "container_registry", "function_app",
+            "resource_group",
+            "storage_account",
+            "app_service",
+            "key_vault",
+            "cosmos_db",
+            "sql_server",
+            "container_registry",
+            "function_app",
         ]
         for rtype in expected_types:
             assert rtype in CAF_ABBREVIATIONS

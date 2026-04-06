@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 class MCPClientInfo:
     """MCP client identity sent during the ``initialize`` handshake.
 
-    Centralises the extension name and version so individual handlers
+    Centralizes the extension name and version so individual handlers
     never hard-code them.  Access via ``self.client_info`` on any
     :class:`MCPHandler` instance.
     """
@@ -39,7 +39,7 @@ class MCPClientInfo:
     version: str = "1.0.0"
 
     def to_dict(self) -> dict[str, str]:
-        """Serialise for the MCP ``initialize`` request."""
+        """Serialize for the MCP ``initialize`` request."""
         return {"name": self.name, "version": self.version}
 
 

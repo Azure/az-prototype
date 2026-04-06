@@ -7,7 +7,6 @@ from knack.util import CLIError
 
 from azext_prototype.ai.provider import AIMessage, AIResponse
 
-
 # ======================================================================
 # AzureOpenAIProvider — extended
 # ======================================================================
@@ -18,21 +17,25 @@ class TestAzureOpenAIProviderExtended:
 
     def test_validate_endpoint_empty_raises(self):
         from azext_prototype.ai.azure_openai import AzureOpenAIProvider
+
         with pytest.raises(CLIError, match="endpoint is required"):
             AzureOpenAIProvider._validate_endpoint("")
 
     def test_validate_endpoint_blocked(self):
         from azext_prototype.ai.azure_openai import AzureOpenAIProvider
+
         with pytest.raises(CLIError, match="not permitted"):
             AzureOpenAIProvider._validate_endpoint("https://api.openai.com/v1")
 
     def test_validate_endpoint_invalid_pattern(self):
         from azext_prototype.ai.azure_openai import AzureOpenAIProvider
+
         with pytest.raises(CLIError, match="Invalid Azure OpenAI"):
             AzureOpenAIProvider._validate_endpoint("https://example.com/openai")
 
     def test_validate_endpoint_valid(self):
         from azext_prototype.ai.azure_openai import AzureOpenAIProvider
+
         # Should not raise
         AzureOpenAIProvider._validate_endpoint("https://my-resource.openai.azure.com/")
 
@@ -127,6 +130,7 @@ class TestAzureOpenAIProviderExtended:
     @patch("azext_prototype.ai.azure_openai.AzureOpenAIProvider._create_client")
     def test_list_models(self, mock_create):
         from azext_prototype.ai.azure_openai import AzureOpenAIProvider
+
         mock_create.return_value = MagicMock()
 
         provider = AzureOpenAIProvider("https://test.openai.azure.com/", deployment="gpt-4o")
@@ -137,6 +141,7 @@ class TestAzureOpenAIProviderExtended:
     @patch("azext_prototype.ai.azure_openai.AzureOpenAIProvider._create_client")
     def test_properties(self, mock_create):
         from azext_prototype.ai.azure_openai import AzureOpenAIProvider
+
         mock_create.return_value = MagicMock()
 
         provider = AzureOpenAIProvider("https://test.openai.azure.com/")
@@ -224,6 +229,7 @@ class TestGitHubModelsProviderExtended:
     @patch("azext_prototype.ai.github_models.GitHubModelsProvider._create_client")
     def test_list_models(self, mock_create):
         from azext_prototype.ai.github_models import GitHubModelsProvider
+
         mock_create.return_value = MagicMock()
 
         provider = GitHubModelsProvider("fake-token")
@@ -235,6 +241,7 @@ class TestGitHubModelsProviderExtended:
     @patch("azext_prototype.ai.github_models.GitHubModelsProvider._create_client")
     def test_properties(self, mock_create):
         from azext_prototype.ai.github_models import GitHubModelsProvider
+
         mock_create.return_value = MagicMock()
 
         provider = GitHubModelsProvider("fake-token", model="o1-mini")
@@ -278,6 +285,7 @@ class TestCopilotProviderExtended:
 
     def _make_provider(self, **kwargs):
         from azext_prototype.ai.copilot_provider import CopilotProvider
+
         return CopilotProvider(**kwargs)
 
     def _mock_ok_response(self, content="Copilot says hi"):
@@ -310,8 +318,7 @@ class TestCopilotProviderExtended:
         provider = self._make_provider(model="gpt-4o")
 
         provider.chat(
-            [AIMessage(role="system", content="Be helpful"),
-             AIMessage(role="user", content="Hello")],
+            [AIMessage(role="system", content="Be helpful"), AIMessage(role="user", content="Hello")],
             temperature=0.5,
             max_tokens=2048,
         )
@@ -341,6 +348,7 @@ class TestCopilotProviderExtended:
     @patch("azext_prototype.ai.copilot_provider.requests.post")
     def test_chat_timeout(self, mock_post, _mock_token):
         import requests as req
+
         mock_post.side_effect = req.Timeout()
         provider = self._make_provider()
 
@@ -383,6 +391,7 @@ class TestCopilotProviderExtended:
     @patch("azext_prototype.ai.copilot_provider.requests.post")
     def test_stream_chat_error(self, mock_post, _mock_token):
         import requests as req
+
         mock_post.side_effect = req.Timeout()
         provider = self._make_provider()
 
@@ -644,12 +653,14 @@ class TestCostAnalystAgent:
 
     def test_instantiation(self):
         from azext_prototype.agents.builtin.cost_analyst import CostAnalystAgent
+
         agent = CostAnalystAgent()
         assert agent.name == "cost-analyst"
         assert agent._temperature == 0.0
 
     def test_parse_components_valid_json(self):
         from azext_prototype.agents.builtin.cost_analyst import CostAnalystAgent
+
         agent = CostAnalystAgent()
 
         result = agent._parse_components('[{"serviceName": "App Service"}]')
@@ -658,6 +669,7 @@ class TestCostAnalystAgent:
 
     def test_parse_components_markdown_fences(self):
         from azext_prototype.agents.builtin.cost_analyst import CostAnalystAgent
+
         agent = CostAnalystAgent()
 
         result = agent._parse_components('```json\n[{"serviceName": "AKS"}]\n```')
@@ -665,6 +677,7 @@ class TestCostAnalystAgent:
 
     def test_parse_components_invalid(self):
         from azext_prototype.agents.builtin.cost_analyst import CostAnalystAgent
+
         agent = CostAnalystAgent()
 
         result = agent._parse_components("not json at all")
@@ -672,6 +685,7 @@ class TestCostAnalystAgent:
 
     def test_arm_to_family_known(self):
         from azext_prototype.agents.builtin.cost_analyst import CostAnalystAgent
+
         assert CostAnalystAgent._arm_to_family("Microsoft.Web/sites") == "Compute"
         assert CostAnalystAgent._arm_to_family("Microsoft.Sql/servers") == "Databases"
         assert CostAnalystAgent._arm_to_family("Microsoft.Storage/storageAccounts") == "Storage"
@@ -679,11 +693,13 @@ class TestCostAnalystAgent:
 
     def test_arm_to_family_unknown(self):
         from azext_prototype.agents.builtin.cost_analyst import CostAnalystAgent
+
         assert CostAnalystAgent._arm_to_family("Microsoft.Unknown/thing") == "Compute"
 
     @patch("requests.get")
     def test_query_retail_price_success(self, mock_get):
         from azext_prototype.agents.builtin.cost_analyst import CostAnalystAgent
+
         agent = CostAnalystAgent()
 
         mock_response = MagicMock()
@@ -699,6 +715,7 @@ class TestCostAnalystAgent:
     @patch("requests.get", side_effect=Exception("network error"))
     def test_query_retail_price_error(self, mock_get):
         from azext_prototype.agents.builtin.cost_analyst import CostAnalystAgent
+
         agent = CostAnalystAgent()
 
         result = agent._query_retail_price("Microsoft.Web", "P1v3", "", "eastus")
@@ -707,6 +724,7 @@ class TestCostAnalystAgent:
     @patch("requests.get")
     def test_fetch_pricing(self, mock_get):
         from azext_prototype.agents.builtin.cost_analyst import CostAnalystAgent
+
         agent = CostAnalystAgent()
 
         mock_response = MagicMock()
@@ -718,8 +736,13 @@ class TestCostAnalystAgent:
         context.project_config = {"project": {"location": "eastus"}}
 
         components = [
-            {"serviceName": "App Service", "armResourceType": "Microsoft.Web/sites",
-             "skuSmall": "B1", "skuMedium": "P1v3", "skuLarge": "P3v3"}
+            {
+                "serviceName": "App Service",
+                "armResourceType": "Microsoft.Web/sites",
+                "skuSmall": "B1",
+                "skuMedium": "P1v3",
+                "skuLarge": "P3v3",
+            }
         ]
 
         result = agent._fetch_pricing(components, context)
@@ -727,15 +750,21 @@ class TestCostAnalystAgent:
         assert all(r["region"] == "eastus" for r in result)
 
     def test_execute(self, mock_ai_provider):
-        from azext_prototype.agents.builtin.cost_analyst import CostAnalystAgent
         from azext_prototype.agents.base import AgentContext
+        from azext_prototype.agents.builtin.cost_analyst import CostAnalystAgent
 
         agent = CostAnalystAgent()
 
         # First call: extraction response (JSON components)
         # Second call: report
         mock_ai_provider.chat.side_effect = [
-            AIResponse(content='[{"serviceName":"App Service","armResourceType":"Microsoft.Web/sites","skuSmall":"B1","skuMedium":"P1v3","skuLarge":"P3v3"}]', model="gpt-4o"),
+            AIResponse(
+                content=(
+                    '[{"serviceName":"App Service","armResourceType":"Microsoft.Web/sites",'
+                    '"skuSmall":"B1","skuMedium":"P1v3","skuLarge":"P3v3"}]'
+                ),
+                model="gpt-4o",
+            ),
             AIResponse(content="| Service | Small | Medium | Large |", model="gpt-4o"),
         ]
 
@@ -764,11 +793,13 @@ class TestQAEngineerAgent:
 
     def test_instantiation(self):
         from azext_prototype.agents.builtin.qa_engineer import QAEngineerAgent
+
         agent = QAEngineerAgent()
         assert agent.name == "qa-engineer"
 
     def test_encode_image(self, tmp_path):
         from azext_prototype.agents.builtin.qa_engineer import QAEngineerAgent
+
         agent = QAEngineerAgent()
 
         img = tmp_path / "test.png"
@@ -776,12 +807,13 @@ class TestQAEngineerAgent:
 
         encoded = agent._encode_image(str(img))
         import base64
+
         decoded = base64.b64decode(encoded)
         assert decoded[:4] == b"\x89PNG"
 
     def test_execute_with_image_success(self, tmp_path):
-        from azext_prototype.agents.builtin.qa_engineer import QAEngineerAgent
         from azext_prototype.agents.base import AgentContext
+        from azext_prototype.agents.builtin.qa_engineer import QAEngineerAgent
 
         agent = QAEngineerAgent()
         img = tmp_path / "error.png"
@@ -798,16 +830,14 @@ class TestQAEngineerAgent:
         mock_provider._client.chat.completions.create.return_value = mock_response
         mock_provider.default_model = "gpt-4o"
 
-        ctx = AgentContext(
-            project_config={}, project_dir=str(tmp_path), ai_provider=mock_provider
-        )
+        ctx = AgentContext(project_config={}, project_dir=str(tmp_path), ai_provider=mock_provider)
 
         result = agent.execute_with_image(ctx, "Analyze this error", str(img))
         assert result.content == "Image analysis"
 
     def test_execute_with_image_fallback(self, tmp_path):
-        from azext_prototype.agents.builtin.qa_engineer import QAEngineerAgent
         from azext_prototype.agents.base import AgentContext
+        from azext_prototype.agents.builtin.qa_engineer import QAEngineerAgent
 
         agent = QAEngineerAgent()
         img = tmp_path / "error.png"
@@ -819,22 +849,18 @@ class TestQAEngineerAgent:
         mock_provider.default_model = "gpt-4o"
         mock_provider.chat.return_value = AIResponse(content="Text fallback", model="gpt-4o")
 
-        ctx = AgentContext(
-            project_config={}, project_dir=str(tmp_path), ai_provider=mock_provider
-        )
+        ctx = AgentContext(project_config={}, project_dir=str(tmp_path), ai_provider=mock_provider)
 
         result = agent.execute_with_image(ctx, "Analyze", str(img))
         assert result.content == "Text fallback"
 
     def test_execute_uses_base_class(self, mock_ai_provider):
         """QAEngineerAgent.execute() should use the base class default."""
-        from azext_prototype.agents.builtin.qa_engineer import QAEngineerAgent
         from azext_prototype.agents.base import AgentContext
+        from azext_prototype.agents.builtin.qa_engineer import QAEngineerAgent
 
         agent = QAEngineerAgent()
-        ctx = AgentContext(
-            project_config={}, project_dir="/tmp", ai_provider=mock_ai_provider
-        )
+        ctx = AgentContext(project_config={}, project_dir="/tmp", ai_provider=mock_ai_provider)
         result = agent.execute(ctx, "Analyze this error log")
         assert result.content == "Mock AI response content"
 
@@ -847,8 +873,8 @@ class TestQAEngineerAgent:
 class TestAgentLoaderExtended:
 
     def test_yaml_agent_execute(self, tmp_path, mock_ai_provider):
-        from azext_prototype.agents.loader import YAMLAgent
         from azext_prototype.agents.base import AgentContext
+        from azext_prototype.agents.loader import YAMLAgent
 
         definition = {
             "name": "test-yaml",
@@ -862,9 +888,7 @@ class TestAgentLoaderExtended:
         }
 
         agent = YAMLAgent(definition)
-        ctx = AgentContext(
-            project_config={}, project_dir=str(tmp_path), ai_provider=mock_ai_provider
-        )
+        ctx = AgentContext(project_config={}, project_dir=str(tmp_path), ai_provider=mock_ai_provider)
         result = agent.execute(ctx, "Build something")
         assert result.content == "Mock AI response content"
 
@@ -915,6 +939,7 @@ class TestAgentLoaderExtended:
 
     def test_load_agents_from_nonexistent_dir(self, tmp_path):
         from azext_prototype.agents.loader import load_agents_from_directory
+
         agents = load_agents_from_directory(str(tmp_path / "nonexistent"))
         assert agents == []
 
@@ -927,33 +952,39 @@ class TestAgentLoaderExtended:
 
     def test_yaml_agent_missing_name_raises(self):
         from azext_prototype.agents.loader import YAMLAgent
+
         with pytest.raises(CLIError, match="must include 'name'"):
             YAMLAgent({"description": "no name"})
 
     def test_load_yaml_agent_not_found(self):
         from azext_prototype.agents.loader import load_yaml_agent
+
         with pytest.raises(CLIError, match="not found"):
             load_yaml_agent("/nonexistent/path.yaml")
 
     def test_load_yaml_agent_wrong_ext(self, tmp_path):
         from azext_prototype.agents.loader import load_yaml_agent
+
         (tmp_path / "test.txt").write_text("test")
         with pytest.raises(CLIError, match=".yaml"):
             load_yaml_agent(str(tmp_path / "test.txt"))
 
     def test_load_yaml_agent_not_mapping(self, tmp_path):
         from azext_prototype.agents.loader import load_yaml_agent
+
         (tmp_path / "bad.yaml").write_text("- item1\n- item2\n", encoding="utf-8")
         with pytest.raises(CLIError, match="mapping"):
             load_yaml_agent(str(tmp_path / "bad.yaml"))
 
     def test_load_python_agent_not_found(self):
         from azext_prototype.agents.loader import load_python_agent
+
         with pytest.raises(CLIError, match="not found"):
             load_python_agent("/nonexistent/agent.py")
 
     def test_load_python_agent_wrong_ext(self, tmp_path):
         from azext_prototype.agents.loader import load_python_agent
+
         (tmp_path / "test.yaml").write_text("test")
         with pytest.raises(CLIError, match=".py"):
             load_python_agent(str(tmp_path / "test.yaml"))
@@ -961,7 +992,7 @@ class TestAgentLoaderExtended:
     def test_load_python_agent_with_agent_class(self, tmp_path):
         from azext_prototype.agents.loader import load_python_agent
 
-        code = '''
+        code = """
 from azext_prototype.agents.base import BaseAgent, AgentCapability
 
 class MyAgent(BaseAgent):
@@ -974,7 +1005,7 @@ class MyAgent(BaseAgent):
         )
 
 AGENT_CLASS = MyAgent
-'''
+"""
         (tmp_path / "my_agent.py").write_text(code, encoding="utf-8")
         agent = load_python_agent(str(tmp_path / "my_agent.py"))
         assert agent.name == "py-agent"
@@ -982,7 +1013,7 @@ AGENT_CLASS = MyAgent
     def test_load_python_agent_auto_discover(self, tmp_path):
         from azext_prototype.agents.loader import load_python_agent
 
-        code = '''
+        code = """
 from azext_prototype.agents.base import BaseAgent, AgentCapability
 
 class AutoAgent(BaseAgent):
@@ -993,7 +1024,7 @@ class AutoAgent(BaseAgent):
             capabilities=[AgentCapability.DEVELOP],
             system_prompt="test",
         )
-'''
+"""
         (tmp_path / "auto_agent.py").write_text(code, encoding="utf-8")
         agent = load_python_agent(str(tmp_path / "auto_agent.py"))
         assert agent.name == "auto-agent"
@@ -1008,7 +1039,7 @@ class AutoAgent(BaseAgent):
     def test_load_python_agent_multiple_classes_raises(self, tmp_path):
         from azext_prototype.agents.loader import load_python_agent
 
-        code = '''
+        code = """
 from azext_prototype.agents.base import BaseAgent, AgentCapability
 
 class AgentA(BaseAgent):
@@ -1018,7 +1049,7 @@ class AgentA(BaseAgent):
 class AgentB(BaseAgent):
     def __init__(self):
         super().__init__(name="b", description="B", capabilities=[], system_prompt="")
-'''
+"""
         (tmp_path / "multi.py").write_text(code, encoding="utf-8")
         with pytest.raises(CLIError, match="Multiple BaseAgent"):
             load_python_agent(str(tmp_path / "multi.py"))

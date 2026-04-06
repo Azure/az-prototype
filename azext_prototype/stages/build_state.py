@@ -22,10 +22,9 @@ import hashlib
 import logging
 import re
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
-import yaml
+from azext_prototype.stages.base_state import BaseState
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +68,7 @@ def _default_build_state() -> dict[str, Any]:
         "review_decisions": [],
         "conversation_history": [],
         "resources": [],
+        "stage_contexts": {},  # {stage_num: condensed_context_str}
         "design_snapshot": {
             "iteration": None,
             "architecture_hash": None,
@@ -83,7 +83,7 @@ def _default_build_state() -> dict[str, Any]:
     }
 
 
-class BuildState:
+class BuildState(BaseState):
     """Manages persistent build state in YAML format.
 
     Provides:
@@ -94,68 +94,14 @@ class BuildState:
     - Build report formatting
     """
 
-    def __init__(self, project_dir: str):
-        self._project_dir = project_dir
-        self._path = Path(project_dir) / BUILD_STATE_FILE
-        self._state: dict[str, Any] = _default_build_state()
-        self._loaded = False
+    _STATE_FILE = BUILD_STATE_FILE
 
-    @property
-    def exists(self) -> bool:
-        """Check if a build.yaml file exists."""
-        return self._path.exists()
+    @staticmethod
+    def _default_state() -> dict[str, Any]:
+        return _default_build_state()
 
-    @property
-    def state(self) -> dict[str, Any]:
-        """Get the current state dict."""
-        return self._state
-
-    def load(self) -> dict[str, Any]:
-        """Load existing build state from YAML.
-
-        Returns the state dict (empty structure if file doesn't exist).
-        """
-        if self._path.exists():
-            try:
-                with open(self._path, "r", encoding="utf-8") as f:
-                    loaded = yaml.safe_load(f) or {}
-                self._state = _default_build_state()
-                self._deep_merge(self._state, loaded)
-                self._backfill_ids()
-                self._loaded = True
-                logger.info("Loaded build state from %s", self._path)
-            except (yaml.YAMLError, IOError) as e:
-                logger.warning("Could not load build state: %s", e)
-                self._state = _default_build_state()
-        else:
-            self._state = _default_build_state()
-
-        return self._state
-
-    def save(self) -> None:
-        """Save the current state to YAML."""
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-
-        now = datetime.now(timezone.utc).isoformat()
-        if not self._state["_metadata"]["created"]:
-            self._state["_metadata"]["created"] = now
-        self._state["_metadata"]["last_updated"] = now
-
-        with open(self._path, "w", encoding="utf-8") as f:
-            yaml.dump(
-                self._state,
-                f,
-                default_flow_style=False,
-                allow_unicode=True,
-                sort_keys=False,
-                width=120,
-            )
-        logger.info("Saved build state to %s", self._path)
-
-    def reset(self) -> None:
-        """Reset state to defaults and save."""
-        self._state = _default_build_state()
-        self._loaded = False
+    def _post_load(self) -> None:
+        self._backfill_ids()
         self.save()
 
     # ------------------------------------------------------------------ #
@@ -170,7 +116,7 @@ class BuildState:
             {
                 "stage": 1,
                 "name": "Foundation",
-                "category": "infra",
+                "capability": "infra",
                 "services": [
                     {
                         "name": "key-vault",
@@ -219,6 +165,33 @@ class BuildState:
 
         self.save()
 
+    def set_stage_advisory(self, stage_num: int, advisory: str) -> None:
+        """Store advisory notes for a completed stage."""
+        for stage in self._state["deployment_stages"]:
+            if stage["stage"] == stage_num:
+                stage["advisory"] = advisory
+                break
+        self.save()
+
+    def get_all_advisories(self) -> list[dict]:
+        """Return advisories from all stages that have them.
+
+        Returns a list of ``{"stage": N, "name": "...", "advisory": "..."}``
+        dicts, ordered by stage number.
+        """
+        results = []
+        for stage in self._state.get("deployment_stages", []):
+            advisory = stage.get("advisory", "")
+            if advisory:
+                results.append(
+                    {
+                        "stage": stage["stage"],
+                        "name": stage.get("name", ""),
+                        "advisory": advisory,
+                    }
+                )
+        return results
+
     def mark_stage_accepted(self, stage_num: int) -> None:
         """Mark a deployment stage as accepted after review."""
         for stage in self._state["deployment_stages"]:
@@ -227,9 +200,73 @@ class BuildState:
                 break
         self.save()
 
+    def mark_stage_generating(self, stage_num: int) -> None:
+        """Mark a stage as actively being generated by the AI agent.
+
+        If the build is interrupted while a stage is in this state,
+        re-entry will delete its artifacts and regenerate from scratch.
+        """
+        for stage in self._state["deployment_stages"]:
+            if stage["stage"] == stage_num:
+                stage["status"] = "generating"
+                break
+        self.save()
+
+    def mark_stage_validating(self, stage_num: int, files: list[str]) -> None:
+        """Mark a stage as having files on disk awaiting QA validation.
+
+        If QA fails and the user fixes files manually, re-entry will
+        re-run QA on the existing files without regenerating.
+        """
+        for stage in self._state["deployment_stages"]:
+            if stage["stage"] == stage_num:
+                stage["status"] = "validating"
+                stage["files"] = files
+                break
+        self.save()
+
+    def clean_stage_artifacts(self, stage_num: int, project_dir: str) -> None:
+        """Delete generated files for a stage and reset it to pending.
+
+        Used when a stage was interrupted during generation (status
+        ``"generating"``) and needs to be regenerated from scratch.
+        """
+        from pathlib import Path
+
+        for stage in self._state["deployment_stages"]:
+            if stage["stage"] == stage_num:
+                for f in stage.get("files", []):
+                    fpath = Path(project_dir) / f
+                    if fpath.exists():
+                        fpath.unlink()
+                stage["status"] = "pending"
+                stage["files"] = []
+                break
+        self.save()
+
+    def cascade_downstream_pending(self, stage_num: int) -> None:
+        """Mark all stages after ``stage_num`` as pending.
+
+        Used when a stage is re-validated after user fixes, ensuring
+        downstream stages regenerate with updated upstream outputs.
+        """
+        for stage in self._state["deployment_stages"]:
+            if stage["stage"] > stage_num and stage.get("status") in ("generated", "accepted"):
+                stage["status"] = "pending"
+                stage["files"] = []
+        self.save()
+
     def get_pending_stages(self) -> list[dict]:
-        """Return stages that have not yet been generated."""
-        return [s for s in self._state["deployment_stages"] if s.get("status") == "pending"]
+        """Return stages that need generation.
+
+        Includes ``"pending"`` (never generated) and ``"generating"``
+        (interrupted during generation, needs full regen) stages.
+        """
+        return [s for s in self._state["deployment_stages"] if s.get("status") in ("pending", "generating")]
+
+    def get_validating_stages(self) -> list[dict]:
+        """Return stages awaiting QA re-validation after user fixes."""
+        return [s for s in self._state["deployment_stages"] if s.get("status") == "validating"]
 
     def get_generated_stages(self) -> list[dict]:
         """Return stages that have been generated (but may not be accepted)."""
@@ -327,7 +364,7 @@ class BuildState:
         # Find insertion point — before the docs stage
         insert_idx = len(existing)
         for i, s in enumerate(existing):
-            if s.get("category") == "docs":
+            if s.get("capability") == "docs":
                 insert_idx = i
                 break
 
@@ -537,7 +574,7 @@ class BuildState:
             icon = {"pending": "  ", "generated": "++ ", "accepted": "v "}.get(status, "  ")
             svc_count = len(stage.get("services", []))
             file_count = len(stage.get("files", []))
-            line = f"  {icon}Stage {stage['stage']}: {stage['name']} ({stage.get('category', '?')})"
+            line = f"  {icon}Stage {stage['stage']}: {stage['name']} ({stage.get('capability', '?')})"
             if file_count:
                 line += f" - {file_count} file(s)"
             elif svc_count:
@@ -621,11 +658,3 @@ class BuildState:
     def _backfill_ids(self) -> None:
         """Backfill ``id``, ``deploy_mode``, and ``manual_instructions`` on legacy state files."""
         self._assign_stable_ids()
-
-    def _deep_merge(self, base: dict, updates: dict) -> None:
-        """Deep merge updates into base dict."""
-        for key, value in updates.items():
-            if key in base and isinstance(base[key], dict) and isinstance(value, dict):
-                self._deep_merge(base[key], value)
-            else:
-                base[key] = value

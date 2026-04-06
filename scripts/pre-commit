@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 """Git pre-commit hook that validates governance files.
 
-Validates staged files across all four governance domains:
+Validates staged files across all governance domains:
   1. Policies (.policy.yaml)
-  2. Workload templates (.template.yaml)
-  3. Anti-patterns (anti_patterns/*.yaml)
-  4. Standards (standards/**/*.yaml)
+  2. Anti-patterns (anti_patterns/*.yaml)
+  3. Standards (standards/**/*.yaml)
+  4. Workload templates (.template.yaml)
 
 Install by running:
     python scripts/install-hooks.py
@@ -23,10 +23,8 @@ import sys
 def main() -> int:
     """Run all governance validators on staged files."""
     validators = [
-        ("policies", [sys.executable, "-m", "azext_prototype.governance.policies.validate", "--hook", "--strict"]),
+        ("governance", [sys.executable, "-m", "azext_prototype.governance.validate", "--all", "--strict"]),
         ("templates", [sys.executable, "-m", "azext_prototype.templates.validate", "--hook", "--strict"]),
-        ("anti-patterns", [sys.executable, "-m", "azext_prototype.governance.anti_patterns.validate", "--hook", "--strict"]),
-        ("standards", [sys.executable, "-m", "azext_prototype.governance.standards.validate", "--hook", "--strict"]),
     ]
 
     failed = []

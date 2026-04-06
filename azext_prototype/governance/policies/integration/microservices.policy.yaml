@@ -1,0 +1,140 @@
+kind: policy
+domain: integration
+description: Governance policies for Microservices
+last_updated: '2026-03-27'
+rules:
+- id: CC-INT-MS-001
+  severity: required
+  description: Authenticate service-to-service calls via managed identity and RBAC — never shared keys or hardcoded tokens
+  rationale: Managed identity eliminates credential management between microservices; RBAC provides auditable access control
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - csharp-developer
+  - python-developer
+  companion_resources:
+  - type: Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31
+    name: id-svc-*
+    description: User-assigned managed identity per microservice for cross-service authentication
+  template_check:
+    scope:
+    - container-apps
+    require_config:
+    - identity
+    error_message: Service '{service_name}' ({service_type}) missing managed identity for service-to-service authentication
+  targets:
+  - services:
+    - Microsoft.App/containerApps
+    - Microsoft.Web/sites
+    - Microsoft.Insights/components
+- id: CC-INT-MS-002
+  severity: recommended
+  description: Enable Dapr sidecar for service invocation, pub/sub, and state management in Container Apps
+  rationale: Dapr provides service discovery, mTLS, pub/sub abstraction, and state management without application-level implementation
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - csharp-developer
+  - python-developer
+  companion_resources:
+  - type: Microsoft.App/managedEnvironments/daprComponents@2024-03-01
+    name: pubsub-servicebus
+    description: Dapr pub/sub component backed by Azure Service Bus with managed identity
+  targets:
+  - services:
+    - Microsoft.App/containerApps
+    - Microsoft.Web/sites
+    - Microsoft.Insights/components
+- id: CC-INT-MS-003
+  severity: required
+  description: Configure distributed tracing with Application Insights and OpenTelemetry for all microservices
+  rationale: Distributed tracing correlates requests across microservices; without it, debugging cross-service failures is
+    impossible
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - csharp-developer
+  - python-developer
+  - monitoring-agent
+  companion_resources:
+  - type: Microsoft.Insights/components@2020-02-02
+    name: app-insights
+    description: Workspace-based Application Insights for distributed tracing and metrics
+  - type: Microsoft.OperationalInsights/workspaces@2023-09-01
+    name: log-analytics
+    description: Log Analytics workspace backing Application Insights
+  template_check:
+    when_services_present:
+    - container-apps
+    require_service:
+    - application-insights
+    severity: warning
+    error_message: Microservices template must include Application Insights for distributed tracing
+  targets:
+  - services:
+    - Microsoft.App/containerApps
+    - Microsoft.Web/sites
+    - Microsoft.Insights/components
+- id: CC-INT-MS-004
+  severity: required
+  description: Configure health checks (liveness and readiness probes) on all Container Apps and App Service instances
+  rationale: Health probes enable automatic restart of unhealthy instances and prevent traffic routing to unready services
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services:
+    - Microsoft.App/containerApps
+    - Microsoft.Web/sites
+    - Microsoft.Insights/components
+- id: CC-INT-MS-005
+  severity: recommended
+  description: Configure circuit breaker and retry patterns using Dapr resiliency policies
+  rationale: Circuit breakers prevent cascade failures; retries with backoff handle transient errors gracefully
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services:
+    - Microsoft.App/containerApps
+    - Microsoft.Web/sites
+    - Microsoft.Insights/components
+patterns:
+- name: Service-to-service auth via managed identity
+  description: Container Apps calling each other using user-assigned managed identities and DefaultAzureCredential
+- name: Dapr-enabled microservices
+  description: Container Apps with Dapr sidecar for service invocation, pub/sub, state, and resiliency
+- name: Observable microservices
+  description: All services emit OpenTelemetry traces to shared Application Insights with service.name attribution
+anti_patterns:
+- description: Do not hardcode service URLs in container images
+  instead: Use environment variables, Dapr service invocation, or internal DNS for service discovery
+- description: Do not skip health probes on any microservice
+  instead: Configure startup, liveness, and readiness probes with appropriate thresholds
+- description: Do not use synchronous calls without circuit breakers
+  instead: Configure Dapr resiliency policies or application-level circuit breakers with timeouts
+references:
+- title: Container Apps service-to-service communication
+  url: https://learn.microsoft.com/azure/container-apps/connect-apps
+- title: Container Apps Dapr integration
+  url: https://learn.microsoft.com/azure/container-apps/dapr-overview
+- title: Container Apps health probes
+  url: https://learn.microsoft.com/azure/container-apps/health-probes
+- title: Application Insights with Container Apps
+  url: https://learn.microsoft.com/azure/container-apps/opentelemetry-agents
+- title: Dapr resiliency policies
+  url: https://docs.dapr.io/operations/resiliency/policies/

@@ -1,0 +1,110 @@
+kind: policy
+domain: integration
+description: Governance policies for Api Patterns
+last_updated: '2026-03-27'
+rules:
+- id: CC-INT-API-001
+  severity: required
+  description: Implement API versioning using URL path segments in APIM with version sets
+  rationale: API versioning prevents breaking changes for existing consumers; URL path versioning is the most discoverable
+    approach
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - csharp-developer
+  - python-developer
+  companion_resources:
+  - type: Microsoft.ApiManagement/service/apiVersionSets@2023-09-01-preview
+    name: api-version-set
+    description: API version set grouping related API versions under a single path
+  - type: Microsoft.ApiManagement/service/apis/policies@2023-09-01-preview
+    name: deprecation-policy
+    description: Outbound policy adding Sunset and Deprecation headers to deprecated API versions
+  targets:
+  - services:
+    - Microsoft.ApiManagement/service
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+- id: CC-INT-API-002
+  severity: required
+  description: Configure OAuth 2.0 / JWT validation in APIM inbound policies for all API endpoints
+  rationale: APIs without authentication allow unrestricted access; JWT validation at the gateway prevents unauthorized requests
+    from reaching backends
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - csharp-developer
+  - python-developer
+  companion_resources:
+  - type: Microsoft.ApiManagement/service/authorizationServers@2023-09-01-preview
+    name: entra-id-oauth
+    description: OAuth 2.0 authorization server for Entra ID integration in developer portal
+  targets:
+  - services:
+    - Microsoft.ApiManagement/service
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+- id: CC-INT-API-003
+  severity: required
+  description: Configure request and response validation policies in APIM to enforce API contracts
+  rationale: Request validation prevents malformed input from reaching backends; response validation ensures API contract
+    compliance
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services:
+    - Microsoft.ApiManagement/service
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+- id: CC-INT-API-004
+  severity: recommended
+  description: Integrate OpenAPI specification with APIM for auto-generated documentation and developer portal
+  rationale: OpenAPI specs provide machine-readable API contracts; APIM developer portal auto-generates interactive documentation
+  applies_to:
+  - cloud-architect
+  - terraform-agent
+  - bicep-agent
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services:
+    - Microsoft.ApiManagement/service
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+patterns:
+- name: Versioned API with APIM version sets
+  description: URL path-segmented API versioning with sunset headers on deprecated versions
+- name: JWT-validated API with Entra ID
+  description: APIM inbound JWT validation using Entra ID OpenID Connect discovery
+- name: OpenAPI-driven API with request validation
+  description: API imported from OpenAPI spec with inbound content and parameter validation
+anti_patterns:
+- description: Do not deploy APIs without versioning
+  instead: Use APIM API version sets with URL segment versioning (v1, v2)
+- description: Do not deploy APIs without authentication
+  instead: Configure validate-jwt policy with Entra ID OpenID Connect discovery
+- description: Do not skip request validation
+  instead: Use validate-content and validate-parameters policies with OpenAPI schema enforcement
+- description: Do not expose internal error details in API responses
+  instead: Use on-error policy to return RFC 9457 Problem Details format
+references:
+- title: APIM API versioning
+  url: https://learn.microsoft.com/azure/api-management/api-management-versions
+- title: APIM JWT validation
+  url: https://learn.microsoft.com/azure/api-management/validate-jwt-policy
+- title: APIM content validation
+  url: https://learn.microsoft.com/azure/api-management/validate-content-policy
+- title: APIM OpenAPI import
+  url: https://learn.microsoft.com/azure/api-management/import-api-from-oas
+- title: RFC 9457 Problem Details
+  url: https://www.rfc-editor.org/rfc/rfc9457

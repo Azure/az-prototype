@@ -118,7 +118,7 @@ def _resolve_severity(policy_severity: str, template_check: dict[str, Any]) -> s
 
 
 def _as_list(value: Any) -> list[Any]:
-    """Normalise a scalar-or-list field into a list."""
+    """Normalize a scalar-or-list field into a list."""
     if isinstance(value, list):
         return value
     if isinstance(value, str):

@@ -21,21 +21,29 @@ import yaml
 logger = logging.getLogger(__name__)
 
 # ------------------------------------------------------------------ #
-# Schema constants — keep in sync with the .policy.yaml spec
+# Schema constants — keep in sync with governance/schemas/policy.schema.json
 # ------------------------------------------------------------------ #
-SUPPORTED_API_VERSIONS = ("v1",)
 SUPPORTED_KINDS = ("policy",)
 VALID_SEVERITIES = ("required", "recommended", "optional")
-VALID_CATEGORIES = ("azure", "security", "integration", "cost", "data", "general")
 
-# Required top-level keys that every policy file must contain
-_REQUIRED_TOP_KEYS = {"metadata"}
-_REQUIRED_METADATA_KEYS = {"name", "category", "services"}
-_REQUIRED_RULE_KEYS = {"id", "severity", "description", "applies_to"}
+# Required top-level keys (new unified format)
+_REQUIRED_TOP_KEYS = {"kind", "domain", "description", "last_updated", "rules"}
+_REQUIRED_RULE_KEYS = {"id", "severity", "description"}
 
 # ------------------------------------------------------------------ #
 # Data classes
 # ------------------------------------------------------------------ #
+
+
+@dataclass
+class CompanionResource:
+    """A resource that must accompany the primary resource."""
+
+    type: str
+    description: str
+    name: str = ""
+    terraform_pattern: str = ""
+    bicep_pattern: str = ""
 
 
 @dataclass
@@ -46,7 +54,12 @@ class PolicyRule:
     severity: str  # required | recommended | optional
     description: str
     rationale: str = ""
+    warning_message: str = ""
     applies_to: list[str] = field(default_factory=list)
+    targets: list = field(
+        default_factory=list
+    )  # [{"services": [...], "terraform_pattern": "...", "prohibitions": [...]}]
+    companion_resources: list[CompanionResource] = field(default_factory=list)
 
 
 @dataclass
@@ -63,13 +76,14 @@ class Policy:
     """A loaded policy document."""
 
     name: str
-    category: str
-    services: list[str] = field(default_factory=list)
+    domain: str
+    description: str = ""
+    last_updated: str = ""
+    services: list[str] = field(default_factory=list)  # backward compat aggregate
     rules: list[PolicyRule] = field(default_factory=list)
     patterns: list[PolicyPattern] = field(default_factory=list)
     anti_patterns: list[dict[str, str]] = field(default_factory=list)
     references: list[dict[str, str]] = field(default_factory=list)
-    last_reviewed: str = ""
 
 
 # ------------------------------------------------------------------ #
@@ -90,7 +104,7 @@ class ValidationError:
 
 
 def validate_policy_file(path: Path) -> list[ValidationError]:
-    """Validate a single .policy.yaml file against the schema.
+    """Validate a single .policy.yaml file against the unified schema.
 
     Returns a list of validation errors (empty means valid).
     """
@@ -111,16 +125,6 @@ def validate_policy_file(path: Path) -> list[ValidationError]:
         errors.append(ValidationError(filename, "Root element must be a mapping"))
         return errors
 
-    # ---- apiVersion ----
-    api_version = data.get("apiVersion")
-    if api_version and api_version not in SUPPORTED_API_VERSIONS:
-        errors.append(
-            ValidationError(
-                filename,
-                f"Unsupported apiVersion '{api_version}'. " f"Supported: {', '.join(SUPPORTED_API_VERSIONS)}",
-            )
-        )
-
     # ---- kind ----
     kind = data.get("kind")
     if kind and kind not in SUPPORTED_KINDS:
@@ -131,33 +135,10 @@ def validate_policy_file(path: Path) -> list[ValidationError]:
             )
         )
 
-    # ---- metadata ----
-    metadata = data.get("metadata")
-    if metadata is None:
-        errors.append(ValidationError(filename, "Missing required key: 'metadata'"))
-        return errors  # can't validate further without metadata
-
-    if not isinstance(metadata, dict):
-        errors.append(ValidationError(filename, "'metadata' must be a mapping"))
-        return errors
-
-    for key in _REQUIRED_METADATA_KEYS:
-        if key not in metadata:
-            errors.append(ValidationError(filename, f"metadata missing required key: '{key}'"))
-
-    category = metadata.get("category", "")
-    if category and category not in VALID_CATEGORIES:
-        errors.append(
-            ValidationError(
-                filename,
-                f"metadata.category '{category}' is not valid. " f"Allowed: {', '.join(VALID_CATEGORIES)}",
-                severity="warning",
-            )
-        )
-
-    services = metadata.get("services")
-    if services is not None and not isinstance(services, list):
-        errors.append(ValidationError(filename, "metadata.services must be a list"))
+    # ---- Validate required top-level keys ----
+    for key in _REQUIRED_TOP_KEYS:
+        if key not in data:
+            errors.append(ValidationError(filename, f"Missing required key: '{key}'"))
 
     # ---- rules ----
     rules = data.get("rules", [])
@@ -165,7 +146,8 @@ def validate_policy_file(path: Path) -> list[ValidationError]:
         errors.append(ValidationError(filename, "'rules' must be a list"))
         rules = []
 
-    rule_ids: set[str] = set()
+    # Same ID is allowed with different targets (different services)
+    rule_id_targets: set[tuple] = set()
     for i, rule in enumerate(rules):
         prefix = f"rules[{i}]"
         if not isinstance(rule, dict):
@@ -177,31 +159,33 @@ def validate_policy_file(path: Path) -> list[ValidationError]:
                 errors.append(ValidationError(filename, f"{prefix} missing required key: '{key}'"))
 
         rid = rule.get("id", "")
+        targets = rule.get("targets", [])
+        if isinstance(targets, dict):
+            targets = [targets]
+        all_svcs = []
+        for t in targets if isinstance(targets, list) else []:
+            all_svcs.extend(t.get("services", []) if isinstance(t, dict) else [])
+        target_svcs = tuple(sorted(all_svcs))
+        key = (rid, target_svcs)
         if rid:
-            if rid in rule_ids:
-                errors.append(ValidationError(filename, f"{prefix}: duplicate rule id '{rid}'"))
-            rule_ids.add(rid)
+            if key in rule_id_targets:
+                errors.append(
+                    ValidationError(filename, f"{prefix}: duplicate rule id+targets '{rid}' for {target_svcs}")
+                )
+            rule_id_targets.add(key)
 
         severity = rule.get("severity", "")
         if severity and severity not in VALID_SEVERITIES:
             errors.append(
                 ValidationError(
                     filename,
-                    f"{prefix}: invalid severity '{severity}'. " f"Allowed: {', '.join(VALID_SEVERITIES)}",
+                    f"{prefix}: invalid severity '{severity}'. Allowed: {', '.join(VALID_SEVERITIES)}",
                 )
             )
 
         applies_to = rule.get("applies_to")
         if applies_to is not None and not isinstance(applies_to, list):
             errors.append(ValidationError(filename, f"{prefix}.applies_to must be a list"))
-        elif isinstance(applies_to, list) and len(applies_to) == 0:
-            errors.append(
-                ValidationError(
-                    filename,
-                    f"{prefix}.applies_to is empty — rule will never be resolved",
-                    severity="warning",
-                )
-            )
 
     # ---- patterns (optional) ----
     patterns = data.get("patterns", [])
@@ -316,7 +300,8 @@ class PolicyEngine:
         for policy in self._policies:
             # Filter by service if specified
             if services:
-                overlap = set(policy.services) & {s.lower() for s in services}
+                policy_svcs = {s.lower() for s in policy.services}
+                overlap = policy_svcs & {s.lower() for s in services}
                 if not overlap:
                     continue
 
@@ -332,13 +317,12 @@ class PolicyEngine:
                 # Return a copy with only the relevant rules
                 filtered = Policy(
                     name=policy.name,
-                    category=policy.category,
+                    domain=policy.domain,
                     services=policy.services,
                     rules=relevant_rules,
                     patterns=policy.patterns,
                     anti_patterns=policy.anti_patterns,
                     references=policy.references,
-                    last_reviewed=policy.last_reviewed,
                 )
                 matched.append(filtered)
 
@@ -394,6 +378,108 @@ class PolicyEngine:
 
         return "\n".join(sections)
 
+    def resolve_for_stage(
+        self,
+        services: list[str],
+        iac_tool: str,
+        agent_name: str = "",
+    ) -> str:
+        """Resolve and format deterministic policies for a stage's services.
+
+        Uses **exact service matching** (not embeddings) to find all
+        policies that apply to the named services.  Returns a formatted
+        brief with the IaC-specific code patterns (terraform or bicep),
+        companion resources, and prohibitions.
+        """
+        if not self._loaded:
+            self.load()
+
+        if not services:
+            return ""
+
+        svc_set = {s.lower() for s in services}
+        matched_policies = []
+        for p in self._policies:
+            # Match by aggregate policy.services (legacy + new targets union)
+            policy_svcs = {s.lower() for s in p.services}
+            overlap = policy_svcs & svc_set
+            if not overlap:
+                # Also try per-rule targets[].services
+                rule_targets = {
+                    s.lower() for r in p.rules for t in r.targets if isinstance(t, dict) for s in t.get("services", [])
+                }
+                overlap = rule_targets & svc_set
+            if not overlap:
+                continue
+            # Only include if the majority of the policy's services are in the stage,
+            # OR the policy is service-specific (1-2 services).
+            if len(policy_svcs) <= 2 or len(overlap) >= max(len(policy_svcs), 1) / 2:
+                matched_policies.append(p)
+        if not matched_policies:
+            return ""
+
+        pattern_key = "terraform_pattern" if iac_tool == "terraform" else "bicep_pattern"
+        sections: list[str] = []
+
+        for policy in matched_policies:
+            rules = [
+                r
+                for r in policy.rules
+                if r.severity == "required" and (not agent_name or not r.applies_to or agent_name in r.applies_to)
+            ]
+            if not rules:
+                continue
+
+            sections.append(f"### {policy.name}")
+
+            for rule in rules:
+                sections.append(f"\n**[{rule.id}] {rule.description}**")
+                if rule.rationale:
+                    sections.append(f"Rationale: {rule.rationale}")
+
+                # Find matching target entry for the requested services
+                for target in rule.targets:
+                    if not isinstance(target, dict):
+                        continue
+                    target_svcs = {s.lower() for s in target.get("services", [])}
+                    if target_svcs and not (target_svcs & svc_set):
+                        continue  # This target entry is for a different service
+                    pattern = target.get(pattern_key, "") or ""
+                    if isinstance(pattern, str) and pattern.strip():
+                        sections.append(f"```\n{pattern.strip()}\n```")
+                    prohibitions = target.get("prohibitions", [])
+                    if prohibitions:
+                        for p in prohibitions:
+                            sections.append(f"- NEVER: {p}")
+
+                for cr in rule.companion_resources:
+                    sections.append(f"\nCOMPANION RESOURCE: {cr.description}")
+                    cr_pattern = getattr(cr, pattern_key, "") or ""
+                    if cr_pattern.strip():
+                        sections.append(f"```\n{cr_pattern.strip()}\n```")
+
+                prohibitions = []  # already handled per-target above
+                if prohibitions:
+                    for p in prohibitions:
+                        sections.append(f"- NEVER: {p}")
+
+            sections.append("")
+
+        if not sections:
+            return ""
+
+        header = (
+            "## MANDATORY RESOURCE POLICIES\n\n"
+            "The following policies define the REQUIRED baseline configuration for each resource.\n"
+            "You MUST include all properties, companion resources, and patterns specified below.\n"
+            "You MAY add additional properties required by the architecture (SKUs, database names,\n"
+            "app settings, etc.), but you must NEVER omit or contradict a policy directive.\n\n"
+            'If a policy says "NEVER use X", do not use X under any circumstances.\n'
+            "If a policy provides exact code, use it as your starting template and extend as needed.\n"
+        )
+
+        return header + "\n".join(sections)
+
     def list_policies(self) -> list[Policy]:
         """Return all loaded policies."""
         if not self._loaded:
@@ -401,30 +487,68 @@ class PolicyEngine:
         return list(self._policies)
 
     def _parse_policy(self, path: Path) -> Policy | None:
-        """Parse a single .policy.yaml file into a Policy object."""
+        """Parse a single .policy.yaml file into a Policy object.
+
+        Supports both the new unified format (flat top-level keys) and
+        the legacy format (apiVersion + metadata wrapper) for backward
+        compatibility during migration.
+        """
         try:
             data: dict[str, Any] = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         except Exception:
             logger.warning("Failed to parse policy file: %s", path)
             return None
 
-        metadata = data.get("metadata", {})
-        if not isinstance(metadata, dict):
+        if not isinstance(data, dict):
             return None
 
+        policy_name = path.stem.replace(".policy", "")
+        policy_domain = str(data.get("domain", "general"))
+        policy_description = str(data.get("description", ""))
+        policy_last_updated = str(data.get("last_updated", ""))
+
         rules = []
+        all_target_services: set[str] = set()
         for r in data.get("rules", []):
             if not isinstance(r, dict):
                 continue
+            companions = [
+                CompanionResource(
+                    type=str(cr.get("type", "")),
+                    description=str(cr.get("description", "")),
+                    name=str(cr.get("name", "")),
+                    terraform_pattern=str(cr.get("terraform_pattern", "")),
+                    bicep_pattern=str(cr.get("bicep_pattern", "")),
+                )
+                for cr in r.get("companion_resources", [])
+                if isinstance(cr, dict)
+            ]
+            # targets is a list of target blocks
+            targets_raw = r.get("targets", [])
+            if isinstance(targets_raw, dict):
+                # Normalize single dict to list
+                targets_raw = [targets_raw]
+            if not isinstance(targets_raw, list):
+                targets_raw = []
+            for t in targets_raw:
+                if isinstance(t, dict):
+                    all_target_services.update(t.get("services", []))
+
             rules.append(
                 PolicyRule(
                     id=str(r.get("id", "")),
                     severity=str(r.get("severity", "optional")),
                     description=str(r.get("description", "")),
                     rationale=str(r.get("rationale", "")),
+                    warning_message=str(r.get("warning_message", "")),
                     applies_to=r.get("applies_to", []),
+                    targets=targets_raw,
+                    companion_resources=companions,
                 )
             )
+
+        # Aggregate services from all per-rule targets
+        aggregate_services = list(all_target_services)
 
         patterns = []
         for p in data.get("patterns", []):
@@ -439,12 +563,13 @@ class PolicyEngine:
             )
 
         return Policy(
-            name=str(metadata.get("name", path.stem)),
-            category=str(metadata.get("category", "general")),
-            services=metadata.get("services", []),
+            name=policy_name,
+            domain=policy_domain,
+            description=policy_description,
+            last_updated=policy_last_updated,
+            services=aggregate_services,
             rules=rules,
             patterns=patterns,
             anti_patterns=data.get("anti_patterns", []),
             references=data.get("references", []),
-            last_reviewed=str(metadata.get("last_reviewed", "")),
         )

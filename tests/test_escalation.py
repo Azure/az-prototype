@@ -13,19 +13,18 @@ Covers:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 import yaml
 
 from azext_prototype.stages.escalation import EscalationEntry, EscalationTracker
 
-
 # ======================================================================
 # Helpers
 # ======================================================================
+
 
 def _make_entry(**kwargs) -> EscalationEntry:
     defaults = {
@@ -58,12 +57,14 @@ def _make_registry(architect_response=None, pm_response=None):
         pm.execute.return_value = MagicMock(content="Descope this item")
 
     registry = MagicMock()
+
     def find_by_cap(cap):
         if cap == AgentCapability.ARCHITECT:
             return [architect]
         if cap == AgentCapability.BACKLOG_GENERATION:
             return [pm]
         return []
+
     registry.find_by_capability.side_effect = find_by_cap
 
     return registry, architect, pm
@@ -71,6 +72,7 @@ def _make_registry(architect_response=None, pm_response=None):
 
 def _make_context():
     from azext_prototype.agents.base import AgentContext
+
     return AgentContext(
         project_config={"project": {"name": "test"}},
         project_dir="/tmp/test",
@@ -81,6 +83,7 @@ def _make_context():
 # ======================================================================
 # EscalationEntry tests
 # ======================================================================
+
 
 class TestEscalationEntry:
 
@@ -113,14 +116,17 @@ class TestEscalationEntry:
 # EscalationTracker state management tests
 # ======================================================================
 
+
 class TestEscalationTrackerState:
 
     def test_record_blocker(self, tmp_project):
         tracker = EscalationTracker(str(tmp_project))
 
         entry = tracker.record_blocker(
-            "Deploy Redis", "Premium tier required",
-            "terraform-agent", "deploy",
+            "Deploy Redis",
+            "Premium tier required",
+            "terraform-agent",
+            "deploy",
         )
 
         assert entry.task_description == "Deploy Redis"
@@ -152,7 +158,7 @@ class TestEscalationTrackerState:
     def test_get_active_blockers_filters_resolved(self, tmp_project):
         tracker = EscalationTracker(str(tmp_project))
         e1 = tracker.record_blocker("task1", "blocked1", "a1", "s1")
-        e2 = tracker.record_blocker("task2", "blocked2", "a2", "s2")
+        e2 = tracker.record_blocker("task2", "blocked2", "a2", "s2")  # noqa: F841
         tracker.resolve(e1, "fixed")
 
         active = tracker.get_active_blockers()
@@ -196,7 +202,7 @@ class TestEscalationTrackerState:
     def test_multiple_records_and_resolves(self, tmp_project):
         tracker = EscalationTracker(str(tmp_project))
         e1 = tracker.record_blocker("t1", "b1", "a", "s")
-        e2 = tracker.record_blocker("t2", "b2", "a", "s")
+        e2 = tracker.record_blocker("t2", "b2", "a", "s")  # noqa: F841
         e3 = tracker.record_blocker("t3", "b3", "a", "s")
 
         tracker.resolve(e1, "fixed")
@@ -210,14 +216,17 @@ class TestEscalationTrackerState:
 # Escalation chain tests
 # ======================================================================
 
+
 class TestEscalationChain:
 
     def test_level_1_to_2_technical(self, tmp_project):
         """Technical blocker escalates to architect."""
         tracker = EscalationTracker(str(tmp_project))
         entry = tracker.record_blocker(
-            "Deploy Cosmos DB", "Premium tier required for multi-region",
-            "terraform-agent", "build",
+            "Deploy Cosmos DB",
+            "Premium tier required for multi-region",
+            "terraform-agent",
+            "build",
         )
 
         registry, architect, pm = _make_registry()
@@ -236,8 +245,10 @@ class TestEscalationChain:
         """Scope blocker escalates to project-manager."""
         tracker = EscalationTracker(str(tmp_project))
         entry = tracker.record_blocker(
-            "Backlog items", "Scope of feature is unclear",
-            "biz-analyst", "design",
+            "Backlog items",
+            "Scope of feature is unclear",
+            "biz-analyst",
+            "design",
         )
 
         registry, architect, pm = _make_registry()
@@ -351,6 +362,7 @@ class TestEscalationChain:
 # Auto-escalation tests
 # ======================================================================
 
+
 class TestAutoEscalation:
 
     def test_timeout_triggers_escalation(self, tmp_project):
@@ -402,11 +414,12 @@ class TestAutoEscalation:
 # Integration with qa_router
 # ======================================================================
 
+
 class TestQARouterIntegration:
 
     def test_qa_router_records_blocker_on_undiagnosed(self, tmp_project):
-        from azext_prototype.stages.qa_router import route_error_to_qa
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.stages.qa_router import route_error_to_qa
 
         tracker = EscalationTracker(str(tmp_project))
 
@@ -417,8 +430,12 @@ class TestQARouterIntegration:
         ctx = _make_context()
 
         result = route_error_to_qa(
-            "Deployment failed", "Deploy Stage 1",
-            qa, ctx, None, lambda m: None,
+            "Deployment failed",
+            "Deploy Stage 1",
+            qa,
+            ctx,
+            None,
+            lambda m: None,
             escalation_tracker=tracker,
             source_agent="terraform-agent",
             source_stage="deploy",
@@ -431,8 +448,8 @@ class TestQARouterIntegration:
         assert blocker.source_stage == "deploy"
 
     def test_qa_router_no_tracker_no_error(self, tmp_project):
-        from azext_prototype.stages.qa_router import route_error_to_qa
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.stages.qa_router import route_error_to_qa
 
         qa = MagicMock()
         qa.execute.return_value = AIResponse(content="", model="gpt-4o", usage={})
@@ -441,8 +458,12 @@ class TestQARouterIntegration:
 
         # No escalation tracker — should not raise
         result = route_error_to_qa(
-            "error", "context",
-            qa, ctx, None, lambda m: None,
+            "error",
+            "context",
+            qa,
+            ctx,
+            None,
+            lambda m: None,
             escalation_tracker=None,
         )
 
@@ -450,8 +471,8 @@ class TestQARouterIntegration:
 
     @patch("azext_prototype.stages.qa_router._submit_knowledge")
     def test_qa_router_diagnosed_no_blocker(self, mock_knowledge, tmp_project):
-        from azext_prototype.stages.qa_router import route_error_to_qa
         from azext_prototype.ai.provider import AIResponse
+        from azext_prototype.stages.qa_router import route_error_to_qa
 
         tracker = EscalationTracker(str(tmp_project))
 
@@ -461,8 +482,12 @@ class TestQARouterIntegration:
         ctx = _make_context()
 
         result = route_error_to_qa(
-            "error", "context",
-            qa, ctx, None, lambda m: None,
+            "error",
+            "context",
+            qa,
+            ctx,
+            None,
+            lambda m: None,
             escalation_tracker=tracker,
         )
 
@@ -471,8 +496,8 @@ class TestQARouterIntegration:
         assert len(tracker.get_active_blockers()) == 0
 
     def test_build_session_has_escalation_tracker(self, tmp_project):
-        from azext_prototype.stages.build_session import BuildSession
         from azext_prototype.agents.base import AgentContext
+        from azext_prototype.stages.build_session import BuildSession
 
         ctx = AgentContext(
             project_config={"project": {"name": "test", "location": "eastus"}},
@@ -489,16 +514,19 @@ class TestQARouterIntegration:
                 "project.iac_tool": "terraform",
                 "project.name": "test",
             }.get(k, d)
-            mock_config.return_value.to_dict.return_value = {"naming": {"strategy": "simple"}, "project": {"name": "test"}}
+            mock_config.return_value.to_dict.return_value = {
+                "naming": {"strategy": "simple"},
+                "project": {"name": "test"},
+            }
             session = BuildSession(ctx, registry)
 
         assert hasattr(session, "_escalation_tracker")
         assert isinstance(session._escalation_tracker, EscalationTracker)
 
     def test_deploy_session_has_escalation_tracker(self, tmp_project):
+        from azext_prototype.agents.base import AgentContext
         from azext_prototype.stages.deploy_session import DeploySession
         from azext_prototype.stages.deploy_state import DeployState
-        from azext_prototype.agents.base import AgentContext
 
         ctx = AgentContext(
             project_config={"project": {"name": "test", "location": "eastus"}},
@@ -520,9 +548,9 @@ class TestQARouterIntegration:
         assert isinstance(session._escalation_tracker, EscalationTracker)
 
     def test_backlog_session_has_escalation_tracker(self, tmp_project):
+        from azext_prototype.agents.base import AgentContext
         from azext_prototype.stages.backlog_session import BacklogSession
         from azext_prototype.stages.backlog_state import BacklogState
-        from azext_prototype.agents.base import AgentContext
 
         ctx = AgentContext(
             project_config={"project": {"name": "test", "location": "eastus"}},
@@ -543,6 +571,7 @@ class TestQARouterIntegration:
 # Report formatting tests
 # ======================================================================
 
+
 class TestReportFormatting:
 
     def test_empty_report(self, tmp_project):
@@ -552,7 +581,7 @@ class TestReportFormatting:
 
     def test_report_with_active_and_resolved(self, tmp_project):
         tracker = EscalationTracker(str(tmp_project))
-        e1 = tracker.record_blocker("Deploy Redis", "Premium needed", "tf", "build")
+        e1 = tracker.record_blocker("Deploy Redis", "Premium needed", "tf", "build")  # noqa: F841
         e2 = tracker.record_blocker("Deploy Cosmos", "Multi-region", "tf", "build")
         tracker.resolve(e2, "Used single region")
 
@@ -567,6 +596,7 @@ class TestReportFormatting:
 # ======================================================================
 # State persistence across sessions
 # ======================================================================
+
 
 class TestStatePersistence:
 

@@ -9,7 +9,7 @@ infrastructure/bicep/
 ├── modules/
 │   ├── <service-name>/
 │   │   ├── main.bicep
-│   │   └── private-endpoint.bicep    # if applicable
+│   │   └── (NO private-endpoint.bicep — PEs belong in Networking stage)
 │   └── ...
 ├── environments/
 │   ├── dev.bicepparam
@@ -32,20 +32,18 @@ param location string = resourceGroup().location
 @description('Tags to apply to all resources')
 param tags object = {}
 
-// Private Endpoint Parameters (include if service supports private endpoints)
-@description('Enable private endpoint')
-param enablePrivateEndpoint bool = true
-
-@description('Subnet resource ID for private endpoint')
-param subnetId string = ''
-
-@description('Private DNS zone resource ID')
-param privateDnsZoneId string = ''
+// NOTE: Do NOT include private endpoint parameters or resources in service stages.
+// Private endpoints are created ONLY in the dedicated Networking stage.
+// Service stages should only set publicNetworkAccess: 'Disabled' on their resources.
 ```
 
-## Private Endpoint Pattern
+## Private Endpoint Pattern (NETWORKING STAGE ONLY)
 
-### private-endpoint.bicep
+**This pattern is used ONLY by the Networking stage.** Do NOT include private endpoint
+resources, DNS zone groups, or PE-related parameters in any other stage. The Networking
+stage creates all private endpoints for all services in the deployment plan.
+
+### private-endpoint.bicep (Networking stage only)
 
 ```bicep
 @description('Name of the private endpoint')
@@ -253,8 +251,8 @@ module storage 'modules/storage/main.bicep' = {
     name: 'st${projectName}${environment}'
     location: location
     tags: commonTags
-    subnetId: networking.outputs.dataSubnetId
-    enablePrivateEndpoint: true
+    // NOTE: Private endpoints are NOT configured here.
+    // The Networking stage creates all PEs centrally.
   }
   dependsOn: [
     networking
@@ -476,7 +474,7 @@ module computeLayer 'modules/compute/main.bicep' = {
 All Bicep templates MUST:
 
 - [ ] Disable public network access where supported (`publicNetworkAccess: 'Disabled'`)
-- [ ] Enable private endpoints for data services
+- [ ] Set `publicNetworkAccess: 'Disabled'` (private endpoints are created by the Networking stage)
 - [ ] Use Managed Identity for authentication (avoid keys/connection strings)
 - [ ] Enable TLS 1.2+ minimum (`minTlsVersion: 'TLS1_2'`)
 - [ ] Enable diagnostic logging
@@ -519,7 +517,7 @@ Refer to `service-registry.yaml` for per-service details:
 ## Critical Reminders
 
 1. **Direct execution** -- This extension runs `az deployment` commands directly. Always validate with `what-if` first.
-2. **Always include private endpoint** -- Use the module pattern above for any service that supports it.
+2. **Do NOT create private endpoints** -- The dedicated Networking stage creates all PEs and DNS zone groups. Your stage should only set `publicNetworkAccess: 'Disabled'` on resources.
 3. **Use parameters** -- No hardcoded values in modules.
 4. **Export outputs** -- Other modules depend on these values.
 5. **Follow naming conventions** -- Use project/environment variables from the naming strategy.

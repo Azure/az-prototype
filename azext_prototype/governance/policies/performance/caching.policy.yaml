@@ -1,0 +1,135 @@
+kind: policy
+domain: performance
+description: Governance policies for Caching
+last_updated: '2026-03-27'
+rules:
+- id: WAF-PERF-CACHE-001
+  severity: required
+  description: Configure Azure Cache for Redis with managed identity authentication, connection multiplexing, and appropriate
+    eviction policy
+  rationale: Redis is the backbone of distributed caching; misconfigured connections cause connection exhaustion and managed
+    identity eliminates key rotation burden
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services:
+    - Microsoft.Cache/redis
+    - Microsoft.Network/frontDoors
+    - Microsoft.Cdn/profiles
+    - Microsoft.ApiManagement/service
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+- id: WAF-PERF-CACHE-002
+  severity: required
+  description: Configure Front Door or CDN caching with appropriate TTL, cache key customization, and compression
+  rationale: Edge caching reduces origin load by 70-90% for static content and improves latency from seconds to milliseconds
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services:
+    - Microsoft.Cache/redis
+    - Microsoft.Network/frontDoors
+    - Microsoft.Cdn/profiles
+    - Microsoft.ApiManagement/service
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+- id: WAF-PERF-CACHE-003
+  severity: recommended
+  description: Implement application-level cache-aside pattern with distributed cache and local memory fallback
+  rationale: Cache-aside reduces database load by 80-95% for read-heavy workloads; layered caching (L1 memory + L2 Redis)
+    minimizes network round-trips
+  applies_to:
+  - app-developer
+  - csharp-developer
+  - python-developer
+  - cloud-architect
+  targets:
+  - services:
+    - Microsoft.Cache/redis
+    - Microsoft.Network/frontDoors
+    - Microsoft.Cdn/profiles
+    - Microsoft.ApiManagement/service
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+- id: WAF-PERF-CACHE-004
+  severity: recommended
+  description: Configure API Management caching policies for frequently accessed API responses
+  rationale: APIM built-in cache reduces backend load and latency without application code changes; external Redis cache provides
+    persistence
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services:
+    - Microsoft.Cache/redis
+    - Microsoft.Network/frontDoors
+    - Microsoft.Cdn/profiles
+    - Microsoft.ApiManagement/service
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+- id: WAF-PERF-CACHE-005
+  severity: recommended
+  description: Enable Cosmos DB integrated cache for read-heavy workloads to reduce RU consumption
+  rationale: Cosmos DB integrated cache provides item and query cache at the gateway level, reducing RU consumption by 50-90%
+    for repeated reads
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  - cloud-architect
+  - app-developer
+  - csharp-developer
+  - python-developer
+  targets:
+  - services:
+    - Microsoft.Cache/redis
+    - Microsoft.Network/frontDoors
+    - Microsoft.Cdn/profiles
+    - Microsoft.ApiManagement/service
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Web/sites
+    - Microsoft.App/containerApps
+patterns:
+- name: Layered caching strategy
+  description: L1 in-memory cache (per-instance, <1ms) → L2 Redis cache (distributed, 1-5ms) → L3 CDN/Front Door (edge, <10ms)
+    → Origin database
+- name: Cache key design
+  description: 'Use hierarchical cache keys: {service}:{entity}:{id}:{version} — enables selective invalidation by prefix'
+anti_patterns:
+- description: Do not cache everything — only cache data that is read frequently and changes infrequently
+  instead: Apply cache-aside pattern selectively; monitor cache hit ratio to validate effectiveness
+- description: Do not use a single global TTL for all cache entries
+  instead: 'Set TTL based on data freshness requirements: 30 days for static assets, 5-15 minutes for API data, 30 minutes
+    for sessions'
+- description: Do not cache without monitoring cache hit ratio
+  instead: Track cache hit/miss ratio via Redis INFO command or Application Insights custom metrics; target >80% hit ratio
+- description: Do not serve stale data without a revalidation strategy
+  instead: 'Use stale-while-revalidate pattern: serve stale data while fetching fresh data in background'
+references:
+- title: Azure Cache for Redis best practices
+  url: https://learn.microsoft.com/azure/azure-cache-for-redis/cache-best-practices-development
+- title: Front Door caching
+  url: https://learn.microsoft.com/azure/frontdoor/front-door-caching
+- title: APIM caching policies
+  url: https://learn.microsoft.com/azure/api-management/api-management-caching-policies
+- title: Cosmos DB integrated cache
+  url: https://learn.microsoft.com/azure/cosmos-db/integrated-cache
+- title: Cache-aside pattern
+  url: https://learn.microsoft.com/azure/architecture/patterns/cache-aside

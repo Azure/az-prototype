@@ -1,0 +1,103 @@
+kind: policy
+domain: cost
+description: Governance policies for Reserved Instances
+last_updated: '2026-03-27'
+rules:
+- id: WAF-COST-RI-001
+  severity: recommended
+  description: Recommend Azure Reserved VM Instances for production workloads with stable, predictable compute usage over
+    12+ months
+  rationale: 1-year reservations save 30-40% over pay-as-you-go; 3-year reservations save 55-65%. Only applicable to stable
+    production workloads
+  applies_to:
+  - cost-analyst
+  - cloud-architect
+  - project-manager
+  targets:
+  - services:
+    - Microsoft.Compute/virtualMachines
+    - Microsoft.Sql/servers/databases
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Web/sites
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.Cache/redis
+    - Microsoft.DBforPostgreSQL/flexibleServers
+- id: WAF-COST-RI-002
+  severity: recommended
+  description: Recommend Azure Savings Plans for compute when workloads may change VM size, region, or service type
+  rationale: Savings Plans provide 15-25% savings with flexibility to change compute type, unlike reservations which are locked
+    to a specific VM size and region
+  applies_to:
+  - cost-analyst
+  - cloud-architect
+  - project-manager
+  targets:
+  - services:
+    - Microsoft.Compute/virtualMachines
+    - Microsoft.Sql/servers/databases
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Web/sites
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.Cache/redis
+    - Microsoft.DBforPostgreSQL/flexibleServers
+- id: WAF-COST-RI-003
+  severity: recommended
+  description: Recommend Cosmos DB reserved capacity for production workloads with predictable RU/s consumption
+  rationale: Cosmos DB 1-year reserved capacity saves ~20% on provisioned throughput; 3-year saves ~30%. Only for provisioned
+    (not serverless) accounts
+  applies_to:
+  - cost-analyst
+  - cloud-architect
+  targets:
+  - services:
+    - Microsoft.Compute/virtualMachines
+    - Microsoft.Sql/servers/databases
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Web/sites
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.Cache/redis
+    - Microsoft.DBforPostgreSQL/flexibleServers
+- id: WAF-COST-RI-004
+  severity: recommended
+  description: Recommend SQL Database reserved capacity for production vCore databases with stable utilization
+  rationale: SQL reserved capacity saves ~30-40% on provisioned vCore compute (not serverless). Only for databases with consistent
+    CPU usage
+  applies_to:
+  - cost-analyst
+  - cloud-architect
+  targets:
+  - services:
+    - Microsoft.Compute/virtualMachines
+    - Microsoft.Sql/servers/databases
+    - Microsoft.DocumentDB/databaseAccounts
+    - Microsoft.Web/sites
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.Cache/redis
+    - Microsoft.DBforPostgreSQL/flexibleServers
+patterns:
+- name: Reservation strategy for production workloads
+  description: After 1-2 months of production data, analyze Azure Advisor recommendations and purchase 1-year reservations
+    for stable baseline compute. Use savings plans for flexible workloads
+- name: Tag-based reservation tracking
+  description: Tag reservation-eligible resources with ReservationEligible, ReservationTerm, and service-specific metadata
+    for cost tracking
+anti_patterns:
+- description: Do not purchase reservations before production workloads are stable
+  instead: Wait 1-2 months for usage data; use Azure Advisor reservation recommendations
+- description: Do not purchase 3-year reservations for new workloads
+  instead: Start with 1-year reservations; upgrade to 3-year after confirming workload stability
+- description: Do not reserve compute for dev/POC environments
+  instead: Use pay-as-you-go, serverless, burstable, and spot instances for dev/POC
+- description: Do not reserve more capacity than your measured baseline
+  instead: Reserve the stable baseline; let autoscale/pay-as-you-go handle spikes
+references:
+- title: Azure Reserved VM Instances
+  url: https://learn.microsoft.com/azure/cost-management-billing/reservations/save-compute-costs-reservations
+- title: Azure Savings Plans
+  url: https://learn.microsoft.com/azure/cost-management-billing/savings-plan/savings-plan-compute-overview
+- title: Cosmos DB reserved capacity
+  url: https://learn.microsoft.com/azure/cosmos-db/reserved-capacity
+- title: SQL Database reserved capacity
+  url: https://learn.microsoft.com/azure/azure-sql/database/reserved-capacity-overview
+- title: Azure Advisor cost recommendations
+  url: https://learn.microsoft.com/azure/advisor/advisor-cost-recommendations

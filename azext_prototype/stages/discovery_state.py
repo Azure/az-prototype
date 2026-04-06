@@ -13,15 +13,49 @@ all learnings from the discovery conversation. The file is:
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
-import yaml
+from azext_prototype.stages.base_state import BaseState
 
 logger = logging.getLogger(__name__)
 
 DISCOVERY_FILE = ".prototype/state/discovery.yaml"
+
+
+@dataclass
+class TrackedItem:
+    """A single tracked discovery item (topic, decision, etc.)."""
+
+    heading: str
+    detail: str  # Description / AI question text (was "questions")
+    kind: str  # "topic" | "decision" (extensible)
+    status: str  # "pending" | "answered" | "confirmed" | "skipped"
+    answer_exchange: int | None  # exchange number where resolved
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "heading": self.heading,
+            "detail": self.detail,
+            "kind": self.kind,
+            "status": self.status,
+            "answer_exchange": self.answer_exchange,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> TrackedItem:
+        return cls(
+            heading=d["heading"],
+            detail=d.get("detail", d.get("questions", "")),
+            kind=d.get("kind", "topic"),
+            status=d.get("status", "pending"),
+            answer_exchange=d.get("answer_exchange"),
+        )
+
+
+# Backward-compat alias — existing code / tests may still reference Topic
+Topic = TrackedItem
 
 
 def _default_discovery_state() -> dict[str, Any]:
@@ -37,8 +71,7 @@ def _default_discovery_state() -> dict[str, Any]:
         },
         "constraints": [],
         "decisions": [],
-        "open_items": [],  # Items that need resolution
-        "confirmed_items": [],  # Items that have been confirmed
+        "items": [],  # Unified TrackedItem list (replaces topics + open_items + confirmed_items)
         "risks": [],
         "scope": {
             "in_scope": [],
@@ -56,10 +89,12 @@ def _default_discovery_state() -> dict[str, Any]:
             "last_updated": None,
             "exchange_count": 0,
         },
+        "artifact_inventory": {},  # {abs_path: {"hash": sha256_hex, "last_processed": iso_ts}}
+        "context_hash": "",  # SHA256 of last --context string processed
     }
 
 
-class DiscoveryState:
+class DiscoveryState(BaseState):
     """Manages persistent discovery state in YAML format.
 
     Provides:
@@ -69,126 +104,164 @@ class DiscoveryState:
     - Merging new learnings with existing state
     """
 
-    def __init__(self, project_dir: str):
-        self._project_dir = project_dir
-        self._path = Path(project_dir) / DISCOVERY_FILE
-        self._state: dict[str, Any] = _default_discovery_state()
-        self._loaded = False
+    _STATE_FILE = DISCOVERY_FILE
 
-    @property
-    def exists(self) -> bool:
-        """Check if a discovery.yaml file exists."""
-        return self._path.exists()
+    @staticmethod
+    def _default_state() -> dict[str, Any]:
+        return _default_discovery_state()
 
-    @property
-    def state(self) -> dict[str, Any]:
-        """Get the current state dict."""
-        return self._state
-
-    def load(self) -> dict[str, Any]:
-        """Load existing discovery state from YAML.
-
-        Returns the state dict (empty structure if file doesn't exist).
-        """
-        if self._path.exists():
-            try:
-                with open(self._path, "r", encoding="utf-8") as f:
-                    loaded = yaml.safe_load(f) or {}
-                    # Merge with defaults to ensure all keys exist
-                    self._state = _default_discovery_state()
-                    self._deep_merge(self._state, loaded)
-                    self._loaded = True
-                    logger.info("Loaded discovery state from %s", self._path)
-            except (yaml.YAMLError, IOError) as e:
-                logger.warning("Could not load discovery state: %s", e)
-                self._state = _default_discovery_state()
-        else:
-            self._state = _default_discovery_state()
-
-        return self._state
+    def _post_load(self) -> None:
+        self._migrate_legacy_state()
 
     def save(self) -> None:
-        """Save the current state to YAML."""
-        self._path.parent.mkdir(parents=True, exist_ok=True)
+        """Save with debug logging, then delegate to base."""
+        from azext_prototype.debug_log import log_state_change
 
-        # Update metadata
-        now = datetime.now(timezone.utc).isoformat()
-        if not self._state["_metadata"]["created"]:
-            self._state["_metadata"]["created"] = now
-        self._state["_metadata"]["last_updated"] = now
+        log_state_change(
+            "save",
+            path=str(self._path),
+            items=len(self._state.get("items", [])),
+            exchanges=self._state.get("_metadata", {}).get("exchange_count", 0),
+            inventory_files=len(self._state.get("artifact_inventory", {})),
+        )
+        super().save()
 
-        with open(self._path, "w", encoding="utf-8") as f:
-            yaml.dump(
-                self._state,
-                f,
-                default_flow_style=False,
-                allow_unicode=True,
-                sort_keys=False,
-                width=120,
-            )
-        logger.info("Saved discovery state to %s", self._path)
+    # ------------------------------------------------------------------ #
+    # Unified item counts
+    # ------------------------------------------------------------------ #
 
     @property
     def open_count(self) -> int:
-        """Get the count of open items needing resolution."""
-        return len(self._state.get("open_items", []))
+        """Count of all items with status == 'pending'."""
+        return sum(1 for item in self._state.get("items", []) if item.get("status") == "pending")
 
     @property
     def confirmed_count(self) -> int:
-        """Get the count of confirmed items."""
-        return len(self._state.get("confirmed_items", []))
+        """Count of items with status in ('confirmed', 'answered')."""
+        return sum(1 for item in self._state.get("items", []) if item.get("status") in ("confirmed", "answered"))
+
+    # ------------------------------------------------------------------ #
+    # Format methods
+    # ------------------------------------------------------------------ #
 
     def format_open_items(self) -> str:
-        """Format open items for display to the user."""
-        items = self._state.get("open_items", [])
-        if not items:
+        """Format pending items for display, grouped by kind."""
+        raw = self._state.get("items", [])
+        pending = [i for i in raw if i.get("status") == "pending"]
+        if not pending:
             return "No open items. All questions have been resolved."
 
+        topics = [i for i in pending if i.get("kind") == "topic"]
+        decisions = [i for i in pending if i.get("kind") == "decision"]
+
         lines = ["Open items requiring resolution:", ""]
-        for i, item in enumerate(items, 1):
-            lines.append(f"  {i}. {item}")
+        idx = 1
+        if topics:
+            lines.append("Topics:")
+            for item in topics:
+                lines.append(f"  {idx}. {item['heading']}")
+                idx += 1
+        if decisions:
+            if topics:
+                lines.append("")
+            lines.append("Decisions:")
+            for item in decisions:
+                lines.append(f"  {idx}. {item['heading']}")
+                idx += 1
         return "\n".join(lines)
 
     def format_confirmed_items(self) -> str:
-        """Format confirmed items for display."""
-        items = self._state.get("confirmed_items", [])
-        if not items:
+        """Format answered/confirmed items for display, grouped by kind."""
+        raw = self._state.get("items", [])
+        done = [i for i in raw if i.get("status") in ("confirmed", "answered")]
+        if not done:
             return "No items confirmed yet."
 
+        topics = [i for i in done if i.get("kind") == "topic"]
+        decisions = [i for i in done if i.get("kind") == "decision"]
+
         lines = ["Confirmed items:", ""]
-        for item in items:
-            lines.append(f"  ✓ {item}")
+        if topics:
+            lines.append("Topics:")
+            for item in topics:
+                lines.append(f"  \u2713 {item['heading']}")
+        if decisions:
+            if topics:
+                lines.append("")
+            lines.append("Decisions:")
+            for item in decisions:
+                lines.append(f"  \u2713 {item['heading']}")
         return "\n".join(lines)
 
     def format_status_summary(self) -> str:
-        """Format a brief status summary."""
-        open_count = self.open_count
-        confirmed_count = self.confirmed_count
+        """Format a brief status summary across all items."""
+        raw = self._state.get("items", [])
+        if not raw:
+            return "No items tracked yet."
+
+        pending = sum(1 for i in raw if i.get("status") == "pending")
+        answered = sum(1 for i in raw if i.get("status") == "answered")
+        confirmed = sum(1 for i in raw if i.get("status") == "confirmed")
+        skipped = sum(1 for i in raw if i.get("status") == "skipped")
 
         parts = []
-        if confirmed_count > 0:
-            parts.append(f"✓ {confirmed_count} confirmed")
-        if open_count > 0:
-            parts.append(f"? {open_count} open")
+        if answered + confirmed > 0:
+            parts.append(f"\u2713 {answered + confirmed} confirmed")
+        if pending > 0:
+            parts.append(f"{pending} open")
+        if skipped > 0:
+            parts.append(f"- {skipped} skipped")
 
         if not parts:
             return "No items tracked yet."
-        return " · ".join(parts)
+        return " \u00b7 ".join(parts)
+
+    # ------------------------------------------------------------------ #
+    # Item mutations
+    # ------------------------------------------------------------------ #
 
     def add_open_item(self, item: str) -> None:
-        """Add an open item that needs resolution."""
-        if item and item not in self._state["open_items"]:
-            self._state["open_items"].append(item)
+        """Add a decision item that needs resolution."""
+        # Avoid duplicates by heading
+        for existing in self._state["items"]:
+            if existing["heading"] == item:
+                return
+        self._state["items"].append(
+            TrackedItem(heading=item, detail=item, kind="decision", status="pending", answer_exchange=None).to_dict()
+        )
+        self.save()
+
+    def add_confirmed_decision(self, text: str) -> None:
+        """Record a context directive as a confirmed decision.
+
+        This is used when ``--context`` adds information that doesn't
+        warrant new topics (e.g. "change the app name to X").  The
+        decision is stored in the ``decisions`` list so it reaches
+        the architect via ``format_as_context()``.
+        """
+        if text and text not in self._state["decisions"]:
+            self._state["decisions"].append(text)
             self.save()
 
     def resolve_item(self, item: str, confirmed_text: str | None = None) -> None:
-        """Move an item from open to confirmed."""
-        if item in self._state["open_items"]:
-            self._state["open_items"].remove(item)
+        """Find matching item and mark it confirmed."""
+        for existing in self._state["items"]:
+            if existing["heading"] == item or existing["heading"] == confirmed_text:
+                existing["status"] = "confirmed"
+                self.save()
+                return
+        # If no existing item found and confirmed_text provided, add as confirmed decision
         if confirmed_text:
-            if confirmed_text not in self._state["confirmed_items"]:
-                self._state["confirmed_items"].append(confirmed_text)
-        self.save()
+            self._state["items"].append(
+                TrackedItem(
+                    heading=confirmed_text,
+                    detail=confirmed_text,
+                    kind="decision",
+                    status="confirmed",
+                    answer_exchange=None,
+                ).to_dict()
+            )
+            self.save()
 
     def extract_conversation_summary(self) -> str:
         """Extract the requirements summary from conversation history.
@@ -267,11 +340,12 @@ class DiscoveryState:
                 parts.append(f"- {decision}")
             parts.append("")
 
-        # Open items
-        if self._state["open_items"]:
+        # Open items — query from unified items
+        pending_items = [i for i in self._state.get("items", []) if i.get("status") == "pending"]
+        if pending_items:
             parts.append("## Open Items (Still Need Resolution)")
-            for item in self._state["open_items"]:
-                parts.append(f"- {item}")
+            for item in pending_items:
+                parts.append(f"- {item['heading']}")
             parts.append("")
 
         # Scope
@@ -388,13 +462,17 @@ class DiscoveryState:
             if learnings.get(key):
                 self._merge_list(self._state[key], learnings[key])
 
-        # Handle open items specially — can be added or resolved
+        # Handle open items — create decision TrackedItems
         if learnings.get("open_items"):
-            self._merge_list(self._state["open_items"], learnings["open_items"])
+            for item_text in learnings["open_items"]:
+                self.add_open_item(item_text)
+
+        # Handle resolved items — mark matching items confirmed
         if learnings.get("resolved_items"):
-            for item in learnings["resolved_items"]:
-                if item in self._state["open_items"]:
-                    self._state["open_items"].remove(item)
+            for item_text in learnings["resolved_items"]:
+                for existing in self._state["items"]:
+                    if existing["heading"] == item_text:
+                        existing["status"] = "confirmed"
 
         # Merge scope
         if learnings.get("scope"):
@@ -447,37 +525,227 @@ class DiscoveryState:
                 results.append(exchange)
         return results
 
-    def _deep_merge(self, base: dict, updates: dict) -> None:
-        """Deep merge updates into base dict."""
-        for key, value in updates.items():
-            if key in base and isinstance(base[key], dict) and isinstance(value, dict):
-                self._deep_merge(base[key], value)
-            else:
-                base[key] = value
+    def topic_at_exchange(self, exchange: int) -> str | None:
+        """Return the topic heading that was being discussed at *exchange*.
 
+        Uses the ``answer_exchange`` field on items to find the topic
+        whose exchange range covers the given number.  Returns ``None``
+        if no matching topic is found.
+        """
+        # Build a list of (answer_exchange, heading) for items that have been answered
+        answered = []
+        for item in self._state.get("items", []):
+            ex = item.get("answer_exchange")
+            if ex is not None:
+                answered.append((ex, item["heading"]))
+        if not answered:
+            return None
 
-def build_incremental_update_prompt(existing_context: str, new_input: str) -> str:
-    """Build a prompt asking the agent to extract learnings from an exchange.
+        # Sort by exchange number
+        answered.sort(key=lambda x: x[0])
 
-    This is called after each exchange to have the agent identify what
-    new information was learned and format it for storage.
-    """
-    return f"""Based on this exchange, extract any new learnings to update our requirements document.
+        # Find the topic whose answer_exchange is >= the given exchange
+        # (the topic being discussed AT exchange N gets answer_exchange >= N)
+        for ex, heading in answered:
+            if ex >= exchange:
+                return heading
+        # If all answer_exchanges are before the given exchange, it was
+        # in the free-form conversation after all topics were covered
+        return None
 
-## Existing Understanding
-{existing_context if existing_context else "(No existing context yet)"}
+    # ------------------------------------------------------------------ #
+    # Unified item persistence (replaces old topic-only methods)
+    # ------------------------------------------------------------------ #
 
-## New Information from User
-{new_input}
+    @property
+    def items(self) -> list[TrackedItem]:
+        """Get all persisted items."""
+        return [TrackedItem.from_dict(t) for t in self._state.get("items", [])]
 
-Please identify:
-1. Any new requirements (functional or non-functional)
-2. Any new constraints or decisions
-3. Any open items that need resolution
-4. Any conflicts with existing understanding (if so, ask for clarification)
-5. Any Azure services that should be considered
+    @property
+    def topic_items(self) -> list[TrackedItem]:
+        """Get only topic-kind items."""
+        return [TrackedItem.from_dict(t) for t in self._state.get("items", []) if t.get("kind") == "topic"]
 
-If there are conflicts between the new information and existing understanding,
-ask a clarifying question to resolve the conflict before proceeding.
+    def items_by_status(self, status: str) -> list[TrackedItem]:
+        """Get items filtered by status."""
+        return [TrackedItem.from_dict(t) for t in self._state.get("items", []) if t.get("status") == status]
 
-Format your response as a natural conversation, but internally track these learnings."""
+    @property
+    def has_items(self) -> bool:
+        """Check if any items have been established."""
+        return bool(self._state.get("items"))
+
+    def set_items(self, items: list[TrackedItem]) -> None:
+        """Persist items (first-run only)."""
+        self._state["items"] = [t.to_dict() for t in items]
+        self.save()
+
+    def append_items(self, new_items: list[TrackedItem]) -> None:
+        """Append new items, deduplicating by heading (case-insensitive)."""
+        existing = self._state.get("items", [])
+        existing_headings = {t["heading"].lower() for t in existing}
+        for t in new_items:
+            if t.heading.lower() not in existing_headings:
+                existing.append(t.to_dict())
+        self._state["items"] = existing
+        self.save()
+
+    def mark_item(self, heading: str, status: str, exchange: int | None = None) -> None:
+        """Update an item's status and optionally record the exchange number."""
+        from azext_prototype.debug_log import log_state_change
+
+        log_state_change("mark_item", heading=heading, status=status, exchange=exchange)
+        for t in self._state.get("items", []):
+            if t["heading"] == heading:
+                t["status"] = status
+                if exchange is not None:
+                    t["answer_exchange"] = exchange
+                break
+        self.save()
+
+    def first_pending_index(self, kind: str | None = None) -> int | None:
+        """Return the index of the first pending item, or None if all done.
+
+        If kind is specified, only considers items of that kind.
+        """
+        for i, t in enumerate(self._state.get("items", [])):
+            if t.get("status") == "pending":
+                if kind is None or t.get("kind") == kind:
+                    return i
+        return None
+
+    # ------------------------------------------------------------------ #
+    # Artifact inventory — content hashing for change detection
+    # ------------------------------------------------------------------ #
+
+    def get_artifact_hashes(self) -> dict[str, str]:
+        """Return a flat ``{path: hash}`` mapping from the inventory."""
+        inv = self._state.get("artifact_inventory", {})
+        return {path: entry["hash"] for path, entry in inv.items() if isinstance(entry, dict) and "hash" in entry}
+
+    def update_artifact_inventory(self, entries: dict[str, str], timestamp: str | None = None) -> None:
+        """Bulk-update the artifact inventory with ``{path: sha256_hex}`` entries.
+
+        Additive — does NOT remove paths absent from *entries* so that
+        different artifact directories across runs accumulate naturally.
+        """
+        ts = timestamp or datetime.now(timezone.utc).isoformat()
+        inv = self._state.setdefault("artifact_inventory", {})
+        for path, hash_hex in entries.items():
+            inv[path] = {"hash": hash_hex, "last_processed": ts}
+        self.save()
+
+    def get_context_hash(self) -> str:
+        """Return the stored SHA256 hash of the last ``--context`` string."""
+        return self._state.get("context_hash", "")
+
+    def update_context_hash(self, hash_hex: str) -> None:
+        """Store the SHA256 hash of the current ``--context`` string."""
+        self._state["context_hash"] = hash_hex
+        self.save()
+
+    # ------------------------------------------------------------------ #
+    # Backward-compat aliases (old names → new names)
+    # ------------------------------------------------------------------ #
+
+    @property
+    def topics(self) -> list[TrackedItem]:
+        """Alias for items — backward compat."""
+        return self.items
+
+    @property
+    def has_topics(self) -> bool:
+        """Alias for has_items — backward compat."""
+        return self.has_items
+
+    def set_topics(self, topics: list[TrackedItem]) -> None:
+        """Alias for set_items — backward compat."""
+        self.set_items(topics)
+
+    def append_topics(self, new_topics: list[TrackedItem]) -> None:
+        """Alias for append_items — backward compat."""
+        self.append_items(new_topics)
+
+    def mark_topic(self, heading: str, status: str, exchange: int | None = None) -> None:
+        """Alias for mark_item — backward compat."""
+        self.mark_item(heading, status, exchange)
+
+    def first_pending_topic_index(self) -> int | None:
+        """Alias for first_pending_index — backward compat."""
+        return self.first_pending_index()
+
+    # ------------------------------------------------------------------ #
+    # Legacy migration
+    # ------------------------------------------------------------------ #
+
+    def _migrate_legacy_state(self) -> None:
+        """Migrate old-format state (topics + open_items + confirmed_items) to unified items.
+
+        Called at end of load(). Converts legacy fields into TrackedItem dicts
+        in the unified ``items`` list, removes the legacy keys, and saves.
+        """
+        migrated = False
+
+        # Migrate old topics → items with kind="topic"
+        if "topics" in self._state and self._state["topics"]:
+            existing_headings = {t["heading"].lower() for t in self._state.get("items", [])}
+            for t in self._state["topics"]:
+                if t.get("heading", "").lower() not in existing_headings:
+                    self._state["items"].append(
+                        {
+                            "heading": t.get("heading", ""),
+                            "detail": t.get("questions", t.get("detail", "")),
+                            "kind": t.get("kind", "topic"),
+                            "status": t.get("status", "pending"),
+                            "answer_exchange": t.get("answer_exchange"),
+                        }
+                    )
+                    existing_headings.add(t.get("heading", "").lower())
+            del self._state["topics"]
+            migrated = True
+
+        # Migrate old open_items → items with kind="decision", status="pending"
+        if "open_items" in self._state and self._state["open_items"]:
+            existing_headings = {t["heading"].lower() for t in self._state.get("items", [])}
+            for item_text in self._state["open_items"]:
+                if item_text and item_text.lower() not in existing_headings:
+                    self._state["items"].append(
+                        {
+                            "heading": item_text,
+                            "detail": item_text,
+                            "kind": "decision",
+                            "status": "pending",
+                            "answer_exchange": None,
+                        }
+                    )
+                    existing_headings.add(item_text.lower())
+            del self._state["open_items"]
+            migrated = True
+
+        # Migrate old confirmed_items → items with kind="decision", status="confirmed"
+        if "confirmed_items" in self._state and self._state["confirmed_items"]:
+            existing_headings = {t["heading"].lower() for t in self._state.get("items", [])}
+            for item_text in self._state["confirmed_items"]:
+                if item_text and item_text.lower() not in existing_headings:
+                    self._state["items"].append(
+                        {
+                            "heading": item_text,
+                            "detail": item_text,
+                            "kind": "decision",
+                            "status": "confirmed",
+                            "answer_exchange": None,
+                        }
+                    )
+                    existing_headings.add(item_text.lower())
+            del self._state["confirmed_items"]
+            migrated = True
+
+        # Clean up empty legacy keys too
+        for legacy_key in ("topics", "open_items", "confirmed_items"):
+            if legacy_key in self._state:
+                del self._state[legacy_key]
+                migrated = True
+
+        if migrated:
+            self.save()

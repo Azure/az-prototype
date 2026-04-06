@@ -17,16 +17,25 @@ fi
 PYTHON=python3
 
 # Ensure build tool is installed
-echo "[1/3] Ensuring build tools are installed..."
+echo "[1/4] Ensuring build tools are installed..."
 $PYTHON -m pip install --upgrade build setuptools wheel --quiet
 
 # Clean previous builds
-echo "[2/3] Cleaning previous builds..."
+echo "[2/4] Cleaning previous builds..."
 rm -rf dist/ build/ *.egg-info
 find azext_prototype/ -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
+# Pre-compute policy embeddings (requires sentence-transformers at build time only)
+echo "[3/4] Computing policy embeddings..."
+$PYTHON -m pip install sentence-transformers --quiet
+$PYTHON scripts/compute_embeddings.py
+if [ $? -ne 0 ]; then
+    echo "ERROR: Embedding computation failed."
+    exit 1
+fi
+
 # Build the wheel
-echo "[3/3] Building wheel..."
+echo "[4/4] Building wheel..."
 $PYTHON -m build --wheel
 if [ $? -ne 0 ]; then
     echo "ERROR: Build failed."

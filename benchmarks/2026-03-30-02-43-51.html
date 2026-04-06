@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Benchmark Run: 2026-03-30 02:43:51</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    body{font-family:'Inter',sans-serif}
+    .gradient-bg{background:linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#0f172a 100%)}
+    .card{background:rgba(30,41,59,.8);border:1px solid rgba(71,85,105,.4)}
+    .tab-btn{transition:all .15s}
+    .tab-btn.active{background:#1e293b;color:#f8fafc;border-bottom:2px solid #8b5cf6}
+    .tab-btn:not(.active){color:#94a3b8}
+    .tab-btn:not(.active):hover{color:#cbd5e1;background:rgba(30,41,59,.4)}
+    .tab-content{display:none}.tab-content.active{display:block}
+    .cp-bar{background:#3b82f6}.cc-bar{background:#f97316}
+    pre{font-size:.7rem;overflow-x:auto}
+    @media print{.no-print{display:none}}
+  </style>
+</head>
+<body class="gradient-bg text-gray-100 min-h-screen">
+
+<header class="max-w-[1400px] mx-auto px-6 pt-8 pb-4">
+  <div class="flex items-end justify-between flex-wrap gap-4">
+    <div>
+      <h1 class="text-2xl font-extrabold tracking-tight">
+        <span class="text-blue-400">GitHub Copilot</span>
+        <span class="text-gray-500 mx-2">vs</span>
+        <span class="text-orange-400">Claude Code</span>
+      </h1>
+      <p class="text-gray-400 mt-1 text-xs">Benchmark Run &mdash; 2026-03-30 02:43:51</p>
+    </div>
+    <div class="text-right text-[10px] text-gray-500 leading-relaxed">
+      <p>Project: KanFlow Azure POC</p>
+      <p>Model: Sonnet 4.6 (both)</p>
+      <p>Stages won &mdash; GHCP: 9 &bull; Claude Code: 5</p>
+    </div>
+  </div>
+</header>
+
+<nav class="max-w-[1400px] mx-auto px-6 overflow-x-auto no-print">
+  <div class="flex gap-0.5 border-b border-slate-700 min-w-max" id="tabNav">
+    <button class="tab-btn active px-3 py-2 text-xs font-semibold rounded-t" onclick="showTab('overview')">Overview</button>
+    <button class="tab-btn px-3 py-2 text-xs font-medium rounded-t" onclick="showTab('s1')">S1</button>
+    <button class="tab-btn px-3 py-2 text-xs font-medium rounded-t" onclick="showTab('s2')">S2</button>
+    <button class="tab-btn px-3 py-2 text-xs font-medium rounded-t" onclick="showTab('s3')">S3</button>
+    <button class="tab-btn px-3 py-2 text-xs font-medium rounded-t" onclick="showTab('s4')">S4</button>
+    <button class="tab-btn px-3 py-2 text-xs font-medium rounded-t" onclick="showTab('s5')">S5</button>
+    <button class="tab-btn px-3 py-2 text-xs font-medium rounded-t" onclick="showTab('s6')">S6</button>
+    <button class="tab-btn px-3 py-2 text-xs font-medium rounded-t" onclick="showTab('s7')">S7</button>
+    <button class="tab-btn px-3 py-2 text-xs font-medium rounded-t" onclick="showTab('s8')">S8</button>
+    <button class="tab-btn px-3 py-2 text-xs font-medium rounded-t" onclick="showTab('s9')">S9</button>
+    <button class="tab-btn px-3 py-2 text-xs font-medium rounded-t" onclick="showTab('s10')">S10</button>
+    <button class="tab-btn px-3 py-2 text-xs font-medium rounded-t" onclick="showTab('s11')">S11</button>
+    <button class="tab-btn px-3 py-2 text-xs font-medium rounded-t" onclick="showTab('s12')">S12</button>
+    <button class="tab-btn px-3 py-2 text-xs font-medium rounded-t" onclick="showTab('s13')">S13</button>
+    <button class="tab-btn px-3 py-2 text-xs font-medium rounded-t" onclick="showTab('s14')">S14</button>
+  </div>
+</nav>
+
+<main class="max-w-[1400px] mx-auto px-6 py-6">
+
+<!-- OVERVIEW TAB -->
+<div class="tab-content active" id="tab-overview">
+
+  <!-- Project Summary -->
+  <section class="mb-6">
+    <div class="card rounded-xl p-5">
+      <h2 class="text-sm font-bold text-gray-200 mb-2">Project: KanFlow Azure POC</h2>
+      <p class="text-xs text-gray-400">14-stage Azure infrastructure pipeline: managed identity, monitoring (Log Analytics + App Insights), networking (VNet, NSGs, DNS), data services (ACR, Key Vault, Service Bus, SQL, Cosmos DB, Redis, Storage), real-time (SignalR), compute (Container Apps), and documentation. All stages use azapi provider with Terraform.</p>
+    </div>
+  </section>
+
+  <!-- Benchmark Scores Table -->
+  <section class="mb-6">
+    <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-purple-500 rounded-full inline-block"></span>Benchmark Scores</h2>
+    <div class="card rounded-xl overflow-hidden">
+      <table class="w-full text-xs">
+        <thead><tr class="bg-slate-800">
+          <th class="px-3 py-2 text-left text-gray-300">Benchmark</th>
+          <th class="px-3 py-2 text-left text-gray-300">Description</th>
+          <th class="px-3 py-2 text-center text-blue-400">GHCP</th>
+          <th class="px-3 py-2 text-center text-orange-400">Claude Code</th>
+          <th class="px-3 py-2 text-center text-gray-300">Delta</th>
+          <th class="px-3 py-2 text-center text-gray-300">Winner</th>
+        </tr></thead>
+        <tbody class="divide-y divide-slate-700" id="benchmarkTable"></tbody>
+        <tfoot><tr class="bg-slate-800 font-bold text-sm">
+          <td class="px-3 py-2" colspan="2">Overall Average</td>
+          <td class="px-3 py-2 text-center text-blue-400" id="ghcpAvg"></td>
+          <td class="px-3 py-2 text-center text-orange-400" id="compAvg"></td>
+          <td class="px-3 py-2 text-center" id="deltaAvg"></td>
+          <td class="px-3 py-2 text-center" id="overallWinner"></td>
+        </tr></tfoot>
+      </table>
+    </div>
+  </section>
+
+  <!-- Aggregate Scores by Stage -->
+  <section class="mb-6">
+    <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-teal-500 rounded-full inline-block"></span>Aggregate Scores by Stage</h2>
+    <div class="card rounded-xl overflow-hidden">
+      <table class="w-full text-xs">
+        <thead><tr class="bg-slate-800">
+          <th class="px-3 py-2 text-left text-gray-300">Stage</th>
+          <th class="px-3 py-2 text-left text-gray-300">Service</th>
+          <th class="px-3 py-2 text-center text-blue-400">GHCP</th>
+          <th class="px-3 py-2 text-center text-orange-400">Claude Code</th>
+          <th class="px-3 py-2 text-center text-gray-300">Winner</th>
+        </tr></thead>
+        <tbody class="divide-y divide-slate-700" id="stageTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Cross-Cutting Patterns -->
+  <section class="mb-6 grid md:grid-cols-2 gap-4">
+    <div class="card rounded-xl p-5 border-l-4 border-blue-500">
+      <h3 class="font-bold text-blue-400 text-sm mb-3">Systematic Copilot Strengths</h3>
+      <ul class="text-xs text-gray-400 space-y-2">
+        <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5 flex-shrink-0">+</span><div><strong class="text-gray-200">Production deploy.sh</strong> &mdash; Every stage: --dry-run, --destroy, --help, upstream state validation, post-deploy verification, color logging. ~230 lines avg.</div></li>
+        <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5 flex-shrink-0">+</span><div><strong class="text-gray-200">Deterministic RBAC</strong> &mdash; <code>uuidv5()</code> with resource+principal+role seeds. Prevents recreation on re-apply.</div></li>
+        <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5 flex-shrink-0">+</span><div><strong class="text-gray-200">Variable validation</strong> &mdash; Validation blocks on SKUs, retention ranges, CIDR blocks, storage names.</div></li>
+        <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5 flex-shrink-0">+</span><div><strong class="text-gray-200">Azure API depth</strong> &mdash; Correct Cosmos DB native RBAC (<code>sqlRoleAssignments</code>), conditional AcrPush, health probes on Container Apps.</div></li>
+        <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5 flex-shrink-0">+</span><div><strong class="text-gray-200">Design documentation</strong> &mdash; Every stage has "Key Design Decisions" section with rationale.</div></li>
+      </ul>
+    </div>
+    <div class="card rounded-xl p-5 border-l-4 border-orange-500">
+      <h3 class="font-bold text-orange-400 text-sm mb-3">Systematic Claude Code Strengths</h3>
+      <ul class="text-xs text-gray-400 space-y-2">
+        <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5 flex-shrink-0">+</span><div><strong class="text-gray-200">Correct tag placement</strong> &mdash; Top-level <code>tags</code> attribute on azapi_resource (v2.x correct) across virtually all stages.</div></li>
+        <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5 flex-shrink-0">+</span><div><strong class="text-gray-200">Strict NEVER compliance</strong> &mdash; Follows MANDATORY RESOURCE POLICY NEVER directives literally (e.g., SQL-005 public access).</div></li>
+        <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5 flex-shrink-0">+</span><div><strong class="text-gray-200">Cleaner providers</strong> &mdash; Tends toward azapi-only, avoiding unnecessary azurerm dependencies.</div></li>
+        <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5 flex-shrink-0">+</span><div><strong class="text-gray-200">RBAC principal separation</strong> &mdash; KV Administrator &rarr; deployer (not app MI). Better least-privilege.</div></li>
+        <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5 flex-shrink-0">+</span><div><strong class="text-gray-200">Documentation excellence</strong> &mdash; Stage 14: 2,234 lines of production-grade architecture + deployment docs.</div></li>
+      </ul>
+    </div>
+    <div class="card rounded-xl p-5 border-l-4 border-blue-800">
+      <h3 class="font-bold text-blue-300 text-sm mb-3">Systematic Copilot Weaknesses</h3>
+      <ul class="text-xs text-gray-400 space-y-2">
+        <li class="flex items-start gap-2"><span class="text-red-400 mt-0.5 flex-shrink-0">&minus;</span><div><strong class="text-red-300">Tags inside body{}</strong> &mdash; Systematic across 11 of 14 stages. Wrong for azapi v2.x. Tags may not apply correctly.</div></li>
+        <li class="flex items-start gap-2"><span class="text-red-400 mt-0.5 flex-shrink-0">&minus;</span><div><strong class="text-red-300">Unnecessary azurerm provider</strong> &mdash; Included in 9+ stages when no azurerm resources exist.</div></li>
+        <li class="flex items-start gap-2"><span class="text-red-400 mt-0.5 flex-shrink-0">&minus;</span><div><strong class="text-red-300">Scope creep</strong> &mdash; Extra subnets (Stage 4), firewall rules (Stage 8), patch schedules (Stage 10).</div></li>
+        <li class="flex items-start gap-2"><span class="text-red-400 mt-0.5 flex-shrink-0">&minus;</span><div><strong class="text-red-300">Stage 14 context loss</strong> &mdash; Catastrophic failure: lost context mid-response, produced partial output.</div></li>
+      </ul>
+    </div>
+    <div class="card rounded-xl p-5 border-l-4 border-orange-800">
+      <h3 class="font-bold text-orange-300 text-sm mb-3">Systematic Claude Code Weaknesses</h3>
+      <ul class="text-xs text-gray-400 space-y-2">
+        <li class="flex items-start gap-2"><span class="text-red-400 mt-0.5 flex-shrink-0">&minus;</span><div><strong class="text-red-300">Minimal deploy.sh</strong> &mdash; Every stage: ~65 lines, no --dry-run, no --destroy, no arg parsing, no post-verify.</div></li>
+        <li class="flex items-start gap-2"><span class="text-red-400 mt-0.5 flex-shrink-0">&minus;</span><div><strong class="text-red-300">Inconsistent azapi versions</strong> &mdash; Ranges from v1.15 to v2.4. v1.x versions break v2.x syntax patterns.</div></li>
+        <li class="flex items-start gap-2"><span class="text-red-400 mt-0.5 flex-shrink-0">&minus;</span><div><strong class="text-red-300">Mixed providers</strong> &mdash; Uses azurerm_role_assignment, azurerm_monitor_metric_alert alongside azapi resources.</div></li>
+        <li class="flex items-start gap-2"><span class="text-red-400 mt-0.5 flex-shrink-0">&minus;</span><div><strong class="text-red-300">Hardcoded names (Stage 13)</strong> &mdash; Queue name and ACR name hardcoded, violating NEVER directive.</div></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Critical Bugs -->
+  <section class="mb-6">
+    <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-red-500 rounded-full inline-block"></span>Critical Bugs</h2>
+    <div class="card rounded-xl overflow-hidden">
+      <table class="w-full text-xs">
+        <thead><tr class="bg-slate-800"><th class="px-3 py-2 text-left text-gray-300">Bug</th><th class="px-3 py-2 text-center">Tool</th><th class="px-3 py-2 text-center">Stage(s)</th><th class="px-3 py-2 text-center">Severity</th></tr></thead>
+        <tbody class="divide-y divide-slate-700">
+          <tr><td class="px-3 py-2">Tags inside <code>body{}</code> (wrong for azapi v2.x)</td><td class="px-3 py-2 text-center text-blue-400">Copilot</td><td class="px-3 py-2 text-center">1-5,7,9-13</td><td class="px-3 py-2 text-center" style="color:#eab308">Medium</td></tr>
+          <tr><td class="px-3 py-2"><code>publicNetworkAccess = "Enabled"</code> violates [SQL-005] NEVER</td><td class="px-3 py-2 text-center text-blue-400">Copilot</td><td class="px-3 py-2 text-center">8</td><td class="px-3 py-2 text-center" style="color:#f97316">High</td></tr>
+          <tr><td class="px-3 py-2">Context loss &mdash; incomplete response</td><td class="px-3 py-2 text-center text-blue-400">Copilot</td><td class="px-3 py-2 text-center">14</td><td class="px-3 py-2 text-center" style="color:#ef4444">Critical</td></tr>
+          <tr><td class="px-3 py-2"><code>jsondecode()</code> on azapi v2.x output</td><td class="px-3 py-2 text-center text-blue-400">Copilot</td><td class="px-3 py-2 text-center">3, 9</td><td class="px-3 py-2 text-center" style="color:#eab308">Medium</td></tr>
+          <tr><td class="px-3 py-2">azapi v1.x (<code>~> 1.15</code>) with v2.x syntax</td><td class="px-3 py-2 text-center text-orange-400">Claude Code</td><td class="px-3 py-2 text-center">3, 5</td><td class="px-3 py-2 text-center" style="color:#ef4444">Critical</td></tr>
+          <tr><td class="px-3 py-2">Missing <code>azurerm</code> provider for <code>azurerm_client_config</code></td><td class="px-3 py-2 text-center text-orange-400">Claude Code</td><td class="px-3 py-2 text-center">6</td><td class="px-3 py-2 text-center" style="color:#f97316">High</td></tr>
+          <tr><td class="px-3 py-2">Hardcoded upstream resource names (NEVER violation)</td><td class="px-3 py-2 text-center text-orange-400">Claude Code</td><td class="px-3 py-2 text-center">13</td><td class="px-3 py-2 text-center" style="color:#f97316">High</td></tr>
+          <tr><td class="px-3 py-2">Cosmos RBAC via <code>azurerm_role_assignment</code> (wrong layer)</td><td class="px-3 py-2 text-center text-orange-400">Claude Code</td><td class="px-3 py-2 text-center">13</td><td class="px-3 py-2 text-center" style="color:#ef4444">Critical</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Dimension Winners Heatmap -->
+  <section class="mb-6">
+    <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-teal-500 rounded-full inline-block"></span>Dimension Winners Across All Stages</h2>
+    <div class="card rounded-xl overflow-x-auto">
+      <table class="w-full text-[10px]">
+        <thead><tr class="bg-slate-800">
+          <th class="px-2 py-2 text-left text-gray-300 whitespace-nowrap">Dimension</th>
+          <th class="px-1 py-2 text-center">1</th><th class="px-1 py-2 text-center">2</th><th class="px-1 py-2 text-center">3</th><th class="px-1 py-2 text-center">4</th><th class="px-1 py-2 text-center">5</th><th class="px-1 py-2 text-center">6</th><th class="px-1 py-2 text-center">7</th><th class="px-1 py-2 text-center">8</th><th class="px-1 py-2 text-center">9</th><th class="px-1 py-2 text-center">10</th><th class="px-1 py-2 text-center">11</th><th class="px-1 py-2 text-center">12</th><th class="px-1 py-2 text-center">13</th><th class="px-1 py-2 text-center">14</th>
+        </tr></thead>
+        <tbody class="divide-y divide-slate-700/30" id="heatmapTable"></tbody>
+      </table>
+    </div>
+    <p class="text-[10px] text-gray-500 mt-2"><span class="text-blue-400">CP</span> = Copilot wins &bull; <span class="text-orange-400">CC</span> = Claude Code wins &bull; <span class="text-gray-400">T</span> = Tie &bull; <span class="text-gray-600">&mdash;</span> = N/A</p>
+  </section>
+
+  <!-- Final Verdict -->
+  <section class="mb-6">
+    <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-amber-500 rounded-full inline-block"></span>Final Verdict</h2>
+    <div class="card rounded-xl p-6">
+      <div class="grid md:grid-cols-2 gap-6 mb-5">
+        <div class="text-center"><div class="text-4xl font-extrabold text-blue-400">81.0</div><div class="text-sm text-blue-300 font-semibold mt-1">GitHub Copilot</div><p class="text-[10px] text-gray-500">8/14 benchmarks won &bull; Best at operational tooling</p></div>
+        <div class="text-center"><div class="text-4xl font-extrabold text-orange-400">78.4</div><div class="text-sm text-orange-300 font-semibold mt-1">Claude Code</div><p class="text-[10px] text-gray-500">6/14 benchmarks won &bull; Best at correctness &amp; docs</p></div>
+      </div>
+      <div class="bg-slate-700/30 rounded-lg p-4 text-sm text-gray-300 space-y-2">
+        <p><strong class="text-blue-400">Copilot wins overall</strong> with a benchmark average of 81.0 vs Claude Code's 78.4, winning 8 of 14 benchmarks &mdash; driven by production-grade deploy.sh, deeper Azure API knowledge, deterministic RBAC, and comprehensive validation.</p>
+        <p><strong class="text-orange-400">Claude Code wins</strong> on correctness and governance &mdash; correct tag placement, strict NEVER compliance, and production-grade documentation. Stage 14's comprehensive 2,234-line output is Claude Code's standout achievement.</p>
+        <p class="text-gray-400 text-xs pt-2 border-t border-slate-600"><em>The ideal output would combine Copilot's deploy.sh scripts, RBAC design, and Azure API depth with Claude Code's tag placement, policy compliance, and documentation capability.</em></p>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- Stage tabs generated by JS -->
+
+</main>
+
+<footer class="max-w-[1400px] mx-auto px-6 pb-8 text-center text-[10px] text-gray-600">
+  <p>Benchmark Suite v1.0 &mdash; Generated 2026-03-30</p>
+</footer>
+
+<script>
+// Benchmark scores (averaged across all stages)
+const benchmarks = [
+  {id:"B-INST",name:"Instruction Adherence",ghcp:88,comp:85,desc:"Following prompt requirements exactly"},
+  {id:"B-CNST",name:"Constraint Compliance",ghcp:82,comp:88,desc:"NEVER/MUST directive adherence"},
+  {id:"B-TECH",name:"Technical Correctness",ghcp:85,comp:78,desc:"Syntax validity, API versions, runtime viability"},
+  {id:"B-SEC",name:"Security Posture",ghcp:84,comp:86,desc:"MI, RBAC, encryption, network controls"},
+  {id:"B-OPS",name:"Operational Readiness",ghcp:95,comp:52,desc:"deploy.sh completeness and quality"},
+  {id:"B-DEP",name:"Dependency Hygiene",ghcp:72,comp:68,desc:"Minimal, correct, consistent dependencies"},
+  {id:"B-SCOPE",name:"Scope Discipline",ghcp:76,comp:84,desc:"No over/under engineering"},
+  {id:"B-QUAL",name:"Code Quality",ghcp:87,comp:78,desc:"Organization, naming, idioms, validation"},
+  {id:"B-OUT",name:"Output Completeness",ghcp:88,comp:85,desc:"All required interfaces exported"},
+  {id:"B-CONS",name:"Cross-Stage Consistency",ghcp:70,comp:65,desc:"Uniform patterns across stages"},
+  {id:"B-DOC",name:"Documentation Quality",ghcp:55,comp:82,desc:"Design docs, rationale, actionability"},
+  {id:"B-REL",name:"Response Reliability",ghcp:90,comp:93,desc:"Complete, parseable, hallucination-free"},
+  {id:"B-RBAC",name:"RBAC & Identity",ghcp:88,comp:72,desc:"Correct mechanisms, deterministic names"},
+  {id:"B-ANTI",name:"Anti-Pattern Absence",ghcp:74,comp:82,desc:"No known bad patterns"},
+];
+
+const stages = [
+  {n:1,name:"Managed Identity",ghcp:96,comp:81,winner:"ghcp",
+   dims:[["Prompt Adherence","Full compliance","Full compliance","T"],["API Version @2023-07-31-preview","Correct","Correct","T"],["Provider","azapi ~>2.8.0, local backend","azapi ~>2.3, azurerm backend","B"],["Naming pi-id-testing-dev-wus3","Computed via locals","Hardcoded in locals","B"],["Resource Group","References existing via data source","Creates new RG (scope creep)","B"],["Outputs","principal_id, client_id, tenant_id, identity_id","principal_id, client_id, identity_id (missing tenant_id)","B"],["deploy.sh","Full: --dry-run, --destroy, --help, post-verify","Basic: login, init/plan/apply only","B"],["Tags","Inside body{} (WRONG for v2.x)","Top-level (CORRECT)","C"],["Documentation","Detailed usage notes, tfvars example","None","B"]],
+   notes:"Copilot's deploy.sh verifies identity via <code>az identity show</code>. Claude Code creates an unrequested resource group. Both produce correct resource names. Copilot's tag-in-body is a systematic error; Claude Code's bare deploy.sh is equally systematic."},
+  {n:2,name:"Log Analytics",ghcp:94,comp:77,winner:"ghcp",
+   dims:[["Prompt Adherence","Full","Full","T"],["Policy [LA-001]","Compliant (defers PE to Stage 4)","Creates PE in-stage (circular VNet dependency)","B"],["API Version @2023-09-01","Correct","Correct","T"],["Companion Resources","Deferred to networking stage","Created in-stage (architecturally broken)","B"],["Variable Validation","retention >= 30, <= 730","None","B"],["deploy.sh","Full: --dry-run, --destroy, --var-file","Basic: requires networking env vars","B"],["Tags","Inside body{} (WRONG)","Top-level (CORRECT)","C"],["Remote State","Stage 1 only","Stage 1 + networking vars (circular)","B"],["Documentation","Design decisions, output consumer table","None","B"]],
+   notes:"The INPUT says 'Stage 4 provides VNet and private endpoints' but MANDATORY policies include companion PE resources. Copilot correctly reads the architecture note. Claude Code follows policies literally, creating PE/DNS resources requiring a VNet from Stage 4 that doesn't exist yet."},
+  {n:3,name:"Application Insights",ghcp:91,comp:66,winner:"ghcp",
+   dims:[["API Version @2020-02-02","Correct","Correct","T"],["azapi Provider Version","~>2.8.0 (v2.x)","~>1.15 (v1.x \u2014 BREAKING BUG)","B"],["Tags","Inside body{} (wrong for v2.x used)","Top-level (correct for v2.x syntax, wrong for v1.x declared)","T"],["Output Access","jsondecode() (v1.x pattern on v2.x)","output.properties.* (v2.x pattern on v1.x)","T"],["Remote State Variables","2 path variables","8 backend config variables","B"],["RG Reference","Via remote state output","Hardcoded ARM path (potential non-existent RG)","B"],["deploy.sh","DRY_RUN env var, post-verify","Modular functions, sensitive output filtering","B"],["Documentation","Governance compliance table","None","B"]],
+   notes:"Both have version/syntax mismatches but in opposite directions. Claude Code's v1.x provider with v2.x syntax is a critical breaking bug. Claude Code's hardcoded resource group path bypasses remote state, risking a reference to a non-existent RG."},
+  {n:4,name:"Networking",ghcp:82,comp:91,winner:"comp",
+   dims:[["Subnets","5 (3 requested + 2 speculative)","3 (matches INPUT exactly)","C"],["NSGs","5 with outbound + App Svc mgmt ports","3 matching policy template","T"],["Private Endpoint","No PE resource (INPUT lists it)","PE with count toggle (correct POC pattern)","C"],["DNS Zones","19 (broader coverage)","14 (missing 5 services)","B"],["Provider","azapi + azurerm (unnecessary)","azapi only (correct)","C"],["Tags","Inside body{} (WRONG)","Top-level (CORRECT)","C"],["Outputs","~30 (16 redundant individual DNS IDs)","~10 (clean map-based)","C"],["deploy.sh","Full: --dry-run, --destroy, post-verify","Basic: login, init/plan/apply","B"],["Remote State","Stage 2 declared but unused","Stage 2 declared but unused","T"]],
+   notes:"Claude Code wins on scope discipline (3 subnets), correct PE placeholder with count toggle, clean azapi-only provider, and tag placement. Copilot wins on deploy.sh and broader DNS zone coverage (19 vs 14)."},
+  {n:5,name:"Container Registry",ghcp:87,comp:80,winner:"ghcp",
+   dims:[["Policy [ACR-001]","Full compliance","Full compliance","T"],["AcrPush RBAC","Conditional (count on CI/CD principal)","Unconditional (assumes CI/CD exists)","B"],["RBAC Naming","uuidv5() deterministic","Placeholder UUID (fragile)","B"],["Provider","azapi ~>2.8.0 + azurerm","azapi ~>1.15 (v1.x!) + azurerm + random","B"],["PE Naming","Custom pattern","Matches policy template","C"],["login_server","Constructed string","From response_export_values","C"],["deploy.sh","Full: --plan-only, --destroy, post-verify","Fragile: Python state blob download","B"],["Tags","Inside body{} (WRONG)","Top-level (CORRECT)","C"],["Documentation","Premium rationale, GUID approach","Summary table only","B"]],
+   notes:"Copilot's conditional AcrPush and uuidv5() naming are technically superior. Claude Code uses azapi v1.x (breaking) and has a fragile state-blob-download in deploy.sh."},
+  {n:6,name:"Key Vault",ghcp:83,comp:87,winner:"comp",
+   dims:[["Policy [KV-001] + [KV-002]","Full compliance","Full compliance","T"],["RBAC Principal Separation","All 4 roles \u2192 app MI (over-permissive)","Admin \u2192 deployer; User/Officer \u2192 app MI (correct)","C"],["File Organization","main.tf + data.tf","key_vault.tf + rbac.tf (better)","C"],["Provider","azapi + azurerm + random","azapi only \u2014 BUT missing azurerm for client_config (BUG)","T"],["Variable Validation","None","Name length, retention, environment enum","C"],["deploy.sh","Basic: login, plan/apply","Full: --dry-run, --destroy, KV pre-flight, RBAC verify","C"],["Tags","Top-level (CORRECT)","Top-level (CORRECT)","T"],["Documentation","Brief policy summary","Detailed three-role separation rationale","C"]],
+   notes:"Role reversal: Claude Code has the superior deploy.sh here. Better RBAC design (Admin \u2192 deployer). However, Claude Code forgot the azurerm provider needed for azurerm_client_config \u2014 a functional bug."},
+  {n:7,name:"Service Bus",ghcp:85,comp:73,winner:"ghcp",
+   dims:[["API Version @2024-01-01","Correct","Correct","T"],["RBAC Scoping","Receiver+Owner now; Sender deferred to S13 (correct)","All 3 now (Sender to worker is over-permissive)","B"],["DLQ Alert","azapi (consistent)","azurerm_monitor_metric_alert (mixed)","B"],["Provider Consistency","Mostly azapi","Mixed azapi + azurerm","B"],["RBAC Naming","uuidv5() deterministic","azurerm auto-names","B"],["Remote State Variables","3 path variables","12 backend config variables","B"],["deploy.sh","Full: --dry-run, --destroy, post-verify","Basic: always auto-approve","B"],["Tags","Inside body{} (WRONG)","Top-level (CORRECT)","C"]],
+   notes:"Copilot correctly defers Data Sender to Stage 13 (API sends, worker receives). Claude Code assigns Sender to the worker, violating least-privilege."},
+  {n:8,name:"Azure SQL",ghcp:74,comp:86,winner:"comp",
+   dims:[["Policy [SQL-001] Entra-only auth","Compliant (separate child resources)","Compliant (separate child resources)","T"],["Policy [SQL-005] publicNetworkAccess","VIOLATED \u2014 defaults Enabled","Compliant \u2014 Disabled","C"],["NEVER Directives","Violates 'NEVER set Enabled'","All followed","C"],["T-SQL Post-Deploy","Separate sql/post_deploy.sql (excellent)","Inline echo in deploy.sh","B"],["Provider","azapi + azurerm","azapi only","C"],["Tags","Double-tagged (body + top-level)","Top-level only (CORRECT)","C"],["deploy.sh","Full: --dry-run, --destroy, --with-private-endpoint","Basic: no arguments","B"],["Security Posture","Firewall rules created","No firewall, PE always deployed","C"]],
+   notes:"Decisive: Copilot violates SQL-005's explicit NEVER directive by defaulting publicNetworkAccess to Enabled and creating firewall rules. NEVER means NEVER \u2014 architecture context cannot override mandatory policy."},
+  {n:9,name:"Cosmos DB",ghcp:86,comp:74,winner:"ghcp",
+   dims:[["API Versions (split)","All correct","All correct","T"],["Cosmos RBAC","sqlRoleAssignments + uuidv5() (correct native)","Role GUID as assignment name (fragile)","B"],["Remote State","No dead refs","Stage 4 loaded but never used (dead code)","B"],["Output Access","jsondecode() (wrong for v2.x)","output.properties.* (correct)","C"],["Backup Policy","Continuous 7-day","Not included","B"],["Variable Validation","Consistency level, TTL","None","B"],["deploy.sh","Full: --dry-run, --destroy, RBAC count verify","Basic: no arguments","B"],["Tags","Inside body{} (WRONG)","Top-level (CORRECT)","C"]],
+   notes:"Copilot uses correct Cosmos native RBAC (sqlRoleAssignments) with deterministic uuidv5(). Claude Code uses role GUID as assignment name, which conflicts if the same role is assigned to another principal."},
+  {n:10,name:"Redis Cache",ghcp:82,comp:79,winner:"ghcp",
+   dims:[["Policy [RED-001]","Full compliance","Full compliance","T"],["maxmemory-policy","allkeys-lru (matches architecture)","volatile-lru (from template, deviates)","B"],["AAD Authentication","Redis Contributor (management-plane only)","aad-enabled + accessPolicyAssignment (data-plane, better)","C"],["Tags","Top-level (CORRECT \u2014 fixed)","Inside body{} (WRONG \u2014 reversed!)","B"],["Variable Validation","SKU, capacity range","None","B"],["deploy.sh","Full: --dry-run, --destroy, post-verify PE + KV","Basic: no arguments","B"],["Lifecycle","ignore_changes on redisConfiguration","None","B"]],
+   notes:"Unusual role reversal on tags: Copilot correct (top-level), Claude Code incorrect (inside body). Claude Code has superior AAD data-plane auth but wrong maxmemory policy."},
+  {n:11,name:"Storage Account",ghcp:81,comp:77,winner:"ghcp",
+   dims:[["RBAC Roles","3 of 4 (missing Data Owner)","All 4 (complete)","C"],["CORS Placement","Correct (blob service sub-resource)","Incorrect (storage account properties)","B"],["Provider Consistency","Pure azapi","Mixed: azurerm lifecycle + role_assignment","B"],["Remote State","Stages 1, 2, 4","Stages 1, 2 (missing Stage 4)","B"],["Versioning + Change Feed","Enabled","Disabled","B"],["defaultToOAuthAuthentication","Not set","true (better)","C"],["Tags","Inside body{} (WRONG)","Top-level (CORRECT)","C"],["deploy.sh","Full: --dry-run, --destroy, post-verify shared-key","Basic: CI-aware auto-approve","B"]],
+   notes:"Copilot misses Data Owner role but correctly places CORS on blob service. Claude Code includes all RBAC roles but misplaces CORS on the storage account (may not work)."},
+  {n:12,name:"SignalR",ghcp:85,comp:72,winner:"ghcp",
+   dims:[["KV Secret","signalr-connection-string (matches INPUT)","signalr-hostname (deviates)","B"],["Conditional PE","Yes (count-based)","No PE resources","B"],["Network ACLs","Conditional Allow/Deny","Simple Allow default","B"],["Outputs","13 (endpoint, SKU, mode, RBAC IDs)","9","B"],["deploy.sh","Full: KV access pre-flight, RBAC verify","Basic: requires env var, no arguments","B"],["Tags","Inside body{} (WRONG)","Top-level (CORRECT)","C"],["Variable Validation","SKU, capacity, mode, public network","None","B"],["Documentation","Python integration example","Auth design notes","B"]],
+   notes:"Copilot stores connection string as explicitly requested by INPUT. Claude Code argues disableLocalAuth means no connection string exists \u2014 architecturally sound but deviates from the stated requirement."},
+  {n:13,name:"Container Apps",ghcp:95,comp:79,winner:"ghcp",
+   dims:[["Provider","azapi ~>2.8.0 only (pure)","azapi ~>1.15 + azurerm (mixed, v1.x!)","B"],["Hardcoded Names","None (all from remote state)","Queue + ACR names hardcoded (NEVER VIOLATION)","B"],["Cosmos DB RBAC","sqlRoleAssignments (correct native)","azurerm_role_assignment (CRITICAL BUG)","B"],["Health Probes","Liveness, readiness, startup","None","B"],["KEDA Scaler","Dynamic queue name from remote state","Hardcoded queue name","B"],["RBAC Naming","uuidv5() + principalType","azurerm auto-naming","B"],["CPU/Memory/Replicas","Parameterized with validation","Hardcoded","B"],["deploy.sh","340+ lines: all 11 upstream checks, health curl","~65 lines: basic init/plan/apply","B"],["Tags","Inside body{} (WRONG)","Top-level (CORRECT)","C"],["Body Format","Native HCL maps (v2.x)","jsonencode() (v1.x)","B"]],
+   notes:"Copilot's strongest stage. Pure azapi, correct Cosmos native RBAC, no hardcoded names, health probes, 340-line deploy.sh. Claude Code has critical bugs: hardcoded names (NEVER violation), Cosmos RBAC via wrong layer, v1.x provider."},
+  {n:14,name:"Documentation",ghcp:20,comp:95,winner:"comp",
+   dims:[["Completeness","FAILED \u2014 lost context, ~300 lines partial","Complete: 2,234 lines, both required files","C"],["Required Files","Partial README + truncated ARCHITECTURE","architecture.md + deployment-guide.md","C"],["Architecture Coverage","Started Mermaid diagrams, then aborted","Full: all 13 stages, RBAC tables, topology, security matrix","C"],["Deployment Guide","Not produced","1,478 lines: runbook, scripts, troubleshooting, CI/CD","C"],["Accuracy","Partial output was accurate","All resource names and references accurate","C"],["deploy-all.sh","Not produced","Complete with ordered stage deployment","C"],["Troubleshooting","Not produced","8 common issues with solutions","C"],["CI/CD Integration","Not produced","Azure DevOps YAML + GitHub Actions examples","C"]],
+   notes:"Copilot suffered catastrophic context loss mid-response: 'I don't have any previous response to continue from.' Claude Code produced production-grade operational documentation covering architecture, deployment, validation, troubleshooting, rollback, and CI/CD."},
+];
+
+// Populate benchmark table
+const bt=document.getElementById('benchmarkTable');
+let ghcpSum=0,compSum=0;
+benchmarks.forEach(b=>{
+  const d=b.ghcp-b.comp;
+  const dStr=d>0?`+${d}`:d<0?`${d}`:'0';
+  const dCls=d>0?'text-blue-400':d<0?'text-orange-400':'text-gray-500';
+  const w=d>=0?'<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">GHCP</span>':'<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#7c2d12;color:#fdba74">Claude Code</span>';
+  bt.innerHTML+=`<tr><td class="px-3 py-1.5 font-mono text-purple-300">${b.id}</td><td class="px-3 py-1.5 text-gray-400">${b.desc}</td><td class="px-3 py-1.5 text-center ${d>=0?'font-bold text-blue-300':''}">${b.ghcp}</td><td class="px-3 py-1.5 text-center ${d<0?'font-bold text-orange-300':''}">${b.comp}</td><td class="px-3 py-1.5 text-center ${dCls}">${dStr}</td><td class="px-3 py-1.5 text-center">${w}</td></tr>`;
+  ghcpSum+=b.ghcp;compSum+=b.comp;
+});
+const gA=(ghcpSum/benchmarks.length).toFixed(1),cA=(compSum/benchmarks.length).toFixed(1);
+document.getElementById('ghcpAvg').textContent=gA;
+document.getElementById('compAvg').textContent=cA;
+const oDelta=parseFloat(gA)-parseFloat(cA);
+document.getElementById('deltaAvg').textContent=(oDelta>0?'+':'')+oDelta.toFixed(1);
+document.getElementById('deltaAvg').className=`px-3 py-2 text-center ${oDelta>=0?'text-blue-400':'text-orange-400'}`;
+document.getElementById('overallWinner').innerHTML=oDelta>=0?'<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">GHCP</span>':'<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#7c2d12;color:#fdba74">Claude Code</span>';
+
+// Populate stage table
+const st=document.getElementById('stageTable');
+stages.forEach(s=>{
+  const w=s.winner==='ghcp'?'<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">GHCP</span>':'<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#7c2d12;color:#fdba74">Claude Code</span>';
+  const gB=s.winner==='ghcp'?'font-bold text-blue-300':'';
+  const cB=s.winner==='comp'?'font-bold text-orange-300':'';
+  st.innerHTML+=`<tr><td class="px-3 py-1.5">${s.n}</td><td class="px-3 py-1.5 cursor-pointer hover:text-purple-300" onclick="showTab('s${s.n}')">${s.name}</td><td class="px-3 py-1.5 text-center ${gB}">${s.ghcp}</td><td class="px-3 py-1.5 text-center ${cB}">${s.comp}</td><td class="px-3 py-1.5 text-center">${w}</td></tr>`;
+});
+
+// Dimension winners heatmap data: [dimName, s1..s14 winners]
+const heatmapData = [
+  ["deploy.sh Quality","B","B","B","B","B","C","B","B","B","B","B","B","B","-"],
+  ["Tags Placement","C","C","T","C","C","T","C","C","C","B","C","C","C","-"],
+  ["Policy Compliance","T","B","T","T","T","T","T","C","T","T","C","T","B","-"],
+  ["Provider Config","B","B","B","C","B","T","B","C","T","T","B","B","B","-"],
+  ["RBAC Design","T","T","T","-","B","C","B","T","B","C","C","B","B","-"],
+  ["Output Design","B","B","T","C","T","C","T","T","C","C","C","B","B","-"],
+  ["Remote State","T","B","B","T","B","T","B","T","B","T","B","T","B","-"],
+  ["Documentation","B","B","B","T","B","C","T","T","B","T","T","B","T","C"],
+  ["Naming","B","T","T","T","C","T","T","T","T","T","T","C","T","-"],
+  ["Scope Discipline","B","B","B","C","T","C","B","T","B","T","T","B","B","C"],
+];
+
+const hmEl = document.getElementById('heatmapTable');
+if (hmEl) {
+  heatmapData.forEach(row => {
+    let cells = `<td class="px-2 py-1 text-gray-300 whitespace-nowrap font-medium">${row[0]}</td>`;
+    for(let i=1;i<=14;i++){
+      const v = row[i];
+      let cls = 'text-gray-600', txt = '\u2014';
+      if(v==='B'){cls='text-blue-400 font-bold';txt='CP';}
+      else if(v==='C'){cls='text-orange-400 font-bold';txt='CC';}
+      else if(v==='T'){cls='text-gray-500';txt='T';}
+      cells += `<td class="px-1 py-1 text-center ${cls}">${txt}</td>`;
+    }
+    hmEl.innerHTML += `<tr class="border-b border-slate-700/30">${cells}</tr>`;
+  });
+}
+
+// Generate stage tabs
+stages.forEach(s=>{
+  const div=document.createElement('div');
+  div.className='tab-content';div.id='tab-s'+s.n;
+  const wBadge=s.winner==='ghcp'?'<span class="text-[10px] px-2 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">GHCP Wins</span>':'<span class="text-[10px] px-2 py-0.5 rounded-full" style="background:#7c2d12;color:#fdba74">Claude Code Wins</span>';
+
+  let dimsHTML = '';
+  if (s.dims) {
+    dimsHTML = s.dims.map(d => {
+      const wClass = d[3]==='B'?'text-blue-400':d[3]==='C'?'text-orange-400':'text-gray-500';
+      const wText = d[3]==='B'?'Copilot':d[3]==='C'?'Claude Code':d[3]==='T'?'Tie':'N/A';
+      return `<tr class="border-b border-slate-700/50">
+        <td class="px-3 py-1.5 font-medium text-gray-300">${d[0]}</td>
+        <td class="px-3 py-1.5">${d[1]}</td>
+        <td class="px-3 py-1.5">${d[2]}</td>
+        <td class="px-3 py-1.5 text-center"><span class="${wClass} font-semibold">${wText}</span></td>
+      </tr>`;
+    }).join('');
+  }
+
+  div.innerHTML = `
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+      <h2 class="text-lg font-bold">Stage ${s.n}: ${s.name}</h2>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 text-sm">
+          <span class="text-blue-400 font-bold">${s.ghcp}</span>
+          <span class="text-gray-600">vs</span>
+          <span class="text-orange-400 font-bold">${s.comp}</span>
+        </div>
+        ${wBadge}
+      </div>
+    </div>
+
+    <div class="card rounded-xl p-4 mb-5">
+      <div class="space-y-2">
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-blue-400 w-16 text-right font-medium">Copilot</span>
+          <div class="flex-1 bg-slate-700 rounded-full h-5 overflow-hidden">
+            <div class="cp-bar h-full rounded-full flex items-center justify-end pr-2 text-[10px] font-bold text-white" style="width:${s.ghcp}%">${s.ghcp}</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-orange-400 w-16 text-right font-medium">Claude</span>
+          <div class="flex-1 bg-slate-700 rounded-full h-5 overflow-hidden">
+            <div class="cc-bar h-full rounded-full flex items-center justify-end pr-2 text-[10px] font-bold text-white" style="width:${s.comp}%">${s.comp}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    ${dimsHTML ? `<div class="card rounded-xl overflow-hidden mb-5">
+      <table class="w-full text-xs">
+        <thead><tr class="bg-slate-800">
+          <th class="px-3 py-2 text-left text-gray-300 w-1/4">Dimension</th>
+          <th class="px-3 py-2 text-left text-blue-400 w-[30%]">Copilot</th>
+          <th class="px-3 py-2 text-left text-orange-400 w-[30%]">Claude Code</th>
+          <th class="px-3 py-2 text-center text-gray-300 w-[10%]">Winner</th>
+        </tr></thead>
+        <tbody>${dimsHTML}</tbody>
+      </table>
+    </div>` : ''}
+
+    ${s.notes ? `<div class="card rounded-xl p-4">
+      <h3 class="text-xs font-semibold text-purple-300 mb-2">Analysis Notes</h3>
+      <p class="text-xs text-gray-400">${s.notes}</p>
+    </div>` : ''}
+  `;
+  document.querySelector('main').appendChild(div);
+});
+
+function showTab(id){
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id==='overview'?'tab-overview':'tab-'+id).classList.add('active');
+  const labels=['overview','s1','s2','s3','s4','s5','s6','s7','s8','s9','s10','s11','s12','s13','s14'];
+  const idx=labels.indexOf(id);
+  if(idx>=0)document.querySelectorAll('.tab-btn')[idx].classList.add('active');
+}
+</script>
+</body>
+</html>

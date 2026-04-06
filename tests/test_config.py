@@ -1,16 +1,15 @@
 """Tests for azext_prototype.config — ProjectConfig and validation."""
 
-
 import pytest
 import yaml
 from knack.util import CLIError
 
 from azext_prototype.config import (
-    DEFAULT_CONFIG,
-    ProjectConfig,
-    SECRET_KEY_PREFIXES,
     _ALLOWED_AI_PROVIDERS,
     _BLOCKED_AI_PROVIDERS,
+    DEFAULT_CONFIG,
+    SECRET_KEY_PREFIXES,
+    ProjectConfig,
     _safe_load_yaml,
     _sanitize_for_yaml,
 )
@@ -310,10 +309,12 @@ class TestSecretsFile:
     def test_create_default_separates_secrets(self, tmp_project):
         """create_default should route secret overrides to secrets file."""
         config = ProjectConfig(str(tmp_project))
-        config.create_default({
-            "project": {"name": "my-app"},
-            "deploy": {"subscription": "sub-123", "resource_group": "rg-test"},
-        })
+        config.create_default(
+            {
+                "project": {"name": "my-app"},
+                "deploy": {"subscription": "sub-123", "resource_group": "rg-test"},
+            }
+        )
 
         # Main file should have resource_group but empty subscription
         with open(tmp_project / "prototype.yaml", "r", encoding="utf-8") as f:
@@ -355,6 +356,7 @@ class TestSecretsFile:
 # ------------------------------------------------------------------ #
 # _sanitize_for_yaml                                                  #
 # ------------------------------------------------------------------ #
+
 
 class TestSanitizeForYaml:
     """Verify _sanitize_for_yaml strips non-standard types."""
@@ -407,12 +409,14 @@ class TestDefaultStrRoundTrip:
             """Mimic knack.validators.DefaultStr."""
 
         config = ProjectConfig(str(tmp_project))
-        config.create_default({
-            "project": {
-                "name": DefaultStr("demo"),
-                "location": DefaultStr("westus"),
-            },
-        })
+        config.create_default(
+            {
+                "project": {
+                    "name": DefaultStr("demo"),
+                    "location": DefaultStr("westus"),
+                },
+            }
+        )
 
         # Must be loadable with yaml.safe_load (via config.load())
         config2 = ProjectConfig(str(tmp_project))

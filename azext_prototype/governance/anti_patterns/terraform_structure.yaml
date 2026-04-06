@@ -1,0 +1,158 @@
+kind: anti-pattern
+domain: terraform_structure
+description: Provider hygiene, version consistency, tag placement, and azapi conventions
+last_updated: '2026-04-04'
+patterns:
+- id: ANTI-TFS-001
+  description: Detects azurerm provider usage — this project uses only the azapi provider
+  rationale: The azurerm provider is not used in this project. All resources use azapi_resource with ARM resource types.
+  warning_message: azurerm provider detected — use hashicorp/azapi provider with azapi_resource for all resources.
+  applies_to:
+  - terraform-agent
+  targets:
+  - services: []
+    search_patterns:
+    - source  = "hashicorp/azurerm"
+    - source = "hashicorp/azurerm"
+    - provider "azurerm"
+    safe_patterns:
+    - '# do not use azurerm'
+    - '# never use azurerm'
+    - never declare the azurerm
+    correct_patterns:
+    - source = "hashicorp/azapi"
+- id: ANTI-TFS-002
+  description: Detects azurerm_* resource types which require the azurerm provider
+  rationale: azurerm_* resources require the azurerm provider which is not used; use azapi_resource with ARM resource types
+    instead.
+  warning_message: azurerm resource detected — use azapi_resource with the ARM resource type instead.
+  applies_to:
+  - terraform-agent
+  targets:
+  - services: []
+    search_patterns:
+    - azurerm_role_assignment
+    - azurerm_monitor_metric_alert
+    - azurerm_storage_management_policy
+    - azurerm_key_vault_secret
+    - azurerm_monitor_diagnostic_setting
+    safe_patterns:
+    - '# do not use azurerm'
+    - never use azurerm
+    correct_patterns:
+    - Microsoft.Authorization/roleAssignments@
+    - Microsoft.Insights/diagnosticSettings@
+- id: ANTI-TFS-003
+  description: Detects random provider usage which introduces non-deterministic behavior
+  rationale: The random provider generates different values on each apply, breaking plan reproducibility and causing unnecessary
+    resource recreation.
+  warning_message: Random provider detected — use deterministic alternatives like substr(md5(...)).
+  applies_to:
+  - terraform-agent
+  targets:
+  - services: []
+    search_patterns:
+    - source  = "hashicorp/random"
+    - source = "hashicorp/random"
+    - provider "random"
+    - random_string
+    - random_id
+    - random_pet
+    safe_patterns:
+    - '# do not use random'
+    correct_patterns:
+    - substr(md5("deterministic-seed"), 0, 8)
+- id: ANTI-TFS-004
+  description: Detects outdated azapi provider version (1.x) — this project requires azapi 2.x
+  rationale: azapi 1.x uses different output access patterns (jsondecode) and lacks v2 features like direct property access.
+  warning_message: Outdated azapi provider version detected — use ~> 2.x.
+  applies_to:
+  - terraform-agent
+  targets:
+  - services: []
+    search_patterns:
+    - ~> 1.15
+    - ~> 1.14
+    - ~> 1.13
+    - ~> 1.12
+    - ~> 1.11
+    - ~> 1.10
+    correct_patterns:
+    - ~> 2.8
+    - ~> 2.
+- id: ANTI-TFS-005
+  description: Detects uuid() function which is non-deterministic and breaks plan reproducibility
+  rationale: uuid() generates a new value every time Terraform evaluates it, causing unnecessary resource recreation on every
+    apply.
+  warning_message: uuid() detected — use uuidv5() with a deterministic seed for reproducible GUIDs.
+  applies_to:
+  - terraform-agent
+  targets:
+  - services: []
+    search_patterns:
+    - uuid()
+    safe_patterns:
+    - uuidv5
+    - '# never use uuid'
+    - do not use uuid
+    correct_patterns:
+    - uuidv5("6ba7b811-9dad-11d1-80b4-00c04fd430c8", "deterministic-seed")
+- id: ANTI-TFS-006
+  description: Detects jsondecode() on azapi v2 resource output — use .output.properties.* directly
+  rationale: azapi v2 provides direct property access via .output.properties.* — jsondecode is a v1 workaround that is unnecessary
+    and error-prone.
+  warning_message: jsondecode() on azapi resource output — use .output.properties.* directly (azapi v2 syntax).
+  applies_to:
+  - terraform-agent
+  targets:
+  - services: []
+    search_patterns:
+    - jsondecode(azapi_resource.
+    - jsondecode( azapi_resource.
+    safe_patterns:
+    - '# jsondecode is for v1.x'
+    correct_patterns:
+    - .output.properties.
+- id: ANTI-TFS-007
+  description: Detects .output.properties.* access without response_export_values on the azapi_resource
+  rationale: azapi_resource requires response_export_values to be set for any .output.properties.* access — without it, the
+    value is null.
+  warning_message: Accessing .output.properties.* without response_export_values — add response_export_values = ["*"] to the
+    resource.
+  applies_to:
+  - terraform-agent
+  targets:
+  - services: []
+    search_patterns:
+    - .output.properties.
+    safe_patterns:
+    - response_export_values
+    correct_patterns:
+    - response_export_values = ["*"]
+- id: ANTI-TFS-008
+  description: Detects data.azurerm_client_config which requires the azurerm provider
+  rationale: data.azurerm_client_config requires azurerm provider — use var.subscription_id and var.tenant_id instead.
+  warning_message: data.azurerm_client_config detected — use var.subscription_id and var.tenant_id instead.
+  applies_to:
+  - terraform-agent
+  targets:
+  - services: []
+    search_patterns:
+    - data.azurerm_client_config
+    - data "azurerm_client_config"
+    correct_patterns:
+    - var.subscription_id
+    - var.tenant_id
+- id: ANTI-TFS-009
+  description: Detects data.azurerm_subscription which requires the azurerm provider
+  rationale: data.azurerm_subscription requires azurerm provider — use var.subscription_id for subscription-level references.
+  warning_message: data.azurerm_subscription detected — use var.subscription_id instead.
+  applies_to:
+  - terraform-agent
+  targets:
+  - services: []
+    search_patterns:
+    - data.azurerm_subscription
+    - data "azurerm_subscription"
+    correct_patterns:
+    - var.subscription_id

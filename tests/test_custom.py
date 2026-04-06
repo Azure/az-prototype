@@ -2,12 +2,10 @@
 
 import json
 import os
-
-import pytest
 from unittest.mock import MagicMock, patch
 
+import pytest
 from knack.util import CLIError
-
 
 # All command functions call _get_project_dir() internally (uses Path.cwd()),
 # so we mock it to point at our tmp fixture directories.
@@ -182,6 +180,7 @@ class TestPrototypeAgentAdd:
         assert agent_file.exists()
 
         import yaml as _yaml
+
         content = _yaml.safe_load(agent_file.read_text(encoding="utf-8"))
         assert content["name"] == "my-data-agent"
 
@@ -270,7 +269,7 @@ class TestPrototypeAgentAdd:
     @patch(f"{_CUSTOM_MODULE}._get_project_dir")
     def test_add_records_config_manifest(self, mock_dir, project_with_config):
         """Verify the agent is recorded in prototype.yaml."""
-        from azext_prototype.custom import prototype_agent_add, _load_config
+        from azext_prototype.custom import _load_config, prototype_agent_add
 
         mock_dir.return_value = str(project_with_config)
         cmd = MagicMock()
@@ -300,6 +299,7 @@ class TestResolveDefinition:
 
     def test_resolves_known_definition(self):
         from pathlib import Path
+
         from azext_prototype.custom import _resolve_definition
 
         defs_dir = Path(__file__).parent.parent / "azext_prototype" / "agents" / "builtin" / "definitions"
@@ -309,6 +309,7 @@ class TestResolveDefinition:
 
     def test_resolves_with_extension(self):
         from pathlib import Path
+
         from azext_prototype.custom import _resolve_definition
 
         defs_dir = Path(__file__).parent.parent / "azext_prototype" / "agents" / "builtin" / "definitions"
@@ -317,6 +318,7 @@ class TestResolveDefinition:
 
     def test_unknown_definition_raises(self):
         from pathlib import Path
+
         from azext_prototype.custom import _resolve_definition
 
         defs_dir = Path(__file__).parent.parent / "azext_prototype" / "agents" / "builtin" / "definitions"
@@ -425,8 +427,9 @@ class TestPrototypeGenerateBacklog:
 
         mock_result = BacklogResult(items_generated=3, items_pushed=0)
 
-        with patch(f"{_CUSTOM_MODULE}._build_context") as mock_ctx, \
-             patch("azext_prototype.stages.backlog_session.BacklogSession") as MockSession:
+        with patch(f"{_CUSTOM_MODULE}._build_context") as mock_ctx, patch(
+            "azext_prototype.stages.backlog_session.BacklogSession"
+        ) as MockSession:
             from azext_prototype.agents.base import AgentContext
 
             ctx = AgentContext(
@@ -455,8 +458,9 @@ class TestPrototypeGenerateBacklog:
 
         mock_result = BacklogResult(items_generated=2, items_pushed=0)
 
-        with patch(f"{_CUSTOM_MODULE}._build_context") as mock_ctx, \
-             patch("azext_prototype.stages.backlog_session.BacklogSession") as MockSession:
+        with patch(f"{_CUSTOM_MODULE}._build_context") as mock_ctx, patch(
+            "azext_prototype.stages.backlog_session.BacklogSession"
+        ) as MockSession:
             from azext_prototype.agents.base import AgentContext
 
             ctx = AgentContext(
@@ -474,7 +478,9 @@ class TestPrototypeGenerateBacklog:
 
     @patch(f"{_CUSTOM_MODULE}._check_requirements")
     @patch(f"{_CUSTOM_MODULE}._get_project_dir")
-    def test_generate_backlog_invalid_provider_raises(self, mock_dir, mock_check_req, project_with_design, mock_ai_provider):
+    def test_generate_backlog_invalid_provider_raises(
+        self, mock_dir, mock_check_req, project_with_design, mock_ai_provider
+    ):
         from azext_prototype.custom import prototype_generate_backlog
 
         mock_dir.return_value = str(project_with_design)
@@ -516,11 +522,14 @@ class TestPrototypeGenerateBacklog:
 
     @patch(f"{_CUSTOM_MODULE}._check_requirements")
     @patch(f"{_CUSTOM_MODULE}._get_project_dir")
-    def test_generate_backlog_defaults_from_config(self, mock_dir, mock_check_req, project_with_design, mock_ai_provider):
+    def test_generate_backlog_defaults_from_config(
+        self, mock_dir, mock_check_req, project_with_design, mock_ai_provider
+    ):
         """Backlog provider/org/project fall back to prototype.yaml values."""
+        import yaml as _yaml
+
         from azext_prototype.custom import prototype_generate_backlog
         from azext_prototype.stages.backlog_session import BacklogResult
-        import yaml as _yaml
 
         # Update config with backlog section
         config_path = project_with_design / "prototype.yaml"
@@ -535,8 +544,9 @@ class TestPrototypeGenerateBacklog:
 
         mock_result = BacklogResult(items_generated=1, items_pushed=0)
 
-        with patch(f"{_CUSTOM_MODULE}._build_context") as mock_ctx, \
-             patch("azext_prototype.stages.backlog_session.BacklogSession") as MockSession:
+        with patch(f"{_CUSTOM_MODULE}._build_context") as mock_ctx, patch(
+            "azext_prototype.stages.backlog_session.BacklogSession"
+        ) as MockSession:
             from azext_prototype.agents.base import AgentContext
 
             ctx = AgentContext(
@@ -563,8 +573,9 @@ class TestPrototypeGenerateBacklog:
 
         mock_result = BacklogResult(items_generated=1, items_pushed=0)
 
-        with patch(f"{_CUSTOM_MODULE}._build_context") as mock_ctx, \
-             patch("azext_prototype.stages.backlog_session.BacklogSession") as MockSession:
+        with patch(f"{_CUSTOM_MODULE}._build_context") as mock_ctx, patch(
+            "azext_prototype.stages.backlog_session.BacklogSession"
+        ) as MockSession:
             from azext_prototype.agents.base import AgentContext
 
             ctx = AgentContext(
@@ -582,7 +593,9 @@ class TestPrototypeGenerateBacklog:
 
     @patch(f"{_CUSTOM_MODULE}._check_requirements")
     @patch(f"{_CUSTOM_MODULE}._get_project_dir")
-    def test_generate_backlog_prompts_when_unconfigured(self, mock_dir, mock_check_req, project_with_design, mock_ai_provider):
+    def test_generate_backlog_prompts_when_unconfigured(
+        self, mock_dir, mock_check_req, project_with_design, mock_ai_provider
+    ):
         """When provider/org/project are missing, prompt interactively and save."""
         from azext_prototype.custom import prototype_generate_backlog
         from azext_prototype.stages.backlog_session import BacklogResult
@@ -592,9 +605,9 @@ class TestPrototypeGenerateBacklog:
 
         mock_result = BacklogResult(items_generated=1, items_pushed=0)
 
-        with patch(f"{_CUSTOM_MODULE}._build_context") as mock_ctx, \
-             patch(f"{_CUSTOM_MODULE}._prompt_backlog_config") as mock_prompt, \
-             patch("azext_prototype.stages.backlog_session.BacklogSession") as MockSession:
+        with patch(f"{_CUSTOM_MODULE}._build_context") as mock_ctx, patch(
+            f"{_CUSTOM_MODULE}._prompt_backlog_config"
+        ) as mock_prompt, patch("azext_prototype.stages.backlog_session.BacklogSession") as MockSession:
             from azext_prototype.agents.base import AgentContext
 
             mock_prompt.return_value = {
@@ -618,6 +631,7 @@ class TestPrototypeGenerateBacklog:
 
         # Verify config was saved
         import yaml as _yaml
+
         config_path = project_with_design / "prototype.yaml"
         with open(config_path, "r", encoding="utf-8") as f:
             saved = _yaml.safe_load(f)
@@ -627,7 +641,9 @@ class TestPrototypeGenerateBacklog:
 
     @patch(f"{_CUSTOM_MODULE}._check_requirements")
     @patch(f"{_CUSTOM_MODULE}._get_project_dir")
-    def test_generate_backlog_no_prompt_when_fully_configured(self, mock_dir, mock_check_req, project_with_design, mock_ai_provider):
+    def test_generate_backlog_no_prompt_when_fully_configured(
+        self, mock_dir, mock_check_req, project_with_design, mock_ai_provider
+    ):
         """No prompt when all three values are supplied via CLI args."""
         from azext_prototype.custom import prototype_generate_backlog
         from azext_prototype.stages.backlog_session import BacklogResult
@@ -637,9 +653,9 @@ class TestPrototypeGenerateBacklog:
 
         mock_result = BacklogResult(items_generated=1, items_pushed=0)
 
-        with patch(f"{_CUSTOM_MODULE}._build_context") as mock_ctx, \
-             patch(f"{_CUSTOM_MODULE}._prompt_backlog_config") as mock_prompt, \
-             patch("azext_prototype.stages.backlog_session.BacklogSession") as MockSession:
+        with patch(f"{_CUSTOM_MODULE}._build_context") as mock_ctx, patch(
+            f"{_CUSTOM_MODULE}._prompt_backlog_config"
+        ) as mock_prompt, patch("azext_prototype.stages.backlog_session.BacklogSession") as MockSession:
             from azext_prototype.agents.base import AgentContext
 
             ctx = AgentContext(

@@ -1,0 +1,21 @@
+kind: transform
+domain: networking
+description: Remove private endpoint resources from non-networking stages
+last_updated: '2026-04-06'
+transforms:
+- id: TFM-NET-001
+  description: Remove private endpoint, private DNS zone, DNS zone link, and DNS zone
+    group resources from non-networking stages. These resources belong exclusively in
+    the dedicated Networking stage.
+  rationale: The architecture mandates a single Networking stage that creates ALL private
+    endpoints, DNS zones, and DNS zone groups. Service stages must NOT create these
+    resources — they only set publicNetworkAccess to Disabled on their own resources.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services: []
+  type: structured
+  handler: remove_private_endpoint_resources
+  search: privateEndpoints or privateDnsZones in non-networking stage
+  replace: removed

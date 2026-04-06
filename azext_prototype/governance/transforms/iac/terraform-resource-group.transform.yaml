@@ -1,0 +1,18 @@
+kind: transform
+domain: iac
+description: Ensure resource group azapi_resource blocks have parent_id
+last_updated: '2026-04-06'
+transforms:
+- id: TFM-RG-001
+  description: Add parent_id to resource group resources that are missing it
+  rationale: The azapi provider requires parent_id on all resources. For resource groups,
+    parent_id must be /subscriptions/${var.subscription_id}. Without it, terraform plan
+    fails immediately.
+  applies_to:
+  - terraform-agent
+  targets:
+  - services: []
+  type: structured
+  handler: add_resource_group_parent_id
+  search: azapi_resource for resourceGroups without parent_id
+  replace: added parent_id

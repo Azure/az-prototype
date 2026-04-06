@@ -14,10 +14,10 @@ from knack.util import CLIError
 from azext_prototype.stages.discovery import DiscoveryResult
 from tests.conftest import make_ai_response
 
-
 # ======================================================================
 # Helpers
 # ======================================================================
+
 
 def _make_discovery_result(**overrides):
     """Quick factory for DiscoveryResult."""
@@ -51,9 +51,7 @@ class TestDesignStageArtifactsPath:
     """Cover lines 102-109 — artifacts_path handling in execute()."""
 
     @patch("azext_prototype.stages.design_stage.DiscoverySession")
-    def test_execute_with_artifacts_file(
-        self, MockDS, project_with_config, mock_agent_context, populated_registry
-    ):
+    def test_execute_with_artifacts_file(self, MockDS, project_with_config, mock_agent_context, populated_registry):
         """When artifacts= points to a file, the content is ingested."""
         from azext_prototype.stages.design_stage import DesignStage
 
@@ -120,8 +118,8 @@ class TestDesignStageNoArchitect:
 
     @patch("azext_prototype.stages.design_stage.DiscoverySession")
     def test_no_architect_agents_raises(self, MockDS, project_with_config, mock_agent_context):
-        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.agents.registry import AgentRegistry
+        from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
         stage.get_guards = lambda: []
@@ -145,9 +143,7 @@ class TestDesignStagePolicyOverrides:
     """Cover the policy_overrides persistence path."""
 
     @patch("azext_prototype.stages.design_stage.DiscoverySession")
-    def test_policy_overrides_stored(
-        self, MockDS, project_with_config, mock_agent_context, populated_registry
-    ):
+    def test_policy_overrides_stored(self, MockDS, project_with_config, mock_agent_context, populated_registry):
         from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
@@ -177,8 +173,8 @@ class TestDesignStageIaCReview:
     """Cover line 318 — _run_iac_review method."""
 
     def test_run_iac_review_with_terraform_agent(self, project_with_config, mock_agent_context, populated_registry):
-        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.config import ProjectConfig
+        from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
         config = ProjectConfig(str(project_with_config))
@@ -195,9 +191,9 @@ class TestDesignStageIaCReview:
         )
 
     def test_run_iac_review_no_iac_agents(self, project_with_config, mock_agent_context):
-        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.agents.registry import AgentRegistry
         from azext_prototype.config import ProjectConfig
+        from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
         config = ProjectConfig(str(project_with_config))
@@ -307,11 +303,13 @@ class TestDesignStageReadArtifacts:
 
     def test_read_artifacts_embedded_images(self, tmp_path):
         """Embedded images from documents are collected in result['images']."""
-        from azext_prototype.stages.design_stage import DesignStage
+        import io
+
         from docx import Document
         from docx.shared import Inches
         from PIL import Image as PILImage
-        import io
+
+        from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
         # Create a DOCX with an embedded image
@@ -333,8 +331,9 @@ class TestDesignStageReadArtifacts:
 
     def test_read_artifacts_document_extraction(self, tmp_path):
         """PDF/DOCX text is extracted and included in content."""
-        from azext_prototype.stages.design_stage import DesignStage
         from docx import Document
+
+        from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
         doc = Document()
@@ -357,12 +356,211 @@ class TestDesignStageReadArtifacts:
         assert result["images"] == []
 
 
+class TestArtifactInventory:
+    """Tests for artifact hash computation and delta detection in DesignStage."""
+
+    def test_compute_artifact_hashes_single_file(self, tmp_path):
+        import hashlib
+
+        from azext_prototype.stages.design_stage import DesignStage
+
+        f = tmp_path / "spec.md"
+        f.write_text("# Spec\nDetails here", encoding="utf-8")
+        expected = hashlib.sha256(f.read_bytes()).hexdigest()
+
+        hashes = DesignStage._compute_artifact_hashes(str(f))
+        assert len(hashes) == 1
+        assert hashes[str(f.resolve())] == expected
+
+    def test_compute_artifact_hashes_directory(self, tmp_path):
+        import hashlib
+
+        from azext_prototype.stages.design_stage import DesignStage
+
+        f1 = tmp_path / "a.md"
+        f1.write_text("Alpha", encoding="utf-8")
+        f2 = tmp_path / "b.txt"
+        f2.write_text("Bravo", encoding="utf-8")
+
+        hashes = DesignStage._compute_artifact_hashes(str(tmp_path))
+        assert len(hashes) == 2
+        assert hashes[str(f1.resolve())] == hashlib.sha256(b"Alpha").hexdigest()
+        assert hashes[str(f2.resolve())] == hashlib.sha256(b"Bravo").hexdigest()
+
+    def test_compute_artifact_hashes_nested(self, tmp_path):
+        from azext_prototype.stages.design_stage import DesignStage
+
+        sub = tmp_path / "sub"
+        sub.mkdir()
+        (sub / "nested.md").write_text("Nested", encoding="utf-8")
+        (tmp_path / "top.txt").write_text("Top", encoding="utf-8")
+
+        hashes = DesignStage._compute_artifact_hashes(str(tmp_path))
+        assert len(hashes) == 2
+
+    def test_compute_artifact_hashes_empty_dir(self, tmp_path):
+        from azext_prototype.stages.design_stage import DesignStage
+
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        hashes = DesignStage._compute_artifact_hashes(str(empty))
+        assert hashes == {}
+
+    def test_read_artifacts_with_include_only(self, tmp_path):
+        from azext_prototype.stages.design_stage import DesignStage
+
+        stage = DesignStage()
+        f1 = tmp_path / "a.md"
+        f1.write_text("Alpha", encoding="utf-8")
+        f2 = tmp_path / "b.txt"
+        f2.write_text("Bravo", encoding="utf-8")
+        f3 = tmp_path / "c.rst"
+        f3.write_text("Charlie", encoding="utf-8")
+
+        # Only include f2
+        result = stage._read_artifacts(str(tmp_path), include_only={str(f2.resolve())})
+        assert "Bravo" in result["content"]
+        assert "Alpha" not in result["content"]
+        assert "Charlie" not in result["content"]
+        assert len(result["read"]) == 1
+
+    def test_read_artifacts_include_only_single_file_excluded(self, tmp_path):
+        from azext_prototype.stages.design_stage import DesignStage
+
+        stage = DesignStage()
+        f = tmp_path / "spec.md"
+        f.write_text("Spec", encoding="utf-8")
+
+        result = stage._read_artifacts(str(f), include_only=set())
+        assert result["content"] == ""
+        assert result["read"] == []
+
+    def test_read_artifacts_include_only_none_reads_all(self, tmp_path):
+        from azext_prototype.stages.design_stage import DesignStage
+
+        stage = DesignStage()
+        (tmp_path / "a.md").write_text("Alpha", encoding="utf-8")
+        (tmp_path / "b.txt").write_text("Bravo", encoding="utf-8")
+
+        result = stage._read_artifacts(str(tmp_path), include_only=None)
+        assert "Alpha" in result["content"]
+        assert "Bravo" in result["content"]
+        assert len(result["read"]) == 2
+
+    def test_unchanged_artifacts_skip_reading(self, tmp_path):
+        """When all hashes match, no files should be read."""
+        import hashlib
+
+        from azext_prototype.stages.design_stage import DesignStage
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        # Use separate dirs for artifacts and project state
+        artifacts_dir = tmp_path / "artifacts"
+        artifacts_dir.mkdir()
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+
+        f1 = artifacts_dir / "a.md"
+        f1.write_text("Alpha", encoding="utf-8")
+        h1 = hashlib.sha256(b"Alpha").hexdigest()
+
+        # Pre-populate inventory with matching hashes
+        ds = DiscoveryState(str(project_dir))
+        ds.load()
+        ds.update_artifact_inventory({str(f1.resolve()): h1})
+
+        stage = DesignStage()
+        current = stage._compute_artifact_hashes(str(artifacts_dir))
+        stored = ds.get_artifact_hashes()
+
+        # All files match — delta should be empty
+        delta = {p for p, h in current.items() if stored.get(p) != h}
+        new = {p for p in current if p not in stored}
+        assert delta == set()
+        assert new == set()
+
+    def test_changed_artifact_detected(self, tmp_path):
+        """When a file changes, it appears in the delta set."""
+        import hashlib
+
+        from azext_prototype.stages.design_stage import DesignStage
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        f1 = tmp_path / "a.md"
+        f1.write_text("Alpha", encoding="utf-8")
+        old_hash = hashlib.sha256(b"Alpha").hexdigest()
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.update_artifact_inventory({str(f1.resolve()): old_hash})
+
+        # Modify the file
+        f1.write_text("Alpha v2", encoding="utf-8")
+
+        current = DesignStage._compute_artifact_hashes(str(tmp_path))
+        stored = ds.get_artifact_hashes()
+        changed = {p for p, h in current.items() if p in stored and stored[p] != h}
+        assert str(f1.resolve()) in changed
+
+    def test_new_artifact_detected(self, tmp_path):
+        """A new file not in inventory appears in the new set."""
+        import hashlib
+
+        from azext_prototype.stages.design_stage import DesignStage
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        f1 = tmp_path / "a.md"
+        f1.write_text("Alpha", encoding="utf-8")
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.update_artifact_inventory({str(f1.resolve()): hashlib.sha256(b"Alpha").hexdigest()})
+
+        # Add a new file
+        f2 = tmp_path / "b.txt"
+        f2.write_text("Bravo", encoding="utf-8")
+
+        current = DesignStage._compute_artifact_hashes(str(tmp_path))
+        stored = ds.get_artifact_hashes()
+        new_files = {p for p in current if p not in stored}
+        assert str(f2.resolve()) in new_files
+
+    def test_context_hash_unchanged_skips(self, tmp_path):
+        """Same context string should produce matching hash."""
+        import hashlib
+
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        ctx = "Build a web app with authentication"
+        ctx_hash = hashlib.sha256(ctx.encode("utf-8")).hexdigest()
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.update_context_hash(ctx_hash)
+
+        # Same context → same hash → should match
+        assert hashlib.sha256(ctx.encode("utf-8")).hexdigest() == ds.get_context_hash()
+
+    def test_context_hash_changed_detected(self, tmp_path):
+        """Different context string should produce non-matching hash."""
+        import hashlib
+
+        from azext_prototype.stages.discovery_state import DiscoveryState
+
+        ds = DiscoveryState(str(tmp_path))
+        ds.load()
+        ds.update_context_hash(hashlib.sha256(b"old context").hexdigest())
+
+        new_hash = hashlib.sha256(b"new context").hexdigest()
+        assert new_hash != ds.get_context_hash()
+
+
 class TestDesignStageReadFile:
     """Cover _read_file — now returns ReadResult."""
 
     def test_read_file_success(self, tmp_path):
-        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.parsers.binary_reader import FileCategory
+        from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
         f = tmp_path / "test.txt"
@@ -382,8 +580,8 @@ class TestDesignStageReadFile:
         assert result.error is not None
 
     def test_read_file_image(self, tmp_path):
-        from azext_prototype.stages.design_stage import DesignStage
         from azext_prototype.parsers.binary_reader import FileCategory
+        from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
         f = tmp_path / "photo.jpg"
@@ -393,9 +591,10 @@ class TestDesignStageReadFile:
         assert result.image_data is not None
 
     def test_read_file_document(self, tmp_path):
-        from azext_prototype.stages.design_stage import DesignStage
-        from azext_prototype.parsers.binary_reader import FileCategory
         from docx import Document
+
+        from azext_prototype.parsers.binary_reader import FileCategory
+        from azext_prototype.stages.design_stage import DesignStage
 
         stage = DesignStage()
         doc = Document()
@@ -473,6 +672,77 @@ class TestDesignStageLoadSaveState:
 
         stage._save_design_state(str(new_dir), {"iteration": 1})
         assert (new_dir / ".prototype" / "state" / "design.json").exists()
+
+
+class TestDesignStageResetDiscoveryState:
+    """Verify --reset clears discovery state too."""
+
+    def test_reset_calls_discovery_state_reset(self, tmp_path):
+        """When reset=True, DiscoveryState.reset() should be called instead of load()."""
+        from azext_prototype.stages.discovery_state import DiscoveryState, Topic
+
+        # Create a discovery state file with existing topics
+        ds = DiscoveryState(str(tmp_path))
+        ds.set_topics(
+            [
+                Topic(heading="Networking", detail="Q?", kind="topic", status="covered", answer_exchange=1),
+                Topic(heading="Security", detail="Q?", kind="topic", status="covered", answer_exchange=2),
+            ]
+        )
+        assert ds.exists
+        assert ds.has_topics
+
+        # Now simulate the reset path
+        ds2 = DiscoveryState(str(tmp_path))
+        ds2.reset()
+
+        # After reset, topics should be empty and state is defaults
+        assert ds2.topics == []
+        assert not ds2.has_topics
+
+        # The file should still exist but with default content
+        ds3 = DiscoveryState(str(tmp_path))
+        ds3.load()
+        assert ds3.topics == []
+
+    def test_reset_flag_resets_discovery_in_design_stage(self, tmp_path):
+        """DesignStage.execute with reset=True should reset discovery state."""
+        from azext_prototype.stages.design_stage import DesignStage
+
+        # Patch DiscoveryState in design_stage module to verify reset is called
+        with patch("azext_prototype.stages.design_stage.DiscoveryState") as MockDS, patch(
+            "azext_prototype.stages.design_stage.DiscoverySession"
+        ) as MockSession, patch("azext_prototype.stages.design_stage.ProjectConfig"):
+            mock_instance = MagicMock()
+            mock_instance.exists = True
+            MockDS.return_value = mock_instance
+
+            mock_session = MagicMock()
+            mock_session.run.return_value = _make_discovery_result()
+            MockSession.return_value = mock_session
+
+            stage = DesignStage()
+            agent_context = MagicMock()
+            agent_context.project_dir = str(tmp_path)
+            registry = MagicMock()
+
+            with patch.object(stage, "_load_design_state", return_value={"iteration": 0}), patch.object(
+                stage, "_save_design_state"
+            ), patch.object(stage, "_write_architecture_docs"):
+                try:
+                    stage.execute(
+                        agent_context,
+                        registry,
+                        reset=True,
+                        print_fn=lambda x: None,
+                        input_fn=lambda x="": "done",
+                    )
+                except Exception:
+                    pass  # We only care about the reset call
+
+            # Verify reset() was called, NOT load()
+            mock_instance.reset.assert_called_once()
+            mock_instance.load.assert_not_called()
 
 
 class TestDesignStageWriteArchDocs:

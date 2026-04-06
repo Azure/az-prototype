@@ -1,0 +1,19 @@
+kind: transform
+domain: iac
+description: Remove unused terraform_remote_state blocks and their associated variables
+last_updated: '2026-04-06'
+transforms:
+- id: TFM-TF-001
+  description: Remove terraform_remote_state data sources that are declared but never
+    referenced elsewhere in the generated code
+  rationale: Unused remote state blocks add unnecessary upstream dependencies, clutter
+    deploy.sh preflight checks, and confuse QA review. If a data source name does
+    not appear outside its own block, it serves no purpose.
+  applies_to:
+  - terraform-agent
+  targets:
+  - services: []
+  type: structured
+  handler: remove_unused_remote_state
+  search: unused terraform_remote_state
+  replace: removed

@@ -4,8 +4,7 @@ Tests the end-to-end flow: agent gets MCP tools → AI requests tool calls
 → agent invokes via MCPManager → feeds results back → AI responds.
 """
 
-import json
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -19,7 +18,6 @@ from azext_prototype.mcp.base import (
 )
 from azext_prototype.mcp.manager import MCPManager
 from azext_prototype.mcp.registry import MCPRegistry
-
 
 # -------------------------------------------------------------------- #
 # Test handler
@@ -121,7 +119,9 @@ class TestAgentMCPToolCallLoop:
         agent._governance_aware = False
 
         mock_agent_context.ai_provider.chat.return_value = AIResponse(
-            content="Hello", model="gpt-4o", usage={"prompt_tokens": 10, "completion_tokens": 5},
+            content="Hello",
+            model="gpt-4o",
+            usage={"prompt_tokens": 10, "completion_tokens": 5},
         )
 
         response = agent.execute(mock_agent_context, "say hello")
@@ -303,7 +303,7 @@ class TestAgentMCPToolCallLoop:
 
         agent_context_with_mcp.ai_provider.chat.return_value = infinite_response
 
-        response = agent.execute(agent_context_with_mcp, "infinite loop")
+        agent.execute(agent_context_with_mcp, "infinite loop")
 
         # Should stop after max_tool_iterations + 1 (initial + 3 loop)
         assert agent_context_with_mcp.ai_provider.chat.call_count == 4  # 1 initial + 3 loop
@@ -550,6 +550,7 @@ class TestBuildMCPManager:
         config.load()
 
         from azext_prototype.custom import _build_mcp_manager
+
         result = _build_mcp_manager(config, str(project_with_config))
         assert result is None
 
@@ -592,9 +593,11 @@ class TestBuildMCPManager:
         )
 
         from azext_prototype.config import ProjectConfig
+
         config = ProjectConfig(str(project_with_config))
         config.load()
 
         from azext_prototype.custom import _build_mcp_manager
+
         manager = _build_mcp_manager(config, str(project_with_config))
         assert manager is not None

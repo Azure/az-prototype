@@ -24,7 +24,7 @@ class CloudArchitectAgent(BaseAgent):
     _temperature = 0.3
     _max_tokens = 32768
     _enable_web_search = True
-    _knowledge_role = "architect"
+    _knowledge_role = "cloud-architect"
     _keywords = [
         "architect",
         "design",
@@ -43,7 +43,12 @@ class CloudArchitectAgent(BaseAgent):
     _contract = AgentContract(
         inputs=["requirements"],
         outputs=["architecture", "deployment_plan"],
-        delegates_to=["terraform-agent", "bicep-agent", "app-developer"],
+        delegates_to=[
+            "infrastructure-architect",
+            "data-architect",
+            "application-architect",
+            "security-architect",
+        ],
     )
 
     def __init__(self):
@@ -142,20 +147,7 @@ class CloudArchitectAgent(BaseAgent):
             max_tokens=self._max_tokens,
         )
 
-        # Post-response governance check
-        warnings = self.validate_response(response.content)
-        if warnings:
-            for w in warnings:
-                logger.warning("Governance: %s", w)
-            warning_block = "\n\n---\n" "**\u26a0 Governance warnings:**\n" + "\n".join(f"- {w}" for w in warnings)
-            response = AIResponse(
-                content=response.content + warning_block,
-                model=response.model,
-                usage=response.usage,
-                finish_reason=response.finish_reason,
-            )
-
-        return response
+        return self._apply_governance_check(response, context)
 
     def _get_naming_instructions(self, config: dict) -> str:
         """Generate naming convention instructions from project config."""
