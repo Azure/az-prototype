@@ -72,6 +72,25 @@ rules:
   - terraform-agent
   - bicep-agent
   - cloud-architect
+  companion_resources:
+  - type: Microsoft.Authorization/roleAssignments@2022-04-01
+    name: AcrPull
+    description: AcrPull role assignment (7f951dda-4ed3-4680-a7ca-43fe172d538d) granting the managed identity permission
+      to pull container images from ACR. Without this, the Container App cannot start — the image pull fails silently.
+    terraform_pattern: |
+      resource "azapi_resource" "acr_pull_role" {
+        type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+        name      = var.acr_pull_role_name
+        parent_id = var.acr_id
+
+        body = {
+          properties = {
+            roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/7f951dda-4ed3-4680-a7ca-43fe172d538d"
+            principalId      = var.identity_principal_id
+            principalType    = "ServicePrincipal"
+          }
+        }
+      }
   template_check:
     scope:
     - container-apps
@@ -238,6 +257,8 @@ rules:
         }
       }
     prohibitions:
+    - NEVER deploy a Container App that references an ACR registry without an AcrPull role assignment for the managed
+      identity — the image pull will fail silently at runtime
     - NEVER use admin credentials (adminUserEnabled) for ACR access — use managed identity with AcrPull role
     - NEVER put secrets directly in environment variables — use Key Vault references via the secrets array with keyVaultUrl
     - NEVER deploy Container Apps without health probes — always include liveness and readiness probes
