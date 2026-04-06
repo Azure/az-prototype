@@ -29,14 +29,18 @@ principles:
   - Use validation blocks for SKU names, IP ranges, etc.
   rationale: Parameterized configurations allow reuse across environments and prevent hardcoded values.
 - id: STAN-TF-003
-  description: 'Resource Naming via Locals: Define resource names in a locals block using a consistent naming pattern.  Never
-    hardcode resource names in resource blocks.'
+  description: 'Resource Naming via Variables or Locals: Resource names should come from variables with defaults set
+    to the deployment plan computed_name, or from locals that derive names from project variables. Variable defaults
+    from the deployment plan (e.g., "pi-rg-worker-dev-wus3") are acceptable — the naming strategy already computed
+    them. Do NOT force computed_name values into locals when they are already correct as variable defaults.'
   applies_to:
   - terraform-agent
   examples:
-  - locals { rg_name = "rg-${var.project}-${var.environment}" }
-  - resource "azapi_resource" "resource_group" { type = "Microsoft.Resources/resourceGroups@2024-03-01"; name = local.rg_name }
-  rationale: Consistent naming conventions prevent resource conflicts and improve discoverability.
+  - variable "resource_group_name" { default = "pi-rg-worker-dev-wus3" }
+  - locals { identity_name = "${var.zone_prefix}-id-worker-${var.environment}-${var.region_short}" }
+  - resource "azapi_resource" "resource_group" { name = var.resource_group_name }
+  rationale: The CLI naming module computes resource names per the project naming strategy. Variable defaults carry
+    these computed names and are overridable at deploy time.
 - id: STAN-TF-004
   description: 'One Resource Type Per File for Complex Modules: When a module manages more than 5 resources, split logically
     related resources into separate files (e.g., networking.tf for subnets and NSGs, iam.tf for role assignments).'
