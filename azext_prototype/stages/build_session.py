@@ -2648,6 +2648,8 @@ class BuildSession(SessionMixin):
         ]
 
         project_root = Path(self._context.project_dir)
+        all_applied: list[str] = []
+        modified_files: list[str] = []
 
         for rel_path in written_paths:
             full_path = project_root / rel_path
@@ -2659,11 +2661,23 @@ class BuildSession(SessionMixin):
             transformed, applied_ids = apply_transforms(content, services=stage_services, iac_tool=self._iac_tool)
             if applied_ids:
                 full_path.write_text(transformed, encoding="utf-8")
+                all_applied.extend(applied_ids)
+                modified_files.append(rel_path)
                 _dbg(
                     "build_session.transforms",
                     f"Applied transforms to {rel_path}",
                     ids=applied_ids,
+                    transformed_content=transformed,
                 )
+
+        if all_applied:
+            _dbg(
+                "build_session.transforms",
+                f"Stage {stage.get('stage', '?')} transform summary",
+                total_transforms=len(all_applied),
+                transform_ids=all_applied,
+                files_modified=modified_files,
+            )
 
         return written_paths
 
