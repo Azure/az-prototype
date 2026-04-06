@@ -277,6 +277,91 @@ def _render_standard_page(yf: Path) -> str:
 
 
 # ---------------------------------------------------------------
+# Transform pages (one per YAML file)
+# ---------------------------------------------------------------
+
+
+def _render_transform_page(yf: Path) -> str:
+    """Render one transform file to wiki markdown."""
+    data = _load_yaml(yf)
+    title = _title_case(yf.stem.replace(".transform", ""))
+    domain = data.get("domain", "")
+    description = data.get("description", "")
+    transforms = data.get("transforms", [])
+
+    lines: list[str] = []
+    lines.append(f"# {title}")
+    lines.append(description)
+    lines.append("")
+    lines.append(f"**Domain:** `{domain}`")
+    lines.append("")
+    lines.append("<hr />")
+    lines.append("")
+
+    # Summary table (HTML)
+    lines.append(f"### Checks ({len(transforms)})")
+    lines.append("")
+    lines.append("<table>")
+    lines.append("<thead>")
+    lines.append("<tr>")
+    lines.append('<th width="185">Check</th><th>Description</th>')
+    lines.append("</tr>")
+    lines.append("</thead>")
+    lines.append("<tbody>")
+    for t in transforms:
+        tid = t.get("id", "?")
+        desc = t.get("description", "").replace("\n", " ")
+        lines.append(f'<tr><td><a href="#{tid}">{tid}</a></td><td>{desc}</td></tr>')
+    lines.append("</tbody>")
+    lines.append("</table>")
+    lines.append("")
+    lines.append("<hr />")
+    lines.append("")
+
+    # Per-transform detail sections
+    for t in transforms:
+        tid = t.get("id", "?")
+        desc = t.get("description", "")
+        rationale = t.get("rationale", "")
+        applies_to = t.get("applies_to", [])
+        targets = t.get("targets", [])
+        tfm_type = t.get("type", "regex")
+        search = t.get("search", "")
+        replace_val = t.get("replace", "")
+
+        lines.append(f"## {tid}")
+        lines.append(desc)
+        lines.append("")
+        if rationale:
+            lines.append(f"**Rationale:** {rationale}  ")
+        agents = ", ".join(applies_to) if applies_to else "_all agents_"
+        lines.append(f"**Agents:** `{agents}`")
+        lines.append("")
+
+        # Targets
+        lines.append("### Targets")
+        lines.append("")
+        services: list[str] = []
+        for tgt in targets:
+            if isinstance(tgt, dict):
+                services.extend(tgt.get("services", []))
+        if services:
+            lines.append("<ul>" + "".join(f"<li>{s}</li>" for s in services) + "</ul>")
+        else:
+            lines.append("*All*")
+        lines.append("")
+
+        lines.append(f"**Type:** {tfm_type.title()}  ")
+        lines.append(f"**Search:** `'{search}'`  ")
+        lines.append(f"**Replace:** `'{replace_val}'`")
+        lines.append("")
+        lines.append("<hr />")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------
 # Policy pages (one per YAML file)
 # ---------------------------------------------------------------
 
@@ -442,6 +527,7 @@ def _generate_sidebar(
     policy_pages: dict[str, list[tuple[str, str]]],
     ap_pages: list[tuple[str, str]],
     std_pages: dict[str, list[tuple[str, str]]],
+    tfm_pages: list[tuple[str, str]] | None = None,
 ) -> str:
     """Generate the governance section of _Sidebar.md.
 
@@ -449,6 +535,7 @@ def _generate_sidebar(
         policy_pages: {section_title: [(display_name, wiki_filename), ...]}
         ap_pages: [(display_name, wiki_filename), ...]
         std_pages: {section_title: [(display_name, wiki_filename), ...]}
+        tfm_pages: [(display_name, wiki_filename), ...]
     """
     # Read existing sidebar and replace/append governance section
     sidebar_path = WIKI_DIR / "_Sidebar.md"
@@ -515,6 +602,16 @@ def _generate_sidebar(
         lines.append("")
     lines.append("</details>")
     lines.append("")
+
+    # Transforms — single collapsible
+    if tfm_pages:
+        lines.append("<details><summary>Transforms</summary>")
+        lines.append("")
+        for display, filename in tfm_pages:
+            lines.append(f"- [{display}]({filename})")
+        lines.append("")
+        lines.append("</details>")
+        lines.append("")
 
     lines.append(marker_end)
 
@@ -651,8 +748,22 @@ def main() -> None:
         if section_pages:
             std_sidebar[section_title] = section_pages
 
+    # --- Transform pages (one per YAML file) ---
+    tfm_dir = GOVERNANCE_DIR / "transforms"
+    tfm_sidebar: list[tuple[str, str]] = []
+    for yf in sorted(tfm_dir.rglob("*.transform.yaml")):
+        raw_name = yf.stem.replace(".transform", "")
+        display_name = _title_case(raw_name)
+        wiki_filename = f"Governance-Transforms-{_wiki_safe(raw_name)}"
+        content = _render_transform_page(yf)
+        out_path = WIKI_DIR / f"{wiki_filename}.md"
+        out_path.write_text(content, encoding="utf-8")
+        print(f"  {out_path.name}")
+        tfm_sidebar.append((display_name, wiki_filename))
+        page_count += 1
+
     # --- Update sidebar ---
-    new_sidebar = _generate_sidebar(policy_sidebar, ap_sidebar, std_sidebar)
+    new_sidebar = _generate_sidebar(policy_sidebar, ap_sidebar, std_sidebar, tfm_sidebar)
     sidebar_path = WIKI_DIR / "_Sidebar.md"
     sidebar_path.write_text(new_sidebar, encoding="utf-8")
     print(f"  {sidebar_path.name} (updated)")

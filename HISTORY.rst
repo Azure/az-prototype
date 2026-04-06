@@ -6,6 +6,29 @@ Release History
 0.2.1b6
 +++++++
 
+Post-generation transforms
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **New governance type: transforms** — deterministic fixes for known AI
+  fabrications, applied automatically after file generation and before QA.
+  No AI call, no token cost.  YAML-defined with ``kind: transform``,
+  scoped by ``targets.services`` (ARM namespaces) and ``applies_to``
+  (agent names).  Directory structure mirrors policies
+  (``governance/transforms/{category}/{service}.transform.yaml``).
+* **TFM-LA-001** — moves ``disableLocalAuth`` from ``properties.features``
+  to ``properties`` root on Log Analytics workspaces (ARM silently drops
+  it if nested wrong).
+* **TFM-CDB-001** — replaces ``capacityMode = "Serverless"`` with
+  ``capabilities = [{ name = "EnableServerless" }]`` on Cosmos DB.
+* **TFM-CDB-002** — injects ``backupPolicy.type = "Continuous"`` on
+  serverless Cosmos DB accounts when missing.
+* **Build pipeline integration** — transforms run at three points: after
+  initial generation, after each QA remediation, and after re-entry
+  remediation.  QA never sees untransformed files.
+* **Governance index** — transforms indexed alongside policies,
+  anti-patterns, and standards for embedding-based retrieval.
+* **Validation** — ``az prototype validate`` always validates transforms
+  (schema, unique IDs, required fields).
+
 Four-level taxonomy
 ~~~~~~~~~~~~~~~~~~~~
 * **Layer → Capability → Component → Resource** — consistent four-level

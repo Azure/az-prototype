@@ -645,6 +645,7 @@ class BuildSession(SessionMixin):
                     source_stage="build",
                 )
             written_paths = self._write_stage_files(stage, content)
+            written_paths = self._apply_stage_transforms(stage, written_paths, _print)
 
             _dbg_flow(
                 "build_session.generate",
@@ -714,6 +715,7 @@ class BuildSession(SessionMixin):
                         self._token_tracker.record(response)
                     content = response.content if response else ""
                     written_paths = self._write_stage_files(stage, content)
+                    written_paths = self._apply_stage_transforms(stage, written_paths, _print)
                     self._build_state.mark_stage_validating(stage_num, written_paths)
 
             # Per-stage QA validation — runs on all stages that produce files
@@ -882,6 +884,7 @@ class BuildSession(SessionMixin):
                         self._token_tracker.record(response)
                     content = response.content if response else ""
                     written_paths = self._write_stage_files(stage, content)
+                    written_paths = self._apply_stage_transforms(stage, written_paths, _print)
                     self._build_state.mark_stage_generated(stage_num, written_paths, agent.name)
 
                     if written_paths:
@@ -2629,6 +2632,39 @@ class BuildSession(SessionMixin):
         project_root = Path(self._context.project_dir)
         return [str(p.relative_to(project_root)) for p in written]
 
+    def _apply_stage_transforms(self, stage: dict, written_paths: list[str], _print: Any) -> list[str]:
+        """Apply deterministic transforms to generated files. Debug log only."""
+        from azext_prototype.debug_log import log_flow as _dbg
+        from azext_prototype.governance.transforms import apply as apply_transforms
+
+        if not written_paths:
+            return written_paths
+
+        services = stage.get("services", [])
+        stage_services = [
+            s.get("resource_type", "") for s in services if isinstance(s, dict) and s.get("resource_type")
+        ]
+
+        project_root = Path(self._context.project_dir)
+
+        for rel_path in written_paths:
+            full_path = project_root / rel_path
+            try:
+                content = full_path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+
+            transformed, applied_ids = apply_transforms(content, services=stage_services, iac_tool=self._iac_tool)
+            if applied_ids:
+                full_path.write_text(transformed, encoding="utf-8")
+                _dbg(
+                    "build_session.transforms",
+                    f"Applied transforms to {rel_path}",
+                    ids=applied_ids,
+                )
+
+        return written_paths
+
     # ------------------------------------------------------------------ #
     # Internal — review loop helpers
     # ------------------------------------------------------------------ #
@@ -3318,6 +3354,7 @@ class BuildSession(SessionMixin):
                 self._token_tracker.record(response)
             content = response.content if response else ""
             written_paths = self._write_stage_files(stage, content)
+            written_paths = self._apply_stage_transforms(stage, written_paths, _print)
             self._build_state.mark_stage_generated(stage_num, written_paths, agent.name)
 
         return True  # All remediation attempts completed without hitting max

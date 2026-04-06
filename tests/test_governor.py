@@ -292,10 +292,11 @@ class TestGovernanceIndex:
         policy_items = [i for i in index._items if i.kind == "policy"]
         ap_items = [i for i in index._items if i.kind == "anti-pattern"]
         std_items = [i for i in index._items if i.kind == "standard"]
+        tfm_items = [i for i in index._items if i.kind == "transform"]
         assert len(policy_items) == 2  # exactly our 2 rules
         assert len(ap_items) > 0  # loaded from built-in files
         assert len(std_items) > 0  # loaded from built-in files
-        assert index.rule_count == len(policy_items) + len(ap_items) + len(std_items)
+        assert index.rule_count == len(policy_items) + len(ap_items) + len(std_items) + len(tfm_items)
 
     def test_retrieve_returns_top_k_sorted(self):
         # Create policies with distinct content

@@ -23,6 +23,7 @@ import logging
 
 from azext_prototype.governance import anti_patterns
 from azext_prototype.governance.policies import PolicyEngine
+from azext_prototype.governance.transforms import reset_cache as _reset_transforms
 from azext_prototype.templates.registry import TemplateRegistry
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,7 @@ def reset_caches() -> None:
     _policy_engine = None
     _template_registry = None
     anti_patterns.reset_cache()
+    _reset_transforms()
 
 
 class GovernanceContext:

@@ -1,0 +1,18 @@
+kind: transform
+domain: monitoring
+description: Automatic corrections for Log Analytics workspace ARM property placement
+last_updated: '2026-04-06'
+transforms:
+- id: TFM-LA-001
+  description: Move disableLocalAuth from inside features block to properties root
+  rationale: ARM silently drops disableLocalAuth if nested inside properties.features.
+    The property must be a direct child of properties for Log Analytics workspaces.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.OperationalInsights/workspaces
+  type: regex
+  search: '(features\s*=\s*\{[^}]*?)(\s*disableLocalAuth\s*=\s*\w+\s*\n?)([^}]*\})'
+  replace: '\1\3'

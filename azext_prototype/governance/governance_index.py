@@ -1,6 +1,6 @@
-"""Governance index — embedding-based retrieval of policies, anti-patterns, and standards.
+"""Governance index — embedding-based retrieval of policies, anti-patterns, standards, and transforms.
 
-Pre-processes governance items (rules, patterns, principles) into vectors
+Pre-processes governance items (rules, patterns, principles, transforms) into vectors
 for fast semantic retrieval.  Supports pre-computed embeddings shipped with
 the wheel as well as runtime computation and disk caching.
 
@@ -8,6 +8,7 @@ Vector files are stored in ``governance/`` as:
 - ``policy.vectors.json``
 - ``anti-pattern.vectors.json``
 - ``standard.vectors.json``
+- ``transform.vectors.json``
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ _VECTOR_FILES = {
     "policy": "policy.vectors.json",
     "anti-pattern": "anti-pattern.vectors.json",
     "standard": "standard.vectors.json",
+    "transform": "transform.vectors.json",
 }
 
 
@@ -208,6 +210,31 @@ class GovernanceIndex:
                     )
         except Exception as exc:
             logger.debug("Skipping standards indexing: %s", exc)
+
+        # Index transforms
+        try:
+            from azext_prototype.governance.transforms import load as load_transforms
+
+            for tfm in load_transforms():
+                tfm_services: list[str] = []
+                for t in tfm.targets:
+                    if isinstance(t, dict):
+                        tfm_services.extend(t.get("services", []))
+                self._items.append(
+                    IndexedItem(
+                        kind="transform",
+                        item_id=tfm.id,
+                        severity="",
+                        description=tfm.description,
+                        rationale=tfm.rationale,
+                        source_name=tfm.domain,
+                        domain=tfm.domain,
+                        services=tfm_services,
+                        applies_to=tfm.applies_to,
+                    )
+                )
+        except Exception as exc:
+            logger.debug("Skipping transforms indexing: %s", exc)
 
         if not self._items:
             self._built = True

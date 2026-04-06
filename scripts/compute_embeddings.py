@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Pre-compute neural embeddings for built-in governance rules.
 
-Run at build time (before wheel construction) to generate three vector
+Run at build time (before wheel construction) to generate four vector
 files in ``azext_prototype/governance/``:
 
 - ``policy.vectors.json``
 - ``anti-pattern.vectors.json``
 - ``standard.vectors.json``
+- ``transform.vectors.json``
 
 These files are shipped inside the wheel so that runtime retrieval
 uses pure-Python cosine similarity — no ``torch`` or
@@ -153,6 +154,38 @@ def _build_standard_items() -> list[dict]:
     return items
 
 
+def _build_transform_items() -> list[dict]:
+    """Extract transform rules for embedding."""
+    from azext_prototype.governance.transforms import load as load_transforms
+
+    transforms = load_transforms()
+    items: list[dict] = []
+    for tfm in transforms:
+        tfm_services: list[str] = []
+        for t in tfm.targets:
+            if isinstance(t, dict):
+                tfm_services.extend(t.get("services", []))
+        text_parts = [
+            f"[{tfm.domain}] Transform {tfm.id}",
+            tfm.description,
+        ]
+        if tfm.rationale:
+            text_parts.append(f"Rationale: {tfm.rationale}")
+        items.append(
+            {
+                "kind": "transform",
+                "item_id": tfm.id,
+                "domain": tfm.domain,
+                "description": tfm.description,
+                "rationale": tfm.rationale,
+                "services": tfm_services,
+                "applies_to": tfm.applies_to,
+                "text": " ".join(text_parts),
+            }
+        )
+    return items
+
+
 def main() -> None:
     from sentence_transformers import SentenceTransformer
 
@@ -170,6 +203,10 @@ def main() -> None:
     print("\n--- Standards ---")
     std_items = _build_standard_items()
     _compute_and_write(std_items, GOVERNANCE_DIR / "standard.vectors.json", model)
+
+    print("\n--- Transforms ---")
+    tfm_items = _build_transform_items()
+    _compute_and_write(tfm_items, GOVERNANCE_DIR / "transform.vectors.json", model)
 
     print("\nDone.")
 

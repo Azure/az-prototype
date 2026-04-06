@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Validate governance YAML files: policies, anti-patterns, and standards.
+"""Validate governance YAML files: policies, anti-patterns, standards, and transforms.
 
 Usage:
     # Validate everything
@@ -211,6 +211,72 @@ def validate_standards() -> list[ValidationError]:
 
 
 # ------------------------------------------------------------------ #
+# Transform validation
+# ------------------------------------------------------------------ #
+
+
+def validate_transforms() -> list[ValidationError]:
+    """Validate all transform YAML files against the unified schema."""
+    tfm_dir = _GOVERNANCE_DIR / "transforms"
+    if not tfm_dir.is_dir():
+        return []
+
+    errors: list[ValidationError] = []
+    all_ids: dict[str, str] = {}
+
+    required_top = {"kind", "domain", "description", "last_updated", "transforms"}
+
+    for yaml_file in sorted(tfm_dir.rglob("*.transform.yaml")):
+        fname = str(yaml_file.relative_to(tfm_dir))
+        try:
+            data = yaml.safe_load(yaml_file.read_text(encoding="utf-8")) or {}
+        except (OSError, yaml.YAMLError) as exc:
+            errors.append(ValidationError(fname, f"Could not load: {exc}"))
+            continue
+
+        if not isinstance(data, dict):
+            errors.append(ValidationError(fname, "Root must be a mapping"))
+            continue
+
+        for key in required_top:
+            if key not in data:
+                errors.append(ValidationError(fname, f"Missing required field '{key}'"))
+
+        if data.get("kind") != "transform":
+            errors.append(ValidationError(fname, f"kind must be 'transform', got '{data.get('kind')}'"))
+
+        transforms = data.get("transforms", [])
+        if not isinstance(transforms, list):
+            errors.append(ValidationError(fname, "'transforms' must be a list"))
+            continue
+
+        for idx, entry in enumerate(transforms, 1):
+            if not isinstance(entry, dict):
+                errors.append(ValidationError(fname, f"Transform {idx}: must be a mapping"))
+                continue
+
+            tid = entry.get("id")
+            if not tid:
+                errors.append(ValidationError(fname, f"Transform {idx}: missing 'id'"))
+
+            if not entry.get("description"):
+                errors.append(ValidationError(fname, f"Transform {idx} ({tid}): missing 'description'"))
+
+            if not entry.get("search"):
+                errors.append(ValidationError(fname, f"Transform {idx} ({tid}): missing 'search'"))
+
+            if "replace" not in entry:
+                errors.append(ValidationError(fname, f"Transform {idx} ({tid}): missing 'replace'"))
+
+            if tid and tid in all_ids:
+                errors.append(ValidationError(fname, f"Duplicate id '{tid}' (also in {all_ids[tid]})"))
+            elif tid:
+                all_ids[tid] = fname
+
+    return errors
+
+
+# ------------------------------------------------------------------ #
 # Workload template validation
 # ------------------------------------------------------------------ #
 
@@ -361,9 +427,12 @@ def main(argv: list[str] | None = None) -> int:
         areas.append("workloads")
         errors.extend(validate_workloads())
 
-    # Taxonomy is always validated (part of governance structure)
+    # Taxonomy and transforms are always validated (part of governance structure)
     areas.append("taxonomy")
     errors.extend(validate_taxonomy())
+
+    areas.append("transforms")
+    errors.extend(validate_transforms())
 
     sys.stdout.write(f"Validating: {', '.join(areas)}\n")
 

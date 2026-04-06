@@ -1,0 +1,40 @@
+kind: transform
+domain: data
+description: Automatic corrections for Cosmos DB ARM schema fabrications
+last_updated: '2026-04-06'
+transforms:
+- id: TFM-CDB-001
+  description: Replace capacityMode with EnableServerless capability
+  rationale: The Cosmos DB ARM schema does not have a capacityMode property.
+    Setting it is silently ignored and serverless mode is not activated.
+    The correct pattern uses capabilities with EnableServerless.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.DocumentDB/databaseAccounts
+  type: regex
+  search: 'capacityMode\s*=\s*"[Ss]erverless"'
+  replace: 'capabilities = [{ name = "EnableServerless" }]'
+- id: TFM-CDB-002
+  description: Inject backupPolicy for serverless Cosmos DB accounts
+  rationale: Serverless Cosmos DB accounts require backupPolicy.type = Continuous.
+    ARM rejects Periodic for serverless, and omitting backupPolicy entirely
+    causes undefined behavior on some API versions.
+  applies_to:
+  - terraform-agent
+  - bicep-agent
+  targets:
+  - services:
+    - Microsoft.DocumentDB/databaseAccounts
+  type: regex
+  search: '(capabilities\s*=\s*\[\s*\{\s*name\s*=\s*"EnableServerless"\s*\}\s*\])(?!\s*\n\s*backupPolicy)'
+  replace: |
+    \1
+    backupPolicy = {
+      type = "Continuous"
+      continuousModeProperties = {
+        tier = "Continuous7Days"
+      }
+    }
