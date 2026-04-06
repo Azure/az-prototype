@@ -34,7 +34,11 @@ mkdir -p COMPARE
 
 Write a Python extraction script (or use the manual process below) to extract from the debug log:
 - For each stage N: find `"Stage N task prompt"` → extract `task_full=...` content → save as `COMPARE/INPUT_N.md`
-- For each stage N: find `"Stage N response"` → extract `content_full=...` content → save as `COMPARE/CP_RESPONSE_N.md`
+- For each stage N: find `"Stage N post-transform"` → extract `transformed_full=...` content → save as `COMPARE/CP_RESPONSE_N.md`
+
+The `transformed_full` field contains the final output after all governance transforms have been applied (e.g., ARM property placement fixes, fabrication corrections). This is the effective quality of the tool's output — what gets deployed.
+
+The raw AI response is also available in the log (`"Stage N response"` → `content_full=`) for diagnostic purposes, but benchmarks should use the post-transform output.
 
 Content boundaries: each multi-line value starts after `=` on the marker line and continues until the next line matching `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \|` (a timestamp-prefixed log entry).
 
@@ -75,22 +79,34 @@ for stage_num in range(1, 50):
     prompt_line = find_line(f"Stage {stage_num} task prompt")
     if prompt_line == -1:
         break
-    response_line = find_line(f"Stage {stage_num} response", prompt_line)
-    if response_line == -1:
-        break
+    # Extract post-transform output (final quality after governance transforms)
+    transform_line = find_line(f"Stage {stage_num} post-transform", prompt_line)
     task_full_line = next((i for i in range(prompt_line, min(prompt_line+10, len(lines)))
                           if "task_full=" in lines[i]), -1)
-    content_full_line = next((i for i in range(response_line, min(response_line+10, len(lines)))
-                             if "content_full=" in lines[i]), -1)
-    if task_full_line == -1 or content_full_line == -1:
+    transformed_full_line = -1
+    if transform_line != -1:
+        transformed_full_line = next((i for i in range(transform_line, min(transform_line+10, len(lines)))
+                                     if "transformed_full=" in lines[i]), -1)
+    # Fallback to raw response if no post-transform entry (e.g., no transforms applied)
+    if transformed_full_line == -1:
+        response_line = find_line(f"Stage {stage_num} response", prompt_line)
+        if response_line != -1:
+            transformed_full_line = next((i for i in range(response_line, min(response_line+10, len(lines)))
+                                         if "content_full=" in lines[i]), -1)
+            content_key = "content_full"
+        else:
+            continue
+    else:
+        content_key = "transformed_full"
+    if task_full_line == -1 or transformed_full_line == -1:
         continue
     prompt = extract_content(task_full_line, "task_full")
-    response = extract_content(content_full_line, "content_full")
+    response = extract_content(transformed_full_line, content_key)
     with open(os.path.join(OUT, f"INPUT_{stage_num}.md"), "w") as f:
         f.write(prompt)
     with open(os.path.join(OUT, f"CP_RESPONSE_{stage_num}.md"), "w") as f:
         f.write(response)
-    print(f"Stage {stage_num}: INPUT={len(prompt)}B  CP_RESPONSE={len(response)}B")
+    print(f"Stage {stage_num}: INPUT={len(prompt)}B  CP_RESPONSE={len(response)}B (source: {content_key})")
 ```
 
 Usage: `python3 extract.py debug_20260328024351.log COMPARE`
