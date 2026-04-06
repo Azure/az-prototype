@@ -26,6 +26,11 @@ Post-generation transforms
   remediation.  QA never sees untransformed files.
 * **Governance index** — transforms indexed alongside policies,
   anti-patterns, and standards for embedding-based retrieval.
+* **Structured transform handlers** — transforms support ``type: structured``
+  with a ``handler`` field pointing to a registered Python function for
+  complex multi-step fixes that regex can't handle.
+* **TFM-TF-001** — removes unused ``terraform_remote_state`` data sources
+  and their associated ``*_state_path`` variables (structured handler).
 * **Validation** — ``az prototype validate`` always validates transforms
   (schema, unique IDs, required fields).
 

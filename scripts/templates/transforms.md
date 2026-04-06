@@ -32,6 +32,7 @@ Move disableLocalAuth from inside features block to properties root
 
 **Type:** Regex  
 **Search:** `'(features\s*=\s*\{[^}]*?)(\s*disableLocalAuth\s*=\s*\w+\s*\n?)([^}]*\})'`  
-**Replace:** `'\1\3'`
+**Replace:** `'\1\3'`  
+**Handler:** `handler`
 
 <hr />

@@ -351,9 +351,11 @@ def _render_transform_page(yf: Path) -> str:
             lines.append("*All*")
         lines.append("")
 
+        handler = t.get("handler", "")
         lines.append(f"**Type:** {tfm_type.title()}  ")
         lines.append(f"**Search:** `'{search}'`  ")
-        lines.append(f"**Replace:** `'{replace_val}'`")
+        lines.append(f"**Replace:** `'{replace_val}'`  ")
+        lines.append(f"**Handler:** `{handler}`" if handler else "")
         lines.append("")
         lines.append("<hr />")
         lines.append("")

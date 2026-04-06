@@ -31,6 +31,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable
 
 from azext_prototype.governance import safe_load_yaml
 
@@ -53,6 +54,7 @@ class Transform:
     search: str = ""
     replace: str = ""
     transform_type: str = "regex"  # "regex" or "structured"
+    handler: str = ""  # Python function name for structured transforms
 
 
 def load(directory: Path | None = None) -> list[Transform]:
@@ -181,8 +183,68 @@ def apply(
                     logger.debug("Transform %s applied (%d replacements)", tfm.id, count)
             except re.error as e:
                 logger.warning("Transform %s has invalid regex: %s", tfm.id, e)
+        elif tfm.transform_type == "structured" and tfm.handler:
+            handler_fn = _STRUCTURED_HANDLERS.get(tfm.handler)
+            if handler_fn:
+                new_result = handler_fn(result)
+                if new_result != result:
+                    result = new_result
+                    applied.append(tfm.id)
+                    logger.debug("Transform %s applied (structured handler: %s)", tfm.id, tfm.handler)
+            else:
+                logger.warning("Transform %s references unknown handler: %s", tfm.id, tfm.handler)
 
     return result, applied
+
+
+# ------------------------------------------------------------------
+# Structured transform handlers
+# ------------------------------------------------------------------
+
+
+def _remove_unused_remote_state(content: str) -> str:
+    """Remove terraform_remote_state blocks that are never referenced.
+
+    Scans for ``data "terraform_remote_state" "name"`` blocks and checks
+    if ``data.terraform_remote_state.name`` appears anywhere else in the
+    content.  Removes unreferenced blocks, their state path variables,
+    and pass-through outputs.
+    """
+    # Find all remote state block names
+    rs_pattern = re.compile(
+        r'data\s+"terraform_remote_state"\s+"(\w+)"\s*\{[^}]*\}',
+        re.DOTALL,
+    )
+    matches = list(rs_pattern.finditer(content))
+    if not matches:
+        return content
+
+    result = content
+    for match in reversed(matches):  # reverse to preserve offsets
+        name = match.group(1)
+        ref = f"data.terraform_remote_state.{name}"
+
+        # Check if referenced anywhere outside the block itself
+        before = result[: match.start()]
+        after = result[match.end() :]
+        if ref not in before and ref not in after:
+            # Remove the block
+            result = before + after
+            logger.debug("Removed unused terraform_remote_state.%s", name)
+
+            # Remove corresponding state path variable
+            var_pattern = re.compile(
+                rf'variable\s+"{name}_state_path"\s*\{{[^}}]*\}}\s*\n?',
+                re.DOTALL,
+            )
+            result = var_pattern.sub("", result)
+
+    return result
+
+
+_STRUCTURED_HANDLERS: dict[str, Callable[[str], str]] = {
+    "remove_unused_remote_state": _remove_unused_remote_state,
+}
 
 
 def reset_cache() -> None:
