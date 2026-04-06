@@ -115,6 +115,7 @@ def load(directory: Path | None = None) -> list[Transform]:
                     search=search,
                     replace=replace_val,
                     transform_type=str(entry.get("type", "regex")),
+                    handler=str(entry.get("handler", "")),
                 )
             )
 
