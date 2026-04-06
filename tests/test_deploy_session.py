@@ -34,6 +34,7 @@ def _build_yaml(stages: list[dict] | None = None, iac_tool: str = "terraform") -
             {
                 "stage": 1,
                 "name": "Foundation",
+                "layer": "infra",
                 "capability": "infra",
                 "services": [
                     {
@@ -50,6 +51,7 @@ def _build_yaml(stages: list[dict] | None = None, iac_tool: str = "terraform") -
             {
                 "stage": 2,
                 "name": "Data Layer",
+                "layer": "data",
                 "capability": "data",
                 "services": [
                     {
@@ -66,6 +68,7 @@ def _build_yaml(stages: list[dict] | None = None, iac_tool: str = "terraform") -
             {
                 "stage": 3,
                 "name": "Application",
+                "layer": "app",
                 "capability": "app",
                 "services": [
                     {
@@ -860,6 +863,7 @@ class TestDeploySession:
             {
                 "stage": 1,
                 "name": "Infra",
+                "layer": "infra",
                 "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
@@ -886,6 +890,7 @@ class TestDeploySession:
             {
                 "stage": 1,
                 "name": "Infra",
+                "layer": "infra",
                 "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
@@ -895,6 +900,7 @@ class TestDeploySession:
             {
                 "stage": 2,
                 "name": "Data",
+                "layer": "data",
                 "capability": "data",
                 "services": [],
                 "dir": "concept/infra/terraform/data",
@@ -1074,11 +1080,12 @@ class TestDeploySession:
         assert result.cancelled is True
 
     def test_docs_stage_auto_deployed(self, tmp_project):
-        """Test that docs-capability stages are auto-marked as deployed."""
+        """Test that docs-layer stages are auto-marked as deployed."""
         stages = [
             {
                 "stage": 1,
                 "name": "Docs",
+                "layer": "docs",
                 "capability": "docs",
                 "services": [],
                 "dir": "concept/docs",
@@ -2059,6 +2066,7 @@ class TestTerraformPreflightValidation:
             {
                 "stage": 1,
                 "name": "Infra",
+                "layer": "infra",
                 "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
@@ -2086,6 +2094,7 @@ class TestTerraformPreflightValidation:
             {
                 "stage": 1,
                 "name": "Infra",
+                "layer": "infra",
                 "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
@@ -2114,6 +2123,7 @@ class TestTerraformPreflightValidation:
             {
                 "stage": 1,
                 "name": "Infra",
+                "layer": "infra",
                 "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
@@ -2138,6 +2148,7 @@ class TestTerraformPreflightValidation:
             {
                 "stage": 1,
                 "name": "App",
+                "layer": "app",
                 "capability": "app",
                 "services": [],
                 "dir": "concept/apps/stage-1",
@@ -2155,6 +2166,7 @@ class TestTerraformPreflightValidation:
             {
                 "stage": 1,
                 "name": "Infra",
+                "layer": "infra",
                 "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform/nonexistent",
@@ -2171,6 +2183,7 @@ class TestTerraformPreflightValidation:
             {
                 "stage": 1,
                 "name": "Infra",
+                "layer": "infra",
                 "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
@@ -2193,6 +2206,7 @@ class TestTerraformPreflightValidation:
             {
                 "stage": 1,
                 "name": "Infra",
+                "layer": "infra",
                 "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
@@ -2379,6 +2393,7 @@ class TestDeployEnv:
             {
                 "stage": 1,
                 "name": "Infra",
+                "layer": "infra",
                 "capability": "infra",
                 "services": [],
                 "dir": "concept/infra/terraform",
@@ -3169,6 +3184,7 @@ class TestRollbackAllCoverage:
             {
                 "stage": 1,
                 "name": "A",
+                "layer": "infra",
                 "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
@@ -3178,6 +3194,7 @@ class TestRollbackAllCoverage:
             {
                 "stage": 2,
                 "name": "B",
+                "layer": "infra",
                 "capability": "infra",
                 "services": [],
                 "dir": "stage-2",
@@ -3364,6 +3381,7 @@ class TestSlashCommandPlan:
             {
                 "stage": 1,
                 "name": "Infra",
+                "layer": "infra",
                 "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
@@ -3391,6 +3409,7 @@ class TestSlashCommandPlan:
             {
                 "stage": 1,
                 "name": "Infra",
+                "layer": "infra",
                 "capability": "infra",
                 "services": [],
                 "dir": "stage-1",
@@ -3419,6 +3438,7 @@ class TestSlashCommandPlan:
             {
                 "stage": 1,
                 "name": "Infra",
+                "layer": "infra",
                 "capability": "infra",
                 "services": [],
                 "dir": "stage-1",

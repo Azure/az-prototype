@@ -1755,7 +1755,7 @@ class TestAgentBuildContext:
         mock_tf_agent.set_knowledge_override = MagicMock()
         mock_tf_agent.set_governor_brief = MagicMock()
 
-        stage = {"name": "Data", "services": [{"name": "sql-server"}]}
+        stage = {"name": "Data", "layer": "infra", "services": [{"name": "sql-server"}]}
 
         with patch.object(session, "_apply_governor_brief") as mock_gov, patch.object(
             session, "_apply_stage_knowledge"
@@ -2430,6 +2430,7 @@ class TestBuildStageTaskGovernorBrief:
         stage = {
             "stage": 1,
             "name": "Foundation",
+            "layer": "infra",
             "capability": "infra",
             "services": [],
             "dir": "concept/infra/terraform/stage-1-foundation",
@@ -2845,6 +2846,7 @@ class TestTerraformPromptReinforcement:
         stage = {
             "stage": 1,
             "name": "Foundation",
+            "layer": "infra",
             "capability": "infra",
             "dir": "concept/infra/terraform/stage-1",
             "services": [],
@@ -3449,25 +3451,26 @@ class TestGetAppScaffoldingRequirements:
     def test_infra_capability_returns_empty(self):
         from azext_prototype.stages.build_session import BuildSession
 
-        result = BuildSession._get_app_scaffolding_requirements({"capability": "infra", "services": []})
+        result = BuildSession._get_app_scaffolding_requirements({"layer": "infra", "capability": "infra", "services": []})
         assert result == ""
 
     def test_data_capability_returns_empty(self):
         from azext_prototype.stages.build_session import BuildSession
 
-        result = BuildSession._get_app_scaffolding_requirements({"capability": "data", "services": []})
+        result = BuildSession._get_app_scaffolding_requirements({"layer": "data", "capability": "data", "services": []})
         assert result == ""
 
     def test_docs_capability_returns_empty(self):
         from azext_prototype.stages.build_session import BuildSession
 
-        result = BuildSession._get_app_scaffolding_requirements({"capability": "docs", "services": []})
+        result = BuildSession._get_app_scaffolding_requirements({"layer": "docs", "capability": "docs", "services": []})
         assert result == ""
 
     def test_functions_detected_by_resource_type(self):
         from azext_prototype.stages.build_session import BuildSession
 
         stage = {
+            "layer": "app",
             "capability": "app",
             "services": [{"name": "api", "resource_type": "Microsoft.Web/functionapps"}],
         }
@@ -3479,6 +3482,7 @@ class TestGetAppScaffoldingRequirements:
         from azext_prototype.stages.build_session import BuildSession
 
         stage = {
+            "layer": "app",
             "capability": "app",
             "services": [{"name": "function-app", "resource_type": ""}],
         }
@@ -3490,6 +3494,7 @@ class TestGetAppScaffoldingRequirements:
         from azext_prototype.stages.build_session import BuildSession
 
         stage = {
+            "layer": "app",
             "capability": "app",
             "services": [{"name": "api", "resource_type": "Microsoft.Web/sites"}],
         }
@@ -3502,6 +3507,7 @@ class TestGetAppScaffoldingRequirements:
         from azext_prototype.stages.build_session import BuildSession
 
         stage = {
+            "layer": "app",
             "capability": "app",
             "services": [{"name": "api-fastapi", "resource_type": "Microsoft.App/containerApps"}],
         }
@@ -3514,6 +3520,7 @@ class TestGetAppScaffoldingRequirements:
         from azext_prototype.stages.build_session import BuildSession
 
         stage = {
+            "layer": "app",
             "capability": "app",
             "services": [{"name": "worker", "resource_type": ""}],
         }
@@ -3525,6 +3532,7 @@ class TestGetAppScaffoldingRequirements:
         from azext_prototype.stages.build_session import BuildSession
 
         stage = {
+            "layer": "app",
             "capability": "schema",
             "services": [{"name": "db-migration", "resource_type": ""}],
         }
@@ -3535,6 +3543,7 @@ class TestGetAppScaffoldingRequirements:
         from azext_prototype.stages.build_session import BuildSession
 
         stage = {
+            "layer": "app",
             "capability": "external",
             "services": [{"name": "stripe-integration", "resource_type": ""}],
         }
@@ -3868,6 +3877,7 @@ class TestBuildStageTaskBicep:
         stage = {
             "stage": 1,
             "name": "Foundation",
+            "layer": "infra",
             "capability": "infra",
             "services": [
                 {
@@ -3895,6 +3905,7 @@ class TestBuildStageTaskBicep:
         stage = {
             "stage": 2,
             "name": "API",
+            "layer": "app",
             "capability": "app",
             "services": [
                 {
@@ -4355,7 +4366,7 @@ class TestBuildSessionRefactored:
         mock_tf_agent.set_knowledge_override = MagicMock()
         mock_tf_agent.set_governor_brief = MagicMock()
 
-        stage = {"name": "Data Layer", "services": [{"name": "cosmos-db"}]}
+        stage = {"name": "Data Layer", "layer": "data", "services": [{"name": "cosmos-db"}]}
 
         with patch.object(session, "_apply_governor_brief") as mock_gov, patch.object(
             session, "_apply_stage_knowledge"
@@ -4363,7 +4374,7 @@ class TestBuildSessionRefactored:
             with session._agent_build_context(mock_tf_agent, stage):
                 pass
 
-        mock_gov.assert_called_once_with(mock_tf_agent, "Data Layer", [{"name": "cosmos-db"}], "infra")
+        mock_gov.assert_called_once_with(mock_tf_agent, "Data Layer", [{"name": "cosmos-db"}], "data")
 
     def test_agent_build_context_calls_apply_stage_knowledge(self, build_context, build_registry, mock_tf_agent):
         """_apply_stage_knowledge should be called with agent and stage dict."""
