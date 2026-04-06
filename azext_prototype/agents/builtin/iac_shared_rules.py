@@ -9,10 +9,12 @@ agent's own prompt.
 SHARED_IAC_RULES = """
 ## CRITICAL: NETWORKING STAGE RULES
 When generating a networking stage (VNet, subnets, DNS zones):
-- Do **NOT** create placeholder private endpoints. PEs belong in their respective
-  service stages (e.g., Key Vault PE in the Key Vault stage), not the networking
-  stage. The networking stage **ONLY** exports PE subnet ID and DNS zone IDs
-  for downstream stages to consume.
+- The networking stage creates ALL private endpoints, private DNS zones,
+  DNS zone links, and DNS zone groups for the entire deployment.
+- Service stages (Key Vault, SQL, Cosmos, etc.) must NOT create their own
+  PE or DNS resources — they only set `publicNetworkAccess = "Disabled"`.
+- The networking stage discovers which services need PEs from the
+  deployment plan and creates all PE + DNS resources in one place.
 - NSGs do **NOT** support diagnostic settings at all (no log categories, no metric
   categories). Do **NOT** create `Microsoft.Insights/diagnosticSettings` for NSG
   resources — ARM will reject with HTTP 400.
