@@ -147,6 +147,26 @@ Do NOT add `subscription_id` or `tenant_id` to the provider block. The az CLI co
 Each stage uses the default `terraform.tfstate` in its own directory.
 Cross-stage references use relative paths: `../stage-1-managed-identity/terraform.tfstate`.
 
+## CRITICAL: NO NULL VALUES IN BODY
+azapi v2 serializes Terraform `null` as JSON `null`. ARM rejects properties
+set to `null` — they must be ABSENT from the body, not null.
+
+NEVER use ternary expressions that produce `null` for optional ARM properties:
+```hcl
+# WRONG — ARM returns 400 Bad Request
+vnetConfiguration = var.enable_vnet ? { ... } : null
+```
+
+Instead, use `merge()` to conditionally include or omit the property:
+```hcl
+# CORRECT — property is absent when disabled
+locals {
+  base = { appLogsConfiguration = { ... } }
+  vnet = var.enable_vnet ? { vnetConfiguration = { ... } } : {}
+}
+body = { properties = merge(local.base, local.vnet) }
+```
+
 ## CRITICAL: TAGS PLACEMENT
 Tags on `azapi_resource` MUST be a TOP-LEVEL attribute, NEVER inside `body`.
 

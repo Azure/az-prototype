@@ -107,6 +107,22 @@ output staticIp string = containerAppEnv.properties.staticIp
 ```
 
 ## Common Pitfalls
+- **NEVER use conditional `null` for optional ARM properties**: azapi v2 serializes Terraform `null` as JSON `null`, but ARM rejects properties set to `null` — they must be **absent** from the body. Instead of `vnetConfiguration = var.enable ? { ... } : null`, use `merge()` in locals to produce a properties map that omits the key entirely when disabled:
+  ```hcl
+  # WRONG — ARM rejects vnetConfiguration: null
+  vnetConfiguration = var.enable_vnet ? { ... } : null
+
+  # CORRECT — omit the property entirely
+  locals {
+    base_properties = {
+      appLogsConfiguration = { ... }
+    }
+    vnet_properties = var.enable_vnet ? {
+      vnetConfiguration = { ... }
+    } : {}
+    environment_properties = merge(local.base_properties, local.vnet_properties)
+  }
+  ```
 - **Log Analytics required**: The environment CANNOT be created without a Log Analytics workspace. Ensure the workspace exists before creating the environment.
 - **Subnet sizing**: VNet-integrated subnets must be at least /23 (512 addresses). A /27 or /28 will fail. The subnet must be delegated to `Microsoft.App/environments`.
 - **Log Analytics shared key retrieval**: Use `data "azapi_resource_action"` (not `resource`) for read-only operations like fetching the shared key. Using `resource` causes re-execution on every apply.

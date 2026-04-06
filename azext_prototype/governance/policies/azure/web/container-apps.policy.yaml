@@ -63,6 +63,10 @@ rules:
           zoneRedundant: false
         }
       }
+    prohibitions:
+    - NEVER use conditional null for vnetConfiguration — azapi v2 serializes null as JSON null which ARM
+      rejects with 400 Bad Request. Use merge() to omit the property entirely when VNet is disabled.
+    - NEVER create a Container Apps Environment without linking to a Log Analytics workspace
 - id: AZ-CA-002
   severity: required
   description: Create Container App with user-assigned managed identity, health probes, and Key Vault secret references
