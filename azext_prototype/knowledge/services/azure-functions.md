@@ -197,7 +197,7 @@ resource "azapi_resource" "functions_storage_blob_role" {
 
   body = {
     properties = {
-      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/b7e6dc6d-f1e8-4753-8033-0f276bb0955b"  # Storage Blob Data Owner
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/b7e6dc6d-f1e8-4753-8033-0f276bb0955b"  # Storage Blob Data Owner
       principalId      = var.managed_identity_principal_id
       principalType    = "ServicePrincipal"
     }
@@ -211,7 +211,7 @@ resource "azapi_resource" "functions_storage_queue_role" {
 
   body = {
     properties = {
-      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/974c5e8b-45b9-4653-ba55-5f855dd0fb88"  # Storage Queue Data Contributor
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/974c5e8b-45b9-4653-ba55-5f855dd0fb88"  # Storage Queue Data Contributor
       principalId      = var.managed_identity_principal_id
       principalType    = "ServicePrincipal"
     }
@@ -225,7 +225,7 @@ resource "azapi_resource" "functions_storage_table_role" {
 
   body = {
     properties = {
-      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3"  # Storage Table Data Contributor
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3"  # Storage Table Data Contributor
       principalId      = var.managed_identity_principal_id
       principalType    = "ServicePrincipal"
     }
@@ -245,7 +245,7 @@ resource "azapi_resource" "servicebus_receiver_role" {
 
   body = {
     properties = {
-      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0"  # Azure Service Bus Data Receiver
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0"  # Azure Service Bus Data Receiver
       principalId      = var.managed_identity_principal_id
       principalType    = "ServicePrincipal"
     }
@@ -259,7 +259,7 @@ resource "azapi_resource" "servicebus_sender_role" {
 
   body = {
     properties = {
-      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/69a216fc-b8fb-44d8-bc22-1f3c2cd27a39"  # Azure Service Bus Data Sender
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/69a216fc-b8fb-44d8-bc22-1f3c2cd27a39"  # Azure Service Bus Data Sender
       principalId      = var.managed_identity_principal_id
       principalType    = "ServicePrincipal"
     }

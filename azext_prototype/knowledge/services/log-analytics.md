@@ -130,7 +130,7 @@ resource "azapi_resource" "reader_role" {
 
   body = {
     properties = {
-      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/73c42c96-874c-492b-b04d-ab87d138a893"  # Log Analytics Reader
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/73c42c96-874c-492b-b04d-ab87d138a893"  # Log Analytics Reader
       principalId      = var.reader_principal_id
       principalType    = "ServicePrincipal"
     }
@@ -145,7 +145,7 @@ resource "azapi_resource" "contributor_role" {
 
   body = {
     properties = {
-      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/92aaf0da-9dab-42b6-94a3-d43ce8d16293"  # Log Analytics Contributor
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/92aaf0da-9dab-42b6-94a3-d43ce8d16293"  # Log Analytics Contributor
       principalId      = var.admin_principal_id
       principalType    = "ServicePrincipal"
     }

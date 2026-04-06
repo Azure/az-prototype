@@ -35,7 +35,7 @@ resource "azapi_resource" "mysql_ad_admin" {
       identityResourceId = azapi_resource.user_identity.id
       login              = var.admin_login_name
       sid                = var.admin_principal_id
-      tenantId           = data.azurerm_client_config.current.tenant_id
+      tenantId           = var.tenant_id
     }
   }
 }

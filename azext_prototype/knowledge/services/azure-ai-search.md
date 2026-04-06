@@ -72,7 +72,7 @@ resource "azapi_resource" "search_index_contributor_role" {
 
   body = {
     properties = {
-      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/8ebe5a00-799e-43f5-93ac-243d3dce84a7"  # Search Index Data Contributor
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/8ebe5a00-799e-43f5-93ac-243d3dce84a7"  # Search Index Data Contributor
       principalId      = var.managed_identity_principal_id
       principalType    = "ServicePrincipal"
     }
@@ -87,7 +87,7 @@ resource "azapi_resource" "search_index_reader_role" {
 
   body = {
     properties = {
-      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/1407120a-92aa-4202-b7e9-c0e197c71c8f"  # Search Index Data Reader
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/1407120a-92aa-4202-b7e9-c0e197c71c8f"  # Search Index Data Reader
       principalId      = var.app_identity_principal_id
       principalType    = "ServicePrincipal"
     }
@@ -102,7 +102,7 @@ resource "azapi_resource" "search_service_contributor_role" {
 
   body = {
     properties = {
-      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/7ca78c08-252a-4471-8644-bb5ff32d4ba0"  # Search Service Contributor
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/7ca78c08-252a-4471-8644-bb5ff32d4ba0"  # Search Service Contributor
       principalId      = var.admin_identity_principal_id
       principalType    = "ServicePrincipal"
     }

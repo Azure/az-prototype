@@ -243,17 +243,27 @@ Items deferred from POC monitoring:
 
 ### Terraform Diagnostic Setting Pattern
 ```hcl
-resource "azurerm_monitor_diagnostic_setting" "example" {
-  name                       = "diag-<resource-name>"
-  target_resource_id         = azurerm_<resource>.this.id
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
+resource "azapi_resource" "diagnostic_setting" {
+  type      = "Microsoft.Insights/diagnosticSettings@2021-05-01-preview"
+  name      = "diag-<resource-name>"
+  parent_id = azapi_resource.<resource>.id  # Target resource to monitor
 
-  enabled_log {
-    category = "<log-category>"
-  }
-
-  metric {
-    category = "AllMetrics"
+  body = {
+    properties = {
+      workspaceId = azapi_resource.log_analytics_workspace.id
+      logs = [
+        {
+          category = "<log-category>"
+          enabled  = true
+        }
+      ]
+      metrics = [
+        {
+          category = "AllMetrics"
+          enabled  = true
+        }
+      ]
+    }
   }
 }
 ```

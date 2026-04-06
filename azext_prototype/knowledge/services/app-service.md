@@ -165,7 +165,7 @@ resource "azapi_resource" "keyvault_secrets_role" {
 
   body = {
     properties = {
-      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/4633458b-17de-408a-b874-0445c86b69e6"  # Key Vault Secrets User
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/4633458b-17de-408a-b874-0445c86b69e6"  # Key Vault Secrets User
       principalId      = var.managed_identity_principal_id
       principalType    = "ServicePrincipal"
     }
@@ -180,7 +180,7 @@ resource "azapi_resource" "storage_blob_role" {
 
   body = {
     properties = {
-      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe"  # Storage Blob Data Contributor
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe"  # Storage Blob Data Contributor
       principalId      = var.managed_identity_principal_id
       principalType    = "ServicePrincipal"
     }

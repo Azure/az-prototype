@@ -26,14 +26,14 @@ depends_on:
 ```hcl
 resource "azapi_resource" "pg_ad_admin" {
   type      = "Microsoft.DBforPostgreSQL/flexibleServers/administrators@2023-06-01-preview"
-  name      = data.azurerm_client_config.current.object_id
+  name      = var.deployer_object_id
   parent_id = azapi_resource.pg_server.id
 
   body = {
     properties = {
       principalName = var.admin_principal_name
       principalType = "ServicePrincipal"
-      tenantId      = data.azurerm_client_config.current.tenant_id
+      tenantId      = var.tenant_id
     }
   }
 }

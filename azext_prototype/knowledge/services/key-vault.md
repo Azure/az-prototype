@@ -22,8 +22,6 @@ display_name: Azure Key Vault
 
 ### Basic Resource
 ```hcl
-data "azurerm_client_config" "current" {}
-
 resource "azapi_resource" "key_vault" {
   type      = "Microsoft.KeyVault/vaults@2023-07-01"
   name      = var.key_vault_name
@@ -32,7 +30,7 @@ resource "azapi_resource" "key_vault" {
 
   body = {
     properties = {
-      tenantId                 = data.azurerm_client_config.current.tenant_id
+      tenantId                 = var.tenant_id
       sku = {
         family = "A"
         name   = "standard"
@@ -93,13 +91,13 @@ resource "azapi_resource" "kv_secrets_user" {
 # Grant the deploying principal write access to secrets (needed during deployment)
 resource "azapi_resource" "kv_secrets_officer_deployer" {
   type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
-  name      = uuidv5("sha1", "${azapi_resource.key_vault.id}-${data.azurerm_client_config.current.object_id}-b86a8fe4-44ce-4948-aee5-eccb2c155cd7")
+  name      = uuidv5("sha1", "${azapi_resource.key_vault.id}-${var.deployer_object_id}-b86a8fe4-44ce-4948-aee5-eccb2c155cd7")
   parent_id = azapi_resource.key_vault.id
 
   body = {
     properties = {
       roleDefinitionId = "/providers/Microsoft.Authorization/roleDefinitions/b86a8fe4-44ce-4948-aee5-eccb2c155cd7"
-      principalId      = data.azurerm_client_config.current.object_id
+      principalId      = var.deployer_object_id
       principalType    = "User"
     }
   }

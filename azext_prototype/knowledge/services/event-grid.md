@@ -136,7 +136,7 @@ resource "azapi_resource" "event_sender_role" {
 
   body = {
     properties = {
-      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/d5a91429-5739-47e2-a06b-3470a27159e7"  # EventGrid Data Sender
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/d5a91429-5739-47e2-a06b-3470a27159e7"  # EventGrid Data Sender
       principalId      = var.managed_identity_principal_id
       principalType    = "ServicePrincipal"
     }

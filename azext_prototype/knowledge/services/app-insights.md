@@ -106,7 +106,7 @@ resource "azapi_resource" "reader_role" {
 
   body = {
     properties = {
-      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/aa49f09b-42d2-4ee6-8548-4c9c6fd4acbb"  # Application Insights Component Reader
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/aa49f09b-42d2-4ee6-8548-4c9c6fd4acbb"  # Application Insights Component Reader
       principalId      = var.reader_principal_id
       principalType    = "ServicePrincipal"
     }
@@ -121,7 +121,7 @@ resource "azapi_resource" "contributor_role" {
 
   body = {
     properties = {
-      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/ae349356-3a1b-4a5e-921d-050484c6347e"  # Application Insights Component Contributor
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/ae349356-3a1b-4a5e-921d-050484c6347e"  # Application Insights Component Contributor
       principalId      = var.admin_principal_id
       principalType    = "ServicePrincipal"
     }

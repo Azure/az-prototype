@@ -65,7 +65,7 @@ resource "azapi_resource" "pg_flexible" {
       authConfig = {
         activeDirectoryAuth = "Enabled"
         passwordAuth        = "Enabled"  # Needed for initial admin; disable later
-        tenantId            = data.azurerm_client_config.current.tenant_id
+        tenantId            = var.tenant_id
       }
     }
   }
@@ -152,7 +152,7 @@ resource "azapi_resource" "aad_admin" {
     properties = {
       principalName = var.aad_admin_display_name
       principalType = "ServicePrincipal"  # or "User", "Group"
-      tenantId      = data.azurerm_client_config.current.tenant_id
+      tenantId      = var.tenant_id
     }
   }
 }
@@ -190,7 +190,7 @@ resource "azapi_resource" "pg_contributor_role" {
 
   body = {
     properties = {
-      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"  # Contributor
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"  # Contributor
       principalId      = var.admin_identity_principal_id
       principalType    = "ServicePrincipal"
     }

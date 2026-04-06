@@ -36,9 +36,9 @@ terraform {
   required_version = ">= 1.9.0"
 
   required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = ">= 4.0, < 5.0"
+    azapi = {
+      source  = "hashicorp/azapi"
+      version = ">= 2.0, < 3.0"
     }
     azuread = {
       source  = "hashicorp/azuread"
@@ -50,12 +50,10 @@ terraform {
 
 ### providers.tf
 
-**Note:** AzureRM 4.x removed the `features {}` sub-blocks for `key_vault` and `resource_group`. The provider now requires explicit opt-in for destructive behaviors via resource-level attributes instead.
+**Note:** AzAPI v2 uses `body` as an HCL object (not a JSON string). All Azure resource properties are set via `body = { properties = { ... } }`. Resource types include an explicit API version in the `type` attribute (e.g., `Microsoft.Storage/storageAccounts@2023-05-01`).
 
 ```hcl
-provider "azurerm" {
-  features {}
-
+provider "azapi" {
   # Subscription is set via prototype.secrets.yaml or az account
   # subscription_id = var.subscription_id  # uncomment if needed
 }
@@ -63,15 +61,17 @@ provider "azurerm" {
 provider "azuread" {}
 ```
 
-### AzureRM 4.x Migration Notes
+### AzAPI v2 Key Concepts
 
-Key breaking changes from 3.x to 4.x:
+Key patterns for AzAPI v2 provider:
 
-- `features {}` block is now required but most sub-blocks are removed
-- `azurerm_resource_group` no longer has `prevent_deletion_if_contains_resources`
-- `azurerm_key_vault`: `purge_soft_delete_on_destroy` and `recover_soft_deleted_key_vaults` removed from features; use resource-level properties
-- Several resources renamed or split (check provider changelog)
-- `skip_provider_registration` moved to a top-level provider attribute
+- Every resource uses `resource "azapi_resource"` with `type = "Microsoft.<Provider>/<ResourceType>@<api-version>"`
+- Properties go in `body = { properties = { ... } }` as native HCL (not JSON strings)
+- `parent_id` sets the parent scope (resource group ID, subscription ID, or parent resource ID)
+- Output values accessed via `output` attribute: `azapi_resource.<name>.output.properties.<field>`
+- Resource `id` and `name` are top-level: `azapi_resource.<name>.id`, `azapi_resource.<name>.name`
+- Data sources use `data "azapi_resource"` with `type` and `resource_id`
+- Use `azapi_resource_action` for POST-based operations (e.g., list keys)
 
 ## State Management
 
@@ -121,8 +121,8 @@ az storage container create \
 ### variables.tf (Template)
 
 ```hcl
-variable "resource_group_name" {
-  description = "Name of the resource group"
+variable "resource_group_id" {
+  description = "Resource ID of the resource group"
   type        = string
 }
 
@@ -156,40 +156,71 @@ stage creates all private endpoints for all services in the deployment plan.
 ### private-endpoint.tf (Networking stage only)
 
 ```hcl
-resource "azurerm_private_endpoint" "this" {
+resource "azapi_resource" "private_endpoint" {
   count = var.enable_private_endpoint && var.subnet_id != null ? 1 : 0
 
-  name                = "pe-${var.name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  subnet_id           = var.subnet_id
+  type      = "Microsoft.Network/privateEndpoints@2023-11-01"
+  name      = "pe-${var.name}"
+  location  = var.location
+  parent_id = var.resource_group_id
 
-  private_service_connection {
-    name                           = "psc-${var.name}"
-    private_connection_resource_id = azurerm_<resource_type>.this.id
-    subresource_names              = ["<group_id>"]  # See service-registry.yaml
-    is_manual_connection           = false
-  }
-
-  dynamic "private_dns_zone_group" {
-    for_each = var.private_dns_zone_id != null ? [1] : []
-    content {
-      name                 = "dns-zone-group"
-      private_dns_zone_ids = [var.private_dns_zone_id]
+  body = {
+    properties = {
+      subnet = {
+        id = var.subnet_id
+      }
+      privateLinkServiceConnections = [
+        {
+          name = "psc-${var.name}"
+          properties = {
+            privateLinkServiceId = azapi_resource.this.id
+            groupIds             = ["<group_id>"]  # See service-registry.yaml
+          }
+        }
+      ]
     }
   }
 
   tags = var.tags
+}
+
+resource "azapi_resource" "private_dns_zone_group" {
+  count = var.enable_private_endpoint && var.subnet_id != null && var.private_dns_zone_id != null ? 1 : 0
+
+  type      = "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01"
+  name      = "dns-zone-group"
+  parent_id = azapi_resource.private_endpoint[0].id
+
+  body = {
+    properties = {
+      privateDnsZoneConfigs = [
+        {
+          name = "config"
+          properties = {
+            privateDnsZoneId = var.private_dns_zone_id
+          }
+        }
+      ]
+    }
+  }
 }
 ```
 
 ## RBAC Assignment Pattern
 
 ```hcl
-resource "azurerm_role_assignment" "this" {
-  scope                = azurerm_<resource_type>.this.id
-  role_definition_name = "<role_name>"  # See service-registry.yaml for roles
-  principal_id         = var.managed_identity_principal_id
+resource "azapi_resource" "role_assignment" {
+  type      = "Microsoft.Authorization/roleAssignments@2022-04-01"
+  name      = var.role_assignment_name  # Must be a GUID
+  parent_id = azapi_resource.this.id    # Scope: the target resource ID
+
+  body = {
+    properties = {
+      roleDefinitionId = "/subscriptions/${data.azapi_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/<role_id>"
+      principalId      = var.managed_identity_principal_id
+      principalType    = "ServicePrincipal"
+    }
+  }
 }
 ```
 
@@ -200,24 +231,25 @@ resource "azurerm_role_assignment" "this" {
 ```hcl
 output "id" {
   description = "Resource ID"
-  value       = azurerm_<resource_type>.this.id
+  value       = azapi_resource.this.id
 }
 
 output "name" {
   description = "Resource name"
-  value       = azurerm_<resource_type>.this.name
+  value       = azapi_resource.this.name
 }
 
 # Include endpoint output for services with endpoints
+# AzAPI v2: access properties via .output.properties.<field>
 output "endpoint" {
   description = "Resource endpoint URL"
-  value       = azurerm_<resource_type>.this.<endpoint_attribute>
+  value       = azapi_resource.this.output.properties.<endpoint_attribute>
 }
 
 # Include private endpoint IP if applicable
 output "private_endpoint_ip" {
   description = "Private endpoint IP address"
-  value       = try(azurerm_private_endpoint.this[0].private_service_connection[0].private_ip_address, null)
+  value       = try(azapi_resource.private_endpoint[0].output.properties.customDnsConfigs[0].ipAddresses[0], null)
 }
 ```
 
@@ -226,12 +258,20 @@ output "private_endpoint_ip" {
 ### dev/main.tf
 
 ```hcl
+resource "azapi_resource" "resource_group" {
+  type     = "Microsoft.Resources/resourceGroups@2024-03-01"
+  name     = "rg-${var.project_name}-${var.environment}"
+  location = var.location
+
+  tags = local.common_tags
+}
+
 module "<service>" {
   source = "../../modules/<service-name>"
 
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
-  name                = "<service>-${var.project_name}-${var.environment}"
+  resource_group_id = azapi_resource.resource_group.id
+  location          = azapi_resource.resource_group.output.location
+  name              = "<service>-${var.project_name}-${var.environment}"
 
   # NOTE: Private endpoints are NOT configured here.
   # The Networking stage creates all PEs centrally.
@@ -329,25 +369,42 @@ terraform apply -input=false tfplan-destroy
 ### Conditional Resource Creation
 
 ```hcl
-resource "azurerm_example" "this" {
+resource "azapi_resource" "example" {
   count = var.enable_feature ? 1 : 0
-  # ...
+
+  type      = "Microsoft.<Provider>/<ResourceType>@<api-version>"
+  name      = var.name
+  location  = var.location
+  parent_id = var.resource_group_id
+
+  body = {
+    properties = {
+      # ...
+    }
+  }
 }
 
 # Reference with try()
 output "example_id" {
-  value = try(azurerm_example.this[0].id, null)
+  value = try(azapi_resource.example[0].id, null)
 }
 ```
 
 ### For Each with Map
 
 ```hcl
-resource "azurerm_example" "this" {
+resource "azapi_resource" "example" {
   for_each = var.instances
 
-  name     = each.key
-  property = each.value.property
+  type      = "Microsoft.<Provider>/<ResourceType>@<api-version>"
+  name      = each.key
+  parent_id = var.resource_group_id
+
+  body = {
+    properties = {
+      property = each.value.property
+    }
+  }
 }
 ```
 
@@ -368,24 +425,28 @@ locals {
 ### Data Sources for Existing Resources
 
 ```hcl
-data "azurerm_client_config" "current" {}
+data "azapi_client_config" "current" {}
 
-data "azurerm_subscription" "current" {}
+# Look up an existing resource by ID
+data "azapi_resource" "existing" {
+  type        = "Microsoft.<Provider>/<ResourceType>@<api-version>"
+  resource_id = "/subscriptions/.../resourceGroups/.../providers/..."
+}
 
 # Reference current user/service principal
 output "current_tenant_id" {
-  value = data.azurerm_client_config.current.tenant_id
+  value = data.azapi_client_config.current.tenant_id
 }
 ```
 
-### Moved Blocks (4.x Refactoring)
+### Moved Blocks (Refactoring)
 
-When renaming resources in 4.x, use `moved` blocks to avoid destroy/recreate:
+When renaming resources, use `moved` blocks to avoid destroy/recreate:
 
 ```hcl
 moved {
-  from = azurerm_storage_account.old_name
-  to   = azurerm_storage_account.new_name
+  from = azapi_resource.old_name
+  to   = azapi_resource.new_name
 }
 ```
 
@@ -426,5 +487,5 @@ Refer to `service-registry.yaml` for per-service details:
 3. **Use variables** -- No hardcoded values in main.tf.
 4. **Export outputs** -- Other modules depend on these values.
 5. **Follow naming conventions** -- Use project/environment prefix from the naming strategy.
-6. **AzureRM 4.x** -- Use `>= 4.0, < 5.0` version constraint. Check migration guide for renamed resources.
+6. **AzAPI v2** -- Use `>= 2.0, < 3.0` version constraint. All resources use ARM resource types with explicit API versions.
 7. **State hygiene** -- Local state for POC, remote state for production. Never commit `.tfstate` files.

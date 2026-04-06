@@ -121,7 +121,7 @@ resource "azapi_resource" "openai_user_role" {
 
   body = {
     properties = {
-      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/a97b65f3-24c7-4388-baec-2e87135dc908"  # Cognitive Services User
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/a97b65f3-24c7-4388-baec-2e87135dc908"  # Cognitive Services User
       principalId      = var.managed_identity_principal_id
       principalType    = "ServicePrincipal"
     }
@@ -136,7 +136,7 @@ resource "azapi_resource" "openai_contributor_role" {
 
   body = {
     properties = {
-      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/25fbc0a9-bd7c-42a3-aa1a-3b75d497ee68"  # Cognitive Services Contributor
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/25fbc0a9-bd7c-42a3-aa1a-3b75d497ee68"  # Cognitive Services Contributor
       principalId      = var.admin_identity_principal_id
       principalType    = "ServicePrincipal"
     }
@@ -151,7 +151,7 @@ resource "azapi_resource" "openai_specific_user_role" {
 
   body = {
     properties = {
-      roleDefinitionId = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"  # Cognitive Services OpenAI User
+      roleDefinitionId = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"  # Cognitive Services OpenAI User
       principalId      = var.managed_identity_principal_id
       principalType    = "ServicePrincipal"
     }
