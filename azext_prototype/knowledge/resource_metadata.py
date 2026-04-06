@@ -159,12 +159,24 @@ def resolve_resource_metadata(
             parent_rt = "/".join(rt_parts[:2])
             parent_key = index.get(parent_rt)
             if parent_key and parent_key in data:
-                child_suffix = "/".join(rt_parts[2:])
                 children = data[parent_key].get("child_resources", {})
-                if child_suffix in children:
-                    api_ver = children[child_suffix].get("api_version", "") or children[child_suffix].get(
-                        "bicep_api_version", ""
-                    )
+                # Match by: 1) resource_type field (authoritative), 2) dict key (case-insensitive)
+                child_suffix = "/".join(rt_parts[2:])
+                matched_child = None
+                for ckey, cval in children.items():
+                    if not isinstance(cval, dict):
+                        continue
+                    # Match by resource_type field
+                    crt = cval.get("resource_type", "")
+                    if crt and crt.lower() == rt_lower:
+                        matched_child = cval
+                        break
+                    # Match by dict key (case-insensitive)
+                    if ckey.lower() == child_suffix:
+                        matched_child = cval
+                        break
+                if matched_child:
+                    api_ver = matched_child.get("api_version", "") or matched_child.get("bicep_api_version", "")
                     if api_ver:
                         result[rt] = ResourceMetadata(
                             resource_type=rt,
