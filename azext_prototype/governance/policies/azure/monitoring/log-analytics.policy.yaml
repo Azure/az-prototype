@@ -170,11 +170,14 @@ rules:
               name = "PerGB2018"
             }
             retentionInDays                      = 30
+            disableLocalAuth                     = false
             publicNetworkAccessForIngestion       = "Disabled"
             publicNetworkAccessForQuery           = "Disabled"
             features = {
               enableLogAccessUsingOnlyResourcePermissions = true
             }
+            # CRITICAL: disableLocalAuth MUST be a direct child of properties,
+            # NEVER inside features. ARM silently drops it if nested wrong.
           }
         }
       }
@@ -206,6 +209,8 @@ rules:
       output logAnalyticsWorkspaceId string = logAnalyticsWorkspace.id
       output logAnalyticsCustomerId string = logAnalyticsWorkspace.properties.customerId
     prohibitions:
+    - NEVER place disableLocalAuth inside properties.features — it MUST be a direct child of properties.
+      ARM silently drops it if nested inside features, leaving local auth enabled.
     - NEVER use Free SKU for production or shared workspaces — use PerGB2018
     - NEVER set retentionInDays below 30 for compliance-sensitive workloads
     - NEVER set publicNetworkAccessForIngestion to Enabled when private endpoints are available
