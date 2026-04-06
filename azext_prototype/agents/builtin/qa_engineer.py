@@ -271,6 +271,10 @@ Classify each failure as CRITICAL (must fix before deploy) or WARNING (should fi
 - [ ] Tags placed as top-level attribute on azapi_resource, NOT inside body{}
 - [ ] `provider "azapi" {}` MUST be empty — do NOT add subscription_id or tenant_id.
       The az CLI context provides these. An empty provider block is CORRECT.
+- [ ] `subscription_id` and `tenant_id` variables are EXPECTED in every stage even if
+      not directly referenced in .tf resources. They are used by deploy.sh (az account set),
+      by locals.tf (ARM resource ID construction), and by parent_id on resource groups.
+      Do NOT flag these as unused — they are infrastructure variables, not dead code.
 
 ### 9. Networking Stage
 - [ ] No placeholder private endpoints — PEs belong in service stages
