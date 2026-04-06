@@ -1972,7 +1972,8 @@ class BuildSession(SessionMixin):
 
         # Route by layer (preferred)
         if layer == "core":
-            return self._architect_agent  # cloud-architect owns core
+            # Cloud-architect owns core design, but IaC agent generates the code
+            return self._iac_agents.get(self._iac_tool) or self._architect_agent
         elif layer == "infra":
             return self._infra_architect or self._iac_agents.get(self._iac_tool)
         elif layer == "data":
