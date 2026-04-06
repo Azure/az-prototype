@@ -67,22 +67,29 @@ View the [command reference](./COMMANDS.md) to see the full list of commands and
 ## Agent System
 
 ### Built-in Agents
-Ships with 12 pre-defined agents:
+Ships with 19 pre-defined agents:
 
 | Agent | Capability | Description |
 |-------|-----------|-------------|
-| `cloud-architect` | Architecture | Cross-service coordination and architecture design |
-| `terraform-agent` | Terraform | Terraform IaC generation |
+| `cloud-architect` | Architecture | Overall overseer, Core layer ownership, deployment planning |
+| `infrastructure-architect` | Infrastructure | Infrastructure layer ownership, directs terraform/bicep agents |
+| `data-architect` | Data | Data layer ownership, schema and access patterns |
+| `application-architect` | Application | Application layer ownership, developer delegation |
+| `security-architect` | Security | Cross-cutting security, RBAC, identity, encryption |
+| `terraform-agent` | Terraform | Terraform IaC generation (azapi provider) |
 | `bicep-agent` | Bicep | Bicep template generation |
-| `app-developer` | Development | Application code generation (APIs, Functions, containers) |
+| `csharp-developer` | C# / .NET | C# application code generation |
+| `python-developer` | Python | Python application code generation |
+| `react-developer` | React / TypeScript | React frontend code generation |
+| `app-developer` | Development | Generic fallback for unsupported languages |
 | `doc-agent` | Documentation | Project and deployment documentation |
-| `qa-engineer` | QA / Analysis | Error diagnosis from logs, strings, or screenshots; fix coordination |
+| `qa-engineer` | QA / Analysis | Error diagnosis, code review, remediation |
 | `biz-analyst` | Business Analysis | Requirements gap analysis and interactive design dialogue |
 | `cost-analyst` | Cost Analysis | Azure cost estimation at S/M/L t-shirt sizes |
 | `project-manager` | Coordination | Scope management, task assignment, escalation |
-| `security-reviewer` | Security | Pre-deployment IaC security scanning |
 | `monitoring-agent` | Monitoring | Observability configuration generation |
 | `governor` | Governance | Embedding-based policy retrieval and enforcement |
+| `advisor` | Advisory | Per-stage trade-off and risk analysis |
 
 ### Custom Agents
 Add your own agents via YAML or Python:
