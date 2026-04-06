@@ -196,28 +196,34 @@ Use `var.subscription_id` and `var.tenant_id` instead of `data "azurerm_client_c
 Use `azapi_resource` for ALL resources including role assignments, metric alerts, and
 diagnostic settings. Any `azurerm_*` resource WILL BE REJECTED.
 
-## CRITICAL: response_export_values (REQUIRED for outputs)
-When you reference `.output.properties.*` on any `azapi_resource` in outputs.tf,
-you MUST declare `response_export_values = ["*"]` on that resource. Without it,
-the output object is empty and terraform plan WILL FAIL with nil references.
+## CRITICAL: response_export_values (REQUIRED on EVERY azapi_resource)
+Add `response_export_values = ["*"]` to EVERY `azapi_resource` block. This is
+NOT optional — it is REQUIRED for the azapi provider to return any output data.
+Without it, `.output` is empty and ALL downstream references fail silently.
 
-CORRECT:
+RULE: If you write `resource "azapi_resource"`, it MUST have `response_export_values = ["*"]`.
+No exceptions. No "only when outputs reference it". ALWAYS include it.
+
 ```hcl
-resource "azapi_resource" "identity" {
-  type = "Microsoft.ManagedIdentity/userAssignedIdentities@2023-07-31-preview"
-  ...
-  response_export_values = ["*"]
-}
-output "principal_id" {
-  value = azapi_resource.identity.output.properties.principalId
+resource "azapi_resource" "ANY_RESOURCE" {
+  type      = "Microsoft.Xxx/yyy@version"
+  name      = var.name
+  parent_id = var.parent_id
+  location  = var.location
+
+  response_export_values = ["*"]   # <-- MANDATORY ON EVERY azapi_resource
+
+  body = { ... }
 }
 ```
 
-WRONG (WILL FAIL — no response_export_values):
+VIOLATIONS THAT WILL BE REJECTED:
 ```hcl
-resource "azapi_resource" "identity" { ... }  # Missing response_export_values
-output "principal_id" {
-  value = azapi_resource.identity.output.properties.principalId  # nil reference!
+resource "azapi_resource" "identity" { ... }  # REJECTED — no response_export_values
+resource "azapi_resource" "kv" {
+  type = "..."
+  body = { ... }
+  # REJECTED — missing response_export_values = ["*"]
 }
 ```
 

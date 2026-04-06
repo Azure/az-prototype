@@ -242,8 +242,120 @@ def _remove_unused_remote_state(content: str) -> str:
     return result
 
 
+def _remove_private_endpoint_resources(content: str) -> str:
+    """Remove private endpoint and DNS zone resources from non-networking stages.
+
+    Matches ``azapi_resource`` blocks whose type contains:
+    - ``Microsoft.Network/privateEndpoints``
+    - ``Microsoft.Network/privateDnsZones``
+    - ``privateDnsZoneGroups``
+    - ``virtualNetworkLinks`` under privateDnsZones
+
+    Also removes associated locals, variables, and outputs that reference
+    the removed resources.
+    """
+    pe_types = (
+        "microsoft.network/privateendpoints",
+        "microsoft.network/privatednszones",
+        "privatednszonegroups",
+        "virtualnetworklinks",
+    )
+
+    # Find and remove azapi_resource blocks with PE/DNS types
+    block_pattern = re.compile(
+        r'resource\s+"azapi_resource"\s+"(\w+)"\s*\{[^}]*?type\s*=\s*"([^"]+)"[^}]*\}',
+        re.DOTALL,
+    )
+
+    removed_names: list[str] = []
+    result = content
+
+    for match in reversed(list(block_pattern.finditer(result))):
+        resource_name = match.group(1)
+        resource_type = match.group(2).lower()
+        if any(pt in resource_type for pt in pe_types):
+            result = result[: match.start()] + result[match.end() :]
+            removed_names.append(resource_name)
+            logger.debug("Removed PE/DNS resource: azapi_resource.%s", resource_name)
+
+    if not removed_names:
+        return content
+
+    # Remove outputs referencing removed resources
+    for name in removed_names:
+        output_pattern = re.compile(
+            rf'output\s+"\w*{re.escape(name)}\w*"\s*\{{[^}}]*\}}\s*\n?',
+            re.DOTALL,
+        )
+        result = output_pattern.sub("", result)
+
+    # Remove variables for PE/DNS (common patterns)
+    for var_name in ("private_endpoint_subnet_id", "private_dns_zone_id", "enable_private_endpoint"):
+        var_pattern = re.compile(
+            rf'variable\s+"{var_name}"\s*\{{[^}}]*\}}\s*\n?',
+            re.DOTALL,
+        )
+        result = var_pattern.sub("", result)
+
+    return result
+
+
+def _add_response_export_values(content: str) -> str:
+    """Add ``response_export_values = ["*"]`` to azapi_resource blocks missing it.
+
+    Finds each ``resource "azapi_resource" "name" { ... }`` block and checks
+    if ``response_export_values`` appears inside it.  If missing, inserts it
+    after the ``parent_id`` line (or after ``type`` if no ``parent_id``).
+    """
+    # Match azapi_resource blocks
+    block_pattern = re.compile(
+        r'(resource\s+"azapi_resource"\s+"\w+"\s*\{)(.*?\n)((?:.*?\n)*?)(})',
+        re.DOTALL,
+    )
+
+    def _inject(match: re.Match) -> str:  # type: ignore[type-arg]
+        full = match.group(0)
+        if "response_export_values" in full:
+            return full  # already has it
+
+        header = match.group(1)
+        first_line = match.group(2)
+        body = match.group(3)
+        closing = match.group(4)
+
+        # Find insertion point: after parent_id, or after location, or after type
+        lines = (first_line + body).splitlines(keepends=True)
+        insert_idx = len(lines)  # fallback: before closing brace
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped.startswith("parent_id"):
+                insert_idx = i + 1
+                break
+            if stripped.startswith("location"):
+                insert_idx = i + 1
+            elif stripped.startswith("type") and insert_idx == len(lines):
+                insert_idx = i + 1
+
+        # Detect indentation from the type/parent_id line
+        indent = "  "
+        if insert_idx > 0 and insert_idx <= len(lines):
+            prev_line = lines[insert_idx - 1]
+            leading = len(prev_line) - len(prev_line.lstrip())
+            indent = " " * leading
+
+        lines.insert(insert_idx, f'\n{indent}response_export_values = ["*"]\n')
+        return header + "".join(lines) + closing
+
+    new_content = block_pattern.sub(_inject, content)
+    if new_content != content:
+        logger.debug("Added response_export_values to azapi_resource blocks")
+    return new_content
+
+
 _STRUCTURED_HANDLERS: dict[str, Callable[[str], str]] = {
     "remove_unused_remote_state": _remove_unused_remote_state,
+    "remove_private_endpoint_resources": _remove_private_endpoint_resources,
+    "add_response_export_values": _add_response_export_values,
 }
 
 

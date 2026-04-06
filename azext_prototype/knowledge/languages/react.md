@@ -774,6 +774,48 @@ describe("useApi", () => {
 });
 ```
 
+## Common Pitfalls
+
+### NEVER use `require()` in test files — Vitest uses ESM
+```typescript
+// WRONG — require() bypasses Vitest module mocks
+const { reducer } = require("./boardReducer");
+
+// CORRECT — use import (ESM)
+import { reducer } from "./boardReducer";
+```
+
+### NEVER use dynamic `import()` inside test bodies
+```typescript
+// WRONG — dynamic import bypasses Vitest mock cache
+it("should work", async () => {
+  const { useApi } = await import("../hooks/useApi");  // mock not applied
+});
+
+// CORRECT — import at top level, mock at module level
+import { useApi } from "../hooks/useApi";
+vi.mock("../hooks/useApi");
+```
+
+### Use ConnectionString, NOT InstrumentationKey
+```typescript
+// WRONG — InstrumentationKey is deprecated
+VITE_APPLICATIONINSIGHTS_KEY=00000000-0000-0000-0000-000000000000
+
+// CORRECT — use ConnectionString
+VITE_APPLICATIONINSIGHTS_CONNECTION_STRING=InstrumentationKey=...;IngestionEndpoint=...
+```
+
+### Always mock MSAL at the module level
+```typescript
+// In test setup (src/test/setup.ts), NOT in individual tests
+vi.mock("@azure/msal-react", () => ({
+  useMsal: () => ({
+    instance: { getActiveAccount: () => ({ username: "test@test.com" }) },
+  }),
+}));
+```
+
 ## Critical Rules
 
 1. **NEVER access Azure services directly** -- no Azure SDK imports in frontend code. All data flows through backend API endpoints with authentication.

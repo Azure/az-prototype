@@ -14,7 +14,7 @@ constraints:
   - Create a deploy.sh script for staged deployment
   - Use terraform fmt compatible formatting
   - Include outputs for resource IDs, endpoints, and names
-  - Every azapi_resource with .output.properties access MUST have response_export_values = ["*"]
+  - '**CRITICAL:** Every azapi_resource with .output.properties access MUST have response_export_values = ["*"]'
 
 system_prompt: |
   You are an expert Terraform developer specializing in Azure using the azapi provider.

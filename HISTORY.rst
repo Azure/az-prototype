@@ -6,6 +6,24 @@ Release History
 0.2.1b6
 +++++++
 
+Generation quality improvements
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **``response_export_values`` prompt strengthening** — TERRAFORM_PROMPT
+  changed from "add when outputs reference it" to "add to EVERY
+  azapi_resource, no exceptions."  Violations section with rejected
+  examples.
+* **TFM-TF-002** — structured transform that adds
+  ``response_export_values = ["*"]`` to azapi_resource blocks missing it.
+* **TFM-NET-001** — structured transform that removes private endpoint,
+  DNS zone, and DNS zone group resources from non-networking stages.
+* **Python knowledge** — added Common Pitfalls section: no module-level
+  client instantiation, no mutable default parameters for services,
+  ``hmac.HMAC`` not ``hmac.new``, Protocol classes for interfaces,
+  pinned dependency ranges.
+* **React knowledge** — added Common Pitfalls section: no ``require()``
+  in Vitest tests (ESM only), no dynamic ``import()`` in test bodies,
+  ConnectionString over InstrumentationKey, module-level MSAL mocks.
+
 Post-generation transforms
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * **New governance type: transforms** — deterministic fixes for known AI
