@@ -8,6 +8,13 @@ Release History
 
 Generation quality improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **TFM-TF-003** — structured transform that fixes backend state file
+  paths: replaces ``terraform.tfstate`` or empty ``backend "local" {}``
+  with the correct ``stage-N-slug.tfstate`` path derived from stage
+  context.  The #1 recurring QA failure across all builds.
+* **Stage context in transforms** — ``apply()`` now accepts a ``stage``
+  dict, enabling structured handlers to use stage number, name, and
+  directory for context-dependent fixes.
 * **``response_export_values`` prompt strengthening** — TERRAFORM_PROMPT
   changed from "add when outputs reference it" to "add to EVERY
   azapi_resource, no exceptions."  Violations section with rejected

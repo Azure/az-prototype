@@ -2659,7 +2659,9 @@ class BuildSession(SessionMixin):
             except (OSError, UnicodeDecodeError):
                 continue
 
-            transformed, applied_ids = apply_transforms(content, services=stage_services, iac_tool=self._iac_tool)
+            transformed, applied_ids = apply_transforms(
+                content, services=stage_services, iac_tool=self._iac_tool, stage=stage
+            )
             if applied_ids:
                 full_path.write_text(transformed, encoding="utf-8")
                 all_applied.extend(applied_ids)

@@ -128,6 +128,7 @@ def apply(
     services: list[str] | None = None,
     iac_tool: str | None = None,
     agent_name: str | None = None,
+    stage: dict | None = None,
 ) -> tuple[str, list[str]]:
     """Apply transforms to generated content.
 
@@ -141,6 +142,9 @@ def apply(
         ``"terraform"`` or ``"bicep"``.
     agent_name:
         Agent that generated the content.
+    stage:
+        Stage dict with ``stage`` (number), ``name``, ``dir``, etc.
+        Used by structured handlers that need stage context.
 
     Returns
     -------
@@ -187,7 +191,12 @@ def apply(
         elif tfm.transform_type == "structured" and tfm.handler:
             handler_fn = _STRUCTURED_HANDLERS.get(tfm.handler)
             if handler_fn:
-                new_result = handler_fn(result)
+                import inspect
+
+                if "stage" in inspect.signature(handler_fn).parameters:
+                    new_result = handler_fn(result, stage=stage)
+                else:
+                    new_result = handler_fn(result)
                 if new_result != result:
                     result = new_result
                     applied.append(tfm.id)
@@ -424,11 +433,51 @@ def _add_resource_group_parent_id(content: str) -> str:
     return new_content
 
 
-_STRUCTURED_HANDLERS: dict[str, Callable[[str], str]] = {
+def _fix_state_path(content: str, stage: dict | None = None) -> str:
+    """Fix backend state file path to follow stage-N-slug.tfstate convention.
+
+    Replaces:
+    - ``backend "local" {}`` (empty, defaults to terraform.tfstate)
+    - ``path = "terraform.tfstate"``
+    - ``path = "...terraform.tfstate"`` (wrong path)
+
+    With the correct ``path = "../../../.terraform-state/stage-N-slug.tfstate"``.
+    Requires ``stage`` context to derive the correct path.
+    """
+    if not stage:
+        return content
+
+    stage_num = stage.get("stage")
+    stage_name = stage.get("name", "")
+    if not stage_num or not stage_name:
+        return content
+
+    slug = stage_name.lower().replace(" ", "-")
+    correct_path = f"../../../.terraform-state/stage-{stage_num}-{slug}.tfstate"
+
+    result = content
+
+    # Fix empty backend "local" {} — inject path
+    empty_backend = re.compile(r'backend\s+"local"\s*\{\s*\}', re.DOTALL)
+    if empty_backend.search(result):
+        result = empty_backend.sub(f'backend "local" {{\n    path = "{correct_path}"\n  }}', result)
+        logger.debug("Fixed empty backend local with path %s", correct_path)
+
+    # Fix wrong path values
+    wrong_path = re.compile(r'path\s*=\s*"[^"]*terraform\.tfstate"')
+    if wrong_path.search(result):
+        result = wrong_path.sub(f'path = "{correct_path}"', result)
+        logger.debug("Fixed terraform.tfstate path to %s", correct_path)
+
+    return result
+
+
+_STRUCTURED_HANDLERS: dict[str, Callable] = {
     "remove_unused_remote_state": _remove_unused_remote_state,
     "remove_private_endpoint_resources": _remove_private_endpoint_resources,
     "add_response_export_values": _add_response_export_values,
     "add_resource_group_parent_id": _add_resource_group_parent_id,
+    "fix_state_path": _fix_state_path,
 }
 
 

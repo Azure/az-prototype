@@ -1,0 +1,18 @@
+kind: transform
+domain: iac
+description: Fix backend state file path to follow stage-N-slug.tfstate convention
+last_updated: '2026-04-06'
+transforms:
+- id: TFM-TF-003
+  description: Replace terraform.tfstate with the correct stage-N-slug.tfstate path
+  rationale: Downstream stages reference upstream state via terraform_remote_state with
+    paths following the stage-N-slug.tfstate convention. Using the default terraform.tfstate
+    breaks all cross-stage references silently.
+  applies_to:
+  - terraform-agent
+  targets:
+  - services: []
+  type: structured
+  handler: fix_state_path
+  search: terraform.tfstate or empty backend local
+  replace: stage-N-slug.tfstate
