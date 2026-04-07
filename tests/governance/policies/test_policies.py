@@ -680,7 +680,7 @@ class TestBuiltinPolicies:
 
     def test_builtin_policies_pass_strict_validation(self) -> None:
         """All built-in .policy.yaml files must pass strict validation."""
-        builtin_dir = Path(__file__).resolve().parent.parent / "azext_prototype" / "policies"
+        builtin_dir = Path(__file__).resolve().parent.parent.parent.parent / "azext_prototype" / "policies"
         errors = validate_policy_directory(builtin_dir)
         actual_errors = [e for e in errors if e.severity == "error"]
         warnings = [e for e in errors if e.severity == "warning"]

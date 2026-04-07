@@ -490,7 +490,7 @@ class TestResolveDefinition:
     def test_resolve_known(self):
         from azext_prototype.custom import _resolve_definition
 
-        defs_dir = Path(__file__).resolve().parent.parent / "azext_prototype" / "agents" / "builtin" / "definitions"
+        defs_dir = Path(__file__).resolve().parent.parent.parent / "azext_prototype" / "agents" / "builtin" / "definitions"
         result = _resolve_definition(defs_dir, "example_custom_agent")
         assert result.exists()
 

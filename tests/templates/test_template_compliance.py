@@ -25,9 +25,9 @@ from azext_prototype.templates.validate import (
 # Helpers
 # ------------------------------------------------------------------ #
 
-BUILTIN_DIR = Path(__file__).resolve().parent.parent / "azext_prototype" / "templates" / "workloads"
+BUILTIN_DIR = Path(__file__).resolve().parent.parent.parent / "azext_prototype" / "templates" / "workloads"
 
-BUILTIN_POLICY_DIR = Path(__file__).resolve().parent.parent / "azext_prototype" / "governance" / "policies"
+BUILTIN_POLICY_DIR = Path(__file__).resolve().parent.parent.parent / "azext_prototype" / "governance" / "policies"
 
 
 def _write_yaml(dest: Path, data: dict | list | str) -> Path:

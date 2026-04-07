@@ -17,7 +17,7 @@ from azext_prototype.templates.registry import (
 # Helpers
 # ------------------------------------------------------------------ #
 
-BUILTIN_DIR = Path(__file__).resolve().parent.parent / "azext_prototype" / "templates" / "workloads"
+BUILTIN_DIR = Path(__file__).resolve().parent.parent.parent / "azext_prototype" / "templates" / "workloads"
 
 EXPECTED_BUILTIN_NAMES = sorted(
     [
@@ -669,7 +669,7 @@ class TestServerlessApiTemplate:
 class TestTemplateSchema:
     """Verify the JSON schema file exists and is valid JSON."""
 
-    SCHEMA_PATH = Path(__file__).resolve().parent.parent / "azext_prototype" / "templates" / "template.schema.json"
+    SCHEMA_PATH = Path(__file__).resolve().parent.parent.parent / "azext_prototype" / "templates" / "template.schema.json"
 
     def test_schema_file_exists(self):
         assert self.SCHEMA_PATH.exists()

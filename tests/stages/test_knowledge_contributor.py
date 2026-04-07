@@ -12,6 +12,10 @@ Covers:
 
 from unittest.mock import MagicMock, patch
 
+_KC_MODULE = "azext_prototype.stages.knowledge_contributor"
+_BP_MODULE = "azext_prototype.stages.backlog_push"
+_CUSTOM_MODULE = "azext_prototype.custom"
+
 # ======================================================================
 # _namespace_to_filename
 # ======================================================================
@@ -441,3 +445,154 @@ class TestSubmitIfGap:
 
         result = submit_if_gap({"service": "x", "context": "y"}, MagicMock())
         assert result is None
+
+# --- Additional imports from merged flat test ---
+import pytest
+
+
+# ======================================================================
+# Helpers
+# ======================================================================
+
+
+def _make_finding(**overrides) -> dict:
+    """Create a minimal finding dict with optional overrides."""
+    finding = {
+        "service": "cosmos-db",
+        "type": "Pitfall",
+        "file": "knowledge/services/cosmos-db.md",
+        "section": "Terraform Patterns",
+        "context": "RU throughput must be set to at least 400 for serverless",
+        "rationale": "Setting below 400 causes deployment failure",
+        "content": "minimum_throughput = 400",
+        "source": "QA diagnosis",
+    }
+    finding.update(overrides)
+    return finding
+
+
+def _make_loader(service_content: str = "") -> MagicMock:
+    """Create a mock KnowledgeLoader that returns *service_content*."""
+    loader = MagicMock()
+    loader.load_service.return_value = service_content
+    return loader
+
+
+# ======================================================================
+# TestKnowledgeContributeCommand
+# ======================================================================
+
+
+class TestKnowledgeContributeCommand:
+    """Tests for ``prototype_knowledge_contribute()`` CLI command."""
+
+    def test_draft_mode(self, project_with_config):
+        from azext_prototype.custom import prototype_knowledge_contribute
+
+        cmd = MagicMock()
+        with patch(f"{_CUSTOM_MODULE}._get_project_dir", return_value=str(project_with_config)):
+            result = prototype_knowledge_contribute(
+                cmd,
+                service="cosmos-db",
+                description="RU throughput must be >= 400",
+                draft=True,
+                json_output=True,
+            )
+
+        assert result["status"] == "draft"
+        assert "cosmos-db" in result["title"]
+
+    def test_noninteractive_submit(self, project_with_config):
+        from azext_prototype.custom import prototype_knowledge_contribute
+
+        cmd = MagicMock()
+        with patch(f"{_CUSTOM_MODULE}._get_project_dir", return_value=str(project_with_config)), patch(
+            f"{_BP_MODULE}.subprocess.run"
+        ) as mock_auth, patch(f"{_KC_MODULE}.subprocess.run") as mock_create:
+            mock_auth.return_value = MagicMock(returncode=0)
+            mock_create.return_value = MagicMock(
+                returncode=0,
+                stdout="https://github.com/Azure/az-prototype/issues/55\n",
+            )
+
+            result = prototype_knowledge_contribute(
+                cmd,
+                service="cosmos-db",
+                description="RU throughput must be >= 400",
+                json_output=True,
+            )
+
+        assert result["status"] == "submitted"
+        assert result["url"] == "https://github.com/Azure/az-prototype/issues/55"
+
+    def test_gh_not_authed_raises(self, project_with_config):
+        from knack.util import CLIError
+
+        from azext_prototype.custom import prototype_knowledge_contribute
+
+        cmd = MagicMock()
+        with patch(f"{_CUSTOM_MODULE}._get_project_dir", return_value=str(project_with_config)), patch(
+            f"{_BP_MODULE}.subprocess.run"
+        ) as mock_auth:
+            mock_auth.return_value = MagicMock(returncode=1)
+
+            with pytest.raises(CLIError, match="not authenticated"):
+                prototype_knowledge_contribute(
+                    cmd,
+                    service="cosmos-db",
+                    description="RU throughput",
+                )
+
+    def test_file_input(self, project_with_config):
+        from azext_prototype.custom import prototype_knowledge_contribute
+
+        # Create a finding file
+        finding_file = project_with_config / "finding.md"
+        finding_file.write_text(
+            "Service: cosmos-db\nContext: RU must be >= 400\nContent: min_ru = 400",
+            encoding="utf-8",
+        )
+
+        cmd = MagicMock()
+        with patch(f"{_CUSTOM_MODULE}._get_project_dir", return_value=str(project_with_config)):
+            result = prototype_knowledge_contribute(
+                cmd,
+                file=str(finding_file),
+                draft=True,
+                json_output=True,
+            )
+
+        assert result["status"] == "draft"
+
+    def test_file_not_found_raises(self, project_with_config):
+        from knack.util import CLIError
+
+        from azext_prototype.custom import prototype_knowledge_contribute
+
+        cmd = MagicMock()
+        with patch(f"{_CUSTOM_MODULE}._get_project_dir", return_value=str(project_with_config)):
+            with pytest.raises(CLIError, match="not found"):
+                prototype_knowledge_contribute(
+                    cmd,
+                    file="/nonexistent/path/finding.md",
+                    draft=True,
+                )
+
+    def test_contribution_type_forwarded(self, project_with_config):
+        from azext_prototype.custom import prototype_knowledge_contribute
+
+        cmd = MagicMock()
+        with patch(f"{_CUSTOM_MODULE}._get_project_dir", return_value=str(project_with_config)):
+            result = prototype_knowledge_contribute(
+                cmd,
+                service="redis",
+                description="Cache eviction pitfall",
+                contribution_type="Service pattern update",
+                section="Pitfalls",
+                draft=True,
+                json_output=True,
+            )
+
+        assert result["status"] == "draft"
+        assert "Service pattern update" in result["body"]
+        assert "Pitfalls" in result["body"]
