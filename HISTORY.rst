@@ -28,11 +28,24 @@ QA checklist hardening
 Full stage retry on QA exhaustion
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * **Full stage retry when QA remediation fails** -- when QA remediation
-  exhausts all attempts for a stage, the build retries the entire stage
-  from scratch instead of stopping.  Previous QA findings are injected
-  into the new generation prompt so the model avoids the same classes of
-  mistakes.  Controlled by ``_MAX_FULL_STAGE_ATTEMPTS`` (default 2:
-  1 initial + 1 retry).
+  exhausts all attempts for a stage, the build now retries the entire
+  stage from scratch (clean artifacts, regenerate, QA) instead of
+  stopping the build immediately.  Previous QA findings are injected
+  into the new generation prompt — framed as guidance rather than
+  file-specific instructions — so the model avoids the same classes
+  of mistakes on the fresh attempt.
+
+  In practice, the same generation prompt produces passing code ~90%
+  of the time.  The remaining ~10% failure rate is stochastic — not a
+  systematic prompt deficiency — meaning a fresh generation with
+  knowledge of what went wrong almost always succeeds.  Without this
+  retry, that 10% forces the user to manually re-run the entire build,
+  losing the progress of all previously generated stages.  The retry
+  doubles the token cost of one stage in the worst case, but saves
+  the full cost of restarting a 16-stage build from scratch.
+
+  Controlled by ``_MAX_FULL_STAGE_ATTEMPTS`` (default 2: 1 initial
+  + 1 fresh retry).
 
 Generation prompt improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
