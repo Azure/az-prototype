@@ -25,20 +25,20 @@ MODEL = "Sonnet 4.6"
 PROJECT = "KanFlow Azure POC"
 
 BENCHMARKS = {
-    "B-INST":  {"ghcp": 88, "comp": 85},
-    "B-CNST":  {"ghcp": 82, "comp": 88},
-    "B-TECH":  {"ghcp": 85, "comp": 78},
-    "B-SEC":   {"ghcp": 84, "comp": 86},
-    "B-OPS":   {"ghcp": 95, "comp": 52},
-    "B-DEP":   {"ghcp": 72, "comp": 68},
-    "B-SCOPE": {"ghcp": 76, "comp": 84},
-    "B-QUAL":  {"ghcp": 87, "comp": 78},
-    "B-OUT":   {"ghcp": 88, "comp": 85},
-    "B-CONS":  {"ghcp": 70, "comp": 65},
-    "B-DOC":   {"ghcp": 55, "comp": 82},
-    "B-REL":   {"ghcp": 90, "comp": 93},
-    "B-RBAC":  {"ghcp": 88, "comp": 72},
-    "B-ANTI":  {"ghcp": 74, "comp": 82},
+    "B-INST":  {"ghcp": 80, "comp": 87},
+    "B-CNST":  {"ghcp": 81, "comp": 86},
+    "B-TECH":  {"ghcp": 79, "comp": 84},
+    "B-SEC":   {"ghcp": 88, "comp": 89},
+    "B-OPS":   {"ghcp": 86, "comp": 80},
+    "B-DEP":   {"ghcp": 82, "comp": 82},
+    "B-SCOPE": {"ghcp": 90, "comp": 89},
+    "B-QUAL":  {"ghcp": 77, "comp": 85},
+    "B-OUT":   {"ghcp": 77, "comp": 83},
+    "B-CONS":  {"ghcp": 72, "comp": 80},
+    "B-DOC":   {"ghcp": 74, "comp": 78},
+    "B-REL":   {"ghcp": 79, "comp": 90},
+    "B-RBAC":  {"ghcp": 89, "comp": 83},
+    "B-ANTI":  {"ghcp": 87, "comp": 87},
 }
 
 BENCHMARK_NAMES = {
@@ -77,20 +77,20 @@ FACTOR_WEIGHTS = {
 }
 
 FACTORS = {
-    "B-INST":  {"ghcp": [27,18,18,15,10], "comp": [26,20,17,13,9]},
-    "B-CNST":  {"ghcp": [28,27,12,5,10],  "comp": [35,28,12,8,5]},
-    "B-TECH":  {"ghcp": [23,23,18,12,9],  "comp": [20,22,16,8,12]},
-    "B-SEC":   {"ghcp": [22,25,14,13,10], "comp": [25,22,18,12,9]},
-    "B-OPS":   {"ghcp": [25,20,20,18,12], "comp": [5,17,10,5,15]},
-    "B-DEP":   {"ghcp": [15,20,15,12,10], "comp": [18,12,15,13,10]},
-    "B-SCOPE": {"ghcp": [25,15,16,10,10], "comp": [30,22,12,10,10]},
-    "B-QUAL":  {"ghcp": [23,18,18,13,15], "comp": [20,17,16,8,17]},
-    "B-OUT":   {"ghcp": [32,20,18,10,8],  "comp": [30,20,17,12,6]},
-    "B-CONS":  {"ghcp": [18,15,8,17,12],  "comp": [10,12,12,18,13]},
-    "B-DOC":   {"ghcp": [10,12,10,10,13], "comp": [22,22,16,12,10]},
-    "B-REL":   {"ghcp": [28,25,20,17],    "comp": [28,25,22,18]},
-    "B-RBAC":  {"ghcp": [28,20,18,12,10], "comp": [18,12,18,14,10]},
-    "B-ANTI":  {"ghcp": [22,16,12,14,10], "comp": [25,18,15,10,14]},
+    "B-INST":  {"ghcp": [24,20,16,12,8],  "comp": [26,22,17,13,9]},
+    "B-CNST":  {"ghcp": [28,25,12,8,8],   "comp": [30,26,13,9,8]},
+    "B-TECH":  {"ghcp": [20,20,16,12,11], "comp": [21,21,17,13,12]},
+    "B-SEC":   {"ghcp": [22,22,18,14,12], "comp": [22,22,18,14,13]},
+    "B-OPS":   {"ghcp": [22,17,17,17,13], "comp": [20,16,16,16,12]},
+    "B-DEP":   {"ghcp": [25,20,16,12,9],  "comp": [25,20,16,12,9]},
+    "B-SCOPE": {"ghcp": [32,22,18,9,9],   "comp": [31,22,18,9,9]},
+    "B-QUAL":  {"ghcp": [19,15,15,12,16], "comp": [21,17,17,13,17]},
+    "B-OUT":   {"ghcp": [27,15,15,12,8],  "comp": [29,17,17,12,8]},
+    "B-CONS":  {"ghcp": [18,14,14,14,12], "comp": [20,16,16,16,12]},
+    "B-DOC":   {"ghcp": [18,18,15,12,11], "comp": [19,20,16,12,11]},
+    "B-REL":   {"ghcp": [24,20,20,15],    "comp": [27,23,22,18]},
+    "B-RBAC":  {"ghcp": [27,18,18,14,12], "comp": [25,17,17,13,11]},
+    "B-ANTI":  {"ghcp": [22,17,17,17,14], "comp": [22,17,17,17,14]},
 }
 
 IMPROVEMENTS = {
@@ -152,20 +152,24 @@ IMPROVEMENTS = {
 }
 
 CONCLUSION = (
-    "This initial benchmark establishes baseline scores for GitHub Copilot (GHCP) and Claude Code "
-    "across 14 quality dimensions. GHCP leads overall with an average of 81.0 versus Claude Code's "
-    "78.4, winning 8 of 14 benchmarks. GHCP's strongest areas are Operational Readiness (B-OPS: 95) "
-    "and RBAC Architecture (B-RBAC: 88), driven by production-grade deploy.sh scripts and correct "
-    "use of Cosmos DB native RBAC with deterministic uuidv5() naming. Claude Code's strongest areas "
-    "are Response Reliability (B-REL: 93) and Constraint Compliance (B-CNST: 88), reflecting strict "
-    "adherence to NEVER directives and consistent response completeness.\n\n"
-    "Root cause analysis identified two critical issues in the prompt pipeline that disproportionately "
-    "affect GHCP scores: (1) a constraint on line 36 of terraform_agent.py that instructed the model "
-    "to place tags inside the body block, causing tag placement failures across 11 of 14 stages, and "
-    "(2) a max_tokens limit of 4,096 on the documentation agent, causing Stage 14 to truncate "
-    "mid-response. Both have been fixed. Additional improvements to scope enforcement, provider "
-    "hygiene, NEVER directive hierarchy, and deploy.sh templates are projected to raise GHCP's "
-    "average to approximately 93 and Claude Code's to approximately 88 in subsequent runs."
+    "This second benchmark run (0.2.1b7) shows Claude Code overtaking GHCP overall with an average "
+    "of 84.5 versus GHCP's 82.2, winning 10 of 14 benchmarks. Claude Code's strongest areas are "
+    "Response Reliability (B-REL: 90), Security Posture (B-SEC: 89), and Instruction Adherence "
+    "(B-INST: 87), reflecting complete responses with correct language compliance and strong policy "
+    "adherence across all stage types. GHCP's strongest areas remain Scope Discipline (B-SCOPE: 90), "
+    "RBAC Architecture (B-RBAC: 89), and Security Posture (B-SEC: 88).\n\n"
+    "The most significant finding is the divergence by stage type. GHCP wins stages 8-15 (middle-to-late "
+    "IaC) with stronger governance policy compliance and more complete deploy.sh scripts. However, GHCP "
+    "suffers catastrophic failures on application code stages (16-18): the React SPA produced only 3 of "
+    "30+ required files, the API was generated in Python instead of the required C#, and the Worker was "
+    "truncated to 4 files. Claude Code delivered complete, buildable projects for all three. Additionally, "
+    "Claude Code wins early IaC stages (1-7) with superior cross-stage consistency.\n\n"
+    "Key improvements since the previous run: QA checklist hardening (response_export_values, deploy.sh "
+    "-state= flag, UUID hex validation), front-loaded remote state directive, and full stage retry on QA "
+    "exhaustion. GHCP's B-DOC improved from 55 to 74 (+19) and B-SCOPE from 76 to 90 (+14), while "
+    "Claude Code's B-OPS improved from 52 to 80 (+28) and B-CONS from 65 to 80 (+15). The recurring "
+    "Claude Code issue of wrong provider source (Azure/azapi vs hashicorp/azapi) and deprecated "
+    "terraform output -state= flag in deploy.sh remain areas for prompt pipeline improvement."
 )
 
 
@@ -198,11 +202,19 @@ def generate_overall_trend_chart():
     fig, ax = plt.subplots(figsize=(7.0, 2.2), dpi=150)
     _style_chart(fig, ax)
 
-    # Build history from BENCHMARK_HISTORY (currently single point, grows with runs)
-    dates = [DATE]
+    # Build history from BENCHMARK_HISTORY
+    prev_ghcp = {"B-INST":88,"B-CNST":82,"B-TECH":85,"B-SEC":84,"B-OPS":95,"B-DEP":72,
+                 "B-SCOPE":76,"B-QUAL":87,"B-OUT":88,"B-CONS":70,"B-DOC":55,"B-REL":90,
+                 "B-RBAC":88,"B-ANTI":74}
+    prev_cc = {"B-INST":85,"B-CNST":88,"B-TECH":78,"B-SEC":86,"B-OPS":52,"B-DEP":68,
+               "B-SCOPE":84,"B-QUAL":78,"B-OUT":85,"B-CONS":65,"B-DOC":82,"B-REL":93,
+               "B-RBAC":72,"B-ANTI":82}
     bids = list(BENCHMARKS.keys())
-    ghcp_avgs = [sum(BENCHMARKS[b]["ghcp"] for b in bids) / len(bids)]
-    cc_avgs = [sum(BENCHMARKS[b]["comp"] for b in bids) / len(bids)]
+    dates = ["2026-03-30", DATE]
+    ghcp_avgs = [sum(prev_ghcp[b] for b in bids) / len(bids),
+                 sum(BENCHMARKS[b]["ghcp"] for b in bids) / len(bids)]
+    cc_avgs = [sum(prev_cc[b] for b in bids) / len(bids),
+               sum(BENCHMARKS[b]["comp"] for b in bids) / len(bids)]
 
     ax.plot(dates, ghcp_avgs, "o-", color=GHCP_COLOR, markersize=5, linewidth=2,
             label="GHCP", zorder=3)
@@ -273,9 +285,15 @@ def generate_trend_chart(bid):
     fig, ax = plt.subplots(figsize=(7.0, 1.5), dpi=150)
     _style_chart(fig, ax)
 
-    dates = [DATE]
-    ghcp_val = [BENCHMARKS[bid]["ghcp"]]
-    cc_val = [BENCHMARKS[bid]["comp"]]
+    prev_ghcp = {"B-INST":88,"B-CNST":82,"B-TECH":85,"B-SEC":84,"B-OPS":95,"B-DEP":72,
+                 "B-SCOPE":76,"B-QUAL":87,"B-OUT":88,"B-CONS":70,"B-DOC":55,"B-REL":90,
+                 "B-RBAC":88,"B-ANTI":74}
+    prev_cc = {"B-INST":85,"B-CNST":88,"B-TECH":78,"B-SEC":86,"B-OPS":52,"B-DEP":68,
+               "B-SCOPE":84,"B-QUAL":78,"B-OUT":85,"B-CONS":65,"B-DOC":82,"B-REL":93,
+               "B-RBAC":72,"B-ANTI":82}
+    dates = ["2026-03-30", DATE]
+    ghcp_val = [prev_ghcp[bid], BENCHMARKS[bid]["ghcp"]]
+    cc_val = [prev_cc[bid], BENCHMARKS[bid]["comp"]]
 
     ax.plot(dates, ghcp_val, "o-", color=GHCP_COLOR, markersize=5, label="GHCP", zorder=3)
     ax.plot(dates, cc_val, "o-", color=CC_COLOR, markersize=5, label="Claude Code", zorder=3)

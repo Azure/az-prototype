@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Benchmark Run: 2026-04-08 14:40:57</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    body{font-family:'Inter',sans-serif}
+    .gradient-bg{background:linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#0f172a 100%)}
+    .card{background:rgba(30,41,59,.8);border:1px solid rgba(71,85,105,.4)}
+    .tab-btn{transition:all .15s}
+    .tab-btn.active{background:#1e293b;color:#f8fafc;border-bottom:2px solid #8b5cf6}
+    .tab-btn:not(.active){color:#94a3b8}
+    .tab-btn:not(.active):hover{color:#cbd5e1;background:rgba(30,41,59,.4)}
+    .tab-content{display:none}.tab-content.active{display:block}
+    .cp-bar{background:#3b82f6}.cc-bar{background:#f97316}
+    pre{font-size:.7rem;overflow-x:auto}
+    @media print{.no-print{display:none}}
+  </style>
+</head>
+<body class="gradient-bg text-gray-100 min-h-screen">
+
+<header class="max-w-[1400px] mx-auto px-6 pt-8 pb-4">
+  <div class="flex items-end justify-between flex-wrap gap-4">
+    <div>
+      <h1 class="text-2xl font-extrabold tracking-tight">
+        <span class="text-blue-400">GitHub Copilot</span>
+        <span class="text-gray-500 mx-2">vs</span>
+        <span class="text-orange-400">Claude Code</span>
+      </h1>
+      <p class="text-gray-400 mt-1 text-xs">Benchmark Run &mdash; <span id="runDate"></span></p>
+    </div>
+    <div class="text-right text-[10px] text-gray-500 leading-relaxed">
+      <p>Project: <span id="projectName"></span></p>
+      <p>Model: <span id="modelName"></span></p>
+      <p>Stages won &mdash; GHCP: <span id="ghcpWins"></span> &bull; Claude Code: <span id="ccWins"></span></p>
+    </div>
+  </div>
+</header>
+
+<!-- Tab navigation -->
+<nav class="max-w-[1400px] mx-auto px-6 overflow-x-auto no-print">
+  <div class="flex gap-0.5 border-b border-slate-700 min-w-max" id="tabNav"></div>
+</nav>
+
+<main class="max-w-[1400px] mx-auto px-6 py-6">
+
+<!-- OVERVIEW TAB -->
+<div class="tab-content active" id="tab-overview">
+
+  <!-- Project Summary -->
+  <section class="mb-6">
+    <div class="card rounded-xl p-5">
+      <h2 class="text-sm font-bold text-gray-200 mb-2">Project: <span class="projectNameInline"></span></h2>
+      <p class="text-xs text-gray-400" id="projectSummary"></p>
+    </div>
+  </section>
+
+  <!-- Benchmark Scores Table -->
+  <section class="mb-6">
+    <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-purple-500 rounded-full inline-block"></span>Benchmark Scores</h2>
+    <div class="card rounded-xl overflow-hidden">
+      <table class="w-full text-xs">
+        <thead><tr class="bg-slate-800">
+          <th class="px-3 py-2 text-left text-gray-300">Benchmark</th>
+          <th class="px-3 py-2 text-left text-gray-300">Description</th>
+          <th class="px-3 py-2 text-center text-blue-400">GHCP</th>
+          <th class="px-3 py-2 text-center text-orange-400">Claude Code</th>
+          <th class="px-3 py-2 text-center text-gray-300">Delta</th>
+          <th class="px-3 py-2 text-center text-gray-300">Winner</th>
+        </tr></thead>
+        <tbody class="divide-y divide-slate-700" id="benchmarkTable"></tbody>
+        <tfoot><tr class="bg-slate-800 font-bold text-sm">
+          <td class="px-3 py-2" colspan="2">Overall Average</td>
+          <td class="px-3 py-2 text-center text-blue-400" id="ghcpAvg"></td>
+          <td class="px-3 py-2 text-center text-orange-400" id="compAvg"></td>
+          <td class="px-3 py-2 text-center" id="deltaAvg"></td>
+          <td class="px-3 py-2 text-center" id="overallWinner"></td>
+        </tr></tfoot>
+      </table>
+    </div>
+  </section>
+
+  <!-- Aggregate Scores by Stage -->
+  <section class="mb-6">
+    <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-green-500 rounded-full inline-block"></span>Aggregate Scores by Stage</h2>
+    <div class="card rounded-xl overflow-hidden">
+      <table class="w-full text-xs">
+        <thead><tr class="bg-slate-800">
+          <th class="px-3 py-2 text-left text-gray-300">Stage</th>
+          <th class="px-3 py-2 text-left text-gray-300">Service</th>
+          <th class="px-3 py-2 text-center text-blue-400">GHCP</th>
+          <th class="px-3 py-2 text-center text-orange-400">Claude Code</th>
+          <th class="px-3 py-2 text-center text-gray-300">Winner</th>
+        </tr></thead>
+        <tbody class="divide-y divide-slate-700" id="stageTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Systematic Strengths & Weaknesses -->
+  <section class="mb-6 grid md:grid-cols-2 gap-4" id="patternsSection"></section>
+
+  <!-- Critical Bugs -->
+  <section class="mb-6" id="bugsSection"></section>
+
+  <!-- Dimension Winners Heatmap -->
+  <section class="mb-6" id="heatmapSection"></section>
+
+  <!-- Final Verdict -->
+  <section class="mb-6">
+    <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-amber-500 rounded-full inline-block"></span>Final Verdict</h2>
+    <div class="card rounded-xl p-6">
+      <div class="grid md:grid-cols-2 gap-6 mb-5">
+        <div class="text-center">
+          <div class="text-4xl font-extrabold text-blue-400" id="verdictGhcp"></div>
+          <div class="text-sm text-blue-300 font-semibold mt-1">GitHub Copilot</div>
+          <p class="text-[10px] text-gray-500" id="verdictGhcpSub"></p>
+        </div>
+        <div class="text-center">
+          <div class="text-4xl font-extrabold text-orange-400" id="verdictComp"></div>
+          <div class="text-sm text-orange-300 font-semibold mt-1">Claude Code</div>
+          <p class="text-[10px] text-gray-500" id="verdictCompSub"></p>
+        </div>
+      </div>
+      <div class="bg-slate-700/30 rounded-lg p-4 text-sm text-gray-300 space-y-2" id="verdictText"></div>
+    </div>
+  </section>
+
+</div><!-- /overview -->
+
+</main>
+
+<footer class="max-w-[1400px] mx-auto px-6 pb-8 text-center text-[10px] text-gray-600">
+  <p>Benchmark Suite v1.0</p>
+</footer>
+
+<!-- ============================================================
+  DATA SECTION
+============================================================ -->
+<script>
+// ---- METADATA ----
+const META = {
+  date: "2026-04-08 14:40:57",
+  project: "KanFlow Azure POC",
+  model: "Claude Sonnet 4.6 (via GitHub Copilot) vs Claude Opus 4.6 (Claude Code)",
+  summary: "19-stage benchmark comparing GitHub Copilot (Claude Sonnet 4.6) and Claude Code (Claude Opus 4.6) across infrastructure (Terraform + azapi), application code (.NET/React), and documentation generation for the KanFlow Azure POC. Stages 1-15 cover IaC generation, stages 16-18 cover application code, and stage 19 covers documentation.",
+  ghcpWins: 0,
+  ccWins: 0,
+};
+
+// ---- BENCHMARK SCORES (averaged across all stages) ----
+const benchmarks = [
+  {id:"B-INST",name:"Instruction Adherence",ghcp:78.2,comp:87.5,desc:"Following prompt requirements exactly"},
+  {id:"B-CNST",name:"Constraint Compliance",ghcp:80.6,comp:85.8,desc:"NEVER/MUST directive adherence"},
+  {id:"B-TECH",name:"Technical Correctness",ghcp:78.7,comp:84.1,desc:"Syntax validity, API versions, runtime viability"},
+  {id:"B-SEC",name:"Security Posture",ghcp:87.6,comp:88.2,desc:"MI, RBAC, encryption, network controls"},
+  {id:"B-OPS",name:"Operational Readiness",ghcp:85.1,comp:81.3,desc:"deploy.sh completeness and quality"},
+  {id:"B-DEP",name:"Dependency Hygiene",ghcp:81.0,comp:81.3,desc:"Minimal, correct, consistent dependencies"},
+  {id:"B-SCOPE",name:"Scope Discipline",ghcp:89.3,comp:88.2,desc:"No over/under engineering"},
+  {id:"B-QUAL",name:"Code Quality",ghcp:77.9,comp:85.7,desc:"Organization, naming, idioms, validation"},
+  {id:"B-OUT",name:"Output Completeness",ghcp:76.6,comp:83.6,desc:"All required interfaces exported"},
+  {id:"B-CONS",name:"Cross-Stage Consistency",ghcp:69.7,comp:79.4,desc:"Uniform patterns across stages"},
+  {id:"B-DOC",name:"Documentation Quality",ghcp:74.9,comp:77.7,desc:"Design docs, rationale, actionability"},
+  {id:"B-REL",name:"Response Reliability",ghcp:79.2,comp:89.3,desc:"Complete, parseable, hallucination-free"},
+  {id:"B-RBAC",name:"RBAC & Identity",ghcp:87.7,comp:82.1,desc:"Correct mechanisms, deterministic names"},
+  {id:"B-ANTI",name:"Anti-Pattern Absence",ghcp:86.3,comp:86.1,desc:"No known bad patterns"},
+];
+
+// ---- PER-STAGE DATA ----
+const stages = [
+  {n:1, name:"Managed Identity", ghcp:95.6, comp:95.6, winner:"ghcp",
+   dims:[
+     ["Policy Compliance","CNST:98, ANTI:100 — perfect","CNST:98, ANTI:100 — perfect","T"],
+     ["deploy.sh Quality","OPS:95 — comprehensive preflight","OPS:95 — comprehensive preflight","T"],
+     ["RBAC Implementation","RBAC:95 — correct MI setup","RBAC:95 — correct MI setup","T"],
+     ["Remote State Hygiene","DEP:95, CONS:95 — consistent backend","DEP:95, CONS:95 — consistent backend","T"],
+     ["Output Completeness","OUT:95 — all interfaces exported","OUT:95 — all interfaces exported","T"],
+     ["Security Controls","SEC:95 — MI-first approach","SEC:95 — MI-first approach","T"],
+     ["Code Completeness","INST:95, QUAL:92, REL:98","INST:95, QUAL:93, REL:98","T"],
+     ["Cross-Stage Consistency","CONS:95 — uniform patterns","CONS:95 — uniform patterns","T"]
+   ],
+   notes:"Both tools produce nearly identical output for this foundational stage. Managed Identity is well-documented and both tools handle it correctly."},
+
+  {n:2, name:"Log Analytics", ghcp:93.7, comp:94.3, winner:"cc",
+   dims:[
+     ["Policy Compliance","CNST:95, ANTI:100","CNST:95, ANTI:100","T"],
+     ["deploy.sh Quality","OPS:93","OPS:95 — slightly more thorough","C"],
+     ["RBAC Implementation","RBAC:95","RBAC:95","T"],
+     ["Remote State Hygiene","DEP:95, CONS:95","DEP:95, CONS:95","T"],
+     ["Output Completeness","OUT:93","OUT:95","C"],
+     ["Security Controls","SEC:92","SEC:92","T"],
+     ["Code Completeness","INST:93, QUAL:90, REL:95","INST:93, QUAL:92, REL:95","C"],
+     ["Cross-Stage Consistency","CONS:95","CONS:95","T"]
+   ],
+   notes:"Claude Code edges ahead with marginally better code quality and output completeness. Both tools handle Log Analytics well."},
+
+  {n:3, name:"Application Insights", ghcp:78.4, comp:94.1, winner:"cc",
+   dims:[
+     ["Policy Compliance","CNST:88, ANTI:95","CNST:95, ANTI:100 — perfect compliance","C"],
+     ["deploy.sh Quality","OPS:65 — missing response_export_values","OPS:92 — complete with exports","C"],
+     ["RBAC Implementation","RBAC:95","RBAC:95","T"],
+     ["Remote State Hygiene","DEP:60, CONS:45 — inconsistent backend","DEP:95, CONS:95 — consistent","C"],
+     ["Output Completeness","OUT:80 — missing exports","OUT:92 — complete","C"],
+     ["Security Controls","SEC:90","SEC:95","C"],
+     ["Code Completeness","INST:82, QUAL:70, REL:85","INST:93, QUAL:90, REL:95","C"],
+     ["Cross-Stage Consistency","CONS:45 — significant drift","CONS:95 — uniform","C"]
+   ],
+   notes:"Copilot's first major stumble: missing <code>response_export_values</code> on azapi resources and inconsistent backend configuration. Claude Code maintains consistency from stages 1-2."},
+
+  {n:4, name:"Networking", ghcp:82.2, comp:88.9, winner:"cc",
+   dims:[
+     ["Policy Compliance","CNST:85, ANTI:90","CNST:90, ANTI:95","C"],
+     ["deploy.sh Quality","OPS:88","OPS:92","C"],
+     ["RBAC Implementation","RBAC:95","RBAC:95","T"],
+     ["Remote State Hygiene","DEP:70, CONS:50 — wrong provider source","DEP:85, CONS:85","C"],
+     ["Output Completeness","OUT:90","OUT:92","C"],
+     ["Security Controls","SEC:88","SEC:85","B"],
+     ["Code Completeness","INST:88, QUAL:82, REL:80","INST:90, QUAL:88, REL:88","C"],
+     ["Cross-Stage Consistency","CONS:50 — Azure/azapi wrong source","CONS:85 — consistent","C"]
+   ],
+   notes:"Copilot uses <code>Azure/azapi</code> instead of <code>hashicorp/azapi</code>, causing terraform init failures. Cross-stage consistency drops significantly."},
+
+  {n:5, name:"Container Registry", ghcp:74.9, comp:91.7, winner:"cc",
+   dims:[
+     ["Policy Compliance","CNST:78, ANTI:88 — tags inside body","CNST:92, ANTI:95","C"],
+     ["deploy.sh Quality","OPS:68 — dummy GUID for CI/CD","OPS:93","C"],
+     ["RBAC Implementation","RBAC:85 — dummy identity GUID","RBAC:92 — deterministic","C"],
+     ["Remote State Hygiene","DEP:55, CONS:40 — significant drift","DEP:88, CONS:82","C"],
+     ["Output Completeness","OUT:75","OUT:90","C"],
+     ["Security Controls","SEC:90","SEC:95","C"],
+     ["Code Completeness","INST:80, QUAL:72, REL:82","INST:92, QUAL:90, REL:92","C"],
+     ["Cross-Stage Consistency","CONS:40 — worst consistency score","CONS:82","C"]
+   ],
+   notes:"Copilot puts tags inside azapi body (wrong), uses dummy GUIDs for CI/CD identity, and shows worst cross-stage consistency score of any stage."},
+
+  {n:6, name:"Key Vault", ghcp:90.3, comp:93.1, winner:"cc",
+   dims:[
+     ["Policy Compliance","CNST:95, ANTI:92","CNST:95, ANTI:95","C"],
+     ["deploy.sh Quality","OPS:92","OPS:95","C"],
+     ["RBAC Implementation","RBAC:78 — access policy instead of RBAC","RBAC:92 — correct RBAC model","C"],
+     ["Remote State Hygiene","DEP:90, CONS:85","DEP:92, CONS:90","C"],
+     ["Output Completeness","OUT:90","OUT:92","C"],
+     ["Security Controls","SEC:95","SEC:95","T"],
+     ["Code Completeness","INST:92, QUAL:90, REL:95","INST:95, QUAL:92, REL:95","C"],
+     ["Cross-Stage Consistency","CONS:85","CONS:90","C"]
+   ],
+   notes:"Both produce strong Key Vault modules, but Copilot uses legacy access policies instead of RBAC for Key Vault, which conflicts with governance rules."},
+
+  {n:7, name:"Azure SQL", ghcp:79.4, comp:90.3, winner:"cc",
+   dims:[
+     ["Policy Compliance","CNST:85, ANTI:75 — SQL Contributor wrong layer","CNST:92, ANTI:90","C"],
+     ["deploy.sh Quality","OPS:88","OPS:90","C"],
+     ["RBAC Implementation","RBAC:65 — SQL Contributor at wrong scope","RBAC:85","C"],
+     ["Remote State Hygiene","DEP:70, CONS:60 — azurerm backend inconsistency","DEP:90, CONS:90","C"],
+     ["Output Completeness","OUT:82","OUT:90","C"],
+     ["Security Controls","SEC:90","SEC:92","C"],
+     ["Code Completeness","INST:88, QUAL:82, REL:90","INST:92, QUAL:90, REL:95","C"],
+     ["Cross-Stage Consistency","CONS:60 — backend type mismatch","CONS:90 — consistent","C"]
+   ],
+   notes:"Copilot assigns SQL Contributor role at wrong layer, uses azurerm backend inconsistently, and references Stage 4 remote state violating networking boundary. Claude Code maintains clean separation."},
+
+  {n:8, name:"Cosmos DB", ghcp:89.0, comp:79.5, winner:"ghcp",
+   dims:[
+     ["Policy Compliance","CNST:92, ANTI:90","CNST:85, ANTI:78 — Azure/azapi wrong source","B"],
+     ["deploy.sh Quality","OPS:85","OPS:72","B"],
+     ["RBAC Implementation","RBAC:90","RBAC:85","B"],
+     ["Remote State Hygiene","DEP:85, CONS:90","DEP:65, CONS:60 — wrong provider","B"],
+     ["Output Completeness","OUT:90","OUT:85","B"],
+     ["Security Controls","SEC:95","SEC:92","B"],
+     ["Code Completeness","INST:92, QUAL:85, REL:92","INST:90, QUAL:80, REL:85","B"],
+     ["Cross-Stage Consistency","CONS:90","CONS:60 — drift begins","B"]
+   ],
+   notes:"Inflection point: Claude Code starts using <code>Azure/azapi</code> (wrong provider source) and consistency degrades. Copilot produces clean, well-structured Cosmos DB module."},
+
+  {n:9, name:"Redis Cache", ghcp:86.4, comp:76.9, winner:"ghcp",
+   dims:[
+     ["Policy Compliance","CNST:90, ANTI:82","CNST:80, ANTI:72 — continuing errors","B"],
+     ["deploy.sh Quality","OPS:88","OPS:78 — deprecated -state= flag","B"],
+     ["RBAC Implementation","RBAC:85","RBAC:80","B"],
+     ["Remote State Hygiene","DEP:88, CONS:88","DEP:80, CONS:70 — wrong provider persists","B"],
+     ["Output Completeness","OUT:88","OUT:75","B"],
+     ["Security Controls","SEC:88","SEC:75","B"],
+     ["Code Completeness","INST:88, QUAL:85, REL:90","INST:82, QUAL:78, REL:82","B"],
+     ["Cross-Stage Consistency","CONS:88","CONS:70","B"]
+   ],
+   notes:"Claude Code continues <code>Azure/azapi</code> error and introduces deprecated <code>terraform output -state=</code> flag. Copilot stable and consistent here."},
+
+  {n:10, name:"Blob Storage", ghcp:88.6, comp:72.5, winner:"ghcp",
+   dims:[
+     ["Policy Compliance","CNST:90, ANTI:90","CNST:78, ANTI:68 — random_uuid for RBAC","B"],
+     ["deploy.sh Quality","OPS:90","OPS:75 — deprecated flags","B"],
+     ["RBAC Implementation","RBAC:85","RBAC:60 — random_uuid instead of uuidv5","B"],
+     ["Remote State Hygiene","DEP:88, CONS:88","DEP:60, CONS:55 — boundary violation","B"],
+     ["Output Completeness","OUT:90","OUT:78","B"],
+     ["Security Controls","SEC:92","SEC:85","B"],
+     ["Code Completeness","INST:90, QUAL:88, REL:92","INST:82, QUAL:78, REL:80","B"],
+     ["Cross-Stage Consistency","CONS:88","CONS:55 — worst CC consistency","B"]
+   ],
+   notes:"Claude Code's worst IaC stage: <code>random_uuid</code> for RBAC names (non-deterministic), Stage 4 remote state boundary violation, wrong provider source. Copilot clean."},
+
+  {n:11, name:"Service Bus", ghcp:88.8, comp:72.5, winner:"ghcp",
+   dims:[
+     ["Policy Compliance","CNST:92, ANTI:90","CNST:62, ANTI:72 — Standard SKU violates NEVER","B"],
+     ["deploy.sh Quality","OPS:82","OPS:55 — deprecated -state= and missing exports","B"],
+     ["RBAC Implementation","RBAC:88","RBAC:60 — missing assignments","B"],
+     ["Remote State Hygiene","DEP:88, CONS:85","DEP:75, CONS:72","B"],
+     ["Output Completeness","OUT:88","OUT:78","B"],
+     ["Security Controls","SEC:95","SEC:85","B"],
+     ["Code Completeness","INST:90, QUAL:90, REL:92","INST:72, QUAL:75, REL:85","B"],
+     ["Cross-Stage Consistency","CONS:85","CONS:72","B"]
+   ],
+   notes:"Claude Code uses Standard SKU for Service Bus violating a NEVER directive (must use Premium for POC), missing response_export_values. Copilot strong policy compliance."},
+
+  {n:12, name:"Container Apps Environment", ghcp:89.5, comp:78.7, winner:"ghcp",
+   dims:[
+     ["Policy Compliance","CNST:90, ANTI:88","CNST:88, ANTI:82 — missing UAMI","B"],
+     ["deploy.sh Quality","OPS:85","OPS:62 — deprecated flags persist","B"],
+     ["RBAC Implementation","RBAC:90","RBAC:65 — missing UAMI + AcrPull","B"],
+     ["Remote State Hygiene","DEP:90, CONS:88","DEP:80, CONS:78","B"],
+     ["Output Completeness","OUT:92","OUT:72 — missing exports","B"],
+     ["Security Controls","SEC:88","SEC:82","B"],
+     ["Code Completeness","INST:92, QUAL:92, REL:95","INST:80, QUAL:82, REL:85","B"],
+     ["Cross-Stage Consistency","CONS:88","CONS:78","B"]
+   ],
+   notes:"Claude Code missing User-Assigned Managed Identity and AcrPull role assignment for container environment. Copilot comprehensive with all companion resources."},
+
+  {n:13, name:"SignalR Service", ghcp:89.7, comp:78.9, winner:"ghcp",
+   dims:[
+     ["Policy Compliance","CNST:90, ANTI:90","CNST:80, ANTI:80 — Free SKU","B"],
+     ["deploy.sh Quality","OPS:88","OPS:82","B"],
+     ["RBAC Implementation","RBAC:90","RBAC:75 — missing assignments","B"],
+     ["Remote State Hygiene","DEP:88, CONS:88","DEP:60, CONS:72","B"],
+     ["Output Completeness","OUT:92","OUT:78 — missing response_export_values","B"],
+     ["Security Controls","SEC:92","SEC:88","B"],
+     ["Code Completeness","INST:90, QUAL:90, REL:92","INST:82, QUAL:82, REL:88","B"],
+     ["Cross-Stage Consistency","CONS:88","CONS:72","B"]
+   ],
+   notes:"Claude Code uses Free SKU for SignalR (should be Standard/Premium for POC), missing response_export_values. Copilot correct SKU and complete."},
+
+  {n:14, name:"API Container App", ghcp:88.7, comp:75.2, winner:"ghcp",
+   dims:[
+     ["Policy Compliance","CNST:88, ANTI:88","CNST:70, ANTI:75 — missing exports","B"],
+     ["deploy.sh Quality","OPS:85","OPS:62 — deprecated -state= flag","B"],
+     ["RBAC Implementation","RBAC:92","RBAC:72","B"],
+     ["Remote State Hygiene","DEP:85, CONS:88","DEP:75, CONS:70","B"],
+     ["Output Completeness","OUT:90","OUT:78 — missing response_export_values","B"],
+     ["Security Controls","SEC:90","SEC:80","B"],
+     ["Code Completeness","INST:90, QUAL:92, REL:90","INST:82, QUAL:78, REL:82","B"],
+     ["Cross-Stage Consistency","CONS:88","CONS:70","B"]
+   ],
+   notes:"Claude Code continues deprecated terraform output -state= flag pattern and missing response_export_values. Copilot produces complete, well-structured container app config."},
+
+  {n:15, name:"Worker Container App", ghcp:90.1, comp:86.9, winner:"ghcp",
+   dims:[
+     ["Policy Compliance","CNST:90, ANTI:90","CNST:88, ANTI:88","B"],
+     ["deploy.sh Quality","OPS:85","OPS:82","B"],
+     ["RBAC Implementation","RBAC:88","RBAC:85","B"],
+     ["Remote State Hygiene","DEP:88, CONS:88","DEP:85, CONS:85","B"],
+     ["Output Completeness","OUT:90","OUT:88","B"],
+     ["Security Controls","SEC:90","SEC:88","B"],
+     ["Code Completeness","INST:92, QUAL:92, REL:92","INST:90, QUAL:88, REL:90","B"],
+     ["Cross-Stage Consistency","CONS:88","CONS:85","B"]
+   ],
+   notes:"Closest Copilot-winning IaC stage. Claude Code recovers somewhat but Copilot maintains its edge with slightly higher scores across all dimensions."},
+
+  {n:16, name:"React SPA", ghcp:25.8, comp:83.8, winner:"cc",
+   dims:[
+     ["Policy Compliance","CNST:20, ANTI:60 — 3 files out of 30+","CNST:90, ANTI:90 — complete project","C"],
+     ["Output Completeness","OUT:10 — catastrophically incomplete","OUT:75 — all major components","C"],
+     ["Security Controls","SEC:55 — minimal","SEC:90 — auth + RBAC patterns","C"],
+     ["Code Completeness","INST:18, QUAL:15, REL:10 — truncated","INST:88, QUAL:90, REL:92 — full app","C"],
+     ["Cross-Stage Consistency","CONS:30 — cannot assess","CONS:80 — aligns with API","C"]
+   ],
+   notes:"Copilot's worst stage: only 3 files generated out of 30+ required. Response truncated catastrophically. Claude Code produces a complete, buildable React SPA with routing, auth, SignalR integration."},
+
+  {n:17, name:"API Application", ghcp:68.2, comp:81.9, winner:"cc",
+   dims:[
+     ["Policy Compliance","CNST:55, ANTI:80 — wrong language","CNST:85, ANTI:85 — correct C#","C"],
+     ["Output Completeness","OUT:65 — functional but wrong lang","OUT:80 — complete .NET API","C"],
+     ["Security Controls","SEC:82 — decent patterns","SEC:88 — MI + RBAC","C"],
+     ["Code Completeness","INST:60, QUAL:78, REL:75 — Python not C#","INST:88, QUAL:88, REL:90 — correct C#","C"],
+     ["Cross-Stage Consistency","CONS:50 — language mismatch","CONS:75 — consistent .NET","C"]
+   ],
+   notes:"Copilot generates the API in Python instead of C# as specified. Functional code but wrong language violates instruction adherence. Claude Code produces correct C# .NET API."},
+
+  {n:18, name:"Worker Application", ghcp:33.5, comp:79.3, winner:"cc",
+   dims:[
+     ["Policy Compliance","CNST:30, ANTI:65 — truncated","CNST:82, ANTI:85 — complete","C"],
+     ["Output Completeness","OUT:15 — 4 files, truncated","OUT:70 — complete worker","C"],
+     ["Security Controls","SEC:70 — basic patterns in partial output","SEC:85 — MI + queue auth","C"],
+     ["Code Completeness","INST:20, QUAL:30, REL:15 — truncated to 4 files","INST:85, QUAL:85, REL:88 — full project","C"],
+     ["Cross-Stage Consistency","CONS:35 — cannot assess truncated","CONS:75 — matches API patterns","C"]
+   ],
+   notes:"Copilot truncates the Worker to 4 files and generates in the wrong language (Python vs C#). Claude Code produces a complete .NET Worker with Service Bus integration."},
+
+  {n:19, name:"Documentation", ghcp:62.8, comp:89.0, winner:"cc",
+   dims:[
+     ["Output Completeness","OUT:70 — truncated deployment guide","OUT:85 — comprehensive","C"],
+     ["Code Completeness","INST:75, QUAL:65, REL:45 — truncation","INST:92, QUAL:90, REL:92 — complete","C"],
+     ["Cross-Stage Consistency","CONS:60 — references don't match","CONS:85 — accurate cross-refs","C"]
+   ],
+   notes:"Copilot's deployment guide is truncated and references are inconsistent with actual stage outputs. Claude Code produces complete, accurate documentation with correct cross-stage references."},
+];
+
+// ---- SYSTEMATIC PATTERNS ----
+const patterns = {
+  ghcpStrengths: [
+    {text:"Policy compliance on later IaC stages", detail:"Stages 8-15 show strong NEVER/MUST directive adherence for governance policies"},
+    {text:"Comprehensive deploy.sh scripts", detail:"Uses jq for TF 1.9 state reading, detailed preflight and post-deploy verification"},
+    {text:"Consistent response_export_values", detail:"Nearly all azapi_resource blocks include response_export_values=['*']"},
+  ],
+  ccStrengths: [
+    {text:"Application code generation", detail:"Complete, buildable projects for React SPA, .NET API, and .NET Worker with correct language compliance"},
+    {text:"Early IaC stage consistency", detail:"Stages 1-7 maintain uniform provider versions, backend type, tagging patterns, and naming conventions"},
+    {text:"Deterministic RBAC naming", detail:"Consistently uses uuidv5() with deterministic seeds for role assignment names"},
+  ],
+  ghcpWeaknesses: [
+    {text:"Application code catastrophic failures", detail:"React SPA 3 files out of 30+, Worker truncated to 4 files, API in wrong language (Python vs C#)"},
+    {text:"Cross-stage consistency drift", detail:"Provider versions, backend types, and tagging patterns vary across stages (e.g., ~>2.4 vs ~>2.8, azurerm vs local backend)"},
+    {text:"Wrong provider source", detail:"Uses Azure/azapi instead of hashicorp/azapi in Stage 4"},
+  ],
+  ccWeaknesses: [
+    {text:"Recurring provider source error", detail:"Uses Azure/azapi instead of hashicorp/azapi in stages 8-10, causing terraform init failures"},
+    {text:"Deprecated terraform output -state=", detail:"Used in deploy.sh across 6 stages despite being removed in Terraform 1.9"},
+    {text:"Missing companion resources in later stages", detail:"Stages 11-14 missing response_export_values, UAMI, and some RBAC assignments"},
+  ],
+};
+
+// ---- CRITICAL BUGS ----
+const bugs = [
+  {desc:"<code>Azure/azapi</code> wrong provider source (should be <code>hashicorp/azapi</code>)", tool:"Copilot", stages:"4", severity:"High"},
+  {desc:"Missing <code>response_export_values</code> on azapi_resource blocks", tool:"Copilot", stages:"3", severity:"High"},
+  {desc:"Tags placed inside azapi <code>body</code> instead of top-level <code>tags</code> attribute", tool:"Copilot", stages:"5", severity:"Medium"},
+  {desc:"Dummy GUID for CI/CD identity instead of data source reference", tool:"Copilot", stages:"5", severity:"Medium"},
+  {desc:"<code>azurerm</code> backend inconsistency (mixed local/remote)", tool:"Copilot", stages:"7", severity:"Medium"},
+  {desc:"Stage 4 remote state reference violating networking boundary", tool:"Copilot", stages:"7", severity:"High"},
+  {desc:"SQL Contributor role assigned at wrong layer/scope", tool:"Copilot", stages:"7", severity:"Medium"},
+  {desc:"React SPA catastrophically incomplete (3 of 30+ files)", tool:"Copilot", stages:"16", severity:"Critical"},
+  {desc:"Wrong language: Python generated instead of specified C#", tool:"Copilot", stages:"17, 18", severity:"Critical"},
+  {desc:"Worker application truncated to 4 files", tool:"Copilot", stages:"18", severity:"Critical"},
+  {desc:"Deployment guide truncated mid-document", tool:"Copilot", stages:"19", severity:"High"},
+  {desc:"<code>Azure/azapi</code> wrong provider source (should be <code>hashicorp/azapi</code>)", tool:"Claude Code", stages:"8, 9, 10", severity:"High"},
+  {desc:"<code>terraform output -state=</code> deprecated flag (removed in TF 1.9)", tool:"Claude Code", stages:"8, 9, 10, 11, 12, 14", severity:"High"},
+  {desc:"<code>random_uuid</code> for RBAC assignment names (non-deterministic)", tool:"Claude Code", stages:"10", severity:"Medium"},
+  {desc:"Stage 4 remote state reference violating networking boundary", tool:"Claude Code", stages:"10", severity:"High"},
+  {desc:"Standard SKU for Service Bus violating NEVER directive (must be Premium)", tool:"Claude Code", stages:"11", severity:"High"},
+  {desc:"Missing UAMI + AcrPull role for container environment", tool:"Claude Code", stages:"12", severity:"Medium"},
+  {desc:"Free SKU for SignalR (should be Standard/Premium for POC)", tool:"Claude Code", stages:"13", severity:"Medium"},
+  {desc:"Missing <code>response_export_values</code> on azapi_resource blocks", tool:"Claude Code", stages:"11, 12, 13, 14", severity:"High"},
+];
+
+// ---- DIMENSION HEATMAP ----
+// Per-stage winners for each dimension
+// S1-S19 columns. B=Copilot wins, C=Claude Code wins, T=Tie, -=N/A
+const heatmapData = [
+  ["Policy Compliance",     "T","T","C","C","C","C","C","B","B","B","B","B","B","B","B","C","C","C","-"],
+  ["deploy.sh Quality",     "T","C","C","C","C","C","C","B","B","B","B","B","B","B","B","-","-","-","-"],
+  ["RBAC Implementation",   "T","T","T","T","C","C","C","B","B","B","B","B","B","B","B","-","-","-","-"],
+  ["Remote State Hygiene",  "T","T","C","C","C","C","C","B","B","B","B","B","B","B","B","-","-","-","-"],
+  ["Output Completeness",   "T","C","C","C","C","C","C","B","B","B","B","B","B","B","B","C","C","C","C"],
+  ["Security Controls",     "T","T","C","B","C","T","C","B","B","B","B","B","B","B","B","C","C","C","-"],
+  ["Code Completeness",     "T","C","C","C","C","C","C","B","B","B","B","B","B","B","B","C","C","C","C"],
+  ["Cross-Stage Consistency","T","T","C","C","C","C","C","B","B","B","B","B","B","B","B","C","C","C","C"],
+];
+
+// ---- VERDICT TEXT ----
+const verdictParagraphs = [
+  '<p><strong class="text-blue-400">Copilot wins IaC stages 8-15</strong> with stronger policy compliance, more complete deploy.sh scripts, and consistent response_export_values, but suffers catastrophic failures on application code stages (16-18) where responses are truncated or generated in the wrong language entirely.</p>',
+  '<p><strong class="text-orange-400">Claude Code wins early IaC stages (1-7) and application code stages (16-18)</strong> with superior cross-stage consistency and complete, compilable projects in the correct languages, but introduces recurring technical errors (wrong provider source, deprecated flags) in middle-to-late IaC stages that compound across stages 8-14.</p>',
+  '<p class="text-gray-400 text-xs pt-2 border-t border-slate-600"><em>Overall, Claude Code wins on breadth and completeness (no truncated responses, correct languages, 10 stages won vs 9), while Copilot wins on IaC policy depth when it produces complete output. The ideal pipeline would use Copilot\'s governance strengths with Claude Code\'s reliability and application code capabilities.</em></p>',
+];
+</script>
+
+<!-- ============================================================
+  RENDERING ENGINE
+============================================================ -->
+<script>
+// Compute wins
+META.ghcpWins = stages.filter(s=>s.winner==='ghcp').length;
+META.ccWins = stages.filter(s=>s.winner==='comp'||s.winner==='cc').length;
+
+// Populate metadata
+document.getElementById('runDate').textContent = META.date;
+document.getElementById('projectName').textContent = META.project;
+document.querySelectorAll('.projectNameInline').forEach(el=>el.textContent=META.project);
+document.getElementById('modelName').textContent = META.model;
+document.getElementById('ghcpWins').textContent = META.ghcpWins;
+document.getElementById('ccWins').textContent = META.ccWins;
+document.getElementById('projectSummary').textContent = META.summary;
+
+// Build tab navigation
+const tabNav = document.getElementById('tabNav');
+tabNav.innerHTML = '<button class="tab-btn active px-3 py-2 text-xs font-semibold rounded-t" onclick="showTab(\'overview\')">Overview</button>';
+stages.forEach(s => {
+  tabNav.innerHTML += `<button class="tab-btn px-3 py-2 text-xs font-medium rounded-t" onclick="showTab('s${s.n}')">S${s.n}</button>`;
+});
+
+// Benchmark table
+const bt = document.getElementById('benchmarkTable');
+let ghcpSum=0, compSum=0;
+benchmarks.forEach(b => {
+  const d = +(b.ghcp - b.comp).toFixed(1);
+  const dStr = d>0?`+${d}`:d<0?`${d}`:'0';
+  const dCls = d>0?'text-blue-400':d<0?'text-orange-400':'text-gray-500';
+  const w = d>=0
+    ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">GHCP</span>'
+    : '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#7c2d12;color:#fdba74">Claude Code</span>';
+  bt.innerHTML += `<tr><td class="px-3 py-1.5 font-mono text-purple-300">${b.id}</td><td class="px-3 py-1.5 text-gray-400">${b.desc}</td><td class="px-3 py-1.5 text-center ${d>=0?'font-bold text-blue-300':''}">${b.ghcp}</td><td class="px-3 py-1.5 text-center ${d<0?'font-bold text-orange-300':''}">${b.comp}</td><td class="px-3 py-1.5 text-center ${dCls}">${dStr}</td><td class="px-3 py-1.5 text-center">${w}</td></tr>`;
+  ghcpSum += b.ghcp; compSum += b.comp;
+});
+const gA = (ghcpSum/benchmarks.length).toFixed(1), cA = (compSum/benchmarks.length).toFixed(1);
+document.getElementById('ghcpAvg').textContent = gA;
+document.getElementById('compAvg').textContent = cA;
+const oDelta = parseFloat(gA) - parseFloat(cA);
+document.getElementById('deltaAvg').textContent = (oDelta>0?'+':'') + oDelta.toFixed(1);
+document.getElementById('deltaAvg').className = `px-3 py-2 text-center ${oDelta>=0?'text-blue-400':'text-orange-400'}`;
+document.getElementById('overallWinner').innerHTML = oDelta>=0
+  ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">GHCP</span>'
+  : '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#7c2d12;color:#fdba74">Claude Code</span>';
+
+// Stage table
+const st = document.getElementById('stageTable');
+stages.forEach(s => {
+  const isGhcp = s.winner==='ghcp';
+  const w = isGhcp
+    ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">GHCP</span>'
+    : '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#7c2d12;color:#fdba74">Claude Code</span>';
+  st.innerHTML += `<tr><td class="px-3 py-1.5">${s.n}</td><td class="px-3 py-1.5 cursor-pointer hover:text-purple-300" onclick="showTab('s${s.n}')">${s.name}</td><td class="px-3 py-1.5 text-center ${isGhcp?'font-bold text-blue-300':''}">${s.ghcp}</td><td class="px-3 py-1.5 text-center ${!isGhcp?'font-bold text-orange-300':''}">${s.comp}</td><td class="px-3 py-1.5 text-center">${w}</td></tr>`;
+});
+
+// Systematic patterns (strengths/weaknesses)
+const ps = document.getElementById('patternsSection');
+function renderPatternCard(title, items, borderColor, titleColor, icon, iconColor) {
+  if (!items || items.length === 0) return '';
+  const lis = items.map(i => `<li class="flex items-start gap-2"><span class="${iconColor} mt-0.5 flex-shrink-0">${icon}</span><div><strong class="text-gray-200">${i.text}</strong> &mdash; ${i.detail}</div></li>`).join('');
+  return `<div class="card rounded-xl p-5 border-l-4 ${borderColor}"><h3 class="font-bold ${titleColor} text-sm mb-3">${title}</h3><ul class="text-xs text-gray-400 space-y-2">${lis}</ul></div>`;
+}
+ps.innerHTML =
+  renderPatternCard('Systematic Copilot Strengths', patterns.ghcpStrengths, 'border-blue-500', 'text-blue-400', '+', 'text-green-400') +
+  renderPatternCard('Systematic Claude Code Strengths', patterns.ccStrengths, 'border-orange-500', 'text-orange-400', '+', 'text-green-400') +
+  renderPatternCard('Systematic Copilot Weaknesses', patterns.ghcpWeaknesses, 'border-blue-800', 'text-blue-300', '&minus;', 'text-red-400') +
+  renderPatternCard('Systematic Claude Code Weaknesses', patterns.ccWeaknesses, 'border-orange-800', 'text-orange-300', '&minus;', 'text-red-400');
+
+// Critical bugs
+const bs = document.getElementById('bugsSection');
+if (bugs.length > 0) {
+  const sevColor = s => s==='Critical'?'color:#ef4444':s==='High'?'color:#f97316':'color:#eab308';
+  const toolColor = t => t==='Copilot'?'text-blue-400':'text-orange-400';
+  const rows = bugs.map(b => `<tr><td class="px-3 py-2">${b.desc}</td><td class="px-3 py-2 text-center ${toolColor(b.tool)}">${b.tool}</td><td class="px-3 py-2 text-center">${b.stages}</td><td class="px-3 py-2 text-center" style="${sevColor(b.severity)}">${b.severity}</td></tr>`).join('');
+  bs.innerHTML = `<h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-red-500 rounded-full inline-block"></span>Critical Bugs</h2><div class="card rounded-xl overflow-hidden"><table class="w-full text-xs"><thead><tr class="bg-slate-800"><th class="px-3 py-2 text-left text-gray-300">Bug</th><th class="px-3 py-2 text-center">Tool</th><th class="px-3 py-2 text-center">Stage(s)</th><th class="px-3 py-2 text-center">Severity</th></tr></thead><tbody class="divide-y divide-slate-700">${rows}</tbody></table></div>`;
+}
+
+// Dimension heatmap
+const hs = document.getElementById('heatmapSection');
+if (heatmapData.length > 0) {
+  const stageCount = stages.length;
+  let thCells = '<th class="px-2 py-2 text-left text-gray-300 whitespace-nowrap">Dimension</th>';
+  for (let i = 1; i <= stageCount; i++) thCells += `<th class="px-1 py-2 text-center">${i}</th>`;
+  const rows = heatmapData.map(row => {
+    let cells = `<td class="px-2 py-1 text-gray-300 whitespace-nowrap font-medium">${row[0]}</td>`;
+    for (let i = 1; i <= stageCount; i++) {
+      const v = row[i] || '-';
+      let cls='text-gray-600', txt='\u2014';
+      if(v==='B'){cls='text-blue-400 font-bold';txt='CP';}
+      else if(v==='C'){cls='text-orange-400 font-bold';txt='CC';}
+      else if(v==='T'){cls='text-gray-500';txt='T';}
+      cells += `<td class="px-1 py-1 text-center ${cls}">${txt}</td>`;
+    }
+    return `<tr class="border-b border-slate-700/30">${cells}</tr>`;
+  }).join('');
+  hs.innerHTML = `<h2 class="text-lg font-bold mb-3 flex items-center gap-2"><span class="w-2 h-5 bg-teal-500 rounded-full inline-block"></span>Dimension Winners Across All Stages</h2><div class="card rounded-xl overflow-x-auto"><table class="w-full text-[10px]"><thead><tr class="bg-slate-800">${thCells}</tr></thead><tbody class="divide-y divide-slate-700/30">${rows}</tbody></table></div><p class="text-[10px] text-gray-500 mt-2"><span class="text-blue-400">CP</span> = Copilot wins &bull; <span class="text-orange-400">CC</span> = Claude Code wins &bull; <span class="text-gray-400">T</span> = Tie &bull; <span class="text-gray-600">&mdash;</span> = N/A</p>`;
+}
+
+// Verdict
+document.getElementById('verdictGhcp').textContent = gA;
+document.getElementById('verdictComp').textContent = cA;
+document.getElementById('verdictGhcpSub').textContent = `${META.ghcpWins}/${stages.length} stages won`;
+document.getElementById('verdictCompSub').textContent = `${META.ccWins}/${stages.length} stages won`;
+document.getElementById('verdictText').innerHTML = verdictParagraphs.join('');
+
+// Generate stage tabs
+stages.forEach(s => {
+  const div = document.createElement('div');
+  div.className = 'tab-content';
+  div.id = 'tab-s' + s.n;
+  const isGhcp = s.winner === 'ghcp';
+  const wBadge = isGhcp
+    ? '<span class="text-[10px] px-2 py-0.5 rounded-full" style="background:#1e3a5f;color:#93c5fd">GHCP Wins</span>'
+    : '<span class="text-[10px] px-2 py-0.5 rounded-full" style="background:#7c2d12;color:#fdba74">Claude Code Wins</span>';
+
+  let dimsHTML = '';
+  if (s.dims && s.dims.length > 0) {
+    dimsHTML = s.dims.map(d => {
+      const wClass = d[3]==='B'?'text-blue-400':d[3]==='C'?'text-orange-400':'text-gray-500';
+      const wText = d[3]==='B'?'Copilot':d[3]==='C'?'Claude Code':d[3]==='T'?'Tie':'N/A';
+      return `<tr class="border-b border-slate-700/50"><td class="px-3 py-1.5 font-medium text-gray-300">${d[0]}</td><td class="px-3 py-1.5">${d[1]}</td><td class="px-3 py-1.5">${d[2]}</td><td class="px-3 py-1.5 text-center"><span class="${wClass} font-semibold">${wText}</span></td></tr>`;
+    }).join('');
+  }
+
+  div.innerHTML = `
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+      <h2 class="text-lg font-bold">Stage ${s.n}: ${s.name}</h2>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 text-sm">
+          <span class="text-blue-400 font-bold">${s.ghcp}</span>
+          <span class="text-gray-600">vs</span>
+          <span class="text-orange-400 font-bold">${s.comp}</span>
+        </div>
+        ${wBadge}
+      </div>
+    </div>
+    <div class="card rounded-xl p-4 mb-5">
+      <div class="space-y-2">
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-blue-400 w-16 text-right font-medium">Copilot</span>
+          <div class="flex-1 bg-slate-700 rounded-full h-5 overflow-hidden">
+            <div class="cp-bar h-full rounded-full flex items-center justify-end pr-2 text-[10px] font-bold text-white" style="width:${s.ghcp}%">${s.ghcp}</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-orange-400 w-16 text-right font-medium">Claude</span>
+          <div class="flex-1 bg-slate-700 rounded-full h-5 overflow-hidden">
+            <div class="cc-bar h-full rounded-full flex items-center justify-end pr-2 text-[10px] font-bold text-white" style="width:${s.comp}%">${s.comp}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    ${dimsHTML ? `<div class="card rounded-xl overflow-hidden mb-5">
+      <table class="w-full text-xs">
+        <thead><tr class="bg-slate-800">
+          <th class="px-3 py-2 text-left text-gray-300 w-1/4">Dimension</th>
+          <th class="px-3 py-2 text-left text-blue-400 w-[30%]">Copilot</th>
+          <th class="px-3 py-2 text-left text-orange-400 w-[30%]">Claude Code</th>
+          <th class="px-3 py-2 text-center text-gray-300 w-[10%]">Winner</th>
+        </tr></thead>
+        <tbody>${dimsHTML}</tbody>
+      </table>
+    </div>` : ''}
+    ${s.notes ? `<div class="card rounded-xl p-4">
+      <h3 class="text-xs font-semibold text-purple-300 mb-2">Analysis Notes</h3>
+      <p class="text-xs text-gray-400">${s.notes}</p>
+    </div>` : ''}
+  `;
+  document.querySelector('main').appendChild(div);
+});
+
+// Tab switching
+function showTab(id) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id==='overview'?'tab-overview':'tab-'+id).classList.add('active');
+  const btns = document.querySelectorAll('.tab-btn');
+  if (id === 'overview') { btns[0].classList.add('active'); }
+  else {
+    const idx = parseInt(id.replace('s',''));
+    if (btns[idx]) btns[idx].classList.add('active');
+  }
+}
+</script>
+</body>
+</html>
