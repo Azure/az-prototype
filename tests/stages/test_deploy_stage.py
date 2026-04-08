@@ -62,7 +62,7 @@ class TestDeployStageGuards:
 
     def test_all_guards_pass(self, deploy_stage, project_with_build, monkeypatch):
         monkeypatch.chdir(project_with_build)
-        with patch("azext_prototype.stages.deploy_helpers.check_az_login", return_value=True):
+        with patch("azext_prototype.stages.deploy_stage.check_az_login", return_value=True):
             # Reload guards with the patched function
             from azext_prototype.stages.deploy_stage import DeployStage
 
