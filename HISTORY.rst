@@ -41,6 +41,22 @@ Generation prompt improvements
   now appears before the architecture context in the generation prompt,
   reducing unused ``terraform_remote_state`` data sources.
 
+Agent-level service filtering
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Agent governance checks now filter by service namespace** — added
+  ``stage_services`` field to ``AgentContext``, populated by
+  ``_agent_build_context()``.  ``_apply_governance_check()`` now passes
+  stage services to ``validate_response()``, reducing false positive
+  anti-pattern warnings for irrelevant service namespaces.
+
+ReDoS fix in transform handlers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Replaced nested-quantifier regex with brace counting** — extracted
+  shared ``_find_azapi_blocks()`` helper and rewrote
+  ``_add_response_export_values``, ``_add_resource_group_parent_id``,
+  and ``_remove_private_endpoint_resources`` to use it.  Eliminates
+  potential exponential backtracking on pathological input.
+
 Test suite consolidation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 * **Consolidated and enhanced unit test coverage** — migrated flat test

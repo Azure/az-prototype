@@ -1,6 +1,6 @@
 """Tests for azext_prototype.agents — registry, loader, base."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
@@ -505,6 +505,39 @@ class TestAzureApiVersionInjection:
         joined = "\n".join(contents)
         assert "AZURE API VERSION" in joined
         assert "deployment-language-bicep" in joined
+
+
+# ------------------------------------------------------------------
+# Agent-level service filtering
+# ------------------------------------------------------------------
+
+
+class TestAgentServiceFiltering:
+    """AgentContext must carry stage_services so _apply_governance_check can filter."""
+
+    def test_agent_context_has_stage_services_field(self):
+        from azext_prototype.agents.base import AgentContext
+
+        ctx = AgentContext(project_config={}, project_dir="/tmp", ai_provider=None)
+        assert ctx.stage_services is None, "Default stage_services should be None"
+
+    def test_apply_governance_check_passes_stage_services(self):
+        from azext_prototype.agents.base import AgentContext
+
+        agent = StubAgent()
+        provider = MagicMock()
+        ctx = AgentContext(project_config={"project": {"iac_tool": "terraform"}}, project_dir="/tmp", ai_provider=provider)
+        ctx.stage_services = ["Microsoft.KeyVault/vaults"]
+
+        response = AIResponse(content="resource content", model="test", usage={})
+
+        with patch.object(agent, "validate_response", return_value=[]) as mock_validate:
+            agent._apply_governance_check(response, ctx)
+            mock_validate.assert_called_once()
+            call_kwargs = mock_validate.call_args
+            assert call_kwargs[1]["services"] == ["Microsoft.KeyVault/vaults"], (
+                f"Expected stage_services to be passed through, got: {call_kwargs[1].get('services')}"
+            )
 
 
 # ------------------------------------------------------------------

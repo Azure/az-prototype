@@ -268,6 +268,32 @@ def _remove_unused_remote_state(content: str, stage_content: str | None = None) 
     return result
 
 
+def _find_azapi_blocks(content: str) -> list[tuple[int, int, str, str]]:
+    """Find all ``azapi_resource`` blocks using brace counting.
+
+    Returns a list of ``(start, end, resource_name, block_text)`` tuples
+    where *start*/*end* are character offsets into *content*.
+    """
+    pattern = re.compile(r'resource\s+"azapi_resource"\s+"(\w+)"\s*\{')
+    blocks: list[tuple[int, int, str, str]] = []
+    for match in pattern.finditer(content):
+        name = match.group(1)
+        start = match.start()
+        brace_start = match.end() - 1
+        depth = 1
+        pos = brace_start + 1
+        while pos < len(content) and depth > 0:
+            if content[pos] == "{":
+                depth += 1
+            elif content[pos] == "}":
+                depth -= 1
+            pos += 1
+        if depth != 0:
+            continue  # malformed block
+        blocks.append((start, pos, name, content[start:pos]))
+    return blocks
+
+
 def _remove_private_endpoint_resources(content: str) -> str:
     """Remove private endpoint and DNS zone resources from non-networking stages.
 
@@ -287,42 +313,20 @@ def _remove_private_endpoint_resources(content: str) -> str:
         "virtualnetworklinks",
     )
 
-    # Find resource block starts and use brace counting to find the end
-    block_start_pattern = re.compile(
-        r'resource\s+"azapi_resource"\s+"(\w+)"\s*\{',
-    )
-
     removed_names: list[str] = []
     result = content
 
-    for match in reversed(list(block_start_pattern.finditer(result))):
-        resource_name = match.group(1)
-        # Find the matching closing brace using brace counting
-        start = match.start()
-        brace_start = match.end() - 1  # position of opening {
-        depth = 1
-        pos = brace_start + 1
-        while pos < len(result) and depth > 0:
-            if result[pos] == "{":
-                depth += 1
-            elif result[pos] == "}":
-                depth -= 1
-            pos += 1
-        if depth != 0:
-            continue  # malformed block, skip
-
-        block_text = result[start:pos]
-        # Check if this block's type is a PE/DNS type
+    for start, end, resource_name, block_text in reversed(_find_azapi_blocks(result)):
         type_match = re.search(r'type\s*=\s*"([^"]+)"', block_text)
         if not type_match:
             continue
         resource_type = type_match.group(1).lower()
         if any(pt in resource_type for pt in pe_types):
             # Remove the block plus any trailing whitespace/newlines
-            end = pos
-            while end < len(result) and result[end] in ("\n", "\r", " "):
-                end += 1
-            result = result[:start] + result[end:]
+            trim_end = end
+            while trim_end < len(result) and result[trim_end] in ("\n", "\r", " "):
+                trim_end += 1
+            result = result[:start] + result[trim_end:]
             removed_names.append(resource_name)
             logger.debug("Removed PE/DNS resource: azapi_resource.%s", resource_name)
 
@@ -351,29 +355,26 @@ def _remove_private_endpoint_resources(content: str) -> str:
 def _add_response_export_values(content: str) -> str:
     """Add ``response_export_values = ["*"]`` to azapi_resource blocks missing it.
 
-    Finds each ``resource "azapi_resource" "name" { ... }`` block and checks
-    if ``response_export_values`` appears inside it.  If missing, inserts it
-    after the ``parent_id`` line (or after ``type`` if no ``parent_id``).
+    Uses brace-counting via :func:`_find_azapi_blocks` to avoid nested-quantifier
+    regex (ReDoS risk).  Inserts after ``parent_id``, ``location``, or ``type``.
     """
-    # Match azapi_resource blocks
-    block_pattern = re.compile(
-        r'(resource\s+"azapi_resource"\s+"\w+"\s*\{)(.*?\n)((?:.*?\n)*?)(})',
-        re.DOTALL,
-    )
+    result = content
+    for start, end, _name, block_text in reversed(_find_azapi_blocks(result)):
+        if "response_export_values" in block_text:
+            continue
 
-    def _inject(match: re.Match) -> str:  # type: ignore[type-arg]
-        full = match.group(0)
-        if "response_export_values" in full:
-            return full  # already has it
+        # Split block body (after the opening { line) into lines
+        header_end = block_text.index("{") + 1
+        header = block_text[:header_end]
+        body_plus_close = block_text[header_end:]
+        # Remove the final closing brace
+        body = body_plus_close.rstrip()
+        if body.endswith("}"):
+            body = body[:-1]
+        closing = "}"
 
-        header = match.group(1)
-        first_line = match.group(2)
-        body = match.group(3)
-        closing = match.group(4)
-
-        # Find insertion point: after parent_id, or after location, or after type
-        lines = (first_line + body).splitlines(keepends=True)
-        insert_idx = len(lines)  # fallback: before closing brace
+        lines = body.splitlines(keepends=True)
+        insert_idx = len(lines)
         for i, line in enumerate(lines):
             stripped = line.strip()
             if stripped.startswith("parent_id"):
@@ -384,48 +385,42 @@ def _add_response_export_values(content: str) -> str:
             elif stripped.startswith("type") and insert_idx == len(lines):
                 insert_idx = i + 1
 
-        # Detect indentation from the type/parent_id line
         indent = "  "
-        if insert_idx > 0 and insert_idx <= len(lines):
+        if 0 < insert_idx <= len(lines):
             prev_line = lines[insert_idx - 1]
             leading = len(prev_line) - len(prev_line.lstrip())
             indent = " " * leading
 
         lines.insert(insert_idx, f'\n{indent}response_export_values = ["*"]\n')
-        return header + "".join(lines) + closing
+        new_block = header + "".join(lines) + closing
+        result = result[:start] + new_block + result[end:]
 
-    new_content = block_pattern.sub(_inject, content)
-    if new_content != content:
+    if result != content:
         logger.debug("Added response_export_values to azapi_resource blocks")
-    return new_content
+    return result
 
 
 def _add_resource_group_parent_id(content: str) -> str:
     """Add ``parent_id`` to resource group azapi_resource blocks missing it.
 
-    Finds ``azapi_resource`` blocks whose type contains
-    ``Microsoft.Resources/resourceGroups`` and injects
-    ``parent_id = "/subscriptions/${var.subscription_id}"``
-    after the ``name`` line.
+    Uses brace-counting via :func:`_find_azapi_blocks` to avoid nested-quantifier
+    regex (ReDoS risk).  Injects after the ``name`` line.
     """
-    # Match azapi_resource blocks with resourceGroups type
-    block_pattern = re.compile(
-        r'(resource\s+"azapi_resource"\s+"\w+"\s*\{)(.*?)(})',
-        re.DOTALL,
-    )
+    result = content
+    for start, end, _name, block_text in reversed(_find_azapi_blocks(result)):
+        if "resourcegroups" not in block_text.lower():
+            continue
+        if "parent_id" in block_text:
+            continue
 
-    def _inject(match: re.Match) -> str:  # type: ignore[type-arg]
-        full = match.group(0)
-        if "resourcegroups" not in full.lower():
-            return full
-        if "parent_id" in full:
-            return full  # already has it
+        header_end = block_text.index("{") + 1
+        header = block_text[:header_end]
+        body_plus_close = block_text[header_end:]
+        body = body_plus_close.rstrip()
+        if body.endswith("}"):
+            body = body[:-1]
+        closing = "}"
 
-        header = match.group(1)
-        body = match.group(2)
-        closing = match.group(3)
-
-        # Insert after the name line
         lines = body.splitlines(keepends=True)
         insert_idx = len(lines)
         for i, line in enumerate(lines):
@@ -433,20 +428,19 @@ def _add_resource_group_parent_id(content: str) -> str:
                 insert_idx = i + 1
                 break
 
-        # Detect indentation
         indent = "  "
-        if insert_idx > 0 and insert_idx <= len(lines):
+        if 0 < insert_idx <= len(lines):
             prev_line = lines[insert_idx - 1]
             leading = len(prev_line) - len(prev_line.lstrip())
             indent = " " * leading
 
         lines.insert(insert_idx, f'{indent}parent_id = "/subscriptions/${{var.subscription_id}}"\n')
-        return header + "".join(lines) + closing
+        new_block = header + "".join(lines) + closing
+        result = result[:start] + new_block + result[end:]
 
-    new_content = block_pattern.sub(_inject, content)
-    if new_content != content:
+    if result != content:
         logger.debug("Added parent_id to resource group azapi_resource")
-    return new_content
+    return result
 
 
 _STRUCTURED_HANDLERS: dict[str, Callable] = {

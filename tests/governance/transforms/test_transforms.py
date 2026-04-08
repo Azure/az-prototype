@@ -393,3 +393,61 @@ class TestApplyWithStageContext:
         )
         assert "TFM-TF-001" in ids
         assert "terraform_remote_state" not in result
+
+
+# ------------------------------------------------------------------
+# ReDoS safety: brace-counting replaces nested quantifier regex
+# ------------------------------------------------------------------
+
+
+class TestBraceCountingSafety:
+    """Transform handlers must use brace counting, not nested-quantifier regex."""
+
+    def test_response_export_values_pathological_input(self):
+        """Long line with no newlines must complete in <1 second (no backtracking)."""
+        import time
+
+        # Pathological: very long body with no newlines, followed by closing brace
+        long_body = "x" * 50000
+        content = f'resource "azapi_resource" "kv" {{\n  type = "Microsoft.KeyVault/vaults@2023-07-01"\n  {long_body}\n}}\n'
+
+        start = time.monotonic()
+        result = _add_response_export_values(content)
+        elapsed = time.monotonic() - start
+
+        assert elapsed < 1.0, f"_add_response_export_values took {elapsed:.2f}s on pathological input (ReDoS?)"
+        assert 'response_export_values = ["*"]' in result
+
+    def test_resource_group_parent_id_pathological_input(self):
+        """Long line with no newlines must complete in <1 second (no backtracking)."""
+        import time
+
+        long_body = "x" * 50000
+        content = f'resource "azapi_resource" "rg" {{\n  type = "Microsoft.Resources/resourceGroups@2024-03-01"\n  name = var.rg\n  {long_body}\n}}\n'
+
+        start = time.monotonic()
+        result = _add_resource_group_parent_id(content)
+        elapsed = time.monotonic() - start
+
+        assert elapsed < 1.0, f"_add_resource_group_parent_id took {elapsed:.2f}s on pathological input (ReDoS?)"
+        assert "parent_id" in result
+
+    def test_find_azapi_blocks_nested_braces(self):
+        """Brace counting must handle nested blocks correctly."""
+        from azext_prototype.governance.transforms import _find_azapi_blocks
+
+        content = """resource "azapi_resource" "kv" {
+  type = "Microsoft.KeyVault/vaults@2023-07-01"
+  body = {
+    properties = {
+      tenantId = var.tenant_id
+    }
+  }
+}
+"""
+        blocks = _find_azapi_blocks(content)
+        assert len(blocks) == 1
+        start, end, name, block_text = blocks[0]
+        assert name == "kv"
+        assert block_text.startswith('resource "azapi_resource"')
+        assert block_text.rstrip().endswith("}")

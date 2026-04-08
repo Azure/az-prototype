@@ -1843,10 +1843,13 @@ class BuildSession(SessionMixin):
         layer = stage.get("layer", "")
         self._apply_governor_brief(agent, stage.get("name", ""), stage.get("services", []), layer)
         self._apply_stage_knowledge(agent, stage)
+        svc_types = [s.get("resource_type", "") for s in stage.get("services", []) if s.get("resource_type")]
+        self._context.stage_services = svc_types or None
         try:
             yield agent
         finally:
             agent.set_knowledge_override("")
+            self._context.stage_services = None
 
     def _apply_stage_knowledge(self, agent: Any, stage: dict) -> None:
         """Set stage-specific knowledge on the agent.

@@ -81,6 +81,7 @@ class AgentContext:
     artifacts: dict[str, Any] = field(default_factory=dict)
     shared_state: dict[str, Any] = field(default_factory=dict)
     mcp_manager: Any = None  # MCPManager | None — typed as Any to avoid circular import
+    stage_services: list[str] | None = None  # ARM namespaces for service filtering
 
     def add_artifact(self, key: str, value: Any):
         """Store an artifact for other agents to reference."""
@@ -299,7 +300,7 @@ class BaseAgent:
         avoid duplicating the governance warning block.
         """
         iac_tool = context.project_config.get("project", {}).get("iac_tool") if context.project_config else None
-        warnings = self.validate_response(response.content, iac_tool=iac_tool, services=None)
+        warnings = self.validate_response(response.content, iac_tool=iac_tool, services=context.stage_services)
         if warnings:
             for w in warnings:
                 logger.warning("Governance: %s", w)
