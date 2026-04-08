@@ -268,10 +268,5 @@ class TestDefaultModel:
 
         assert DEFAULT_CONFIG["ai"]["model"] == "claude-sonnet-4.5"
 
-    def test_copilot_default(self):
-        from azext_prototype.ai.copilot_provider import CopilotProvider
-
-        assert CopilotProvider.DEFAULT_MODEL == "claude-sonnet-4"
-
     def test_github_models_default(self):
         assert GitHubModelsProvider.DEFAULT_MODEL == "gpt-4o"

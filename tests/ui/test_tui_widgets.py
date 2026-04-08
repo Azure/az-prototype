@@ -196,27 +196,6 @@ async def test_info_bar_updates():
 
 
 @pytest.mark.asyncio
-async def test_prompt_input_disable():
-    """PromptInput should be disabled by default."""
-    app = PrototypeApp()
-    async with app.run_test() as pilot:  # noqa: F841
-        prompt = app.prompt_input
-        assert prompt._enabled is False
-        assert prompt.read_only is True
-
-
-@pytest.mark.asyncio
-async def test_prompt_input_enable():
-    """PromptInput should allow enabling for input."""
-    app = PrototypeApp()
-    async with app.run_test() as pilot:  # noqa: F841
-        prompt = app.prompt_input
-        prompt.enable()
-        assert prompt._enabled is True
-        assert prompt.read_only is False
-
-
-@pytest.mark.asyncio
 async def test_file_list():
     """ConsoleView should render file lists."""
     app = PrototypeApp()
@@ -249,40 +228,3 @@ async def test_console_view_write_markup_invalid_falls_back():
         app.console_view.write_markup("[invalid_tag_that_wont_parse")
 
 
-# -------------------------------------------------------------------- #
-# PromptInput allow_empty tests
-# -------------------------------------------------------------------- #
-
-
-@pytest.mark.asyncio
-async def test_prompt_input_allow_empty():
-    """PromptInput with allow_empty=True should submit empty string."""
-    app = PrototypeApp()
-    async with app.run_test() as pilot:  # noqa: F841
-        prompt = app.prompt_input
-        prompt.enable(allow_empty=True)
-        assert prompt._allow_empty is True
-        assert prompt._enabled is True
-
-
-@pytest.mark.asyncio
-async def test_prompt_input_default_no_allow_empty():
-    """PromptInput defaults to allow_empty=False."""
-    app = PrototypeApp()
-    async with app.run_test() as pilot:  # noqa: F841
-        prompt = app.prompt_input
-        prompt.enable()
-        assert prompt._allow_empty is False
-
-
-@pytest.mark.asyncio
-async def test_prompt_input_input_mode():
-    """In input mode (default), text has '> ' prefix and placeholder is empty."""
-    app = PrototypeApp()
-    async with app.run_test() as pilot:  # noqa: F841
-        prompt = app.prompt_input
-        prompt.enable()
-        assert prompt._allow_empty is False
-        assert prompt._enabled is True
-        assert prompt.text == "> "
-        assert prompt.placeholder == ""

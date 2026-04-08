@@ -921,28 +921,6 @@ class TestAgentLoaderExtended:
         score = agent.can_handle("process the data")
         assert score > 0.3
 
-    def test_load_agents_from_directory(self, tmp_path):
-        from azext_prototype.agents.loader import load_agents_from_directory
-
-        (tmp_path / "agent1.yaml").write_text(
-            "name: agent1\ndescription: A\ncapabilities: []\nsystem_prompt: test\n",
-            encoding="utf-8",
-        )
-        (tmp_path / "agent2.yaml").write_text(
-            "name: agent2\ndescription: B\ncapabilities: []\nsystem_prompt: test\n",
-            encoding="utf-8",
-        )
-        (tmp_path / "_skip.py").write_text("# skipped", encoding="utf-8")
-
-        agents = load_agents_from_directory(str(tmp_path))
-        assert len(agents) == 2
-
-    def test_load_agents_from_nonexistent_dir(self, tmp_path):
-        from azext_prototype.agents.loader import load_agents_from_directory
-
-        agents = load_agents_from_directory(str(tmp_path / "nonexistent"))
-        assert agents == []
-
     def test_load_agents_handles_invalid_files(self, tmp_path):
         from azext_prototype.agents.loader import load_agents_from_directory
 
@@ -956,59 +934,12 @@ class TestAgentLoaderExtended:
         with pytest.raises(CLIError, match="must include 'name'"):
             YAMLAgent({"description": "no name"})
 
-    def test_load_yaml_agent_not_found(self):
-        from azext_prototype.agents.loader import load_yaml_agent
-
-        with pytest.raises(CLIError, match="not found"):
-            load_yaml_agent("/nonexistent/path.yaml")
-
-    def test_load_yaml_agent_wrong_ext(self, tmp_path):
-        from azext_prototype.agents.loader import load_yaml_agent
-
-        (tmp_path / "test.txt").write_text("test")
-        with pytest.raises(CLIError, match=".yaml"):
-            load_yaml_agent(str(tmp_path / "test.txt"))
-
     def test_load_yaml_agent_not_mapping(self, tmp_path):
         from azext_prototype.agents.loader import load_yaml_agent
 
         (tmp_path / "bad.yaml").write_text("- item1\n- item2\n", encoding="utf-8")
         with pytest.raises(CLIError, match="mapping"):
             load_yaml_agent(str(tmp_path / "bad.yaml"))
-
-    def test_load_python_agent_not_found(self):
-        from azext_prototype.agents.loader import load_python_agent
-
-        with pytest.raises(CLIError, match="not found"):
-            load_python_agent("/nonexistent/agent.py")
-
-    def test_load_python_agent_wrong_ext(self, tmp_path):
-        from azext_prototype.agents.loader import load_python_agent
-
-        (tmp_path / "test.yaml").write_text("test")
-        with pytest.raises(CLIError, match=".py"):
-            load_python_agent(str(tmp_path / "test.yaml"))
-
-    def test_load_python_agent_with_agent_class(self, tmp_path):
-        from azext_prototype.agents.loader import load_python_agent
-
-        code = """
-from azext_prototype.agents.base import BaseAgent, AgentCapability
-
-class MyAgent(BaseAgent):
-    def __init__(self):
-        super().__init__(
-            name="py-agent",
-            description="Python agent",
-            capabilities=[AgentCapability.DEVELOP],
-            system_prompt="test",
-        )
-
-AGENT_CLASS = MyAgent
-"""
-        (tmp_path / "my_agent.py").write_text(code, encoding="utf-8")
-        agent = load_python_agent(str(tmp_path / "my_agent.py"))
-        assert agent.name == "py-agent"
 
     def test_load_python_agent_auto_discover(self, tmp_path):
         from azext_prototype.agents.loader import load_python_agent

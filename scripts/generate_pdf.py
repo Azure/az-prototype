@@ -18,7 +18,7 @@ from docx.shared import Pt, Inches, RGBColor
 # DATA
 # ============================================================
 
-VERSION = "v0.2.1b6"
+VERSION = "v0.2.1b7"
 DATE = datetime.now().strftime("%B %d, %Y")
 DATE_SHORT = datetime.now().strftime("%Y-%m-%d")
 MODEL = "Sonnet 4.6"

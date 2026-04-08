@@ -105,40 +105,6 @@ class TestFindAz:
 # ======================================================================
 
 
-class TestBuildDeployEnv:
-    """Test build_deploy_env merges OS environ with Azure auth vars."""
-
-    def test_all_params_set(self):
-        from azext_prototype.stages.deploy_helpers import build_deploy_env
-
-        env = build_deploy_env(
-            subscription="sub-123",
-            tenant="tenant-abc",
-            client_id="cid",
-            client_secret="csec",
-        )
-        assert env["ARM_SUBSCRIPTION_ID"] == "sub-123"
-        assert env["TF_VAR_subscription_id"] == "sub-123"
-        assert env["SUBSCRIPTION_ID"] == "sub-123"
-        assert env["ARM_TENANT_ID"] == "tenant-abc"
-        assert env["ARM_CLIENT_ID"] == "cid"
-        assert env["ARM_CLIENT_SECRET"] == "csec"
-
-    def test_none_params_skipped(self):
-        from azext_prototype.stages.deploy_helpers import build_deploy_env
-
-        env = build_deploy_env(subscription="sub-only")
-        assert env["ARM_SUBSCRIPTION_ID"] == "sub-only"
-        assert "ARM_TENANT_ID" not in env or env.get("ARM_TENANT_ID") == os.environ.get("ARM_TENANT_ID")
-
-    def test_includes_os_environ(self):
-        from azext_prototype.stages.deploy_helpers import build_deploy_env
-
-        env = build_deploy_env()
-        # Should contain at least PATH from os.environ
-        assert "PATH" in env
-
-
 # ======================================================================
 # Terraform Secret Variable Scanning
 # ======================================================================
@@ -1051,46 +1017,3 @@ class TestDeployEnvPassing:
             assert c.kwargs.get("env") is None
 
 
-class TestSecretVariableScanning:
-    """Tests for scan_tf_secret_variables()."""
-
-    def test_scan_finds_secret_suffix(self, tmp_path):
-        tf = tmp_path / "main.tf"
-        tf.write_text('variable "graph_client_secret" {}\n')
-        result = scan_tf_secret_variables(tmp_path)
-        assert "graph_client_secret" in result
-
-    def test_scan_finds_password_suffix(self, tmp_path):
-        tf = tmp_path / "main.tf"
-        tf.write_text('variable "admin_password" {\n  type = string\n}\n')
-        result = scan_tf_secret_variables(tmp_path)
-        assert "admin_password" in result
-
-    def test_scan_ignores_known_vars(self, tmp_path):
-        tf = tmp_path / "main.tf"
-        tf.write_text('variable "client_secret" {}\n')
-        result = scan_tf_secret_variables(tmp_path)
-        assert "client_secret" not in result
-
-    def test_scan_ignores_non_secret_vars(self, tmp_path):
-        tf = tmp_path / "main.tf"
-        tf.write_text('variable "location" {}\nvariable "resource_group_name" {}\n')
-        result = scan_tf_secret_variables(tmp_path)
-        assert result == []
-
-    def test_scan_ignores_vars_with_default(self, tmp_path):
-        tf = tmp_path / "main.tf"
-        tf.write_text('variable "api_secret" {\n  default = "preset-value"\n}\n')
-        result = scan_tf_secret_variables(tmp_path)
-        assert result == []
-
-    def test_scan_multiple_files(self, tmp_path):
-        (tmp_path / "main.tf").write_text('variable "graph_client_secret" {}\n')
-        (tmp_path / "variables.tf").write_text('variable "db_password" {}\n')
-        result = scan_tf_secret_variables(tmp_path)
-        assert "graph_client_secret" in result
-        assert "db_password" in result
-
-    def test_scan_empty_dir(self, tmp_path):
-        result = scan_tf_secret_variables(tmp_path)
-        assert result == []

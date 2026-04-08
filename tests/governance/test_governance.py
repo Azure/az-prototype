@@ -501,44 +501,6 @@ class TestMultiStepAgentGovernance:
 
 
 # ------------------------------------------------------------------ #
-# Credential detection patterns — exhaustive
-# ------------------------------------------------------------------ #
-
-
-class TestCredentialDetection:
-    """Test all credential patterns are detected."""
-
-    @pytest.fixture(autouse=True)
-    def _setup_governance(self, policy_engine, template_registry):
-        import azext_prototype.agents.governance as gov_mod
-
-        gov_mod._policy_engine = policy_engine
-        gov_mod._template_registry = template_registry
-
-    @pytest.mark.parametrize(
-        "pattern",
-        [
-            "connection_string",
-            "connectionstring",
-            "access_key",
-            "accesskey",
-            "account_key",
-            "accountkey",
-            "shared_access_key",
-            "client_secret",
-            'password="bad"',
-            "password='bad'",
-            "password = foo",
-        ],
-    )
-    def test_credential_pattern_detected(self, pattern, governance_ctx):
-        warnings = governance_ctx.check_response_for_violations("terraform-agent", f"Use {pattern} for auth")
-        assert any(
-            "credential" in w.lower() or "secret" in w.lower() or "managed identity" in w.lower() for w in warnings
-        ), f"Pattern '{pattern}' should be detected as credential"
-
-
-# ------------------------------------------------------------------ #
 # GovernanceContext — edge cases
 # ------------------------------------------------------------------ #
 

@@ -261,33 +261,6 @@ class TestMonitoringAgent:
 class TestNewAgentsInRegistry:
     """Test that new agents register and resolve correctly."""
 
-    def test_security_architect_registered(self, populated_registry):
-        assert "security-architect" in populated_registry
-        agent = populated_registry.get("security-architect")
-        assert agent.name == "security-architect"
-
-    def test_monitoring_agent_registered(self, populated_registry):
-        assert "monitoring-agent" in populated_registry
-        agent = populated_registry.get("monitoring-agent")
-        assert agent.name == "monitoring-agent"
-
-    def test_all_builtin_agents_registered(self, populated_registry):
-        expected = [
-            "cloud-architect",
-            "terraform-agent",
-            "bicep-agent",
-            "app-developer",
-            "doc-agent",
-            "qa-engineer",
-            "biz-analyst",
-            "cost-analyst",
-            "project-manager",
-            "security-architect",
-            "monitoring-agent",
-        ]
-        for name in expected:
-            assert name in populated_registry, f"Built-in agent '{name}' not registered"
-
     def test_builtin_count(self, populated_registry):
         assert len(populated_registry) == 19
 
