@@ -3,6 +3,64 @@
 Release History
 ===============
 
+0.2.1b7
++++++++
+
+Build stage re-entry fix
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **QA remediation failure now retries on re-entry** — fixed a bug where
+  ``mark_stage_generated()`` was called after each remediation attempt
+  inside ``_run_stage_qa()``, leaving the stage with status ``"generated"``
+  even when QA subsequently failed.  On re-entry, the stage was skipped
+  instead of retried.  Changed to ``mark_stage_validating()`` so failed
+  stages remain in the retry list.
+
+QA checklist hardening
+~~~~~~~~~~~~~~~~~~~~~~~~
+* **Aligned response_export_values directive** — QA checklist now requires
+  ``response_export_values = ["*"]`` on EVERY ``azapi_resource``, matching
+  the terraform agent's mandatory rule (was conditional on output usage).
+* **Added deploy.sh -state= flag check** — QA checklist now flags use of
+  ``terraform output -state=`` which was removed in Terraform 1.9.
+* **Added UUID hex validation** — QA checklist now checks that UUID values
+  in role assignment names contain only valid hex characters ``[0-9a-f]``.
+
+Full stage retry on QA exhaustion
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Full stage retry when QA remediation fails** -- when QA remediation
+  exhausts all attempts for a stage, the build retries the entire stage
+  from scratch instead of stopping.  Previous QA findings are injected
+  into the new generation prompt so the model avoids the same classes of
+  mistakes.  Controlled by ``_MAX_FULL_STAGE_ATTEMPTS`` (default 2:
+  1 initial + 1 retry).
+
+Generation prompt improvements
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Front-loaded remote state no-dead-code directive** — when upstream
+  stages exist, a ``CROSS-STAGE DEPENDENCIES — NO DEAD CODE`` section
+  now appears before the architecture context in the generation prompt,
+  reducing unused ``terraform_remote_state`` data sources.
+
+Test suite consolidation
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Consolidated and enhanced unit test coverage** — migrated flat test
+  files to a mirrored directory structure (1:1 test-to-source mapping),
+  merged split test files, and removed ~114 duplicate tests across 10
+  files.  Test suite reduced from 3,644 to 3,530 tests with zero loss
+  of unique coverage.
+
+QA review continuation for large stages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **QA review collects complete response before evaluating** — when the
+  QA review response is truncated (``finish_reason=length``), the build
+  session now continues requesting until the full review is received,
+  then evaluates the concatenated result.  Uses the existing
+  ``_execute_with_continuation()`` pattern with a review-specific
+  continuation prompt that prevents the QA agent from generating code
+  in the continuation.  Conversation history is saved and restored
+  around QA calls to prevent review messages from contaminating
+  subsequent stage generation.
+
 0.2.1b6
 +++++++
 

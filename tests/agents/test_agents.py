@@ -505,3 +505,66 @@ class TestAzureApiVersionInjection:
         joined = "\n".join(contents)
         assert "AZURE API VERSION" in joined
         assert "deployment-language-bicep" in joined
+
+
+# ------------------------------------------------------------------
+# QA checklist content requirements
+# ------------------------------------------------------------------
+
+
+class TestQaChecklistContent:
+    """QA checklist must contain directives that prevent recurring QA failures."""
+
+    def test_response_export_values_is_mandatory_on_every_resource(self):
+        """response_export_values must be required on EVERY azapi_resource, not conditional."""
+        from azext_prototype.agents.builtin.qa_engineer import QAEngineerAgent
+
+        agent = QAEngineerAgent()
+        prompt = agent.system_prompt
+        # Must NOT contain the conditional "whose .output.properties is referenced"
+        assert "whose `.output.properties` is referenced" not in prompt, (
+            "QA checklist makes response_export_values conditional — "
+            "it must be mandatory on EVERY azapi_resource to match terraform agent"
+        )
+        # Must require it on every resource
+        assert "EVERY" in prompt and "response_export_values" in prompt
+
+    def test_deploy_sh_no_state_flag(self):
+        """QA checklist must flag deploy.sh using 'terraform output -state='."""
+        from azext_prototype.agents.builtin.qa_engineer import QAEngineerAgent
+
+        agent = QAEngineerAgent()
+        prompt = agent.system_prompt
+        assert "-state=" in prompt, (
+            "QA checklist must explicitly check for terraform output -state= "
+            "flag which was removed in Terraform 1.9"
+        )
+
+    def test_uuid_hex_validation(self):
+        """QA checklist must flag invalid hex characters in UUID values."""
+        from azext_prototype.agents.builtin.qa_engineer import QAEngineerAgent
+
+        agent = QAEngineerAgent()
+        prompt = agent.system_prompt
+        assert "hex" in prompt.lower() and "uuid" in prompt.lower(), (
+            "QA checklist must include check for valid hex characters in UUIDs"
+        )
+
+
+# ------------------------------------------------------------------
+# Terraform agent prompt requirements
+# ------------------------------------------------------------------
+
+
+class TestTerraformAgentPromptContent:
+    """Terraform agent prompt must have strong directives to prevent recurring failures."""
+
+    def test_deploy_sh_no_state_flag_in_prompt(self):
+        """Terraform agent must prohibit 'terraform output -state=' in deploy.sh."""
+        from azext_prototype.agents.builtin.terraform_agent import TerraformAgent
+
+        agent = TerraformAgent()
+        prompt = agent.system_prompt
+        assert "-state=" in prompt, (
+            "Terraform agent must explicitly prohibit -state= flag"
+        )

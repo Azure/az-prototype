@@ -328,6 +328,182 @@ class TestGeneratingReentry:
 
 
 # ------------------------------------------------------------------
+# Full stage retry on QA exhaustion
+# ------------------------------------------------------------------
+
+
+class TestFullStageRetry:
+    """When QA remediation exhausts all attempts, the build retries the
+    entire stage from scratch with prior QA findings injected."""
+
+    def test_constant_default(self):
+        """_MAX_FULL_STAGE_ATTEMPTS must default to 2 (1 initial + 1 retry)."""
+        from azext_prototype.stages.build_session import _MAX_FULL_STAGE_ATTEMPTS
+
+        assert _MAX_FULL_STAGE_ATTEMPTS == 2
+
+    def test_full_retry_on_qa_exhaustion(self, build_context, build_registry):
+        """QA fail on first full attempt → clean artifacts → retry → QA pass → stage generated."""
+        session = _make_session(build_context, build_registry)
+        design = {"architecture": "Test"}
+
+        session._build_state.set_deployment_plan([_make_pending_stage(1, "Key Vault", layer="data")])
+        session._build_state.set_design_snapshot(design)
+
+        qa_call_count = [0]
+
+        def mock_qa(*args, **kwargs):
+            qa_call_count[0] += 1
+            if qa_call_count[0] == 1:
+                session._last_qa_content = "CRITICAL: missing auth"
+                return False  # First full attempt fails
+            return True  # Second full attempt passes
+
+        session._run_stage_qa = mock_qa
+
+        clean_called = []
+        original_clean = session._build_state.clean_stage_artifacts
+
+        def spy_clean(stage_num, project_dir):
+            clean_called.append(stage_num)
+            original_clean(stage_num, project_dir)
+
+        session._build_state.clean_stage_artifacts = spy_clean
+
+        with patch.object(session, "_build_stage_task", return_value=(MagicMock(name="tf"), "task")):
+            with patch.object(session, "_execute_with_retry", return_value=MagicMock(content="```main.tf\n#ok\n```")):
+                with patch.object(session, "_write_stage_files", return_value=["main.tf"]):
+                    with patch.object(session, "_apply_stage_transforms", return_value=["main.tf"]):
+                        session.run(design=design, input_fn=lambda p: "done", print_fn=lambda m: None)
+
+        assert qa_call_count[0] == 2, f"QA should run twice (1 per full attempt), got {qa_call_count[0]}"
+        assert 1 in clean_called, "Artifacts should be cleaned before retry"
+        final_status = session._build_state._state["deployment_stages"][0]["status"]
+        assert final_status in ("generated", "accepted"), f"Stage should be generated or accepted, got '{final_status}'"
+
+    def test_full_retry_injects_qa_findings(self, build_context, build_registry):
+        """Second _build_stage_task call must include prior_qa_findings from failed attempt."""
+        session = _make_session(build_context, build_registry)
+        design = {"architecture": "Test"}
+
+        session._build_state.set_deployment_plan([_make_pending_stage(1, "Key Vault", layer="data")])
+        session._build_state.set_design_snapshot(design)
+
+        qa_call_count = [0]
+
+        def mock_qa(*args, **kwargs):
+            qa_call_count[0] += 1
+            if qa_call_count[0] == 1:
+                session._last_qa_content = "CRITICAL: missing managed identity"
+                return False
+            return True
+
+        session._run_stage_qa = mock_qa
+
+        build_task_calls = []
+        mock_agent = MagicMock(name="tf")
+
+        def spy_build_task(stage, arch, templates, prior_qa_findings=""):
+            build_task_calls.append(prior_qa_findings)
+            return mock_agent, "task"
+
+        with patch.object(session, "_build_stage_task", side_effect=spy_build_task):
+            with patch.object(session, "_execute_with_retry", return_value=MagicMock(content="```main.tf\n#ok\n```")):
+                with patch.object(session, "_write_stage_files", return_value=["main.tf"]):
+                    with patch.object(session, "_apply_stage_transforms", return_value=["main.tf"]):
+                        session.run(design=design, input_fn=lambda p: "done", print_fn=lambda m: None)
+
+        assert len(build_task_calls) >= 2, f"_build_stage_task should be called at least twice, got {len(build_task_calls)}"
+        assert build_task_calls[0] == "", "First attempt should have no prior QA findings"
+        assert "missing managed identity" in build_task_calls[1], (
+            f"Second attempt should inject prior QA findings, got: {build_task_calls[1]!r}"
+        )
+
+    def test_full_retry_exhausted_stops_build(self, build_context, build_registry):
+        """Both full attempts fail → build stops, stage stays validating."""
+        session = _make_session(build_context, build_registry)
+        design = {"architecture": "Test"}
+
+        session._build_state.set_deployment_plan([_make_pending_stage(1, "Key Vault", layer="data")])
+        session._build_state.set_design_snapshot(design)
+
+        def mock_qa_always_fail(*args, **kwargs):
+            session._last_qa_content = "CRITICAL: unfixable"
+            return False
+
+        session._run_stage_qa = mock_qa_always_fail
+
+        with patch.object(session, "_build_stage_task", return_value=(MagicMock(name="tf"), "task")):
+            with patch.object(session, "_execute_with_retry", return_value=MagicMock(content="```main.tf\n#ok\n```")):
+                with patch.object(session, "_write_stage_files", return_value=["main.tf"]):
+                    with patch.object(session, "_apply_stage_transforms", return_value=["main.tf"]):
+                        session.run(design=design, input_fn=lambda p: "done", print_fn=lambda m: None)
+
+        status = session._build_state._state["deployment_stages"][0]["status"]
+        assert status != "generated", f"Stage should NOT be generated after exhausted retries, got '{status}'"
+
+    def test_build_stage_task_includes_prior_qa_findings(self, build_context, build_registry):
+        """Task string must include prior QA findings section before architecture context."""
+        session = _make_session(build_context, build_registry)
+
+        session._build_state.set_deployment_plan([{
+            "stage": 1,
+            "name": "Key Vault",
+            "layer": "data",
+            "capability": "data",
+            "dir": "concept/infra/terraform/stage-1-key-vault",
+            "services": [{"name": "kv", "computed_name": "kv", "resource_type": "Microsoft.KeyVault/vaults",
+                          "sku": "standard", "component": "secrets"}],
+            "status": "pending",
+            "files": [],
+        }])
+
+        findings = "CRITICAL: missing managed identity RBAC assignment"
+        agent, task = session._build_stage_task(
+            session._build_state._state["deployment_stages"][0],
+            "arch",
+            [],
+            prior_qa_findings=findings,
+        )
+
+        assert agent is not None
+        assert "Previous QA Failures" in task, "Task must contain prior QA findings section"
+        assert findings in task, "Task must contain the actual QA findings text"
+        assert task.index("Previous QA Failures") < task.index("## Architecture Context"), (
+            "Prior QA findings must appear BEFORE architecture context"
+        )
+
+    def test_no_retry_when_qa_passes_first_time(self, build_context, build_registry):
+        """QA passes on first attempt → no clean_stage_artifacts, build_stage_task called once."""
+        session = _make_session(build_context, build_registry)
+        design = {"architecture": "Test"}
+
+        session._build_state.set_deployment_plan([_make_pending_stage(1, "Key Vault", layer="data")])
+        session._build_state.set_design_snapshot(design)
+
+        session._run_stage_qa = lambda *a, **kw: True
+
+        clean_called = []
+        session._build_state.clean_stage_artifacts = lambda sn, pd: clean_called.append(sn)
+
+        build_task_calls = [0]
+        mock_agent = MagicMock(name="tf")
+
+        def counting_build_task(*args, **kwargs):
+            build_task_calls[0] += 1
+            return mock_agent, "task"
+
+        with patch.object(session, "_build_stage_task", side_effect=counting_build_task):
+            with patch.object(session, "_execute_with_retry", return_value=MagicMock(content="```main.tf\n#ok\n```")):
+                with patch.object(session, "_write_stage_files", return_value=["main.tf"]):
+                    with patch.object(session, "_apply_stage_transforms", return_value=["main.tf"]):
+                        session.run(design=design, input_fn=lambda p: "done", print_fn=lambda m: None)
+
+        assert build_task_calls[0] == 1, f"_build_stage_task should be called once, got {build_task_calls[0]}"
+        assert len(clean_called) == 0, "clean_stage_artifacts should NOT be called when QA passes first time"
+
+
+# ------------------------------------------------------------------
 # Build state: cascade_downstream_pending
 # ------------------------------------------------------------------
 
@@ -651,6 +827,69 @@ class TestBuildStageTask:
         agent, task = session._build_stage_task(stage, "arch", [])
         assert agent is not None
         assert "architecture.md" in task or "deployment-guide.md" in task
+
+    def test_iac_stage_task_has_remote_state_directive_before_context(self, build_context, build_registry):
+        """Remote state no-dead-code directive must appear before the architecture context."""
+        session = _make_session(build_context, build_registry)
+
+        # Set up a generated stage so prev_context is populated
+        session._build_state.set_deployment_plan([
+            {
+                "stage": 1,
+                "name": "Managed Identity",
+                "layer": "core",
+                "capability": "core",
+                "services": [],
+                "status": "pending",
+                "dir": "concept/infra/terraform/stage-1-managed-identity",
+                "files": [],
+            },
+            {
+                "stage": 2,
+                "name": "Key Vault",
+                "layer": "data",
+                "capability": "data",
+                "dir": "concept/infra/terraform/stage-2-key-vault",
+                "services": [
+                    {
+                        "name": "key-vault",
+                        "computed_name": "kv-test",
+                        "resource_type": "Microsoft.KeyVault/vaults",
+                        "sku": "standard",
+                        "component": "secrets",
+                    }
+                ],
+                "status": "pending",
+                "files": [],
+            },
+        ])
+        # Mark stage 1 as generated (creates proper generation_log entry)
+        session._build_state.mark_stage_generated(1, ["main.tf"], "terraform-agent")
+
+        # Verify the state is correct before calling _build_stage_task
+        gen_stages = session._build_state.get_generated_stages()
+        assert len(gen_stages) == 1, f"Expected 1 generated stage, got {len(gen_stages)}: {gen_stages}"
+        assert gen_stages[0]["stage"] == 1
+
+        stage = session._build_state._state["deployment_stages"][1]
+        agent, task = session._build_stage_task(stage, "arch", [])
+        assert agent is not None
+        assert "Previously Generated Stages" in task, (
+            f"Task must contain prev stages section. Task length={len(task)}. "
+            f"Generated stages: {[s['stage'] for s in session._build_state.get_generated_stages()]}"
+        )
+
+        # The no-dead-code remote state directive must appear BEFORE architecture context
+        # to ensure the model prioritizes it during generation
+        directive_marker = "ONLY declare"
+        arch_marker = "## Architecture Context"
+        assert directive_marker in task, (
+            "Task must contain no-dead-code remote state directive (ONLY declare...)"
+        )
+        assert task.index(directive_marker) < task.index(arch_marker), (
+            "No-dead-code remote state directive must appear BEFORE architecture context "
+            "to ensure the model sees it with highest priority"
+        )
 
     def test_no_agent_returns_empty(self, build_context, build_registry):
         session = _make_session(build_context, build_registry)
@@ -1851,21 +2090,17 @@ class TestQaRemediationWriteBack:
 
         session._build_state.set_deployment_plan([stage])
 
-        qa_response = MagicMock(content="VERDICT: PASS", model="test", usage={})
-
         call_count = [0]
 
-        def mock_delegate(**kwargs):
+        def mock_qa_execute(ctx, task):
             call_count[0] += 1
             if call_count[0] == 1:
                 raise CopilotRateLimitError("rate limited", retry_after=1)
-            return qa_response
+            return _make_response("VERDICT: PASS")
 
-        with patch("azext_prototype.stages.build_session.AgentOrchestrator") as MockOrch:
-            mock_orch = MockOrch.return_value
-            mock_orch.delegate.side_effect = mock_delegate
-            with patch.object(session, "_countdown"):
-                passed = session._run_stage_qa(stage, "arch", [], False, lambda m: None)
+        session._qa_agent.execute = mock_qa_execute
+        with patch.object(session, "_countdown"):
+            passed = session._run_stage_qa(stage, "arch", [], False, lambda m: None)
 
         assert passed is True
         assert call_count[0] >= 2
@@ -1892,11 +2127,9 @@ class TestQaRemediationWriteBack:
 
         session._build_state.set_deployment_plan([stage])
 
-        with patch("azext_prototype.stages.build_session.AgentOrchestrator") as MockOrch:
-            mock_orch = MockOrch.return_value
-            mock_orch.delegate.side_effect = CopilotTimeoutError("timeout")
-            with patch.object(session, "_countdown"):
-                passed = session._run_stage_qa(stage, "arch", [], False, lambda m: None)
+        session._qa_agent.execute = MagicMock(side_effect=CopilotTimeoutError("timeout"))
+        with patch.object(session, "_countdown"):
+            passed = session._run_stage_qa(stage, "arch", [], False, lambda m: None)
 
         assert passed is False
 
@@ -1923,31 +2156,171 @@ class TestQaRemediationWriteBack:
 
         call_count = [0]
 
-        def mock_delegate(**kwargs):
+        def mock_qa_execute(ctx, task):
             call_count[0] += 1
             if call_count[0] == 1:
                 # First QA call: issues found
-                return MagicMock(content="VERDICT: FAIL\nCRITICAL: missing auth", model="test", usage={})
+                return _make_response("VERDICT: FAIL\nCRITICAL: missing auth")
             # Second QA call: pass
-            return MagicMock(content="VERDICT: PASS", model="test", usage={})
+            return _make_response("VERDICT: PASS")
 
-        regen_response = MagicMock(content="```main.tf\nfixed\n```", model="test", usage={})
+        regen_response = _make_response("```main.tf\nfixed\n```")
 
         mock_iac_agent = MagicMock()
         mock_iac_agent.name = "terraform-agent"
 
-        with patch("azext_prototype.stages.build_session.AgentOrchestrator") as MockOrch:
-            mock_orch = MockOrch.return_value
-            mock_orch.delegate.side_effect = mock_delegate
-            with patch.object(session, "_select_agent", return_value=mock_iac_agent):
-                with patch.object(session, "_build_stage_task", return_value=(mock_iac_agent, "task")):
-                    with patch.object(session, "_execute_with_retry", return_value=regen_response):
-                        with patch.object(session, "_write_stage_files", return_value=["main.tf"]):
-                            with patch.object(session, "_apply_stage_transforms", return_value=["main.tf"]):
-                                passed = session._run_stage_qa(stage, "arch", [], False, lambda m: None)
+        session._qa_agent.execute = mock_qa_execute
+        with patch.object(session, "_select_agent", return_value=mock_iac_agent):
+            with patch.object(session, "_build_stage_task", return_value=(mock_iac_agent, "task")):
+                with patch.object(session, "_execute_with_retry", return_value=regen_response):
+                    with patch.object(session, "_write_stage_files", return_value=["main.tf"]):
+                        with patch.object(session, "_apply_stage_transforms", return_value=["main.tf"]):
+                            passed = session._run_stage_qa(stage, "arch", [], False, lambda m: None)
 
         assert passed is True
         assert call_count[0] >= 2
+
+
+# ------------------------------------------------------------------
+# QA remediation status transitions
+# ------------------------------------------------------------------
+
+
+class TestQaRemediationStatusTransition:
+    """After QA remediation, stage must stay 'validating' until QA passes.
+
+    Bug: mark_stage_generated() was called after each remediation attempt,
+    leaving the stage as 'generated' even when QA subsequently failed.
+    On re-entry, 'generated' stages are skipped instead of retried.
+    """
+
+    def test_qa_remediation_failure_leaves_stage_validating(self, build_context, build_registry):
+        """After exhausted QA remediation, stage status must be 'validating' for re-entry."""
+        session = _make_session(build_context, build_registry)
+
+        stage = {
+            "stage": 1,
+            "name": "Key Vault",
+            "layer": "data",
+            "capability": "data",
+            "services": [{"name": "key-vault", "resource_type": "Microsoft.KeyVault/vaults"}],
+            "files": ["main.tf"],
+        }
+
+        project_dir = Path(build_context.project_dir)
+        stage_dir = project_dir / "concept" / "infra" / "terraform" / "stage-1-key-vault"
+        stage_dir.mkdir(parents=True, exist_ok=True)
+        (stage_dir / "main.tf").write_text("resource {}", encoding="utf-8")
+        stage["files"] = [str((stage_dir / "main.tf").relative_to(project_dir))]
+
+        session._build_state.set_deployment_plan([stage])
+
+        # QA always returns FAIL — exhausts all remediation attempts
+        session._qa_agent.execute = MagicMock(
+            return_value=_make_response("CRITICAL: This will never be fixed.")
+        )
+
+        mock_iac_agent = MagicMock()
+        mock_iac_agent.name = "terraform-agent"
+
+        with patch.object(session, "_select_agent", return_value=mock_iac_agent):
+            with patch.object(session, "_build_stage_task", return_value=(mock_iac_agent, "task")):
+                with patch.object(session, "_execute_with_retry", return_value=_make_response("```main.tf\nfixed\n```")):
+                    with patch.object(session, "_write_stage_files", return_value=["main.tf"]):
+                        with patch.object(session, "_apply_stage_transforms", return_value=["main.tf"]):
+                            passed = session._run_stage_qa(stage, "arch", [], False, lambda m: None)
+
+        assert passed is False
+        actual_status = session._build_state._state["deployment_stages"][0]["status"]
+        assert actual_status == "validating", (
+            f"After exhausted QA remediation, stage should be 'validating' for re-entry, got '{actual_status}'"
+        )
+
+    def test_reentry_after_qa_failure_retries_qa(self, build_context, build_registry):
+        """Re-running build after QA failure must re-attempt QA on the 'validating' stage."""
+        session = _make_session(build_context, build_registry)
+        design = {"architecture": "Test"}
+
+        session._build_state.set_deployment_plan([
+            _make_validating_stage(1, "Key Vault", layer="data", files=["main.tf"])
+        ])
+        session._build_state.set_design_snapshot(design)
+
+        qa_called = []
+
+        def mock_qa(*args, **kwargs):
+            qa_called.append(True)
+            return True
+
+        session._run_stage_qa = mock_qa
+
+        session.run(design=design, input_fn=lambda p: "done", print_fn=lambda m: None)
+
+        assert len(qa_called) > 0, "Re-entry must re-run QA on a 'validating' stage"
+
+    def test_qa_remediation_marks_validating_between_attempts(self, build_context, build_registry):
+        """After remediation writes files, status must be 'validating' before next QA check."""
+        session = _make_session(build_context, build_registry)
+
+        stage = {
+            "stage": 1,
+            "name": "Key Vault",
+            "layer": "data",
+            "capability": "data",
+            "services": [{"name": "key-vault", "resource_type": "Microsoft.KeyVault/vaults"}],
+            "files": ["main.tf"],
+        }
+
+        project_dir = Path(build_context.project_dir)
+        stage_dir = project_dir / "concept" / "infra" / "terraform" / "stage-1-key-vault"
+        stage_dir.mkdir(parents=True, exist_ok=True)
+        (stage_dir / "main.tf").write_text("resource {}", encoding="utf-8")
+        stage["files"] = [str((stage_dir / "main.tf").relative_to(project_dir))]
+
+        session._build_state.set_deployment_plan([stage])
+
+        # Track which mark_stage_* calls happen inside the remediation loop
+        status_calls = []
+        original_validating = session._build_state.mark_stage_validating
+        original_generated = session._build_state.mark_stage_generated
+
+        def spy_validating(sn, files):
+            original_validating(sn, files)
+            status_calls.append(("validating", sn))
+
+        def spy_generated(sn, files, agent):
+            original_generated(sn, files, agent)
+            status_calls.append(("generated", sn))
+
+        session._build_state.mark_stage_validating = spy_validating
+        session._build_state.mark_stage_generated = spy_generated
+
+        call_count = [0]
+
+        def mock_qa_execute(ctx, task):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return _make_response("VERDICT: FAIL\nCRITICAL: missing auth")
+            return _make_response("VERDICT: PASS")
+
+        mock_iac_agent = MagicMock()
+        mock_iac_agent.name = "terraform-agent"
+
+        session._qa_agent.execute = mock_qa_execute
+
+        with patch.object(session, "_select_agent", return_value=mock_iac_agent):
+            with patch.object(session, "_build_stage_task", return_value=(mock_iac_agent, "task")):
+                with patch.object(session, "_execute_with_retry", return_value=_make_response("```main.tf\nfixed\n```")):
+                    with patch.object(session, "_write_stage_files", return_value=["main.tf"]):
+                        with patch.object(session, "_apply_stage_transforms", return_value=["main.tf"]):
+                            passed = session._run_stage_qa(stage, "arch", [], False, lambda m: None)
+
+        assert passed is True
+        # The mark call inside the remediation loop must be "validating", not "generated"
+        assert any(status == "validating" for status, _ in status_calls), (
+            f"Remediation loop must call mark_stage_validating, not mark_stage_generated. "
+            f"Calls observed: {status_calls}"
+        )
 
 
 # ------------------------------------------------------------------
@@ -3997,6 +4370,7 @@ def mock_architect_agent_for_build():
 def mock_qa_agent():
     agent = MagicMock()
     agent.name = "qa-engineer"
+    agent.execute.return_value = _make_response("All looks good. No issues found.")
     return agent
 
 
@@ -4044,15 +4418,14 @@ class TestBuildSession:
             session._governance = mock_gov_cls.return_value
             session._policy_resolver._governance = mock_gov_cls.return_value
 
-            # Patch AgentOrchestrator.delegate to avoid real QA call
-            with patch("azext_prototype.stages.build_session.AgentOrchestrator") as mock_orch:
-                mock_orch.return_value.delegate.return_value = _make_response("QA looks good")
+            # QA agent returns clean review
+            session._qa_agent.execute.return_value = _make_response("QA looks good. No issues found.")
 
-                result = session.run(
-                    design={"architecture": "Sample architecture with key-vault and sql-database"},
-                    input_fn=lambda p: next(inputs),
-                    print_fn=lambda m: None,
-                )
+            result = session.run(
+                design={"architecture": "Sample architecture with key-vault and sql-database"},
+                input_fn=lambda p: next(inputs),
+                print_fn=lambda m: None,
+            )
 
         assert result.cancelled is False
         assert result.review_accepted is True
@@ -4377,14 +4750,13 @@ class TestBuildSession:
             session._governance = mock_gov_cls.return_value
             session._policy_resolver._governance = mock_gov_cls.return_value
 
-            with patch("azext_prototype.stages.build_session.AgentOrchestrator") as mock_orch:
-                mock_orch.return_value.delegate.return_value = _make_response("QA ok")
+            session._qa_agent.execute.return_value = _make_response("QA ok. No issues found.")
 
-                session.run(
-                    design=design,
-                    input_fn=lambda p: next(inputs),
-                    print_fn=lambda m: None,
-                )
+            session.run(
+                design=design,
+                input_fn=lambda p: next(inputs),
+                print_fn=lambda m: None,
+            )
 
         # Stage 1 (generated) should NOT have been re-run
         # Only doc agent should have been called (for stage 2)
@@ -4845,14 +5217,13 @@ class TestIncrementalBuildSession:
             session._governance = mock_gov_cls.return_value
             session._policy_resolver._governance = mock_gov_cls.return_value
 
-            with patch("azext_prototype.stages.build_session.AgentOrchestrator") as mock_orch:
-                mock_orch.return_value.delegate.return_value = _make_response("QA ok")
+            session._qa_agent.execute.return_value = _make_response("QA ok. No issues found.")
 
-                result = session.run(
-                    design=new_design,
-                    input_fn=lambda p: next(inputs),
-                    print_fn=lambda m: printed.append(m),
-                )
+            result = session.run(
+                design=new_design,
+                input_fn=lambda p: next(inputs),
+                print_fn=lambda m: printed.append(m),
+            )
 
         output = "\n".join(printed)
         assert "Design changes detected" in output
@@ -4941,14 +5312,13 @@ class TestIncrementalBuildSession:
             session._governance = mock_gov_cls.return_value
             session._policy_resolver._governance = mock_gov_cls.return_value
 
-            with patch("azext_prototype.stages.build_session.AgentOrchestrator") as mock_orch:
-                mock_orch.return_value.delegate.return_value = _make_response("QA ok")
+            session._qa_agent.execute.return_value = _make_response("QA ok. No issues found.")
 
-                result = session.run(
-                    design=new_design,
-                    input_fn=lambda p: next(inputs),
-                    print_fn=lambda m: printed.append(m),
-                )
+            result = session.run(
+                design=new_design,
+                input_fn=lambda p: next(inputs),
+                print_fn=lambda m: printed.append(m),
+            )
 
         output = "\n".join(printed)
         assert "full plan re-derive" in output.lower()
@@ -6266,11 +6636,10 @@ class TestPerStageQA:
 
         printed = []
 
-        with patch("azext_prototype.stages.build_session.AgentOrchestrator") as mock_orch:
-            mock_orch.return_value.delegate.return_value = _make_response(
-                "All looks good. Code is clean and well-structured."
-            )
-            session._run_stage_qa(stage, "arch", [], False, lambda m: printed.append(m))
+        qa_agent.execute = MagicMock(
+            return_value=_make_response("All looks good. Code is clean and well-structured.")
+        )
+        session._run_stage_qa(stage, "arch", [], False, lambda m: printed.append(m))
 
         output = "\n".join(printed)
         assert "passed QA" in output
@@ -6298,15 +6667,14 @@ class TestPerStageQA:
         printed = []
         call_count = [0]
 
-        def mock_delegate(**kwargs):
+        def mock_qa_execute(ctx, task):
             call_count[0] += 1
             if call_count[0] == 1:
                 return _make_response("CRITICAL: Missing managed identity config. Must fix.")
             return _make_response("All resolved, no remaining issues.")
 
-        with patch("azext_prototype.stages.build_session.AgentOrchestrator") as mock_orch:
-            mock_orch.return_value.delegate.side_effect = mock_delegate
-            session._run_stage_qa(stage, "arch", [], False, lambda m: printed.append(m))
+        qa_agent.execute = mock_qa_execute
+        session._run_stage_qa(stage, "arch", [], False, lambda m: printed.append(m))
 
         output = "\n".join(printed)
         assert "remediating" in output.lower()
@@ -6314,8 +6682,6 @@ class TestPerStageQA:
         assert call_count[0] >= 2
 
     def test_per_stage_qa_max_attempts(self, tmp_project):
-        pass
-
         session, qa_agent, tf_agent = self._make_session(tmp_project)
 
         stage_dir = tmp_project / "concept" / "infra" / "terraform" / "stage-1"
@@ -6337,10 +6703,11 @@ class TestPerStageQA:
 
         printed = []
 
-        with patch("azext_prototype.stages.build_session.AgentOrchestrator") as mock_orch:
-            # Always return issues
-            mock_orch.return_value.delegate.return_value = _make_response("CRITICAL: This will never be fixed.")
-            session._run_stage_qa(stage, "arch", [], False, lambda m: printed.append(m))
+        # Always return issues
+        qa_agent.execute = MagicMock(
+            return_value=_make_response("CRITICAL: This will never be fixed.")
+        )
+        session._run_stage_qa(stage, "arch", [], False, lambda m: printed.append(m))
 
         output = "\n".join(printed)
         assert "issues remain" in output.lower()
@@ -6383,6 +6750,129 @@ class TestPerStageQA:
         stage = {"stage": 1, "name": "Foundation", "files": []}
         content = session._collect_stage_file_content(stage)
         assert content == ""
+
+    def test_qa_collects_complete_review_before_evaluating(self, tmp_project):
+        """When a QA review response is truncated (finish_reason=length),
+        the system must continue collecting until the full review is received,
+        then evaluate the concatenated result.
+
+        Business requirement: QA must never evaluate a partial review.
+        """
+        session, qa_agent, tf_agent = self._make_session(tmp_project)
+
+        stage_dir = tmp_project / "concept" / "infra" / "terraform" / "stage-1"
+        stage_dir.mkdir(parents=True, exist_ok=True)
+        (stage_dir / "main.tf").write_text(
+            'resource "azapi_resource" "rg" {\n  type = "Microsoft.Resources/resourceGroups@2025-06-01"\n}'
+        )
+
+        stage = {
+            "stage": 1,
+            "name": "Foundation",
+            "capability": "infra",
+            "dir": "concept/infra/terraform/stage-1",
+            "files": ["concept/infra/terraform/stage-1/main.tf"],
+            "status": "generated",
+            "services": [],
+        }
+
+        # First response: truncated mid-review (no verdict yet)
+        truncated = _make_response(
+            "### Review\n\nChecking authentication...\nChecking cross-stage refs...\n",
+            finish_reason="length",
+        )
+        # Second response: continuation completes the review with a verdict
+        complete = _make_response(
+            "\nAll checks passed.\n\nVERDICT: PASS",
+            finish_reason="stop",
+        )
+        qa_agent.execute = MagicMock(side_effect=[truncated, complete])
+
+        printed = []
+        passed = session._run_stage_qa(stage, "arch", [], False, lambda m: printed.append(m))
+
+        assert passed is True, "Stage should pass QA after full review is collected"
+        assert qa_agent.execute.call_count == 2, "QA agent should be called twice (initial + continuation)"
+        assert "passed QA" in "\n".join(printed)
+
+    def test_qa_continuation_requests_review_not_code(self, tmp_project):
+        """When QA is continued after truncation, the continuation prompt
+        must instruct the agent to continue reviewing — not to generate code.
+
+        Business requirement: a truncated QA review must never trigger
+        code generation in the continuation response.
+        """
+        session, qa_agent, tf_agent = self._make_session(tmp_project)
+
+        stage_dir = tmp_project / "concept" / "infra" / "terraform" / "stage-1"
+        stage_dir.mkdir(parents=True, exist_ok=True)
+        (stage_dir / "main.tf").write_text(
+            'resource "azapi_resource" "rg" {\n  type = "Microsoft.Resources/resourceGroups@2025-06-01"\n}'
+        )
+
+        stage = {
+            "stage": 1,
+            "name": "Foundation",
+            "capability": "infra",
+            "dir": "concept/infra/terraform/stage-1",
+            "files": ["concept/infra/terraform/stage-1/main.tf"],
+            "status": "generated",
+            "services": [],
+        }
+
+        truncated = _make_response("Partial review...", finish_reason="length")
+        complete = _make_response("\nVERDICT: PASS", finish_reason="stop")
+        qa_agent.execute = MagicMock(side_effect=[truncated, complete])
+
+        session._run_stage_qa(stage, "arch", [], False, lambda m: None)
+
+        # The continuation call (second invoke) must contain review language
+        second_call_args = qa_agent.execute.call_args_list[1]
+        continuation_task = second_call_args[0][1]  # positional arg: (context, task)
+        continuation_lower = continuation_task.lower()
+
+        assert "review" in continuation_lower, "Continuation prompt must mention 'review'"
+        assert "do not" in continuation_lower and "code" in continuation_lower, (
+            "Continuation prompt must instruct agent NOT to generate code"
+        )
+
+    def test_qa_review_does_not_contaminate_generation_history(self, tmp_project):
+        """QA review messages — including continuations — must not leak
+        into the conversation history used for subsequent stage generation.
+
+        Business requirement: each stage's generation must start from a
+        clean context, uncontaminated by QA review exchanges.
+        """
+        session, qa_agent, tf_agent = self._make_session(tmp_project)
+
+        stage_dir = tmp_project / "concept" / "infra" / "terraform" / "stage-1"
+        stage_dir.mkdir(parents=True, exist_ok=True)
+        (stage_dir / "main.tf").write_text(
+            'resource "azapi_resource" "rg" {\n  type = "Microsoft.Resources/resourceGroups@2025-06-01"\n}'
+        )
+
+        stage = {
+            "stage": 1,
+            "name": "Foundation",
+            "capability": "infra",
+            "dir": "concept/infra/terraform/stage-1",
+            "files": ["concept/infra/terraform/stage-1/main.tf"],
+            "status": "generated",
+            "services": [],
+        }
+
+        history_before = len(session._context.conversation_history)
+
+        truncated = _make_response("Partial review...", finish_reason="length")
+        complete = _make_response("\nVERDICT: PASS", finish_reason="stop")
+        qa_agent.execute = MagicMock(side_effect=[truncated, complete])
+
+        session._run_stage_qa(stage, "arch", [], False, lambda m: None)
+
+        history_after = len(session._context.conversation_history)
+        assert history_after == history_before, (
+            f"QA contaminated conversation history: {history_before} → {history_after} messages"
+        )
 
 
 # ======================================================================
@@ -6529,21 +7019,20 @@ class TestAdvisoryQA:
             session._governance = mock_gov_cls.return_value
             session._policy_resolver._governance = mock_gov_cls.return_value
 
-            with patch("azext_prototype.stages.build_session.AgentOrchestrator") as mock_orch:
-                # Return warnings — in old code this would trigger remediation
-                mock_orch.return_value.delegate.return_value = _make_response(
-                    "WARNING: Missing monitoring. CRITICAL: No backup config."
+            # QA agent returns warnings — in old code this would trigger remediation
+            qa_agent.execute = MagicMock(
+                return_value=_make_response("WARNING: Missing monitoring. CRITICAL: No backup config.")
+            )
+
+            with patch.object(session, "_identify_affected_stages") as mock_identify:
+                session.run(
+                    design={"architecture": "Simple architecture"},
+                    input_fn=lambda p: next(inputs),
+                    print_fn=lambda m: None,
                 )
 
-                with patch.object(session, "_identify_affected_stages") as mock_identify:
-                    session.run(
-                        design={"architecture": "Simple architecture"},
-                        input_fn=lambda p: next(inputs),
-                        print_fn=lambda m: None,
-                    )
-
-                    # _identify_affected_stages should NOT have been called during Phase 4
-                    mock_identify.assert_not_called()
+                # _identify_affected_stages should NOT have been called during Phase 4
+                mock_identify.assert_not_called()
 
     def test_advisory_qa_header_says_advisory(self, tmp_project):
         """Output should contain 'Advisory notes' not 'QA Review'."""

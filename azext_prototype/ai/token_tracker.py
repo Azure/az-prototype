@@ -44,30 +44,35 @@ _CONTEXT_WINDOWS: dict[str, int] = {
 # GitHub Copilot Premium Request Unit (PRU) multipliers.
 # Each API call costs (1 × multiplier) PRUs.  Only applies to the
 # Copilot provider — models not in this table produce 0 PRUs.
-# Source: https://docs.github.com/en/copilot/concepts/billing/copilot-requests
+# Source: https://docs.github.com/en/copilot/managing-copilot/monitoring-usage-and-entitlements/about-premium-requests
+# Last updated: 2026-04-08
 _PRU_MULTIPLIERS: dict[str, float] = {
     # Included with paid plans (0 PRUs)
     "gpt-5-mini": 0,
     "gpt-4.1": 0,
     "gpt-4o": 0,
+    "raptor-mini": 0,
     # Low-cost (0.25–0.33 PRUs per request)
     "grok-code-fast-1": 0.25,
     "claude-haiku-4.5": 0.33,
     "gemini-3-flash": 0.33,
-    "gpt-5.1-codex-mini": 0.33,
     "gpt-5.4-mini": 0.33,
     # Standard (1 PRU per request)
     "claude-sonnet-4": 1,
     "claude-sonnet-4.5": 1,
     "claude-sonnet-4.6": 1,
+    "gemini-2.5-pro": 1,
     "gemini-3-pro": 1,
-    "gemini-3-pro-1.5": 1,
+    "gemini-3.1-pro": 1,
     "gpt-5.1": 1,
     "gpt-5.2": 1,
+    "gpt-5.2-codex": 1,
+    "gpt-5.3-codex": 1,
     "gpt-5.4": 1,
     # Premium (3+ PRUs per request)
     "claude-opus-4.5": 3,
     "claude-opus-4.6": 3,
+    "claude-opus-4.6-fast": 30,
 }
 
 

@@ -233,6 +233,8 @@ Classify each failure as CRITICAL (must fix before deploy) or WARNING (should fi
 - [ ] deploy.sh includes error handling (set -euo pipefail, trap)
 - [ ] deploy.sh exports outputs to JSON file for downstream stages
 - [ ] deploy.sh includes Azure login verification
+- [ ] deploy.sh does NOT use `terraform output -state=` — this flag was removed
+      in Terraform 1.9. Use `jq` on the state file or `cd` into the stage directory
 
 ### 4. Output Completeness
 - [ ] outputs.tf exports resource group name(s)
@@ -251,8 +253,8 @@ Classify each failure as CRITICAL (must fix before deploy) or WARNING (should fi
 - [ ] All referenced variables are defined in variables.tf
 - [ ] All referenced locals are defined in locals.tf
 - [ ] Application code includes all referenced classes/models/DTOs
-- [ ] Every azapi_resource whose `.output.properties` is referenced in
-      outputs.tf MUST have `response_export_values = ["*"]` declared
+- [ ] EVERY `azapi_resource` block MUST have `response_export_values = ["*"]`
+      declared — no exceptions, even if outputs.tf does not reference its properties
 - [ ] No .tf file is empty or contains only comments (dead files)
 
 ### 7. Terraform File Structure
@@ -314,6 +316,8 @@ Classify each failure as CRITICAL (must fix before deploy) or WARNING (should fi
       **NOT** string interpolation on the storage account ID
 - [ ] RBAC assignments for the worker identity (Stage 1) are **unconditional**
       (no `count`). The worker identity exists before any service stage runs.
+- [ ] UUID values in role assignment names contain only valid hex characters
+      `[0-9a-f]` — letters `g`-`z` are invalid and ARM rejects with `InvalidName`
 
 ### 13. Application Code (app stages only)
 - [ ] Application source code is syntactically correct and complete
