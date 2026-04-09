@@ -163,6 +163,56 @@ const BENCHMARK_HISTORY = [
       {n:10,ghcp:82,comp:79},{n:11,ghcp:81,comp:77},{n:12,ghcp:85,comp:72},
       {n:13,ghcp:95,comp:79},{n:14,ghcp:20,comp:95}
     ]
+  },
+  {
+    date: "2026-04-08",
+    model: "Sonnet 4.6",
+    project: "KanFlow Azure POC",
+    ghcp_scores: {
+      "B-INST":80,"B-CNST":81,"B-TECH":79,"B-SEC":88,
+      "B-OPS":86,"B-DEP":82,"B-SCOPE":90,"B-QUAL":77,
+      "B-OUT":77,"B-CONS":72,"B-DOC":74,"B-REL":79,
+      "B-RBAC":89,"B-ANTI":87
+    },
+    comparison_scores: {
+      "B-INST":87,"B-CNST":86,"B-TECH":84,"B-SEC":89,
+      "B-OPS":80,"B-DEP":82,"B-SCOPE":89,"B-QUAL":85,
+      "B-OUT":83,"B-CONS":80,"B-DOC":78,"B-REL":90,
+      "B-RBAC":83,"B-ANTI":87
+    },
+    // Per-benchmark sub-factor scores for the latest run
+    ghcp_factors: {
+      "B-INST":{f1:24,f2:20,f3:16,f4:12,f5:8},
+      "B-CNST":{f1:28,f2:24,f3:12,f4:8,f5:9},
+      "B-TECH":{f1:20,f2:20,f3:16,f4:12,f5:11},
+      "B-SEC":{f1:22,f2:22,f3:18,f4:13,f5:13},
+      "B-OPS":{f1:22,f2:17,f3:17,f4:17,f5:13},
+      "B-DEP":{f1:25,f2:20,f3:16,f4:12,f5:9},
+      "B-SCOPE":{f1:32,f2:22,f3:18,f4:9,f5:9},
+      "B-QUAL":{f1:19,f2:15,f3:15,f4:12,f5:16},
+      "B-OUT":{f1:27,f2:15,f3:15,f4:12,f5:8},
+      "B-CONS":{f1:18,f2:14,f3:14,f4:14,f5:12},
+      "B-DOC":{f1:19,f2:18,f3:15,f4:11,f5:11},
+      "B-REL":{f1:24,f2:20,f3:20,f4:15},
+      "B-RBAC":{f1:27,f2:18,f3:18,f4:13,f5:13},
+      "B-ANTI":{f1:22,f2:17,f3:17,f4:17,f5:14}
+    },
+    comparison_factors: {
+      "B-INST":{f1:26,f2:22,f3:17,f4:13,f5:9},
+      "B-CNST":{f1:30,f2:26,f3:13,f4:9,f5:8},
+      "B-TECH":{f1:21,f2:21,f3:17,f4:13,f5:12},
+      "B-SEC":{f1:22,f2:22,f3:18,f4:14,f5:13},
+      "B-OPS":{f1:20,f2:16,f3:16,f4:16,f5:12},
+      "B-DEP":{f1:25,f2:20,f3:16,f4:12,f5:9},
+      "B-SCOPE":{f1:31,f2:22,f3:18,f4:9,f5:9},
+      "B-QUAL":{f1:21,f2:17,f3:17,f4:13,f5:17},
+      "B-OUT":{f1:29,f2:17,f3:17,f4:12,f5:8},
+      "B-CONS":{f1:20,f2:16,f3:16,f4:16,f5:12},
+      "B-DOC":{f1:20,f2:19,f3:16,f4:12,f5:11},
+      "B-REL":{f1:27,f2:22,f3:23,f4:18},
+      "B-RBAC":{f1:25,f2:17,f3:17,f4:12,f5:12},
+      "B-ANTI":{f1:22,f2:17,f3:17,f4:17,f5:14}
+    }
   }
 ];
 

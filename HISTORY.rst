@@ -3,6 +3,93 @@
 Release History
 ===============
 
+0.2.1b7
++++++++
+
+Build stage re-entry fix
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **QA remediation failure now retries on re-entry** — fixed a bug where
+  ``mark_stage_generated()`` was called after each remediation attempt
+  inside ``_run_stage_qa()``, leaving the stage with status ``"generated"``
+  even when QA subsequently failed.  On re-entry, the stage was skipped
+  instead of retried.  Changed to ``mark_stage_validating()`` so failed
+  stages remain in the retry list.
+
+QA checklist hardening
+~~~~~~~~~~~~~~~~~~~~~~~~
+* **Aligned response_export_values directive** — QA checklist now requires
+  ``response_export_values = ["*"]`` on EVERY ``azapi_resource``, matching
+  the terraform agent's mandatory rule (was conditional on output usage).
+* **Added deploy.sh -state= flag check** — QA checklist now flags use of
+  ``terraform output -state=`` which was removed in Terraform 1.9.
+* **Added UUID hex validation** — QA checklist now checks that UUID values
+  in role assignment names contain only valid hex characters ``[0-9a-f]``.
+
+Full stage retry on QA exhaustion
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Full stage retry when QA remediation fails** -- when QA remediation
+  exhausts all attempts for a stage, the build now retries the entire
+  stage from scratch (clean artifacts, regenerate, QA) instead of
+  stopping the build immediately.  Previous QA findings are injected
+  into the new generation prompt — framed as guidance rather than
+  file-specific instructions — so the model avoids the same classes
+  of mistakes on the fresh attempt.
+
+  In practice, the same generation prompt produces passing code ~90%
+  of the time.  The remaining ~10% failure rate is stochastic — not a
+  systematic prompt deficiency — meaning a fresh generation with
+  knowledge of what went wrong almost always succeeds.  Without this
+  retry, that 10% forces the user to manually re-run the entire build,
+  losing the progress of all previously generated stages.  The retry
+  doubles the token cost of one stage in the worst case, but saves
+  the full cost of restarting a 16-stage build from scratch.
+
+  Controlled by ``_MAX_FULL_STAGE_ATTEMPTS`` (default 2: 1 initial
+  + 1 fresh retry).
+
+Generation prompt improvements
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Front-loaded remote state no-dead-code directive** — when upstream
+  stages exist, a ``CROSS-STAGE DEPENDENCIES — NO DEAD CODE`` section
+  now appears before the architecture context in the generation prompt,
+  reducing unused ``terraform_remote_state`` data sources.
+
+Agent-level service filtering
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Agent governance checks now filter by service namespace** — added
+  ``stage_services`` field to ``AgentContext``, populated by
+  ``_agent_build_context()``.  ``_apply_governance_check()`` now passes
+  stage services to ``validate_response()``, reducing false positive
+  anti-pattern warnings for irrelevant service namespaces.
+
+ReDoS fix in transform handlers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Replaced nested-quantifier regex with brace counting** — extracted
+  shared ``_find_azapi_blocks()`` helper and rewrote
+  ``_add_response_export_values``, ``_add_resource_group_parent_id``,
+  and ``_remove_private_endpoint_resources`` to use it.  Eliminates
+  potential exponential backtracking on pathological input.
+
+Test suite consolidation
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **Consolidated and enhanced unit test coverage** — migrated flat test
+  files to a mirrored directory structure (1:1 test-to-source mapping),
+  merged split test files, and removed ~114 duplicate tests across 10
+  files.  Test suite reduced from 3,644 to 3,530 tests with zero loss
+  of unique coverage.
+
+QA review continuation for large stages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **QA review collects complete response before evaluating** — when the
+  QA review response is truncated (``finish_reason=length``), the build
+  session now continues requesting until the full review is received,
+  then evaluates the concatenated result.  Uses the existing
+  ``_execute_with_continuation()`` pattern with a review-specific
+  continuation prompt that prevents the QA agent from generating code
+  in the continuation.  Conversation history is saved and restored
+  around QA calls to prevent review messages from contaminating
+  subsequent stage generation.
+
 0.2.1b6
 +++++++
 

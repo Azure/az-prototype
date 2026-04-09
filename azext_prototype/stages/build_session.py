@@ -29,7 +29,6 @@ from typing import Any, Callable, Iterator
 
 from azext_prototype.agents.base import AgentCapability, AgentContext
 from azext_prototype.agents.governance import GovernanceContext
-from azext_prototype.agents.orchestrator import AgentOrchestrator
 from azext_prototype.agents.registry import AgentRegistry
 from azext_prototype.config import ProjectConfig
 from azext_prototype.naming import create_naming_strategy
@@ -58,6 +57,11 @@ _SLASH_COMMANDS = frozenset({"/status", "/stages", "/files", "/policy", "/descri
 
 # Maximum remediation cycles per stage before proceeding
 _MAX_STAGE_REMEDIATION_ATTEMPTS = 3
+
+# Maximum full stage attempts (generation + QA cycle). When QA remediation
+# exhausts all attempts, the stage is cleaned and regenerated from scratch
+# with prior QA findings injected into the generation prompt.
+_MAX_FULL_STAGE_ATTEMPTS = 2  # 1 initial + 1 fresh retry
 
 # Keywords that indicate QA found actionable issues (fallback tier)
 _QA_ISSUE_KEYWORDS = frozenset({"critical", "error", "missing", "fix", "issue", "broken"})
@@ -247,6 +251,10 @@ class BuildSession(SessionMixin):
                 {"naming": {"strategy": "simple"}, "project": {"name": self._project_name}}
             )
 
+        # Last QA content from a failed QA remediation — injected into the
+        # generation prompt on full stage retry so the model knows what to avoid.
+        self._last_qa_content: str = ""
+
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
@@ -395,7 +403,8 @@ class BuildSession(SessionMixin):
         else:
             # Branch C: No design changes
             pending_check = self._build_state.get_pending_stages()
-            if pending_check:
+            validating_check = self._build_state.get_validating_stages()
+            if pending_check or validating_check:
                 _print("Resuming from existing deployment plan.")
                 _print("")
             else:
@@ -490,7 +499,7 @@ class BuildSession(SessionMixin):
             # Handle re-entry: "validating" stages need QA re-run only
             if stage_status == "validating":
                 _print(f"[{generated_count}/{total_stages}] Stage {stage_num}: {stage_name} (re-validating)")
-                if layer in ("core", "infra", "data", "app"):
+                if stage.get("files"):
                     qa_passed = self._run_stage_qa(stage, architecture, templates, use_styled, _print)
                     if qa_passed:
                         self._build_state.mark_stage_generated(stage_num, stage.get("files", []), "user-fix")
@@ -521,57 +530,139 @@ class BuildSession(SessionMixin):
             # Use condensed per-stage context (from one-time condensation call)
             focused_context = stage_contexts.get(stage_num, "")
 
-            # App-layer stages use architect → developer delegation
-            sub_layer_context = ""
-            if layer == "app" and (self._app_architect or self._csharp_dev or self._python_dev or self._react_dev):
-                agent, sub_layer_context = self._decompose_app_stage(stage, focused_context, _print)
-            else:
-                agent = self._select_agent(stage)
-            if not agent:
-                _print(f"       Skipped (no agent for capability '{stage.get('capability', '')}')")
-                continue
+            # ---- Full stage retry loop ----
+            # When QA remediation exhausts all attempts, clean the stage and
+            # regenerate from scratch with prior QA findings injected.
+            prior_qa_findings = ""
+            stage_completed = False
+            written_paths: list[str] = []
+            agent = None
 
-            with self._agent_build_context(agent, stage):
-                # Clear conversation history so prior stage context cannot
-                # bleed into this stage (especially after truncation/continuation).
-                self._context.conversation_history.clear()
+            for full_attempt in range(_MAX_FULL_STAGE_ATTEMPTS):
+                if full_attempt > 0:
+                    _print(
+                        f"       Full retry ({full_attempt}/{_MAX_FULL_STAGE_ATTEMPTS - 1}): "
+                        f"regenerating stage from scratch..."
+                    )
+                    self._build_state.clean_stage_artifacts(stage_num, self._context.project_dir)
 
-                _, task = self._build_stage_task(stage, focused_context, templates)
+                # App-layer stages use architect → developer delegation
+                sub_layer_context = ""
+                if layer == "app" and (self._app_architect or self._csharp_dev or self._python_dev or self._react_dev):
+                    agent, sub_layer_context = self._decompose_app_stage(stage, focused_context, _print)
+                else:
+                    agent = self._select_agent(stage)
+                if not agent:
+                    _print(f"       Skipped (no agent for capability '{stage.get('capability', '')}')")
+                    break
 
-                # Inject sub-layer guidance for app stages
-                if sub_layer_context:
-                    task += f"\n{sub_layer_context}\n"
+                with self._agent_build_context(agent, stage):
+                    # Clear conversation history so prior stage context cannot
+                    # bleed into this stage (especially after truncation/continuation).
+                    self._context.conversation_history.clear()
+
+                    _, task = self._build_stage_task(
+                        stage, focused_context, templates, prior_qa_findings=prior_qa_findings
+                    )
+
+                    # Inject sub-layer guidance for app stages
+                    if sub_layer_context:
+                        task += f"\n{sub_layer_context}\n"
+
+                    _dbg_flow(
+                        "build_session.generate",
+                        f"Stage {stage_num} task prompt",
+                        layer=layer,
+                        capability=stage.get("capability", ""),
+                        agent_name=agent.name,
+                        delegated=bool(sub_layer_context),
+                        task_len=len(task),
+                        has_service_policies="MANDATORY RESOURCE POLICIES" in task,
+                        has_api_versions="Resource API Versions" in task,
+                        has_companion="Companion Resource Requirements" in task,
+                        has_networking_note="Networking Stage" in task,
+                        task_full=task,
+                    )
+
+                    self._build_state.mark_stage_generating(stage_num)
+                    try:
+                        with self._maybe_spinner(f"Building Stage {stage_num}: {stage_name}...", use_styled):
+                            response = self._execute_with_retry(
+                                agent, task, stage_num, stage_name, _print, stage_capability=layer
+                            )
+                        if response is None:
+                            # All retry attempts exhausted — stop build
+                            build_stopped = True
+                            break
+                    except Exception as exc:
+                        _print(f"       Agent error in Stage {stage_num} — routing to QA for diagnosis...")
+                        svc_names_list = [s.get("name", "") for s in services if s.get("name")]
+                        route_error_to_qa(
+                            exc,
+                            f"Build Stage {stage_num}: {stage_name}",
+                            self._qa_agent,
+                            self._context,
+                            self._token_tracker,
+                            _print,
+                            services=svc_names_list,
+                            escalation_tracker=self._escalation_tracker,
+                            source_agent=agent.name,
+                            source_stage="build",
+                        )
+                        break  # Agent error — not stochastic, don't retry
+
+                if response:
+                    self._token_tracker.record(response)
+                content = response.content if response else ""
 
                 _dbg_flow(
                     "build_session.generate",
-                    f"Stage {stage_num} task prompt",
+                    f"Stage {stage_num} response",
                     layer=layer,
                     capability=stage.get("capability", ""),
                     agent_name=agent.name,
-                    delegated=bool(sub_layer_context),
-                    task_len=len(task),
-                    has_service_policies="MANDATORY RESOURCE POLICIES" in task,
-                    has_api_versions="Resource API Versions" in task,
-                    has_companion="Companion Resource Requirements" in task,
-                    has_networking_note="Networking Stage" in task,
-                    task_full=task,
+                    content_len=len(content) if content else 0,
+                    content_type=type(content).__name__,
+                    content_full=content if content else "(empty)",
                 )
 
-                self._build_state.mark_stage_generating(stage_num)
-                try:
-                    with self._maybe_spinner(f"Building Stage {stage_num}: {stage_name}...", use_styled):
-                        response = self._execute_with_retry(
-                            agent, task, stage_num, stage_name, _print, stage_capability=layer
+                # Debug: scan response for anti-pattern violations before policy resolver
+                # Skip scanning for docs and app stages — docs describe the architecture
+                # and app stages generate source code, not IaC. Both trigger false positives.
+                if content and layer not in ("docs", "app"):
+                    try:
+                        from azext_prototype.governance.anti_patterns import (
+                            scan as _ap_scan,
                         )
-                    if response is None:
-                        # All retry attempts exhausted — stop build
-                        build_stopped = True
-                        break
-                except Exception as exc:
-                    _print(f"       Agent error in Stage {stage_num} — routing to QA for diagnosis...")
+
+                        stage_svc_types = [s.get("resource_type", "") for s in services if s.get("resource_type")]
+                        _ap_violations = _ap_scan(
+                            content, iac_tool=self._iac_tool, agent_name=agent.name, services=stage_svc_types
+                        )
+                        if _ap_violations:
+                            _dbg_flow(
+                                "build_session.generate",
+                                f"Stage {stage_num} anti-pattern violations detected",
+                                violation_count=len(_ap_violations),
+                                violations=_ap_violations,
+                            )
+                    except Exception:
+                        pass
+
+                # Debug: check what the parser would extract
+                _dbg_files = parse_file_blocks(content) if content else {}
+                _dbg_flow(
+                    "build_session.generate",
+                    f"Stage {stage_num} parse_file_blocks",
+                    file_count=len(_dbg_files),
+                    filenames=list(_dbg_files.keys())[:10],
+                )
+
+                if not content:
+                    _print(f"       Empty response for Stage {stage_num} — routing to QA for diagnosis...")
                     svc_names_list = [s.get("name", "") for s in services if s.get("name")]
                     route_error_to_qa(
-                        exc,
+                        "Agent returned empty response",
                         f"Build Stage {stage_num}: {stage_name}",
                         self._qa_agent,
                         self._context,
@@ -582,150 +673,97 @@ class BuildSession(SessionMixin):
                         source_agent=agent.name,
                         source_stage="build",
                     )
-                    continue
+                written_paths = self._write_stage_files(stage, content)
+                written_paths = self._apply_stage_transforms(stage, written_paths, _print)
 
-            if response:
-                self._token_tracker.record(response)
-            content = response.content if response else ""
-
-            _dbg_flow(
-                "build_session.generate",
-                f"Stage {stage_num} response",
-                layer=layer,
-                capability=stage.get("capability", ""),
-                agent_name=agent.name,
-                content_len=len(content) if content else 0,
-                content_type=type(content).__name__,
-                content_full=content if content else "(empty)",
-            )
-
-            # Debug: scan response for anti-pattern violations before policy resolver
-            # Skip scanning for docs and app stages — docs describe the architecture
-            # and app stages generate source code, not IaC. Both trigger false positives.
-            if content and layer not in ("docs", "app"):
-                try:
-                    from azext_prototype.governance.anti_patterns import (
-                        scan as _ap_scan,
-                    )
-
-                    stage_svc_types = [s.get("resource_type", "") for s in services if s.get("resource_type")]
-                    _ap_violations = _ap_scan(
-                        content, iac_tool=self._iac_tool, agent_name=agent.name, services=stage_svc_types
-                    )
-                    if _ap_violations:
-                        _dbg_flow(
-                            "build_session.generate",
-                            f"Stage {stage_num} anti-pattern violations detected",
-                            violation_count=len(_ap_violations),
-                            violations=_ap_violations,
-                        )
-                except Exception:
-                    pass
-
-            # Debug: check what the parser would extract
-            _dbg_files = parse_file_blocks(content) if content else {}
-            _dbg_flow(
-                "build_session.generate",
-                f"Stage {stage_num} parse_file_blocks",
-                file_count=len(_dbg_files),
-                filenames=list(_dbg_files.keys())[:10],
-            )
-
-            if not content:
-                _print(f"       Empty response for Stage {stage_num} — routing to QA for diagnosis...")
-                svc_names_list = [s.get("name", "") for s in services if s.get("name")]
-                route_error_to_qa(
-                    "Agent returned empty response",
-                    f"Build Stage {stage_num}: {stage_name}",
-                    self._qa_agent,
-                    self._context,
-                    self._token_tracker,
-                    _print,
-                    services=svc_names_list,
-                    escalation_tracker=self._escalation_tracker,
-                    source_agent=agent.name,
-                    source_stage="build",
+                _dbg_flow(
+                    "build_session.generate",
+                    f"Stage {stage_num} written_paths",
+                    count=len(written_paths),
+                    paths=written_paths[:5],
                 )
-            written_paths = self._write_stage_files(stage, content)
-            written_paths = self._apply_stage_transforms(stage, written_paths, _print)
 
-            _dbg_flow(
-                "build_session.generate",
-                f"Stage {stage_num} written_paths",
-                count=len(written_paths),
-                paths=written_paths[:5],
-            )
+                # Files written — mark as validating (ready for QA)
+                self._build_state.mark_stage_validating(stage_num, written_paths)
 
-            # Files written — mark as validating (ready for QA)
-            self._build_state.mark_stage_validating(stage_num, written_paths)
-
-            if written_paths:
-                if use_styled:
-                    self._console.print_file_list(written_paths)
+                if written_paths:
+                    if use_styled:
+                        self._console.print_file_list(written_paths)
+                    else:
+                        for f in written_paths:
+                            _print(f"         {f}")
                 else:
-                    for f in written_paths:
-                        _print(f"         {f}")
-            else:
-                _print("       No files extracted from response.")
+                    _print("       No files extracted from response.")
 
-            # Policy check — runs on all stage categories
-            if content:
-                resolutions, needs_regen = self._policy_resolver.check_and_resolve(
-                    agent.name,
-                    content,
-                    self._build_state,
-                    stage_num,
-                    input_fn=input_fn,
-                    print_fn=print_fn,
-                    iac_tool=self._iac_tool,
-                )
+                # Policy check — runs on all stage categories
+                if content:
+                    resolutions, needs_regen = self._policy_resolver.check_and_resolve(
+                        agent.name,
+                        content,
+                        self._build_state,
+                        stage_num,
+                        input_fn=input_fn,
+                        print_fn=print_fn,
+                        iac_tool=self._iac_tool,
+                    )
 
-                if needs_regen:
-                    fix_instructions = self._policy_resolver.build_fix_instructions(resolutions)
-                    _print("Regenerating with fix instructions...")
+                    if needs_regen:
+                        fix_instructions = self._policy_resolver.build_fix_instructions(resolutions)
+                        _print("Regenerating with fix instructions...")
 
-                    try:
-                        with self._maybe_spinner(f"Re-building Stage {stage_num}...", use_styled):
-                            response = self._execute_with_retry(
-                                agent,
-                                task + fix_instructions,
-                                stage_num,
-                                stage_name,
+                        try:
+                            with self._maybe_spinner(f"Re-building Stage {stage_num}...", use_styled):
+                                response = self._execute_with_retry(
+                                    agent,
+                                    task + fix_instructions,
+                                    stage_num,
+                                    stage_name,
+                                    _print,
+                                    stage_capability=layer,
+                                )
+                            if response is None:
+                                build_stopped = True
+                                break
+                        except Exception as exc:
+                            svc_names_list = [s.get("name", "") for s in services if s.get("name")]
+                            route_error_to_qa(
+                                exc,
+                                f"Build Stage {stage_num} (regen): {stage_name}",
+                                self._qa_agent,
+                                self._context,
+                                self._token_tracker,
                                 _print,
-                                stage_capability=layer,
+                                services=svc_names_list,
+                                escalation_tracker=self._escalation_tracker,
+                                source_agent=agent.name,
+                                source_stage="build",
                             )
-                        if response is None:
-                            build_stopped = True
-                            break
-                    except Exception as exc:
-                        svc_names_list = [s.get("name", "") for s in services if s.get("name")]
-                        route_error_to_qa(
-                            exc,
-                            f"Build Stage {stage_num} (regen): {stage_name}",
-                            self._qa_agent,
-                            self._context,
-                            self._token_tracker,
-                            _print,
-                            services=svc_names_list,
-                            escalation_tracker=self._escalation_tracker,
-                            source_agent=agent.name,
-                            source_stage="build",
-                        )
-                        continue
+                            break  # Agent error — not stochastic, don't retry
 
-                    if response:
-                        self._token_tracker.record(response)
-                    content = response.content if response else ""
-                    written_paths = self._write_stage_files(stage, content)
-                    written_paths = self._apply_stage_transforms(stage, written_paths, _print)
-                    self._build_state.mark_stage_validating(stage_num, written_paths)
+                        if response:
+                            self._token_tracker.record(response)
+                        content = response.content if response else ""
+                        written_paths = self._write_stage_files(stage, content)
+                        written_paths = self._apply_stage_transforms(stage, written_paths, _print)
+                        self._build_state.mark_stage_validating(stage_num, written_paths)
 
-            # Per-stage QA validation — runs on all stages that produce files
-            qa_passed = True
-            if written_paths:
-                qa_passed = self._run_stage_qa(stage, architecture, templates, use_styled, _print)
+                # Per-stage QA validation — runs on all stages that produce files
+                qa_passed = True
+                if written_paths:
+                    qa_passed = self._run_stage_qa(stage, architecture, templates, use_styled, _print)
 
-            if qa_passed:
+                if qa_passed:
+                    stage_completed = True
+                    break  # QA passed — exit retry loop
+
+                # QA failed — capture findings for next full attempt
+                prior_qa_findings = self._last_qa_content
+
+            # ---- After full stage retry loop ----
+            if build_stopped:
+                break  # Propagate to stage loop
+
+            if stage_completed and agent is not None:
                 self._build_state.mark_stage_generated(stage_num, written_paths, agent.name)
 
                 # Per-stage advisory (non-blocking — failure is logged, not fatal)
@@ -735,8 +773,10 @@ class BuildSession(SessionMixin):
 
                 if self._update_task_fn:
                     self._update_task_fn(task_id, "completed")
+            elif not agent:
+                continue  # No agent — skip to next stage
             else:
-                # QA failed after max attempts — stop build
+                # All full attempts exhausted — stop build
                 build_stopped = True
                 if use_styled:
                     self._console.print_token_status(self._token_tracker.format_status())
@@ -1803,10 +1843,13 @@ class BuildSession(SessionMixin):
         layer = stage.get("layer", "")
         self._apply_governor_brief(agent, stage.get("name", ""), stage.get("services", []), layer)
         self._apply_stage_knowledge(agent, stage)
+        svc_types = [s.get("resource_type", "") for s in stage.get("services", []) if s.get("resource_type")]
+        self._context.stage_services = svc_types or None
         try:
             yield agent
         finally:
             agent.set_knowledge_override("")
+            self._context.stage_services = None
 
     def _apply_stage_knowledge(self, agent: Any, stage: dict) -> None:
         """Set stage-specific knowledge on the agent.
@@ -2113,6 +2156,7 @@ class BuildSession(SessionMixin):
         stage: dict,
         architecture: str,
         templates: list,
+        prior_qa_findings: str = "",
     ) -> tuple[Any | None, str]:
         """Build the task prompt for a stage.
 
@@ -2199,9 +2243,37 @@ class BuildSession(SessionMixin):
 
         layer = stage.get("layer", "")
 
-        task = (
-            f"Generate{tool_label} code for deployment "
-            f"Stage {stage['stage']}: {stage_name}.\n\n"
+        task = f"Generate{tool_label} code for deployment " f"Stage {stage['stage']}: {stage_name}.\n\n"
+
+        # Inject prior QA findings from a failed full-stage attempt so the
+        # model avoids repeating the same classes of mistakes.
+        if prior_qa_findings:
+            task += (
+                "## CRITICAL: Previous QA Failures (DO NOT REPEAT THESE ISSUES)\n"
+                "A previous generation of this stage failed QA review after multiple\n"
+                "remediation attempts. The following issues could not be resolved.\n\n"
+                "NOTE: The file names and code structure below are from a previous\n"
+                "generation and may not match yours. Focus on the **underlying issues**\n"
+                "described — avoid the same classes of mistakes regardless of file\n"
+                "names or layout.\n\n"
+                f"{prior_qa_findings}\n\n"
+                "Generate this stage from scratch, ensuring these classes of issues\n"
+                "are avoided from the start.\n\n"
+            )
+
+        # Front-load the no-dead-code remote state directive so the model
+        # sees it BEFORE the architecture context (reduces unused data sources).
+        if is_iac and prev_context:
+            task += (
+                "## CRITICAL: CROSS-STAGE DEPENDENCIES — NO DEAD CODE\n"
+                "ONLY declare `terraform_remote_state` data sources for stages whose\n"
+                "outputs you actually reference in resource definitions or locals.\n"
+                "Do NOT declare remote state data sources 'for completeness' or 'in case needed.'\n"
+                "Every `data.terraform_remote_state` block MUST have at least one output\n"
+                "referenced in `locals.tf` or `main.tf`. If it doesn't, do not create it.\n\n"
+            )
+
+        task += (
             f"## Architecture Context\n{architecture}\n\n"
             f"## This Stage\n"
             f"Name: {stage_name}\n"
@@ -3272,7 +3344,13 @@ class BuildSession(SessionMixin):
         from azext_prototype.debug_log import log_flow as _dbg
 
         stage_num = stage["stage"]
-        orchestrator = AgentOrchestrator(self._registry, self._context)
+
+        _QA_CONTINUATION_PROMPT = (
+            "Your previous review was cut off. Continue your review "
+            "EXACTLY where you left off. Do NOT regenerate or emit "
+            "any code — only continue the review analysis and "
+            "provide your VERDICT."
+        )
 
         # Build context briefs once for all QA attempts
         services = stage.get("services", [])
@@ -3288,7 +3366,7 @@ class BuildSession(SessionMixin):
             # 2. Build QA task
             qa_task = self._build_qa_task(stage_num, stage["name"], attempt, file_content, qa_context, layer)
 
-            # 3. Run QA (with timeout/rate-limit retry)
+            # 3. Run QA (with timeout/rate-limit retry and continuation)
             from azext_prototype.ai.copilot_provider import (
                 CopilotRateLimitError,
                 CopilotTimeoutError,
@@ -3297,12 +3375,16 @@ class BuildSession(SessionMixin):
             qa_result = None
             max_attempts = len(self._TIMEOUT_BACKOFFS) + 1
             for qa_attempt in range(max_attempts):
+                # Save conversation history — QA messages must not
+                # leak into the generation context for subsequent stages.
+                saved_history = list(self._context.conversation_history)
                 try:
                     with self._maybe_spinner(f"QA reviewing Stage {stage_num}...", use_styled):
-                        qa_result = orchestrator.delegate(
-                            from_agent="build-session",
-                            to_agent_name=self._qa_agent.name,
-                            sub_task=qa_task,
+                        qa_result = self._execute_with_continuation(
+                            self._qa_agent,
+                            qa_task,
+                            max_continuations=3,
+                            continuation_prompt=_QA_CONTINUATION_PROMPT,
                         )
                     break
                 except CopilotRateLimitError as exc:
@@ -3319,6 +3401,8 @@ class BuildSession(SessionMixin):
                             f"Stage {stage_num} will be retried on next build."
                         )
                         return False
+                finally:
+                    self._context.conversation_history = saved_history
 
             if qa_result:
                 self._token_tracker.record(qa_result)
@@ -3340,6 +3424,7 @@ class BuildSession(SessionMixin):
 
             if not has_issues:
                 _print(f"       Stage {stage_num} passed QA.")
+                self._last_qa_content = ""
                 return True
 
             # 5. If at max attempts, report issues concisely and fail
@@ -3353,6 +3438,7 @@ class BuildSession(SessionMixin):
                         if stripped.startswith(("CRITICAL", "WARNING", "**CRITICAL", "**WARNING", "- [", "| ")):
                             _print(f"       {stripped}")
                 _print("")
+                self._last_qa_content = qa_content or ""
                 return False
 
             # 6. Remediate — re-invoke IaC agent with focused context + governance + knowledge
@@ -3405,7 +3491,7 @@ class BuildSession(SessionMixin):
             content = response.content if response else ""
             written_paths = self._write_stage_files(stage, content)
             written_paths = self._apply_stage_transforms(stage, written_paths, _print)
-            self._build_state.mark_stage_generated(stage_num, written_paths, agent.name)
+            self._build_state.mark_stage_validating(stage_num, written_paths)
 
         return True  # All remediation attempts completed without hitting max
 
@@ -3559,6 +3645,7 @@ class BuildSession(SessionMixin):
         stage_num: int = 0,
         stage_name: str = "",
         stage_capability: str = "",
+        continuation_prompt: str | None = None,
     ) -> Any:
         """Execute an agent task, automatically continuing if truncated.
 
@@ -3567,6 +3654,11 @@ class BuildSession(SessionMixin):
         an assistant message so the model can see what it already generated.
         A continuation prompt is then sent as a new user message, and the
         model picks up where it left off.
+
+        If *continuation_prompt* is provided it is used verbatim instead of
+        the default code-generation continuation text.  This is useful for
+        QA reviews where the continuation should request more review, not
+        more code.
         """
         from azext_prototype.ai.provider import AIMessage, AIResponse
 
@@ -3585,22 +3677,25 @@ class BuildSession(SessionMixin):
             # model sees what it already generated when continuing.
             self._context.conversation_history.append(AIMessage(role="assistant", content=response.content or ""))
 
-            # Include stage context so the model stays on track
-            stage_hint = ""
-            if stage_num and stage_name:
-                stage_hint = (
-                    f" You are generating Stage {stage_num}: {stage_name} "
-                    f"(layer: {stage_capability}). "
-                    "Stay within this stage's scope — do not generate content "
-                    "for any other stage."
-                )
+            if continuation_prompt:
+                cont_task = continuation_prompt
+            else:
+                # Include stage context so the model stays on track
+                stage_hint = ""
+                if stage_num and stage_name:
+                    stage_hint = (
+                        f" You are generating Stage {stage_num}: {stage_name} "
+                        f"(layer: {stage_capability}). "
+                        "Stay within this stage's scope — do not generate content "
+                        "for any other stage."
+                    )
 
-            cont_task = (
-                "Your previous response was cut off mid-generation. "
-                "Continue EXACTLY where you left off — do not repeat any "
-                "file or content already generated. Pick up mid-line if "
-                f"necessary. Maintain the same code block format.{stage_hint}"
-            )
+                cont_task = (
+                    "Your previous response was cut off mid-generation. "
+                    "Continue EXACTLY where you left off — do not repeat any "
+                    "file or content already generated. Pick up mid-line if "
+                    f"necessary. Maintain the same code block format.{stage_hint}"
+                )
             self._context.conversation_history.append(AIMessage(role="user", content=cont_task))
 
             cont = agent.execute(self._context, cont_task)
